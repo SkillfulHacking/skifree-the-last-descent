@@ -18,8 +18,10 @@ export interface GeoArrays {
   skinWeight: Float32Array;
   color: Float32Array;
   index: Uint32Array;
-  /** fur data: x = fur length (m), y = bareness 0..1, z = baked ambient occlusion */
+  /** fur data: x = fur length (m), y = bareness 0..1, z = baked ambient occlusion, w = strand coverage 0..1 */
   fur?: Float32Array;
+  /** fur comb (bind space): extra tip displacement per metre of fur length (fringe falling over the face) */
+  comb?: Float32Array;
   uv?: Float32Array;
 }
 
@@ -46,13 +48,13 @@ export interface QualityConfig {
 export function qualityConfig(q: QualityPreset): QualityConfig {
   switch (q) {
     case 'low':
-      return { bodyH: 0.04, headH: 0.016, limbH: 0.022, shells: 6, cards: 350 };
+      return { bodyH: 0.042, headH: 0.016, limbH: 0.022, shells: 6, cards: 350 };
     case 'medium':
-      return { bodyH: 0.042, headH: 0.015, limbH: 0.022, shells: 8, cards: 700 };
+      return { bodyH: 0.0445, headH: 0.015, limbH: 0.022, shells: 8, cards: 700 };
     case 'high':
-      return { bodyH: 0.036, headH: 0.0125, limbH: 0.019, shells: 12, cards: 1300 };
+      return { bodyH: 0.038, headH: 0.0125, limbH: 0.019, shells: 12, cards: 1300 };
     case 'ultra':
-      return { bodyH: 0.026, headH: 0.01, limbH: 0.013, shells: 22, cards: 2400 };
+      return { bodyH: 0.0272, headH: 0.01, limbH: 0.013, shells: 22, cards: 2400 };
   }
 }
 
@@ -143,7 +145,7 @@ const CARD_TABLE = Float32Array.from(BONE_NAMES.map((_, i) => CARDS_BY_BONE[base
 
 const COL = {
   under: [0.3, 0.31, 0.33],
-  skin: [0.17, 0.18, 0.215],
+  skin: [0.15, 0.142, 0.15],
   lip: [0.05, 0.05, 0.06],
   gum: [0.36, 0.1, 0.12],
   palate: [0.2, 0.05, 0.065],
@@ -157,7 +159,26 @@ interface VertAttr {
   col: number[];
   cards: number;
   ao: number;
+  /** strand density 0..1 (feathers the fur toward the face) */
+  cov: number;
+  /** fringe weight 0..1 (long overlapping hairs at the skin edge) */
+  fringe: number;
+  comb: [number, number, number];
 }
+
+/** comb direction for the facial fringe: over the edge toward the face centre, falling down */
+const FACE_C = new THREE.Vector3(0, 2.9, 0.44);
+function fringeComb(p: THREE.Vector3, n: THREE.Vector3, w: number, down: number): [number, number, number] {
+  const d = FACE_C.clone().sub(p);
+  d.y *= 0.6;
+  d.addScaledVector(n, -d.dot(n));
+  if (d.lengthSq() > 1e-8) d.normalize();
+  d.multiplyScalar(0.75).add(new THREE.Vector3(0, -down, 0.15));
+  d.addScaledVector(n, -d.dot(n) * 0.7);
+  return [d.x * w, d.y * w, d.z * w];
+}
+const nearEye = (p: THREE.Vector3): number =>
+  Math.min(p.distanceTo(EYE_CENTERS[0]), p.distanceTo(EYE_CENTERS[1]));
 
 const MY = MOUTH_POS.y;
 
@@ -171,6 +192,9 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
   }
   let bare = 0;
   let col = COL.under;
+  let cov = 1;
+  let fringe = 0;
+  let comb: [number, number, number] = [0, 0, 0];
   if (part === 'body') {
     const chest = n.z > 0.35 && p.y > 1.45 && p.y < 2.35 && Math.abs(p.x) < 0.5 ? 1 : 0;
     fur *= 1 - 0.3 * chest;
@@ -187,13 +211,32 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
     const fx = p.x / wx;
     const fy = (p.y - 2.9) / 0.135;
     // irregular hairline: fur creeps onto the cheeks in tufts
-    const r = Math.sqrt(fx * fx + fy * fy) + (vnoise(p.x * 40, p.y * 40, p.z * 40) - 0.5) * 0.28;
-    let face = (1 - smoothstep(0.8, 1.0, r)) * smoothstep(0.17, 0.23, p.z);
-    // forehead above the brow is furred
-    face *= 1 - smoothstep(3.02, 3.06, p.y) * 0.9;
-    // fur framing the face starts short and lengthens away from it
-    fur *= 0.35 + 0.65 * smoothstep(0.95, 1.5, r + (0.23 - Math.min(0.23, p.z)) * 4);
-    bare = face;
+    // (mirror-symmetric noise: an irregular but balanced hairline)
+    const r = Math.sqrt(fx * fx + fy * fy) + (vnoise(Math.abs(p.x) * 40, p.y * 40, p.z * 40) - 0.5) * 0.16;
+    // the pelt thins out gradually over ~6–12 cm toward the face (no hard mask edge)
+    const rr = r + (0.23 - Math.min(0.23, p.z)) * 3.5 + smoothstep(3.0, 3.06, p.y) * 0.8;
+    cov = smoothstep(0.52, 1.22, rr);
+    // eyes, nostrils and lips stay clear
+    cov *= smoothstep(0.035, 0.06, nearEye(p));
+    const noseD = Math.hypot(p.x / 0.09, (p.y - 2.89) / 0.055, (p.z - 0.41) / 0.06);
+    cov *= smoothstep(1.0, 1.6, noseD);
+    if (p.y < 2.835 && p.z > 0.32) cov *= 1 - smoothstep(0.32, 0.35, p.z);
+    // skin shows through where the fur is sparse
+    bare = 1 - smoothstep(0.08, 0.8, cov);
+    // fur framing the face starts short and lengthens away from it, with a band of long fringe hairs
+    // (brow, cheeks) at the thinning edge that falls over onto the skin
+    fur *= 0.45 + 0.55 * smoothstep(0.95, 1.6, rr);
+    fringe = cov > 0.02 ? Math.exp(-(((cov - 0.42) / 0.26) ** 2)) * smoothstep(0.2, 0.26, p.z + 0.06) : 0;
+    // eye shield: above and beside the eyes the hair is short and swept up/back so nothing droops into them
+    const ex = Math.abs(p.x) - 0.085;
+    const ey = p.y - 2.948;
+    const shield = p.z > 0.12 ? (1 - smoothstep(0.07, 0.13, Math.hypot(ex * 0.8, Math.max(0, ey) * 0.7, Math.min(0, ey) * 2.5))) : 0;
+    fringe *= 1 - shield;
+    fur *= 1 + fringe * 1.0;
+    fur = Math.min(fur, 0.018 + (fur - 0.018) * (1 - shield));
+    comb = fringeComb(p, n, fringe, 0.55);
+    comb[1] += 0.75 * shield;
+    comb[2] -= 0.35 * shield;
     col = COL.skin;
     // lips & nose: darker leather
     const nose = Math.hypot(p.x / 0.1, (p.y - 2.895) / 0.06, (p.z - 0.4) / 0.07);
@@ -205,23 +248,31 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
     }
     if (p.y < 2.88 && p.z < 0.25) fur *= 1.45; // ruff around the face / mane
     if (Math.abs(p.x) > 0.14 && p.z > 0.0) fur *= 1.3;
-    cards *= 1 - face;
+    cards *= smoothstep(0.7, 1.0, cov);
     // nothing may hang over the face from the forehead
     if (p.z > 0.08 && p.y > 2.9) cards = 0;
   } else if (part === 'jaw') {
     col = COL.skin;
-    const front = smoothstep(0.33, 0.375, p.z) * smoothstep(2.71, 2.75, p.y);
-    bare = front;
-    if (front > 0.3) col = COL.lip;
+    // only the lower lip rim is bare leather; the chin carries a beard that hangs over it
+    const lipRim = smoothstep(0.335, 0.365, p.z) * smoothstep(2.738, 2.758, p.y);
+    const chin = smoothstep(0.3, 0.35, p.z) * smoothstep(2.74, 2.7, p.y);
+    cov = (1 - lipRim) * (1 - 0.35 * smoothstep(0.33, 0.37, p.z) * (1 - chin));
+    if (lipRim > 0.3) col = COL.lip;
     if (p.y > MY - 0.03 && n.y > 0.2 && Math.abs(p.x) < 0.112 && p.z < 0.395) {
       // gum rim / floor of the mouth
       col = Math.abs(p.x) < 0.085 && p.y < MY - 0.005 ? COL.tongue : COL.gum;
-      bare = 1;
+      cov = 0;
     }
     // cheeks partially bare where the mouth stretches
-    if (Math.abs(p.x) > 0.09 && p.y > 2.77 && p.z > 0.21) bare = Math.max(bare, 0.5);
+    if (Math.abs(p.x) > 0.09 && p.y > 2.77 && p.z > 0.21) cov = Math.min(cov, 0.45);
+    bare = 1 - smoothstep(0.08, 0.8, cov);
     fur *= 1.2;
-    cards *= 1 - bare;
+    // beard: longer under the chin, combed down and slightly forward
+    const beard = smoothstep(2.78, 2.7, p.y) * smoothstep(0.12, 0.3, p.z) * cov;
+    fur *= 1 + 0.7 * beard;
+    fringe = beard;
+    comb = [0, -0.75 * beard, 0.25 * beard];
+    cards *= smoothstep(0.75, 1.0, cov);
   } else if (part.startsWith('hand')) {
     const s = part.endsWith('L') ? 1 : -1;
     const f = handFrame(s);
@@ -243,7 +294,9 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
     else if (p.z > 0.2) fur = 0.022;
     else fur = 0.05;
   }
-  return { fur: fur * (1 - bare), bare, col, cards: cards * (1 - bare), ao: 1 };
+  if (part !== 'head' && part !== 'jaw') cov = 1 - bare;
+  if (cov < 0.02) cov = 0;
+  return { fur: cov > 0 ? fur * (part === 'head' || part === 'jaw' ? 1 : 1 - bare) : 0, bare, col, cards: cards * (1 - bare), ao: 1, cov, fringe, comb };
 }
 
 function mixCol(a: number[], b: number[], t: number): number[] {
@@ -301,7 +354,8 @@ function mergeBody(parts: BuiltPart[]): GeoArrays {
     skinWeight: new Float32Array(vc * 4),
     color: new Float32Array(vc * 3),
     index: new Uint32Array(ic),
-    fur: new Float32Array(vc * 3),
+    fur: new Float32Array(vc * 4),
+    comb: new Float32Array(vc * 3),
   };
   let vo = 0;
   let io = 0;
@@ -317,9 +371,11 @@ function mergeBody(parts: BuiltPart[]): GeoArrays {
       const c = mixCol(COL.under, a.col, a.bare);
       const ao = a.ao * a.ao;
       out.color.set([c[0] * ao, c[1] * ao, c[2] * ao], (vo + v) * 3);
-      out.fur![(vo + v) * 3] = a.fur;
-      out.fur![(vo + v) * 3 + 1] = a.bare;
-      out.fur![(vo + v) * 3 + 2] = a.ao;
+      out.fur![(vo + v) * 4] = a.fur;
+      out.fur![(vo + v) * 4 + 1] = a.bare;
+      out.fur![(vo + v) * 4 + 2] = a.ao;
+      out.fur![(vo + v) * 4 + 3] = a.cov;
+      out.comb!.set(a.comb, (vo + v) * 3);
     }
     vo += n;
     io += p.indices.length;
@@ -479,7 +535,7 @@ function buildHard(): GeoArrays {
 
 // ---------------------------------------------------------------- eyes
 export const EYE_RADIUS = 0.025;
-export const EYE_CENTERS = [new THREE.Vector3(0.08, 2.947, 0.293), new THREE.Vector3(-0.08, 2.947, 0.293)];
+export const EYE_CENTERS = [new THREE.Vector3(0.085, 2.948, 0.305), new THREE.Vector3(-0.085, 2.948, 0.305)];
 
 function buildEyes(): GeoArrays {
   const g = new GeoBuilder();
@@ -491,8 +547,8 @@ function buildEyes(): GeoArrays {
     const up = new THREE.Vector3(0, 1, 0);
     const right = new THREE.Vector3().crossVectors(up, fwd).normalize();
     const up2 = new THREE.Vector3().crossVectors(fwd, right);
-    const W = 28;
-    const H = 20;
+    const W = 24;
+    const H = 16;
     const start = g.pos.length / 3;
     for (let i = 0; i <= H; i++) {
       const th = (i / H) * Math.PI; // angle from forward axis
@@ -580,7 +636,7 @@ function buildCards(body: GeoArrays, parts: BuiltPart[], count: number): GeoArra
     const v = pick();
     P.fromArray(body.position, v * 3);
     N.fromArray(body.normal, v * 3);
-    const fur = body.fur![v * 3];
+    const fur = body.fur![v * 4];
     let len = Math.min(0.38, Math.max(0.09, fur * 2.1 + 0.05)) * (0.7 + 0.6 * rnd());
     const width = len * (0.38 + 0.25 * rnd());
     if (N.z < -0.4 && P.y > 2.0) len *= 0.72; // keep the back hackles from spiking when hunched
@@ -631,7 +687,103 @@ function buildCards(body: GeoArrays, parts: BuiltPart[], count: number): GeoArra
       g.idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
     }
   }
+  buildFringe(g, body, parts, Math.round(count * 0.09), rnd, tints);
   return g.build();
+}
+
+/**
+ * Facial fringe: short, narrow locks rooted in the thinning band around the face (brow, cheeks, beard), combed
+ * over the edge of the bare skin so the fur → skin transition has overlapping hairs instead of a cut line.
+ */
+function buildFringe(g: GeoBuilder, body: GeoArrays, parts: BuiltPart[], count: number, rnd: () => number, tints: number[][]): void {
+  const cand: number[] = [];
+  const cw: number[] = [];
+  let total = 0;
+  let vo = 0;
+  for (const p of parts) {
+    const n = p.positions.length / 3;
+    if (p.name === 'head' || p.name === 'jaw') {
+      for (let v = 0; v < n; v++) {
+        const a = p.attrs[v];
+        if (a.fringe < 0.25 || a.cov < 0.15 || a.cov > 0.85 || a.fur < 0.02) continue;
+        total += a.fringe;
+        cand.push(vo + v);
+        cw.push(total);
+      }
+    }
+    vo += n;
+  }
+  if (!cand.length) return;
+  const P = new THREE.Vector3();
+  const N = new THREE.Vector3();
+  const C = new THREE.Vector3();
+  const SEG = 2;
+  let made = 0;
+  for (let tries = 0; made < count && tries < count * 8; tries++) {
+    const r = rnd() * total;
+    let lo = 0;
+    let hi = cw.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (cw[mid] < r) lo = mid + 1;
+      else hi = mid;
+    }
+    const v = cand[lo];
+    P.fromArray(body.position, v * 3);
+    N.fromArray(body.normal, v * 3);
+    C.fromArray(body.comb!, v * 3);
+    const fur = body.fur![v * 4];
+    if (P.y > 2.93 && P.z > 0.15) continue; // no locks from the brow
+    if (Math.hypot(Math.abs(P.x) - 0.125, P.y - 2.79, (P.z - 0.3) * 0.7) < 0.06) continue; // nor at the mouth corners
+    const len = Math.min(0.075, Math.max(0.03, fur * 0.9)) * (0.75 + 0.5 * rnd());
+    const dir = N.clone().multiplyScalar(0.22).addScaledVector(C, 1.1);
+    dir.add(new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).multiplyScalar(0.25)).normalize();
+    // the locks must never veil the eyes or plug the nostrils
+    const tip = P.clone().addScaledVector(dir, len);
+    const mid = P.clone().addScaledVector(dir, len * 0.5);
+    if (Math.min(nearEye(tip), nearEye(mid)) < 0.06) continue;
+    // nor cover them as seen from the front
+    const eye2d = (q: THREE.Vector3): number => Math.min(Math.hypot(q.x - 0.085, q.y - 2.948), Math.hypot(q.x + 0.085, q.y - 2.948));
+    if (tip.z > 0.22 && Math.min(eye2d(tip), eye2d(mid)) < 0.065) continue;
+    if (Math.hypot(tip.x / 0.09, (tip.y - 2.89) / 0.05, (tip.z - 0.41) / 0.06) < 1.2) continue;
+    if (tip.y < 2.84 && tip.y > 2.72 && tip.z > 0.33 && Math.abs(tip.x) < 0.13) continue;
+    made++;
+    const width = len * (0.3 + 0.15 * rnd());
+    let wax = new THREE.Vector3().crossVectors(dir, N);
+    if (wax.lengthSq() < 1e-4) wax.set(1, 0, 0);
+    wax.normalize().applyAxisAngle(dir, (rnd() - 0.5) * 0.8);
+    const col = tints[Math.floor(rnd() * tints.length)];
+    const bright = 0.8 + 0.2 * rnd();
+    const lock = Math.floor(rnd() * 4);
+    const si = [body.skinIndex[v * 4], body.skinIndex[v * 4 + 1], body.skinIndex[v * 4 + 2], body.skinIndex[v * 4 + 3]];
+    const sw = [body.skinWeight[v * 4], body.skinWeight[v * 4 + 1], body.skinWeight[v * 4 + 2], body.skinWeight[v * 4 + 3]];
+    const start = g.pos.length / 3;
+    let cur = P.clone().addScaledVector(N, -0.004);
+    let d = dir.clone();
+    for (let i = 0; i <= SEG; i++) {
+      const t = i / SEG;
+      if (i > 0) {
+        d = d.add(new THREE.Vector3(0, -0.3, 0)).addScaledVector(N, -0.15).normalize();
+        cur = cur.clone().addScaledVector(d, len / SEG);
+      }
+      const ao = 0.5 + 0.5 * t;
+      const cc = [col[0] * bright * ao, col[1] * bright * ao, col[2] * bright * ao];
+      const w = width * (1 - 0.45 * t) * 0.5;
+      for (const sgn of [-1, 1]) {
+        const p = cur.clone().addScaledVector(wax, sgn * w);
+        g.pos.push(p.x, p.y, p.z);
+        g.nrm.push(N.x, N.y, N.z);
+        g.col.push(cc[0], cc[1], cc[2]);
+        g.si.push(si[0], si[1], si[2], si[3]);
+        g.sw.push(sw[0], sw[1], sw[2], sw[3]);
+        g.uv.push((lock + (sgn < 0 ? 0.02 : 0.98)) / 4, 1 - t * 0.98);
+      }
+    }
+    for (let i = 0; i < SEG; i++) {
+      const a = start + i * 2;
+      g.idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+    }
+  }
 }
 
 // ---------------------------------------------------------------- entry
@@ -654,7 +806,7 @@ export function buildYetiGeometry(q: QualityPreset): YetiGeometrySet {
     const a = body.index[t];
     const b = body.index[t + 1];
     const c = body.index[t + 2];
-    if (Math.max(fl[a * 3], fl[b * 3], fl[c * 3]) > 0.007) si.push(a, b, c);
+    if (Math.max(fl[a * 4], fl[b * 4], fl[c * 4]) > 0.007) si.push(a, b, c);
   }
   const set: YetiGeometrySet = {
     body,
@@ -682,7 +834,8 @@ export function toBufferGeometry(a: GeoArrays): THREE.BufferGeometry {
   g.setAttribute('color', new THREE.BufferAttribute(a.color, 3));
   g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(a.skinIndex, 4));
   g.setAttribute('skinWeight', new THREE.BufferAttribute(a.skinWeight, 4));
-  if (a.fur) g.setAttribute('furData', new THREE.BufferAttribute(a.fur, 3));
+  if (a.fur) g.setAttribute('furData', new THREE.BufferAttribute(a.fur, 4));
+  if (a.comb) g.setAttribute('furComb', new THREE.BufferAttribute(a.comb, 3));
   if (a.uv) g.setAttribute('uv', new THREE.BufferAttribute(a.uv, 2));
   g.setIndex(new THREE.BufferAttribute(a.index, 1));
   return g;

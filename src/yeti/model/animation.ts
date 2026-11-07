@@ -29,6 +29,10 @@ export class PoseSample {
   readonly curl = [0, 0];
   readonly curl2 = [0, 0];
   readonly thumb = [0, 0];
+  /** 0..1 the foot is (authored as) bearing weight on the ground: drives foot locking & slope alignment */
+  readonly plant = [1, 1];
+  /** 0..1 the hand target is authored relative to the ground (knuckle-walking): it follows the terrain */
+  readonly handGround = [0, 0];
   jaw = 0;
   look = 0;
   lookPitch = 0;
@@ -56,6 +60,8 @@ export class PoseSample {
       this.curl[i] = 0.35;
       this.curl2[i] = 0.35;
       this.thumb[i] = 0.25;
+      this.plant[i] = 1;
+      this.handGround[i] = 0;
     }
     this.jaw = 0.02;
     this.look = 0;
@@ -84,6 +90,8 @@ export class PoseSample {
       this.curl[i] = o.curl[i];
       this.curl2[i] = o.curl2[i];
       this.thumb[i] = o.thumb[i];
+      this.plant[i] = o.plant[i];
+      this.handGround[i] = o.handGround[i];
     }
     this.jaw = o.jaw;
     this.look = o.look;
@@ -126,6 +134,8 @@ export class PoseSample {
       this.curl[i] = k(this.curl[i], o.curl[i]);
       this.curl2[i] = k(this.curl2[i], o.curl2[i]);
       this.thumb[i] = k(this.thumb[i], o.thumb[i]);
+      this.plant[i] = k(this.plant[i], o.plant[i]);
+      this.handGround[i] = k(this.handGround[i], o.handGround[i]);
     }
     this.jaw = k(this.jaw, o.jaw);
     this.look = k(this.look, o.look);
@@ -226,13 +236,36 @@ export interface GaitStyle {
 
 /** Bipedal walk / run. Strike: left foot at phase 0, right foot at 0.5. */
 export function bipedDuty(v: number): number {
-  return 0.66 - 0.3 * clamp((v - 1) / 7, 0, 1);
+  return 0.66 - 0.3 * clamp((v - 1) / 4, 0, 1);
 }
 export function bipedFreq(v: number): number {
   return 0.55 + 0.11 * v;
 }
 export function gallopFreq(v: number): number {
   return 1.2 + 0.06 * v;
+}
+export const CRAWL_DUTY = 0.68;
+/** longest distance a foot travels (relative to the body) while planted, m */
+const MAX_STANCE_TRAVEL = 1.35;
+const MAX_CRAWL_TRAVEL = 1.0;
+const MAX_GALLOP_TRAVEL = 1.3;
+const GALLOP_FOOT_DUTY = 0.24;
+export function crawlFreq(v: number): number {
+  return 0.55 + 0.4 * v;
+}
+/** Gait frequency (Hz) of a mode at ground speed v. Stride length is derived from it so that stride × frequency = v. */
+export function modeFreq(mode: YetiMode, v: number, gallopW: number): number {
+  if (mode === 'crawl') return Math.max(crawlFreq(v), (v * CRAWL_DUTY) / MAX_CRAWL_TRAVEL);
+  // the cadence rises when needed so the stance travel stays within the reach of the legs
+  const fb = Math.max(bipedFreq(v) * (mode === 'emerge' ? 0.85 : mode === 'turnAway' ? 0.9 : 1), (v * bipedDuty(v)) / MAX_STANCE_TRAVEL);
+  const fg = Math.max(gallopFreq(v), (v * GALLOP_FOOT_DUTY) / MAX_GALLOP_TRAVEL);
+  return fb * (1 - gallopW) + fg * gallopW;
+}
+/** Authored plant weight for a limb in a cyclic gait: 1 in stance, ramps 1→0 / 0→1 over the first/last 10 % of swing. */
+function gaitPlant(ph: number, duty: number): number {
+  if (ph < duty) return 1;
+  const u = (ph - duty) / (1 - duty);
+  return clamp(Math.max(1 - u / 0.1, (u - 0.9) / 0.1), 0, 1);
 }
 
 function biped(o: PoseSample, c: AnimCtx, st: GaitStyle): void {
@@ -241,7 +274,8 @@ function biped(o: PoseSample, c: AnimCtx, st: GaitStyle): void {
   const runK = smooth(3, 8, v);
   posture(o, st.hunch + 0.25 * runK);
   const duty = bipedDuty(v);
-  const len = Math.min(1.75, (v * duty) / Math.max(0.3, c.freq)) * amp;
+  // stride length × frequency = speed, so planted feet do not slide (amp only scales the flourish)
+  const len = Math.min(1.75, (v * duty) / Math.max(0.3, c.freq));
   const height = (0.14 + 0.035 * v) * amp * (1 - 0.3 * st.heavy);
   const P = c.phase;
   for (let i = 0; i < 2; i++) {
@@ -253,13 +287,22 @@ function biped(o: PoseSample, c: AnimCtx, st: GaitStyle): void {
     o.footPitch[i] = fc[2];
     o.toes[i] = -fc[2] * 0.7;
     o.knee[i].set(0.2 * s, 0, 1);
+    o.plant[i] = amp < 0.15 ? 1 : gaitPlant(ph, duty);
   }
   const C = Math.cos(TAU * P);
   // bob: dips after each foot strike
   const bobA = (0.035 + 0.012 * v) * amp * (1 + 0.6 * st.heavy);
   o.hips.y += -bobA * (0.5 + 0.5 * Math.cos(2 * TAU * (P - 0.1)));
+  // weight acceptance: a short sharp sag just after each heel strike, the mass of the torso and the
+  // dangling arms following a beat later (the head is stabilised by the look solver)
+  const ph2 = frac(2 * P);
+  const imp = Math.exp(-(((ph2 - 0.09) / 0.075) ** 2)) * amp * (0.4 + 0.6 * st.heavy) * (1 - 0.6 * runK);
+  o.hips.y += -0.045 * imp;
+  o.add('spine1', 0.05 * imp);
+  o.add('spine3', 0.035 * imp);
+  for (let i = 0; i < 2; i++) o.addSide('forearm', i, -0.08 * imp);
   o.hips.x += 0.055 * Math.sin(TAU * P) * amp * (1 - 0.7 * runK);
-  o.add('hips', 0.02 * v * amp, -0.13 * C * amp, 0.04 * Math.sin(TAU * P) * amp * (1 + st.heavy));
+  o.add('hips', 0.02 * v * amp, -0.13 * C * amp, 0.05 * Math.sin(TAU * P) * amp * (1 + st.heavy));
   o.add('spine2', 0.012 * v, 0.06 * C * amp);
   o.add('spine3', 0.01 * v, 0.09 * C * amp, -0.035 * Math.sin(TAU * P) * amp * (1 + st.heavy));
   o.add('spine1', 0.05 * st.heavy * Math.cos(2 * TAU * (P - 0.1)) * amp);
@@ -306,8 +349,10 @@ function gallop(o: PoseSample, c: AnimCtx): void {
   o.add('neck', -0.55 - 0.05 * und);
   o.add('head', -0.45);
   const hDuty = 0.32;
-  const fDuty = 0.3;
+  const fDuty = GALLOP_FOOT_DUTY;
+  // stance travel = speed × stance time for hands and feet alike (no skating)
   const len = Math.min(1.9, (v * hDuty) / Math.max(0.5, c.freq));
+  const lenF = Math.min(1.5, (v * fDuty) / Math.max(0.5, c.freq));
   for (let i = 0; i < 2; i++) {
     const s = SGN[i];
     // hands
@@ -324,9 +369,11 @@ function gallop(o: PoseSample, c: AnimCtx): void {
     o.curl[i] = 1.45 - 0.6 * reach;
     o.curl2[i] = 1.5 - 0.7 * reach;
     o.thumb[i] = 0.9;
+    o.handGround[i] = 1;
     // feet
     const pf = frac(P - 0.5 - (i === R ? 0.1 : 0));
-    footCycle(pf, fDuty, len * 0.85, 0.4, fc);
+    footCycle(pf, fDuty, lenF, 0.4, fc);
+    o.plant[i] = gaitPlant(pf, fDuty);
     o.foot[i].set(0.38 * s, 0.2 + fc[1], 0.12 + fc[0]);
     o.footPitch[i] = fc[2];
     o.toes[i] = -fc[2] * 0.7;
@@ -367,6 +414,7 @@ function lurk(o: PoseSample, t: number, c: AnimCtx): void {
     o.curl[i] = 1.35;
     o.curl2[i] = 1.4;
     o.thumb[i] = 0.9;
+    o.handGround[i] = 1;
   }
   o.look = 0.75;
   o.lookPitch = -0.08;
@@ -402,6 +450,7 @@ function grip(o: PoseSample, t: number, c: AnimCtx): void {
   o.palmDir[L].set(-0.4, 0, -1).normalize();
   o.curl[L] = 1.35;
   o.curl2[L] = 1.4;
+  o.handGround[L] = 1;
   for (let i = 0; i < 2; i++) {
     o.foot[i].set(0.4 * SGN[i], 0.2, 0.0 + (i === L ? 0.15 : -0.1));
     o.knee[i].set(0.5 * SGN[i], 0, 1);
@@ -412,18 +461,36 @@ function grip(o: PoseSample, t: number, c: AnimCtx): void {
   o.jaw = 0.08 + 0.05 * (0.5 + 0.5 * br);
 }
 
+/** Heavy, hunched step-out: long slow strides (stride × frequency = speed), the knees stay bent under the
+ * load, shoulders rolling over each planted foot, arms hanging low and swinging like dead weight. */
 function emerge(o: PoseSample, _t: number, c: AnimCtx): void {
-  biped(o, c, { hunch: 1.35, armSwing: 0.22, heavy: 1, slump: 0 });
-  const sway = Math.sin(TAU * c.phase);
+  biped(o, c, { hunch: 1.4, armSwing: 0.2, heavy: 1.35, slump: 0 });
+  const amp = smooth(0.05, 0.8, c.speed);
+  const P = c.phase;
+  const sway = Math.sin(TAU * P);
+  o.hips.y += -0.1 * amp;
+  // the torso rolls over the stance side, the head pushes forward and scans
+  o.add('spine2', 0, 0.05 * Math.cos(TAU * P) * amp, -0.05 * sway * amp);
   o.add('neck', 0.05, 0.06 * sway);
+  for (let i = 0; i < 2; i++) {
+    const s = SGN[i];
+    o.addSide('clav', i, 0, 0, -0.06 * s * amp);
+    o.addSide('upperArm', i, -0.12, 0, 0.05 * s);
+    o.foot[i].x += 0.04 * s;
+  }
+  o.lookPitch = -0.02;
   o.jaw = 0.12 + 0.05 * Math.sin(TAU * 0.4 * c.time);
 }
 
+/** Deliberate crouch-to-stand: the feet stay planted and the height comes from the legs and spine unfolding. */
 function stand(o: PoseSample, t: number, c: AnimCtx): void {
-  const u = smooth(0, 1.1, t);
+  const u = smooth(0.05, 1.1, t);
   const puff = smooth(0.8, 1.2, t) * (1 - 0.6 * smooth(1.3, 2.2, t));
-  posture(o, 1.25 * (1 - u) + 0.08);
-  o.hips.y += 0.02 * u;
+  posture(o, 1.4 * (1 - u) + 0.08);
+  // starts from the emerge crouch (knees bent under the load) and pushes up through the legs first
+  const legs = smooth(0.0, 0.75, t);
+  o.hips.y += -0.2 * (1 - legs) + 0.02 * u;
+  for (let i = 0; i < 2; i++) o.foot[i].x += 0.04 * SGN[i] * (1 - u);
   o.add('spine2', -0.07 * puff);
   o.add('spine3', -0.08 * puff);
   const br = Math.sin(TAU * 0.28 * c.time);
@@ -506,6 +573,7 @@ function leap(o: PoseSample, t: number, _c: AnimCtx): void {
     p.lerp(tucked, tuck);
     p.lerp(reach, ext);
     o.foot[i].copy(p);
+    o.plant[i] = 1 - air;
     o.footPitch[i] = 0.7 * launch * air - 0.3 * ext;
     o.knee[i].set(0.3 * s, 0, 1);
     // arms: swing back on crouch, throw forward/up on launch, spread for landing
@@ -533,6 +601,7 @@ function grab(o: PoseSample, t: number, _c: AnimCtx): void {
   const step = smooth(0, 0.3, t);
   o.foot[L].set(0.38, 0.2 + 0.25 * Math.sin(Math.PI * step), -0.04 + 0.55 * step);
   o.footPitch[L] = -0.25 * Math.sin(Math.PI * step);
+  o.plant[L] = Math.sin(Math.PI * step) > 0.12 ? 0 : 1;
   o.foot[R].set(-0.36, 0.2, -0.15 * u);
   // right arm lunges forward
   o.armIK[R] = 1;
@@ -642,6 +711,68 @@ function turnAway(o: PoseSample, _t: number, c: AnimCtx): void {
   o.jaw = 0.05;
 }
 
+/**
+ * Low all-fours prowl (lateral-sequence walk: hind L 0, fore L 0.25, hind R 0.5, fore R 0.75). Used for the
+ * approach from deep inside the cave. Heavy: the pelvis sways over the supporting hind leg, the shoulder
+ * blades roll up over each loaded hand, the head hangs low between the shoulders and scans.
+ */
+function crawl(o: PoseSample, _t: number, c: AnimCtx): void {
+  const v = c.speed;
+  const amp = smooth(0.03, 0.6, v);
+  const P = c.phase;
+  const br = Math.sin(TAU * 0.3 * c.time);
+  const duty = CRAWL_DUTY;
+  const len = Math.min(1.5, (v * duty) / Math.max(0.3, c.freq));
+  o.hips.y += -0.55 + 0.012 * br;
+  o.hips.z += -0.25;
+  o.add('hips', 0.82);
+  o.add('spine1', 0.3 + 0.015 * br);
+  o.add('spine2', 0.2 + 0.02 * br);
+  o.add('spine3', 0.04);
+  o.add('neck', -0.18);
+  o.add('head', -0.2);
+  const S = Math.sin(TAU * P);
+  // pelvis sways over the supporting hind leg and dips after each hind strike
+  o.hips.x += 0.05 * S * amp;
+  o.hips.y += -0.035 * amp * (0.5 + 0.5 * Math.cos(2 * TAU * (P - 0.1)));
+  o.add('hips', 0, -0.07 * Math.cos(TAU * P) * amp, 0.05 * S * amp);
+  // the chest rolls the other way, a quarter cycle later (fore limbs lead by 0.25)
+  o.add('spine3', 0.02 * Math.cos(2 * TAU * (P - 0.35)) * amp, 0.09 * Math.cos(TAU * (P - 0.25)) * amp, -0.06 * Math.sin(TAU * (P - 0.25)) * amp);
+  for (let i = 0; i < 2; i++) {
+    const s = SGN[i];
+    // hind feet
+    const pf = frac(P + i * 0.5);
+    footCycle(pf, duty, len, 0.16 * amp, fc);
+    o.foot[i].set(0.44 * s, 0.2 + fc[1], -0.02 + fc[0]);
+    o.footPitch[i] = fc[2] * 0.8;
+    o.toes[i] = -fc[2] * 0.6;
+    o.knee[i].set(0.6 * s, 0, 1);
+    o.plant[i] = amp < 0.15 ? 1 : gaitPlant(pf, duty);
+    // fore limbs: knuckle-walk
+    const ph = frac(P - 0.25 - i * 0.5);
+    footCycle(ph, duty, len, 0.2 * amp, fc);
+    const sw = ph >= duty ? (ph - duty) / (1 - duty) : 0;
+    const reach = Math.sin(Math.PI * sw);
+    const load = ph < duty ? Math.sin((Math.PI * ph) / duty) : 0;
+    o.armIK[i] = 1;
+    o.hand[i].set(0.6 * s, 0.33 + fc[1], 1.1 + fc[0]);
+    o.elbow[i].set(0.9 * s, 0.1, -1);
+    o.handAim[i] = 1;
+    o.handDir[i].set(0.05 * s, -1, 0.15 + 0.8 * reach).normalize();
+    o.palmDir[i].set(-0.35 * s, 0, -1).normalize();
+    o.curl[i] = 1.42 - 0.55 * reach;
+    o.curl2[i] = 1.45 - 0.6 * reach;
+    o.thumb[i] = 0.9;
+    o.handGround[i] = 1;
+    // shoulder blade rides up over the loaded arm, drops and rolls forward as it reaches
+    o.addSide('clav', i, 0, -0.1 * s * reach * amp, (0.1 * load - 0.04 * reach) * s * amp);
+  }
+  o.look = 0.75;
+  o.lookPitch = -0.02;
+  o.lookYaw = 0.14 * Math.sin(0.35 * c.time) + 0.04 * Math.sin(TAU * (P - 0.25)) * amp;
+  o.jaw = 0.1 + 0.05 * (0.5 + 0.5 * br);
+}
+
 function walk(o: PoseSample, _t: number, c: AnimCtx): void {
   biped(o, c, { hunch: 0.85, armSwing: 0.3, heavy: 0.5, slump: 0 });
 }
@@ -665,6 +796,9 @@ export function sampleMode(mode: YetiMode, o: PoseSample, t: number, c: AnimCtx)
       break;
     case 'grip':
       grip(o, t, c);
+      break;
+    case 'crawl':
+      crawl(o, t, c);
       break;
     case 'emerge':
       emerge(o, t, c);
@@ -699,4 +833,13 @@ export function sampleMode(mode: YetiMode, o: PoseSample, t: number, c: AnimCtx)
   }
 }
 
-export const GAIT_MODES: ReadonlySet<YetiMode> = new Set<YetiMode>(['walk', 'run', 'emerge', 'turnAway']);
+export const GAIT_MODES: ReadonlySet<YetiMode> = new Set<YetiMode>(['walk', 'run', 'emerge', 'turnAway', 'crawl']);
+
+/** Cross-fade duration (s) when switching from `from` to `to`. */
+export function crossfadeTime(from: YetiMode, to: YetiMode): number {
+  if (from === 'crawl' || to === 'crawl') return 0.9;
+  if (from === 'emerge' && to === 'stand') return 0.6;
+  if (from === 'grip' && to === 'emerge') return 0.6;
+  if (from === 'lurk' || to === 'lurk') return 0.6;
+  return 0.3;
+}

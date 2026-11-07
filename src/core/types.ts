@@ -52,8 +52,9 @@ export type YetiMode =
   | 'hidden'
   | 'lurk' // deep in cave: only eyes glint, slight sway
   | 'grip' // hand grips cave entrance edge, body still in shadow
-  | 'emerge' // steps out of the cave, hunched
-  | 'stand' // rises to full height
+  | 'crawl' // low all-fours prowl (approach from deep inside the cave); root translated along the floor at ~0.8–1.4 m/s
+  | 'emerge' // heavy hunched step-out of the cave (stride tied to speed)
+  | 'stand' // deliberate crouch-to-stand, feet planted (height comes from the skeleton unfolding)
   | 'roar' // chest out, arms wide, jaw wide open
   | 'walk'
   | 'run' // knuckle-gallop / powerful bipedal sprint depending on speed

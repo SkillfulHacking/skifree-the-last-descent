@@ -135,26 +135,27 @@ export function headPart(h: number): PartSpec {
   P.push(new Ellipsoid(V(0, 2.87, -0.01), V(0.18, 0.16, 0.16), hb).blend(0.08));
   P.push(new RoundCone(V(0, 2.58, -0.04), V(0, 2.86, 0.05), 0.19, 0.17, skinLerp(B.neck, B.head, 0.2, 1)).blend(0.1));
   for (const s of [1, -1]) {
-    // heavy brow ridge (two arcs meeting above the nose)
-    P.push(new RoundCone(V(0.17 * s, 2.995, 0.26), V(0.0, 2.985, 0.35), 0.052, 0.048, hb).blend(0.035));
+    // heavy brow ridge (two arcs meeting above the nose) with a shelf that overhangs each socket
+    P.push(new RoundCone(V(0.175 * s, 2.998, 0.265), V(0.0, 2.99, 0.355), 0.056, 0.05, hb).blend(0.035));
+    P.push(new Ellipsoid(V(0.09 * s, 2.991, 0.338), V(0.062, 0.024, 0.032), hb).blend(0.02));
     // cheekbones
     P.push(new Ellipsoid(V(0.135 * s, 2.915, 0.255), V(0.075, 0.055, 0.08), hb).blend(0.05));
     // jowls at the side of the muzzle
     P.push(new Ellipsoid(V(0.12 * s, 2.845, 0.27), V(0.075, 0.075, 0.09), hb).blend(0.05));
     // eye sockets (carved deep under the brow)
-    P.push(new Ellipsoid(V(0.08 * s, 2.946, 0.33), V(0.042, 0.03, 0.045), hb).subtract(0.016));
+    P.push(new Ellipsoid(V(0.079 * s, 2.946, 0.338), V(0.056, 0.032, 0.05), hb).subtract(0.016));
     // nostrils (carved, flared)
     P.push(new Ellipsoid(V(0.034 * s, 2.876, 0.432), V(0.021, 0.014, 0.024), hb).subtract(0.01));
     // nostril wings
     P.push(new Ellipsoid(V(0.05 * s, 2.885, 0.41), V(0.03, 0.026, 0.03), hb).blend(0.02));
     // heavy, angry upper lids: slope down toward the nose
-    P.push(new Ellipsoid(V(0.08 * s, 2.963, 0.298), V(0.04, 0.019, 0.034), hb, V(-0.42 * s, 1, 0)).blend(0.012).after());
+    P.push(new Ellipsoid(V(0.084 * s, 2.964, 0.304), V(0.04, 0.019, 0.034), hb, V(-0.42 * s, 1, 0)).blend(0.012).after());
   }
   // prognathic muzzle
   P.push(new Ellipsoid(V(0, 2.855, 0.3), V(0.145, 0.09, 0.125), hb).blend(0.06));
   // broad flat nose + bridge
-  P.push(new Ellipsoid(V(0, 2.9, 0.392), V(0.08, 0.048, 0.048), hb).blend(0.035));
-  P.push(new RoundCone(V(0, 2.975, 0.335), V(0, 2.925, 0.39), 0.033, 0.036, hb).blend(0.03));
+  P.push(new Ellipsoid(V(0, 2.896, 0.394), V(0.08, 0.046, 0.048), hb).blend(0.035));
+  P.push(new RoundCone(V(0, 2.975, 0.336), V(0, 2.925, 0.392), 0.021, 0.031, hb).blend(0.03));
   // upper lip
   P.push(new Ellipsoid(V(0, 2.81, 0.36), V(0.13, 0.048, 0.078), hb).blend(0.04));
   return {

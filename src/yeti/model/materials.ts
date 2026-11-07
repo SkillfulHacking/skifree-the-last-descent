@@ -37,6 +37,50 @@ vec4 yCell(vec3 p) {
 }
 `;
 
+/**
+ * Procedural facial relief in bind space (metres): negative = crease. Crow's feet and under-eye folds,
+ * horizontal nose-bridge creases, brow furrows, deep snarl (nasolabial) folds, vertical lip wrinkles, pores.
+ */
+const WRINKLE_GLSL = /* glsl */ `
+float ySegDist(vec2 p, vec2 a, vec2 b) {
+  vec2 pa = p - a, ba = b - a;
+  float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  return length(pa - ba * h);
+}
+float yWrinkle(vec3 p) {
+  float h = 0.0;
+  float ax = abs(p.x);
+  // irregularity: every family of folds is broken up by low-frequency noise
+  float m1 = smoothstep(0.25, 0.75, yNoise(p * 55.0 + 3.1));
+  float m2 = smoothstep(0.3, 0.8, yNoise(p * 38.0 + 7.7));
+  float jit = (yNoise(p * 140.0) - 0.5) * 2.0;
+  // eyes: radial crow's feet on the outer side, two soft folds under the eye
+  vec2 e = vec2(ax - 0.085, p.y - 2.948);
+  float d = length(e * vec2(1.0, 1.25));
+  float ring = smoothstep(0.03, 0.04, d) * (1.0 - smoothstep(0.05, 0.068, d));
+  float ang = atan(e.y, e.x);
+  float outer = smoothstep(0.005, 0.03, e.x);
+  h -= ring * outer * pow(abs(sin(ang * 9.0 + jit * 0.8)), 8.0) * 0.35 * (0.5 + 0.5 * m1);
+  float below = smoothstep(-0.004, -0.025, e.y) * (1.0 - smoothstep(0.02, 0.05, abs(e.x)));
+  h -= ring * below * pow(0.5 + 0.5 * sin(d * 260.0 + jit), 6.0) * 0.3;
+  // nose bridge: a few horizontal creases between the eyes
+  float bridge = exp(-pow(p.x / 0.028, 2.0)) * smoothstep(2.935, 2.95, p.y) * (1.0 - smoothstep(2.975, 2.99, p.y));
+  h -= bridge * pow(0.5 + 0.5 * sin(p.y * 470.0 + jit * 1.5), 6.0) * 0.4 * (0.4 + 0.6 * m2);
+  // snarl folds from the nostril wings down past the mouth corners (the one strong crease)
+  float sd = ySegDist(vec2(ax, p.y), vec2(0.062, 2.885), vec2(0.122, 2.8)) + jit * 0.0015;
+  float front = smoothstep(0.27, 0.33, p.z);
+  h -= exp(-pow(sd / 0.007, 2.0)) * front * 0.9;
+  h += exp(-pow((sd - 0.012) / 0.009, 2.0)) * front * 0.18;
+  // upper lip: faint, irregular vertical wrinkles
+  float lip = smoothstep(2.8, 2.81, p.y) * (1.0 - smoothstep(2.835, 2.85, p.y)) * smoothstep(0.35, 0.375, p.z);
+  h -= lip * pow(0.5 + 0.5 * sin(p.x * 330.0 + jit * 2.0), 8.0) * 0.18 * m1;
+  // pores + leathery grain
+  h -= pow(yNoise(p * 1100.0), 6.0) * 0.45;
+  h += (yNoise(p * 260.0) - 0.5) * 0.14 + (yNoise(p * 90.0) - 0.5) * 0.12;
+  return h;
+}
+`;
+
 export interface FurUniforms {
   uShells: THREE.IUniform<number>;
   uFurScale: THREE.IUniform<number>;
@@ -72,7 +116,8 @@ export function createShellMaterial(u: FurUniforms): THREE.MeshStandardMaterial 
         '#include <common>',
         /* glsl */ `#include <common>
 attribute float shell;
-attribute vec3 furData;
+attribute vec4 furData;
+attribute vec3 furComb;
 uniform float uShells;
 uniform float uFurScale;
 uniform vec3 uGravity;
@@ -80,7 +125,8 @@ uniform vec3 uMotion;
 varying vec3 vFurP;
 varying float vFurH;
 varying float vFurLen;
-varying float vFurAO;`,
+varying float vFurAO;
+varying float vFurCov;`,
       )
       .replace(
         '#include <skinning_vertex>',
@@ -88,12 +134,19 @@ varying float vFurAO;`,
   float fh = (shell + 1.0) / uShells;
   float fl = furData.x * uFurScale;
   vec3 fn = normalize(objectNormal);
-  // strands rise along the normal, then droop under gravity / trail with motion
-  transformed += fn * (fh * fl) + (uGravity + uMotion) * (fh * fh * fl);
+  #ifdef USE_SKINNING
+    vec3 fcomb = (skinMatrix * vec4(furComb, 0.0)).xyz;
+  #else
+    vec3 fcomb = furComb;
+  #endif
+  // strands rise along the normal, then droop under gravity / trail with motion; facial fringe hairs are
+  // combed over the edge of the skin
+  transformed += fn * (fh * fl) + (uGravity + uMotion + fcomb) * (fh * fh * fl);
   vFurP = position;
   vFurH = fh;
   vFurLen = fl;
-  vFurAO = furData.z;`,
+  vFurAO = furData.z;
+  vFurCov = furData.w;`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
@@ -107,12 +160,13 @@ varying vec3 vFurP;
 varying float vFurH;
 varying float vFurLen;
 varying float vFurAO;
+varying float vFurCov;
 ${NOISE_GLSL}`,
       )
       .replace(
         '#include <color_fragment>',
         /* glsl */ `#include <color_fragment>
-  if (vFurLen < 0.007) discard;
+  if (vFurLen < 0.007 || vFurCov < 0.01) discard;
   vec3 P = vFurP;
   // clumping: strands converge toward clump centres toward their tips
   vec4 cl = yCell(P * uClumpDensity);
@@ -121,11 +175,14 @@ ${NOISE_GLSL}`,
   vec3 Pc = P + (cpos - P) * clump * vFurH;
   vec4 st = yCell(Pc * uDensity);
   float d = length(st.xyz - Pc * uDensity);
+  // sparse pelt toward the face: drop strands by id (density feathers out, no hard edge)
+  if (fract(st.w * 31.71) > vFurCov) discard;
   float hmax = mix(0.5, 1.0, fract(st.w * 17.31));
   // shorter fur gets thicker strands (reads as dense pelt)
   float tH = vFurH / hmax;
   if (tH > 1.0) discard;
-  float radius = 0.78 * (1.0 - pow(tH, 1.25));
+  // sparse strands toward the face are also finer, so the thinning reads as single hairs over skin
+  float radius = 0.78 * (1.0 - pow(tH, 1.25)) * mix(0.5, 1.0, smoothstep(0.0, 0.8, vFurCov));
   if (d > radius) discard;
   float n1 = yNoise(P * 2.1);
   float n2 = yNoise(P * 6.3 + 3.7);
@@ -147,7 +204,7 @@ ${NOISE_GLSL}`,
   #include <opaque_fragment>`,
       );
   };
-  m.customProgramCacheKey = () => 'yeti-shell-fur-v1';
+  m.customProgramCacheKey = () => 'yeti-shell-fur-v2';
   return m;
 }
 
@@ -160,15 +217,21 @@ export function createSkinMaterial(): THREE.MeshStandardMaterial {
       .replace(
         '#include <common>',
         `#include <common>
-attribute vec3 furData;
+attribute vec4 furData;
 varying vec3 vSkinP;
-varying float vBare;`,
+varying float vBare;
+varying mat3 vB2V;`,
       )
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
   vSkinP = position;
-  vBare = furData.y;`,
+  vBare = furData.y;
+  #ifdef USE_SKINNING
+    vB2V = normalMatrix * mat3(skinMatrix);
+  #else
+    vB2V = normalMatrix;
+  #endif`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
@@ -176,35 +239,46 @@ varying float vBare;`,
         `#include <common>
 varying vec3 vSkinP;
 varying float vBare;
-${NOISE_GLSL}`,
+varying mat3 vB2V;
+${NOISE_GLSL}
+${WRINKLE_GLSL}`,
       )
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
   float sn = yNoise(vSkinP * 90.0) * 0.6 + yNoise(vSkinP * 260.0) * 0.4;
   float blot = yNoise(vSkinP * 14.0);
-  diffuseColor.rgb *= mix(1.0, 0.82 + 0.3 * sn, vBare) * (0.9 + 0.2 * blot);`,
+  diffuseColor.rgb *= mix(1.0, 0.86 + 0.2 * sn, vBare) * (0.95 + 0.1 * blot);
+  // wrinkles & pores (bind space) on bare skin: height + gradient by central differences
+  float yWr = 0.0;
+  vec3 yWrG = vec3(0.0);
+  if (vBare > 0.02) {
+    const float he = 0.0012;
+    yWr = yWrinkle(vSkinP);
+    yWrG = vec3(yWrinkle(vSkinP + vec3(he, 0.0, 0.0)), yWrinkle(vSkinP + vec3(0.0, he, 0.0)), yWrinkle(vSkinP + vec3(0.0, 0.0, he))) - yWr;
+    yWrG /= he;
+    // creases and pores collect darkness, ridges catch a little light
+    diffuseColor.rgb *= mix(1.0, clamp(1.0 + 0.7 * yWr, 0.55, 1.1), vBare);
+  }`,
       )
       .replace(
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>
-  roughnessFactor = mix(0.95, 0.42 + 0.25 * sn, vBare);`,
+  // greasy leather: shinier on the ridges, matte in the creases
+  roughnessFactor = mix(0.95, 0.6 + 0.2 * sn - 0.2 * clamp(yWr, -0.4, 0.4), vBare);`,
       )
       .replace(
         '#include <normal_fragment_maps>',
         `#include <normal_fragment_maps>
-  {
-    // leathery wrinkles: perturb the normal with noise gradient on bare skin
-    float e = 0.004;
-    vec3 q = vSkinP * 70.0;
-    float n0 = yNoise(q);
-    vec3 g = vec3(yNoise(q + vec3(e*70.0,0,0)) - n0, yNoise(q + vec3(0,e*70.0,0)) - n0, yNoise(q + vec3(0,0,e*70.0)) - n0);
-    vec3 gv = (viewMatrix * vec4(g, 0.0)).xyz;
-    normal = normalize(normal - gv * 1.6 * vBare);
+  if (vBare > 0.02) {
+    // wrinkle / pore relief: bind-space height gradient carried to view space through the skinning
+    vec3 gv = vB2V * yWrG;
+    gv -= normal * dot(gv, normal);
+    normal = normalize(normal - gv * 0.0024 * vBare);
   }`,
       );
   };
-  m.customProgramCacheKey = () => 'yeti-skin-v1';
+  m.customProgramCacheKey = () => 'yeti-skin-v2';
   return m;
 }
 
@@ -333,19 +407,25 @@ export function createEyeMaterial(): EyeMaterial {
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
-  totalEmissiveRadiance = emissive * vColor.rgb * vColor.rgb * uGlow * 16.0;`,
+  // both eyes share one glow; a faint self-illumination of the iris keeps them alive in shadowed sockets
+  float yFace = saturate(dot(normal, isOrthographic ? vec3(0.0, 0.0, 1.0) : normalize(-vViewPosition)));
+  totalEmissiveRadiance = emissive * vColor.rgb * vColor.rgb * (uGlow * 16.0 + 0.9) * (0.55 + 0.45 * yFace);`,
       )
       .replace(
         '#include <opaque_fragment>',
         `{
     // fixed key glint so the eyes always catch a highlight, even deep in the sockets
+    // (a key glint plus a near-camera catch-light, both in view space: whichever part of each eye is visible
+    // gets one, so neither eye reads dead from a 3/4 view)
     vec3 r = reflect(-geometryViewDir, normal);
     float gl = pow(saturate(dot(r, normalize(vec3(0.35, 0.55, 0.75)))), 160.0);
-    outgoingLight += vec3(1.0, 0.97, 0.9) * gl * 1.6;
+    float gc = pow(saturate(dot(r, normalize(vec3(0.12, 0.3, 1.0)))), 420.0);
+    float wet = pow(1.0 - yFace, 3.0) * 0.12;
+    outgoingLight += vec3(1.0, 0.97, 0.9) * (gl * 1.6 + gc * 2.2) + vec3(0.8, 0.85, 0.9) * wet;
   }
   #include <opaque_fragment>`,
       );
   };
-  m.customProgramCacheKey = () => 'yeti-eyes-v1';
+  m.customProgramCacheKey = () => 'yeti-eyes-v2';
   return { material: m, glow };
 }

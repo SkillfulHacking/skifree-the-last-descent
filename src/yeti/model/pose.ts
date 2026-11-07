@@ -43,6 +43,8 @@ export class PoseSolver {
   readonly mq: THREE.Quaternion[] = [];
   readonly mp: THREE.Vector3[] = [];
   readonly hipsOffset = new THREE.Vector3();
+  /** total (thigh + shin) length of each leg */
+  readonly legLen: number[];
   private legs: Chain[];
   private arms: Chain[];
   private handInv: THREE.Quaternion[];
@@ -82,6 +84,7 @@ export class PoseSolver {
       mk(B.thighL, B.shinL, B.footL, new THREE.Vector3(0, 0, 1)),
       mk(B.thighR, B.shinR, B.footR, new THREE.Vector3(0, 0, 1)),
     ];
+    this.legLen = this.legs.map((c) => c.la + c.lb);
     this.arms = [
       mk(B.upperArmL, B.forearmL, B.handL, new THREE.Vector3(0, 0, -1)),
       mk(B.upperArmR, B.forearmR, B.handR, new THREE.Vector3(0, 0, -1)),
@@ -126,6 +129,11 @@ export class PoseSolver {
     else this.local[i].slerp(this.tq, weight);
   }
 
+  /** Re-solve arm k (0 = L) so its wrist reaches `target` (model space), elbow toward `pole`. */
+  solveArm(k: number, target: THREE.Vector3, pole: THREE.Vector3): void {
+    this.solveChain(this.arms[k], target, pole, 1);
+  }
+
   private solveChain(ch: Chain, target: THREE.Vector3, pole: THREE.Vector3, weight: number): void {
     if (weight <= 1e-3) return;
     const pA = this.mp[ch.a];
@@ -150,7 +158,14 @@ export class PoseSolver {
     this.fk();
   }
 
+  /** Full solve without terrain adaptation (flat ground at y = 0). */
   apply(s: PoseSample): void {
+    this.applyFK(s);
+    this.solveRest(s, null);
+  }
+
+  /** Step 1: forward kinematics from the sample's euler offsets and hips offset. */
+  applyFK(s: PoseSample): void {
     // 1. FK from eulers
     for (let i = 0; i < BONE_COUNT; i++) {
       _e.set(s.rot[i * 3], s.rot[i * 3 + 1], s.rot[i * 3 + 2], 'XYZ');
@@ -168,7 +183,13 @@ export class PoseSolver {
     }
     this.hipsOffset.copy(s.hips);
     this.fk();
+  }
 
+  /**
+   * Steps 2–4: head look, leg IK and arm IK. `feet` (optional) overrides the leg IK targets with terrain-adapted
+   * ankle positions and model-space foot orientations.
+   */
+  solveRest(s: PoseSample, feet: { ankle: THREE.Vector3[]; q: THREE.Quaternion[] } | null): void {
     // 2. head stabilisation / look
     if (s.look > 1e-3) {
       _e.set(s.lookPitch, s.lookYaw, s.lookRoll, 'YXZ');
@@ -184,10 +205,12 @@ export class PoseSolver {
     // 3. legs (always IK) + foot alignment
     for (let k = 0; k < 2; k++) {
       const ch = this.legs[k];
-      this.solveChain(ch, s.foot[k], s.knee[k], 1);
-      _e.set(s.footPitch[k], s.footYaw[k], 0, 'YXZ');
-      const fq = new THREE.Quaternion().setFromEuler(_e);
-      this.setLocalFromModel(ch.c, fq, 1);
+      this.solveChain(ch, feet ? feet.ankle[k] : s.foot[k], s.knee[k], 1);
+      if (feet) this.setLocalFromModel(ch.c, feet.q[k], 1);
+      else {
+        _e.set(s.footPitch[k], s.footYaw[k], 0, 'YXZ');
+        this.setLocalFromModel(ch.c, this.tq2.setFromEuler(_e), 1);
+      }
       const toes = k === L ? B.toesL : B.toesR;
       this.local[toes].setFromAxisAngle(_x.set(1, 0, 0), s.toes[k]);
     }
