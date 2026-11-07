@@ -193,7 +193,7 @@ ${NOISE_GLSL}`,
   fc = mix(fc, grey, smoothstep(0.5, 0.85, n2) * 0.55 + smoothstep(0.6, 0.95, cl.w) * 0.2);
   fc *= 0.82 + 0.28 * fract(st.w * 7.13);
   float ao = mix(0.32, 1.0, pow(vFurH, 0.7)) * mix(vFurAO, 1.0, 0.35 + 0.65 * vFurH);
-  diffuseColor.rgb = fc * ao;`,
+  diffuseColor.rgb = fc * ao * diffuse; // diffuse = material.color (white; scaled by setShade)`,
       )
       .replace(
         '#include <opaque_fragment>',

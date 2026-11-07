@@ -235,6 +235,8 @@ export class CaveCinematic {
     const b = P[i + 1] ?? a;
     const f = a.s === b.s ? 0 : Math.min(1, Math.max(0, (a.s - s) / (a.s - b.s)));
     const root = this.st.yeti.root;
+    // deeper in the tunnel = darker (the sky light cannot reach in there)
+    this.st.yeti.setShade(1 - 0.88 * Math.min(1, Math.max(0, (s - 0.5) / 6)));
     root.position.lerpVectors(a.p, b.p, f);
     root.position.y = this.st.world.cave.floorHeightAt(root.position.x, root.position.z);
     const dx = b.p.x - a.p.x;
@@ -246,6 +248,7 @@ export class CaveCinematic {
   finish() {
     const st = this.st;
     st.yeti.setEyeGlow(0);
+    st.yeti.setShade(1);
     st.world.env.setAmbientScale(1);
     st.world.env.sun.intensity = this.sunBase;
     st.world.terrain.uniforms.uCloudShadow.value = 1;

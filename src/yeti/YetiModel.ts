@@ -390,6 +390,33 @@ export class YetiModel {
     return this.toWorld(this.solver.pointOn(bone, this.palmBind[i], new THREE.Vector3()), target);
   }
 
+  private shadeBase: Map<THREE.Material, { color: THREE.Color | null; env: number }> | null = null;
+  /**
+   * Darken the Yeti's lighting response (1 = normal, 0 = black) — for standing deep inside a cave,
+   * where the heightfield sky light would otherwise light the white fur like a stage. The eyes'
+   * glow is unaffected (it is emissive).
+   */
+  setShade(k: number): void {
+    k = THREE.MathUtils.clamp(k, 0, 1);
+    if (!this.shadeBase) {
+      this.shadeBase = new Map();
+      this.root.traverse((o) => {
+        const mats = (o as THREE.Mesh).material;
+        if (!mats) return;
+        for (const m of Array.isArray(mats) ? mats : [mats]) {
+          const sm = m as THREE.MeshStandardMaterial;
+          if (this.shadeBase!.has(m) || !('envMapIntensity' in sm)) continue;
+          this.shadeBase!.set(m, { color: sm.color ? sm.color.clone() : null, env: sm.envMapIntensity ?? 1 });
+        }
+      });
+    }
+    for (const [m, b] of this.shadeBase) {
+      const sm = m as THREE.MeshStandardMaterial;
+      if (b.color) sm.color.copy(b.color).multiplyScalar(k);
+      sm.envMapIntensity = b.env * k;
+    }
+  }
+
   setEyeGlow(v: number): void {
     this.eyeGlow.value = THREE.MathUtils.clamp(v, 0, 1);
   }
