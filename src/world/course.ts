@@ -7,6 +7,7 @@
  */
 import { clamp, fbm, gnoise, ridged, smoothstep, Rng } from '../core/rng';
 import type { SurfaceType } from '../core/types';
+import { CAVE_D, caveTerrainHeight, CAVE_INFLUENCE_Z, type CaveAnchor } from './caveTerrain';
 
 export const COURSE = {
   startZ: 0,
@@ -196,21 +197,21 @@ export function generateFeatures(seed: number): CourseFeatures {
 }
 
 // --- cave cliff -----------------------------------------------------------------
-/** Lateral offset (from centreline) of the cave cliff base. */
-export const CAVE_D = 46;
-/** The cave floor sits this far above the surrounding slope (a rocky ledge). */
-export const CAVE_FLOOR_RAISE = 1.6;
-export function caveMouthXZ(): { x: number; z: number } {
-  return { x: centerX(COURSE.caveZ) + CAVE_D + 2, z: COURSE.caveZ };
+export { CAVE_D, CAVE_FLOOR_RAISE } from './caveTerrain';
+/** The default (classic course) cave anchor. */
+export function defaultCaveAnchor(): CaveAnchor {
+  return { z: COURSE.caveZ, centerX: centerX(COURSE.caveZ), side: 1, d: CAVE_D };
 }
 
 // --- the heightfield ------------------------------------------------------------
 export class Mountain {
   readonly seed: number;
   readonly features: CourseFeatures;
+  readonly caves: CaveAnchor[];
   constructor(seed = SEED_DEFAULT) {
     this.seed = seed;
     this.features = generateFeatures(seed);
+    this.caves = [defaultCaveAnchor()];
   }
 
   /** Terrain height at world (x, z). */
@@ -289,18 +290,8 @@ export class Mountain {
       h += c.drop * plateau * lm;
     }
 
-    // the cave cliff on +X side
-    const cz = Math.abs(z - COURSE.caveZ);
-    if (cz < 120 && d > CAVE_D - 14) {
-      const zm = 1 - smoothstep(55, 120, cz);
-      const rise = smoothstep(CAVE_D - 2, CAVE_D + 6, d);
-      // the cliff is lower right around the mouth so the tunnel's rock hood can cap it
-      const cliffH = 28 - 17 * (1 - smoothstep(9, 26, cz)) * smoothstep(CAVE_D - 6, CAVE_D + 2, d) * (1 - smoothstep(CAVE_D + 24, CAVE_D + 40, d));
-      const cliff = zm * (cliffH * rise + 6 * smoothstep(CAVE_D - 14, CAVE_D - 2, d) + ridged(x / 14, z / 14, s + 9, 3) * 6 * rise);
-      // the cave: a notch cut into the cliff at floor level (the tunnel mesh forms walls/ceiling)
-      const notch = (1 - smoothstep(4.0, 6.0, cz)) * smoothstep(CAVE_D - 7, CAVE_D - 4, d) * (1 - smoothstep(CAVE_D + 27, CAVE_D + 30, d));
-      h += cliff * (1 - notch) + notch * CAVE_FLOOR_RAISE;
-    }
+    // caves cut into cliffs (terrain cut and cave mesh share src/world/caveTerrain.ts)
+    for (const c of this.caves) if (Math.abs(z - c.z) < CAVE_INFLUENCE_Z) h = caveTerrainHeight(c, x, z, d, h, s);
 
     // resort: flatten the run-out
     if (z > 3000) {

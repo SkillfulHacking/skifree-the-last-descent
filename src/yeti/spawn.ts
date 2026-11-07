@@ -1,18 +1,19 @@
 import * as THREE from 'three';
-import { COURSE, Mountain, caveMouthXZ, centerX } from '../world/course';
+import { Mountain, centerX } from '../world/course';
+import { caveMouthXZ, type CaveAnchor } from '../world/caveTerrain';
 
 /**
  * Where the Yeti stands at the end of the cave cinematic (on the ledge in the cave mouth),
  * and the leap that carries it down onto the slope when the chase begins.
  */
-export function yetiSpawnAfterCinematic(m: Mountain): { pos: THREE.Vector3; heading: number; leap: THREE.Vector3 } {
-  const c = caveMouthXZ();
+export function yetiSpawnAfterCinematic(m: Mountain, anchor: CaveAnchor = m.caves[0]!): { pos: THREE.Vector3; heading: number; leap: THREE.Vector3 } {
+  const c = caveMouthXZ(anchor);
   const x = c.x - 3;
   const z = c.z + 1;
   const pos = new THREE.Vector3(x, m.heightAt(x, z), z);
   // leap toward the piste, slightly downhill
-  const tx = centerX(COURSE.caveZ + 14) + 18;
-  const tz = COURSE.caveZ + 14;
+  const tx = centerX(anchor.z + 14) + 18 * anchor.side;
+  const tz = anchor.z + 14;
   const heading = Math.atan2(tx - x, tz - z);
   const dist = Math.hypot(tx - x, tz - z);
   const flight = 1.0;

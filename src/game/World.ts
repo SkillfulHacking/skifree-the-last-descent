@@ -4,7 +4,8 @@
  */
 import * as THREE from 'three';
 import type { QualityPreset } from '../core/types';
-import { COURSE, Mountain, SEED_DEFAULT, caveMouthXZ, routeX } from '../world/course';
+import { COURSE, Mountain, SEED_DEFAULT, routeX } from '../world/course';
+import { caveMouthXZ } from '../world/caveTerrain';
 import { generateObstacles, type ObstacleField } from '../physics/obstacles';
 import { TerrainRenderer } from '../world/TerrainRenderer';
 import { Vegetation } from '../world/Vegetation';
@@ -39,14 +40,14 @@ export class World {
     this.mountain = new Mountain(seed);
     this.obstacles = generateObstacles(this.mountain, seed);
     this.terrain = new TerrainRenderer(this.mountain, quality);
-    const cm = caveMouthXZ();
+    const cm = caveMouthXZ(this.mountain.caves[0]!);
     this.terrain.pinned.push({ x: cm.x + 10, z: cm.z, r: 20 });
     this.scene.add(this.terrain.group);
     this.env = new Environment(this.scene, renderer, quality);
     this.terrain.uniforms.uSunDir.value.copy(this.env.sunDir);
     this.vegetation = new Vegetation(this.mountain, this.obstacles.list, quality, seed);
     this.scene.add(this.vegetation.group);
-    this.cave = new Cave(this.mountain);
+    this.cave = new Cave(this.mountain, this.mountain.caves[0]!);
     this.scene.add(this.cave.group);
     this.footprints = new Footprints(this.mountain, 120);
     this.yetiPrints = new Footprints(this.mountain, 500);

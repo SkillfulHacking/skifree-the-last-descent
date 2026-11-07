@@ -6,7 +6,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Rng, gnoise } from '../core/rng';
-import { CAVE_D, COURSE, centerX, routeX, type Mountain } from './course';
+import { centerX, routeX, type Mountain } from './course';
+import type { CaveAnchor } from './caveTerrain';
 import { brokenTreeGeometry, rockGeometry } from './props';
 
 export class Cave {
@@ -20,9 +21,10 @@ export class Cave {
   readonly lipTop = new THREE.Vector3();
   private disposables: Array<{ dispose(): void }> = [];
 
-  constructor(m: Mountain) {
-    const z = COURSE.caveZ;
-    const mx = centerX(z) + CAVE_D - 3; // floor ledge point at the mouth
+  constructor(m: Mountain, anchor: CaveAnchor) {
+    const z = anchor.z;
+    const CAVE_D = anchor.d;
+    const mx = anchor.centerX + CAVE_D - 3; // floor ledge point at the mouth
     const floorY = m.heightAt(mx + 4, z);
     this.mouth.set(mx, floorY, z);
     this.inside.set(mx + 8.5, floorY, z);

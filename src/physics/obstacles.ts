@@ -3,7 +3,7 @@
  * Pure logic (no rendering). The primary route lane is guaranteed clear of solid obstacles.
  */
 import { Rng, clamp, fbm, smoothstep } from '../core/rng';
-import { COURSE, Mountain, centerX, halfWidth, routeX, CAVE_D } from '../world/course';
+import { COURSE, Mountain, centerX, halfWidth, routeX } from '../world/course';
 
 export type ObstacleKind = 'tree' | 'rock' | 'boulder' | 'log' | 'stump';
 
@@ -86,7 +86,7 @@ export function generateObstacles(m: Mountain, seed: number): ObstacleField {
   const kickers = m.features.kickers;
   const nearKicker = (x: number, z: number) =>
     kickers.some((k) => z > k.z - k.run - 18 && z < k.z + 26 && Math.abs(x - (centerX(k.z) + k.d)) < k.width * 0.5 + 6);
-  const cave = { x: centerX(COURSE.caveZ) + CAVE_D, z: COURSE.caveZ };
+  const caves = m.caves.map((c) => ({ x: c.centerX + c.side * c.d, z: c.z, side: c.side, d: c.d }));
 
   const add = (o: Omit<Obstacle, 'id' | 'collidable' | 'y'>) => {
     const id = list.length;
@@ -114,9 +114,9 @@ export function generateObstacles(m: Mountain, seed: number): ObstacleField {
       if (lane < LANE_HALF + 1.5) continue; // primary route stays clear
       if (z > COURSE.finishZ - 60 && ad < 140) continue; // finish chute & resort handled by Resort module
       if (z < 40 && z > -60 && ad < 40) continue; // start platform
-      if (Math.hypot(x - cave.x, z - cave.z) < 26) continue; // cave mouth
+      if (caves.some((c) => Math.hypot(x - c.x, z - c.z) < 26)) continue; // cave mouth
       if (nearKicker(x, z)) continue;
-      if (d > CAVE_D - 16 && Math.abs(z - COURSE.caveZ) < 40) continue; // keep cave clearing open
+      if (caves.some((c) => d * c.side > c.d - 16 && Math.abs(z - c.z) < 40)) continue; // keep cave clearing open
 
       // altitude tree line: open alpine at the summit, forests lower down
       const treeLine = smoothstep(120, 520, z);
