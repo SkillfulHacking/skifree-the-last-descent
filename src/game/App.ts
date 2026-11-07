@@ -339,10 +339,10 @@ export class App {
     };
   }
 
-  async startRun(retry: boolean) {
+  async startRun(retry: boolean, sameCourse = retry) {
     void this.audio.unlock().then(() => this.applyVolumes());
     // a retry replays exactly the same course, even if the Daily day rolled over meanwhile (B8)
-    const course = retry && this.world ? this.world.course : this.currentCourse();
+    const course = sameCourse && this.world ? this.world.course : this.currentCourse();
     const q = this.pendingQuality ?? this.settings.quality;
     if (q !== this.world?.quality || courseId(course) !== this.world?.id) {
       this.menu.close();
@@ -767,7 +767,7 @@ export class App {
         const i = this.renderer.info;
         return { fps: this.perf.fps, p50: s[Math.floor(s.length * 0.5)] ?? 0, p95: s[Math.floor(s.length * 0.95)] ?? 0, calls: i.render.calls, triangles: i.render.triangles, geometries: i.memory.geometries, textures: i.memory.textures, particles: this.world?.particles.aliveCount ?? 0, terrainPending: this.world?.terrain.pending ?? 0 };
       },
-      startRun: (skipIntro = true) => this.startRun(skipIntro),
+      startRun: (skipIntro = true) => this.startRun(skipIntro, false),
       toMenu: () => this.toMenu(),
       teleport: (z: number, speed = 18) => this.session?.debugTeleport(z, speed),
       toCave: () => {
@@ -821,6 +821,23 @@ export class App {
           out[k] = r;
         }
         return out;
+      },
+      /** Independent grounding check: every sole probe vs the surface the Yeti stands on. */
+      yetiGround: () => {
+        const w = this.world;
+        const y = this.yeti;
+        if (!w || !y) return null;
+        const inCave = this.session?.run.phase === 'caveCinematic';
+        const floor = (x: number, z: number) => (inCave ? w.cave.floorHeightAt(x, z) : w.mountain.heightAt(x, z));
+        const probes = Array.from({ length: 5 }, () => new THREE.Vector3());
+        const out: Record<string, number> = {};
+        for (const side of ['left', 'right'] as const) {
+          y.getSoleProbes(side, probes);
+          out[side] = Math.min(...probes.map((p) => p.y - floor(p.x, p.z)));
+        }
+        const r = y.root.position;
+        const roof = inCave ? w.cave.clearanceAt(r.x, r.z) : Infinity;
+        return { visible: y.root.visible, mode: this.session?.yetiAnim.mode ?? null, t: this.session?.debugState().cinematicTime ?? -1, rootAboveFloor: r.y - floor(r.x, r.z), left: out['left']!, right: out['right']!, roofClearance: roof, pos: r.toArray().map((v) => +v.toFixed(2)) };
       },
       world: () => this.world,
       renderer: this.renderer,

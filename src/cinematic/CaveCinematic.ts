@@ -13,6 +13,7 @@ export class CaveCinematic {
   private eyeTarget = 0;
   private shakeLevel = 0;
   private dim = 0;
+  private sunBase: number;
   private leap: { t: number; from: THREE.Vector3; vel: THREE.Vector3; heading: number; landed: boolean } | null = null;
   onRunPrompt: (() => void) | null = null;
 
@@ -25,6 +26,7 @@ export class CaveCinematic {
       ep.forEach((p, i) => this.path.push({ s: i === ep.length - 1 ? LEDGE_AT : 14 - 0.75 * i, p }));
     }
     const { world, camera, follow, phys } = st;
+    this.sunBase = world.env.sun.intensity;
     const cave = world.cave;
     const M = cave.mouth.clone();
     const O = cave.outward.clone(); // toward the piste (-X)
@@ -61,9 +63,9 @@ export class CaveCinematic {
       st.yeti.getHandWorldPosition('right', hand);
       return pose(hand.clone().addScaledVector(O, dist).add(new THREE.Vector3(0, -0.5, -0.9)), hand.clone().add(new THREE.Vector3(0, -0.2, 0)), fov);
     };
-    tl.shot({ start: 6.6, end: 7.9, from: handShot(1.9, 30), to: handShot(1.6, 28), handheld: 0.012 });
+    tl.shot({ start: 6.6, end: 7.9, from: handShot(2.8, 34), to: handShot(2.4, 32), handheld: 0.012 });
     // Beat 6–7: he emerges and rises to full height (low angle)
-    tl.shot({ start: 7.9, end: 11.0, from: () => pose(at(M, 6.0, 1.5, 2.4), M.clone().add(new THREE.Vector3(-0.8, 2.2, 0)), 50), to: () => pose(at(M, 5.2, 1.3, 2.0), M.clone().add(new THREE.Vector3(-1.0, 3.0, 0)), 48), handheld: 0.02 });
+    tl.shot({ start: 7.9, end: 11.0, from: () => pose(at(M, 9.0, 1.4, 3.2), M.clone().addScaledVector(O, 0.6).add(new THREE.Vector3(0, 1.8, 0)), 50), to: () => pose(at(M, 8.2, 1.2, 2.8), M.clone().addScaledVector(O, 1.6).add(new THREE.Vector3(0, 2.6, 0)), 48), handheld: 0.02 });
     // Beat 8: the roar — wide, then (beat 9) a close-up on the face
     tl.shot({ start: 11.0, end: 12.3, from: () => pose(at(M, 7.5, 0.6, 3.2), M.clone().add(new THREE.Vector3(-1.5, 3.0, 0)), 46), to: () => pose(at(M, 7, 0.5, 3), M.clone().add(new THREE.Vector3(-1.5, 3.2, 0)), 44) });
     tl.shot({
@@ -194,17 +196,21 @@ export class CaveCinematic {
       this.placeAt(sNow);
       st.yetiAnim.speed = Math.abs(sNow - sPrev) / Math.max(1e-3, dt);
     } else if (t < 6.2) {
-      // a low prowl up the tunnel from the deep chamber (unseen until the eyes beat)
-      const k = Math.min(1, t / 6.2);
+      // a low prowl up the tunnel from the deep chamber (deep in the dark until the eyes beat)
+      const k = Math.min(1, Math.max(0, (t - 1.0) / 5.2));
       const sNow = CRAWL_FROM + (GRIP_AT + 0.6 - CRAWL_FROM) * k;
       this.placeAt(sNow);
-      st.yetiAnim.speed = Math.abs(GRIP_AT + 0.6 - CRAWL_FROM) / 6.2;
+      st.yetiAnim.speed = t < 1.0 ? 0 : Math.abs(GRIP_AT + 0.6 - CRAWL_FROM) / 5.2;
     } else st.yetiAnim.speed = 0;
     // the light drops while we stare into the darkness (sky/ambient light would otherwise
     // wash the inside of the cave; the sun is already blocked by the tunnel's shadow)
     const dim = t > 3.6 && t < 7.9 ? 1 : 0;
     this.dim += (dim - this.dim) * (1 - Math.exp(-2.5 * dt));
     st.world.env.setAmbientScale(1 - 0.85 * this.dim);
+    // a cloud crosses the sun while we stare into the cave: low sun would otherwise reach in
+    // through the mouth and light the Yeti like a stage (the reveal needs darkness and eyes)
+    st.world.env.sun.intensity = this.sunBase * (1 - 0.82 * this.dim);
+    st.world.terrain.uniforms.uCloudShadow.value = 1 + 1.5 * this.dim;
     this.eye += (this.eyeTarget - this.eye) * (1 - Math.exp(-3 * dt));
     st.yeti.setEyeGlow(this.eye);
     if (this.shakeLevel > 0) {
@@ -241,6 +247,8 @@ export class CaveCinematic {
     const st = this.st;
     st.yeti.setEyeGlow(0);
     st.world.env.setAmbientScale(1);
+    st.world.env.sun.intensity = this.sunBase;
+    st.world.terrain.uniforms.uCloudShadow.value = 1;
     st.hud.letterbox(false);
     st.hud.gameplayWidgets(true);
     st.poseOverride = {};
@@ -262,6 +270,6 @@ export class CaveCinematic {
 }
 
 /** exit-path depths (see Cave.exitPath): crawl start, grip point, ledge */
-const CRAWL_FROM = 11;
-const GRIP_AT = 2.2;
+const CRAWL_FROM = 12.5;
+const GRIP_AT = 1.0;
 const LEDGE_AT = -2.2;
