@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SkiFree — Audio Test Bench</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; font: 13px/1.4 system-ui, sans-serif; background: #10161f; color: #dde6f0; }
+      header { padding: 12px 18px; background: #18222f; border-bottom: 1px solid #2a3a4e; display: flex; gap: 12px; align-items: center; }
+      header h1 { font-size: 16px; margin: 0 12px 0 0; }
+      main { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 14px; padding: 14px 18px; }
+      section { background: #162030; border: 1px solid #263547; border-radius: 8px; padding: 10px 12px; }
+      section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: #8fb3d9; margin: 0 0 8px; }
+      button { background: #24364c; color: #e6eef7; border: 1px solid #36506d; border-radius: 5px; padding: 5px 9px; margin: 2px; cursor: pointer; font: inherit; }
+      button:hover { background: #2f4763; }
+      button.active { background: #4a6f2c; border-color: #6c9a43; }
+      label.row { display: grid; grid-template-columns: 120px 1fr 48px; gap: 8px; align-items: center; margin: 3px 0; }
+      label.chk { margin-right: 12px; }
+      input[type=range] { width: 100%; }
+      output { text-align: right; font-variant-numeric: tabular-nums; color: #b8c9dc; }
+      #status { color: #ffcf6e; }
+      table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: 12px; }
+      th, td { border-bottom: 1px solid #263547; padding: 3px 6px; text-align: right; }
+      th:first-child, td:first-child { text-align: left; }
+      td.bad { color: #ff7b7b; } td.ok { color: #8be08b; }
+      #offline { grid-column: 1 / -1; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>SkiFree — Audio Test Bench</h1>
+      <button id="unlock">Unlock audio</button>
+      <button id="pause">Pause</button>
+      <span id="status">locked — click "Unlock audio"</span>
+    </header>
+    <main>
+      <section>
+        <h2>Volumes</h2>
+        <div id="volumes"></div>
+      </section>
+      <section>
+        <h2>Music</h2>
+        <div id="music"></div>
+        <div id="musicParams"></div>
+      </section>
+      <section>
+        <h2>Skier / continuous</h2>
+        <div id="cont"></div>
+        <div id="flags"></div>
+        <label class="row">Surface <select id="surface"><option>snow</option><option>packed</option><option>powder</option><option>ice</option></select><span></span></label>
+      </section>
+      <section>
+        <h2>Yeti &amp; crowd</h2>
+        <div id="yeti"></div>
+      </section>
+      <section>
+        <h2>One-shots — skier &amp; world</h2>
+        <div id="sfxA"></div>
+      </section>
+      <section>
+        <h2>One-shots — yeti, stingers, UI</h2>
+        <div id="sfxB"></div>
+      </section>
+      <section id="offline">
+        <h2>Offline render suite (OfflineAudioContext, same code path)</h2>
+        <button id="runOffline">Run offline suite</button>
+        <span id="offlineStatus"></span>
+        <table id="results"></table>
+      </section>
+    </main>
+    <script type="module" src="./audio.ts"></script>
+  </body>
+</html>
