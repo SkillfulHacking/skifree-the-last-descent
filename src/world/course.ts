@@ -10,7 +10,7 @@ import type { SurfaceType } from '../core/types';
 import { caveTerrainHeight, CAVE_INFLUENCE_Z, type CaveAnchor } from './caveTerrain';
 import { CLASSIC, ClassicProfile, GeneratedProfile, type CliffBand, type CourseProfile, type Kicker } from './profile';
 
-export type { Kicker, CliffBand, CourseProfile, Encounter, Sighting, SegmentType } from './profile';
+export type { Kicker, CliffBand, CourseProfile, Encounter, Sighting, SegmentType, AltRoute } from './profile';
 export { CAVE_D, CAVE_FLOOR_RAISE } from './caveTerrain';
 
 export const SEED_DEFAULT = 20261106;

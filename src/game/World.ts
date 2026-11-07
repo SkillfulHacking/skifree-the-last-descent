@@ -24,6 +24,7 @@ import { Particles } from '../fx/Particles';
 import { SkiTracks } from '../fx/SkiTracks';
 import { StartArea } from '../world/StartArea';
 import { Checkpoint } from '../world/Checkpoint';
+import { AltMarkers } from '../world/Markers';
 import { buildMountain, courseId, type CourseConfig } from './CourseConfig';
 
 export interface CaveSlot {
@@ -56,6 +57,7 @@ export class World {
   readonly origin = new THREE.Vector3();
   private caves = new Map<number, CaveSlot>();
   private lodges = new Map<number, Checkpoint>();
+  private markers = new Map<number, AltMarkers>();
   /** the encounter the session cares about now (set by GameSession) */
   focusEncounter: Encounter | null = null;
   private streamZ = -Infinity;
@@ -185,6 +187,20 @@ export class World {
       c.dispose();
       this.lodges.delete(cz);
     }
+    // trail markers along alternate lines
+    const alts = this.mountain.profile.altRoutes(z - 300, z + 1600);
+    const wantA = new Set(alts.map((a) => a.z0));
+    for (const a of alts) {
+      if (this.markers.has(a.z0)) continue;
+      const mk = new AltMarkers(this.mountain, a);
+      this.scene.add(mk.mesh);
+      this.markers.set(a.z0, mk);
+    }
+    for (const [k, mk] of this.markers) {
+      if (wantA.has(k)) continue;
+      mk.dispose();
+      this.markers.delete(k);
+    }
   }
 
   /** Cave for an encounter (built on demand). */
@@ -287,6 +303,8 @@ export class World {
     this.caves.clear();
     for (const c of this.lodges.values()) c.dispose();
     this.lodges.clear();
+    for (const mk of this.markers.values()) mk.dispose();
+    this.markers.clear();
     this.terrain.dispose();
     this.vegetation.dispose();
     this.env.dispose();
