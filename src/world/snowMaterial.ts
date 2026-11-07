@@ -1,7 +1,9 @@
 /**
  * Physically based snow/rock/ice terrain material: MeshStandardMaterial extended with procedural
  * world-space detail (micro-normals, packed/groomed/ice/powder variation, slope-based rock,
- * drifting cloud shadows). Terrain geometry is in world space (mesh at origin, identity transform).
+ * drifting cloud shadows). Terrain chunk meshes carry their own translation; with the floating
+ * origin the scene is rendered shifted by −uOrigin, so procedural patterns sample (render pos +
+ * uOrigin) to stay locked to the ground across origin shifts.
  */
 import * as THREE from 'three';
 
@@ -20,6 +22,7 @@ export interface TerrainUniforms {
   uCloudShadow: { value: number };
   uDetail: { value: number };
   uSunDir: { value: THREE.Vector3 };
+  uOrigin: { value: THREE.Vector3 };
 }
 
 export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra'): { material: THREE.MeshStandardMaterial; uniforms: TerrainUniforms } {
@@ -28,6 +31,7 @@ export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra')
     uCloudShadow: { value: 1 },
     uDetail: { value: quality === 'low' ? 0.0 : quality === 'medium' ? 0.6 : 1.0 },
     uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+    uOrigin: { value: new THREE.Vector3() },
   };
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0 });
   material.onBeforeCompile = (shader) => {
@@ -35,11 +39,14 @@ export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra')
     shader.uniforms.uCloudShadow = uniforms.uCloudShadow;
     shader.uniforms.uDetail = uniforms.uDetail;
     shader.uniforms.uSunDir = uniforms.uSunDir;
+    shader.uniforms.uOrigin = uniforms.uOrigin;
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
         `#include <common>
 attribute vec3 aSurf;
+uniform vec3 uOrigin;
+varying vec3 vNPos;
 varying vec3 vWPos;
 varying vec3 vWNormal;
 varying vec3 vSurf;`,
@@ -48,6 +55,7 @@ varying vec3 vSurf;`,
         '#include <begin_vertex>',
         `#include <begin_vertex>
 vWPos = (modelMatrix * vec4(position,1.0)).xyz;
+vNPos = vWPos + uOrigin;
 vWNormal = normalize(mat3(modelMatrix) * normal);
 vSurf = aSurf;`,
       );
@@ -59,6 +67,7 @@ uniform float uTime;
 uniform float uCloudShadow;
 uniform float uDetail;
 uniform vec3 uSunDir;
+varying vec3 vNPos;
 varying vec3 vWPos;
 varying vec3 vWNormal;
 varying vec3 vSurf;
@@ -74,8 +83,8 @@ vec2 sf_pp = vec2(0.0);
         '#include <color_fragment>',
         `#include <color_fragment>
 {
-  vec3 wp = vWPos;
-  sf_dist = length(cameraPosition - wp);
+  vec3 wp = vNPos; // pattern space (absolute world)
+  sf_dist = length(cameraPosition - vWPos);
   vec3 wn = normalize(vWNormal);
   float slope = 1.0 - wn.y;
   // project onto a vertical plane on steep faces (avoids streaks from top-down projection)
@@ -130,7 +139,7 @@ if (uDetail > 0.0) {
   // sparse ice-crystal glints where the sun's reflection lines up (not a bloom/sparkle overlay)
   vec3 V = normalize(cameraPosition - vWPos);
   vec3 R = reflect(-uSunDir, normalize(vWNormal));
-  float cell = sf_hash(floor(vWPos.xz * 38.0) + floor(vWPos.y * 38.0));
+  float cell = sf_hash(floor(mod(vNPos.xz, 1024.0) * 38.0) + floor(mod(vNPos.y, 1024.0) * 38.0));
   float glint = step(0.996, cell) * pow(max(dot(R, V), 0.0), 24.0) * (1.0 - smoothstep(4.0, 40.0, sf_dist)) * (1.0 - sf_rock);
   totalEmissiveRadiance += vec3(1.0, 0.97, 0.92) * glint * 1.6 * uDetail;
 }
@@ -157,6 +166,6 @@ if (uDetail > 0.0) {
 `,
       );
   };
-  material.customProgramCacheKey = () => 'skifree-snow-v1';
+  material.customProgramCacheKey = () => 'skifree-snow-v2';
   return { material, uniforms };
 }

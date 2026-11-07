@@ -3,17 +3,17 @@
  * Not exposed in the normal gameplay UI.
  */
 import { clamp, wrapAngle } from '../core/rng';
-import { routeX } from '../world/course';
+import type { Mountain } from '../world/course';
 import type { SkierInput } from '../physics/SkierPhysics';
 import type { SkierState } from '../physics/SkierPhysics';
 
 export type AutopilotStyle = 'skilled' | 'intermediate' | 'average' | 'careless' | 'cautious';
 
-export function autopilotInput(s: SkierState, style: AutopilotStyle, time: number): SkierInput {
+export function autopilotInput(m: Mountain, s: SkierState, style: AutopilotStyle, time: number): SkierInput {
   const speed = s.speed;
   const look = 7 + speed * 0.55;
   const tz = s.pos.z + look;
-  const tx = routeX(tz);
+  const tx = m.routeX(tz);
   const desired = Math.atan2(tx - s.pos.x, tz - s.pos.z);
   const err = wrapAngle(desired - s.heading);
   // also damp lateral velocity relative to heading

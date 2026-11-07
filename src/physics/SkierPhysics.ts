@@ -444,7 +444,7 @@ export class SkierPhysics {
     if (this.obstacles) {
       this.obstacles.grid.query(s.pos.x, s.pos.z, 3, queryOut);
       for (const id of queryOut) {
-        const o = this.obstacles.list[id];
+        const o = this.obstacles.get(id);
         if (!o || o.kind === 'rock' || o.kind === 'stump') continue;
         const dx = o.x - s.pos.x;
         const dz = o.z - s.pos.z;
@@ -485,7 +485,7 @@ export class SkierPhysics {
     if (field) {
       field.grid.query(s.pos.x, s.pos.z, 4, queryOut);
       for (const id of queryOut) {
-        const o = field.list[id];
+        const o = field.get(id);
         if (!o) continue;
         this.collideObstacle(o, dt, stillTouching);
         if (s.crashed && !this.s.crashed) break;

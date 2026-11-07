@@ -20,7 +20,20 @@ export interface HudFrame {
   canRecover: boolean;
   airTime: number;
   progress: number; // 0..1 along the course
-  caveProgress: number;
+  /** where the (next) cave sits on the progress bar, or null when there is none to show */
+  caveProgress: number | null;
+  /** Endless: no finish — show the distance travelled and the next refuge instead */
+  endless?: boolean;
+  distance?: number;
+  nextRefuge?: number | null;
+}
+
+/** 640 m · 8.4 km · 48 km */
+export function fmtDistance(m: number): string {
+  const v = Math.max(0, m);
+  if (v < 1000) return `${Math.round(v)} m`;
+  if (v < 20000) return `${(v / 1000).toFixed(1)} km`;
+  return `${Math.round(v / 1000)} km`;
 }
 
 export class Hud {
@@ -28,6 +41,9 @@ export class Hud {
   private speed: HTMLDivElement;
   private speedUnit: HTMLDivElement;
   private dist: HTMLDivElement;
+  private distLabel!: HTMLDivElement;
+  private distSub!: HTMLDivElement;
+  private prog!: HTMLDivElement;
   private score: HTMLDivElement;
   private mult: HTMLDivElement;
   private yetiWrap: HTMLDivElement;
@@ -67,9 +83,11 @@ export class Hud {
     this.mult = el('div', 'hud-mult', tl, '×1.0');
 
     const tr = el('div', 'hud-tr', this.root);
-    el('div', 'hud-label', tr, 'TO FINISH');
-    this.dist = el('div', 'hud-dist', tr, '3000 m');
+    this.distLabel = el('div', 'hud-label', tr, 'TO FINISH');
+    this.dist = el('div', 'hud-dist', tr, '');
+    this.distSub = el('div', 'hud-label hud-dist-sub', tr, '');
     const prog = el('div', 'hud-progress', tr);
+    this.prog = prog;
     this.progressFill = el('div', 'fill', prog);
     this.progressCave = el('div', 'cave-mark', prog);
     this.progressYeti = el('div', 'yeti-mark', prog);
@@ -177,12 +195,22 @@ export class Hud {
     this.speed.textContent = String(Math.round(f.speedKmh));
     this.speed.classList.toggle('fast', f.speedKmh > 90);
     this.speedUnit.textContent = 'KM/H';
-    this.dist.textContent = `${Math.max(0, Math.round(f.distanceToFinish))} m`;
+    if (f.endless) {
+      this.distLabel.textContent = 'DISTANCE';
+      this.dist.textContent = fmtDistance(f.distance ?? 0);
+      this.distSub.textContent = f.nextRefuge != null && f.nextRefuge > 0 ? `REFUGE IN ${fmtDistance(f.nextRefuge)}` : '';
+    } else {
+      this.distLabel.textContent = 'TO FINISH';
+      this.dist.textContent = fmtDistance(f.distanceToFinish);
+      this.distSub.textContent = '';
+    }
+    this.prog.classList.toggle('hidden', !!f.endless);
     this.score.textContent = Math.round(f.score).toLocaleString('en-US');
     this.mult.textContent = `×${f.multiplier.toFixed(1)}`;
     this.mult.classList.toggle('hot', f.multiplier >= 2);
     this.progressFill.style.width = `${(f.progress * 100).toFixed(1)}%`;
-    this.progressCave.style.left = `${(f.caveProgress * 100).toFixed(1)}%`;
+    this.progressCave.classList.toggle('hidden', f.caveProgress === null);
+    if (f.caveProgress !== null) this.progressCave.style.left = `${(f.caveProgress * 100).toFixed(1)}%`;
     if (f.airTime > 0.35) {
       this.air.textContent = `AIR ${f.airTime.toFixed(1)}s`;
       this.air.classList.add('on');
@@ -199,7 +227,8 @@ export class Hud {
       this.yetiWrap.classList.toggle('near', d < 40);
       const pulse = this.reduceFlashes ? 0.55 : 0.5 + 0.5 * Math.sin(performance.now() / (d < 25 ? 90 : 160));
       this.danger.style.opacity = String(Math.max(0, threat - 0.55) * 2.0 * (0.6 + 0.4 * pulse));
-      const yetiProg = Math.max(0, Math.min(1, f.progress - d / 3000));
+      const total = f.progress > 0 ? (f.distance ?? 0) / f.progress : 3000;
+      const yetiProg = Math.max(0, Math.min(1, f.progress - d / Math.max(1, total)));
       this.progressYeti.style.left = `${(yetiProg * 100).toFixed(1)}%`;
     } else this.danger.style.opacity = '0';
 

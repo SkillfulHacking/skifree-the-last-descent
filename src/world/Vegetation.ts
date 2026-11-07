@@ -1,16 +1,19 @@
 /**
- * Instanced trees, rocks, logs and stumps, bucketed into Z bands for culling and two-level LOD.
+ * Instanced trees, rocks, logs and stumps. Streamed: follows the ObstacleField's 256 m bands
+ * (built when a band is generated, disposed when it is released), split into x-cells for culling
+ * and two-level LOD. Decorative forests on the outer valley walls are generated per band too,
+ * deterministically, so memory stays bounded on any course length.
  */
 import * as THREE from 'three';
 import type { QualityPreset } from '../core/types';
 import { Rng, fbm, smoothstep } from '../core/rng';
-import type { Obstacle } from '../physics/obstacles';
-import { centerX, halfWidth, type Mountain } from './course';
+import { BAND, type Obstacle, type ObstacleField } from '../physics/obstacles';
+import type { Mountain } from './course';
 import { createFoliageMaterial, logGeometry, pineGeometry, rockGeometry, stumpGeometry } from './props';
 
-const CELL = 160;
+const CELL = 256;
 
-interface Band {
+interface Cell {
   x0: number;
   z0: number;
   near: THREE.InstancedMesh[];
@@ -29,50 +32,101 @@ interface Inst {
   sz: number;
 }
 
+type Bucket = { trees: Inst[][]; rocks: Inst[][]; logs: Inst[]; stumps: Inst[]; farTrees: Inst[][] };
+
 export class Vegetation {
   readonly group = new THREE.Group();
-  private bands: Band[] = [];
+  /** band index → cells */
+  private bands = new Map<number, Cell[]>();
+  private queue: Array<{ band: number; list: readonly Obstacle[] }> = [];
   readonly uTime = { value: 0 };
   private geos: THREE.BufferGeometry[] = [];
   private mats: THREE.Material[] = [];
   private nearDist: number;
-  private farDist: number;
+  readonly farDist: number;
   private shadowDist: number;
+  private decorPerBand: number;
+  private foliage: THREE.Material;
+  private foliageFar: THREE.Material;
+  private rockMat: THREE.Material;
+  private treeNear: THREE.BufferGeometry[];
+  private treeFar: THREE.BufferGeometry[];
+  private rockNear: THREE.BufferGeometry[];
+  private rockFar: THREE.BufferGeometry[];
+  private logGeo: THREE.BufferGeometry;
+  private stumpGeo: THREE.BufferGeometry;
 
   constructor(
-    mountain: Mountain,
-    obstacles: Obstacle[],
+    private mountain: Mountain,
+    field: ObstacleField,
     quality: QualityPreset,
-    seed: number,
+    private seed: number,
   ) {
     this.nearDist = { low: 110, medium: 170, high: 230, ultra: 320 }[quality];
     this.farDist = { low: 1300, medium: 1900, high: 2500, ultra: 3200 }[quality];
     this.shadowDist = { low: 60, medium: 90, high: 120, ultra: 160 }[quality];
-    const foliage = createFoliageMaterial(this.uTime, quality !== 'low');
-    const foliageFar = createFoliageMaterial(this.uTime, false);
-    const rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true });
-    this.mats.push(foliage, foliageFar, rockMat);
+    // the original static build scattered 6k/10k/15k decorative trees over ~4.5 km
+    this.decorPerBand = Math.round(({ low: 6000, medium: 10000, high: 15000, ultra: 15000 }[quality] * BAND) / 4500);
+    this.foliage = createFoliageMaterial(this.uTime, quality !== 'low');
+    this.foliageFar = createFoliageMaterial(this.uTime, false);
+    this.rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true });
+    this.mats.push(this.foliage, this.foliageFar, this.rockMat);
 
-    const treeNear = [0, 1, 2].map((v) => pineGeometry(v, true));
-    const treeFar = [0, 1, 2].map((v) => pineGeometry(v, false));
-    const rockNear = [0, 1, 2, 3].map((v) => rockGeometry(v, true));
-    const rockFar = [0, 1, 2, 3].map((v) => rockGeometry(v, false));
-    const log = logGeometry();
-    const stump = stumpGeometry();
-    this.geos.push(...treeNear, ...treeFar, ...rockNear, ...rockFar, log, stump);
+    this.treeNear = [0, 1, 2].map((v) => pineGeometry(v, true));
+    this.treeFar = [0, 1, 2].map((v) => pineGeometry(v, false));
+    this.rockNear = [0, 1, 2, 3].map((v) => rockGeometry(v, true));
+    this.rockFar = [0, 1, 2, 3].map((v) => rockGeometry(v, false));
+    this.logGeo = logGeometry();
+    this.stumpGeo = stumpGeometry();
+    this.geos.push(...this.treeNear, ...this.treeFar, ...this.rockNear, ...this.rockFar, this.logGeo, this.stumpGeo);
 
-    // bucket instances: key = band index, then type
-    type Bucket = { trees: Inst[][]; rocks: Inst[][]; logs: Inst[]; stumps: Inst[]; farTrees: Inst[][] };
+    field.onBand((band, list, added) => {
+      if (added) this.queue.push({ band, list });
+      else this.dropBand(band);
+    });
+  }
+
+  /** Build every queued band now (loading screen). */
+  flush() {
+    while (this.queue.length) {
+      const q = this.queue.shift()!;
+      this.buildBand(q.band, q.list);
+    }
+  }
+
+  get pending() {
+    return this.queue.length;
+  }
+  get bandCount() {
+    return this.bands.size;
+  }
+
+  private dropBand(band: number) {
+    const qi = this.queue.findIndex((q) => q.band === band);
+    if (qi >= 0) this.queue.splice(qi, 1);
+    const cells = this.bands.get(band);
+    if (!cells) return;
+    for (const c of cells)
+      for (const m of new Set([...c.near, ...c.far, ...c.mid])) {
+        this.group.remove(m);
+        m.dispose();
+      }
+    this.bands.delete(band);
+  }
+
+  private buildBand(band: number, obstacles: readonly Obstacle[]) {
+    if (this.bands.has(band)) this.dropBand(band);
+    const mountain = this.mountain;
+    const seed = this.seed;
     const buckets = new Map<number, Bucket>();
-    const key = (x: number, z: number) => Math.floor(x / CELL) * 100000 + Math.floor(z / CELL);
-    const get = (z: number, x: number) => {
-      const b = key(x, z);
+    const get = (x: number) => {
+      const b = Math.floor(x / CELL);
       let v = buckets.get(b);
       if (!v) buckets.set(b, (v = { trees: [[], [], []], rocks: [[], [], [], []], logs: [], stumps: [], farTrees: [[], [], []] }));
       return v;
     };
     for (const o of obstacles) {
-      const b = get(o.z, o.x);
+      const b = get(o.x);
       const base: Inst = { x: o.x, y: o.y, z: o.z, rot: o.rot, sx: o.scale, sy: o.scale, sz: o.scale };
       switch (o.kind) {
         case 'tree':
@@ -94,22 +148,30 @@ export class Vegetation {
       }
     }
     // decorative forests on the outer valley walls (render only, no collision)
-    const rng = new Rng(seed ^ 0xf0e57);
-    for (let i = 0; i < (quality === 'low' ? 6000 : quality === 'medium' ? 10000 : 15000); i++) {
-      const z = rng.range(-300, 4200);
-      const side = rng.chance(0.5) ? 1 : -1;
-      const cx = centerX(z);
-      const w = halfWidth(z);
-      const off = w + 60 + Math.pow(rng.float(), 1.4) * 900;
-      const x = cx + side * off;
-      if (Math.abs(x) < 560 && z < 3420) continue; // corridor trees come from the obstacle field
-      const y = mountain.heightAt(x, z);
-      // tree line by altitude relative to the local valley floor
-      const rel = y - mountain.heightAt(cx, z);
-      const dens = smoothstep(260, 120, rel) * (0.5 + 0.5 * smoothstep(-0.3, 0.3, fbm(x / 140, z / 140, seed + 3, 2)));
-      if (rng.float() > dens) continue;
-      const s = rng.range(0.8, 1.5);
-      get(z, x).farTrees[rng.int(0, 2)]!.push({ x, y: y - 0.4, z, rot: rng.range(0, 6.28), sx: s, sy: s * rng.range(0.9, 1.2), sz: s });
+    const zA = band * BAND;
+    if (zA + BAND > -300) {
+      const rng = new Rng((seed ^ 0xf0e57 ^ Math.imul(band + 101, 0x27d4eb2d)) >>> 0);
+      for (let i = 0; i < this.decorPerBand; i++) {
+        const z = zA + rng.float() * BAND;
+        const side = rng.chance(0.5) ? 1 : -1;
+        const cx = mountain.centerX(z);
+        const w = mountain.halfWidth(z);
+        const off = w + 60 + Math.pow(rng.float(), 1.4) * 900;
+        const x = cx + side * off;
+        const r1 = rng.float();
+        const s = rng.range(0.8, 1.5);
+        const sy = rng.range(0.9, 1.2);
+        const rot = rng.range(0, 6.28);
+        const v = rng.int(0, 2);
+        if (Math.abs(x) < 560) continue; // corridor trees come from the obstacle field
+        if (z < -300) continue;
+        const y = mountain.heightAt(x, z);
+        // tree line by altitude relative to the local valley floor
+        const rel = y - mountain.heightAt(cx, z);
+        const dens = smoothstep(260, 120, rel) * (0.5 + 0.5 * smoothstep(-0.3, 0.3, fbm(x / 140, z / 140, seed + 3, 2))) * (0.35 + 0.65 * mountain.profile.treeLine(z));
+        if (r1 > dens) continue;
+        get(x).farTrees[v]!.push({ x, y: y - 0.4, z, rot, sx: s, sy: s * sy, sz: s });
+      }
     }
 
     const m4 = new THREE.Matrix4();
@@ -134,64 +196,74 @@ export class Vegetation {
       im.frustumCulled = true;
       return im;
     };
-    for (const [bi, b] of buckets) {
-      const bx = Math.round(bi / 100000);
-      const bz = bi - bx * 100000;
-      const band: Band = { x0: bx * CELL, z0: bz * CELL, near: [], far: [], shadowCasters: [], mid: [] };
+    const cells: Cell[] = [];
+    for (const [bx, b] of buckets) {
+      const cell: Cell = { x0: bx * CELL, z0: zA, near: [], far: [], shadowCasters: [], mid: [] };
       b.trees.forEach((list, v) => {
         if (!list.length) return;
-        const n = make(treeNear[v]!, foliage, list, true);
-        band.near.push(n);
-        band.shadowCasters.push(n);
+        const n = make(this.treeNear[v]!, this.foliage, list, true);
+        cell.near.push(n);
+        cell.shadowCasters.push(n);
       });
       const decorative = b.farTrees.flat();
       const allTrees = [...b.trees.flat(), ...decorative];
       // one draw call per cell for distant trees (all variants share the far mesh)
-      if (allTrees.length) band.far.push(make(treeFar[0]!, foliageFar, allTrees, false));
-      if (decorative.length) band.near.push(make(treeFar[1]!, foliageFar, decorative, false));
+      if (allTrees.length) cell.far.push(make(this.treeFar[0]!, this.foliageFar, allTrees, false));
+      if (decorative.length) cell.near.push(make(this.treeFar[1]!, this.foliageFar, decorative, false));
       b.rocks.forEach((list, v) => {
         if (!list.length) return;
-        const n = make(rockNear[v]!, rockMat, list, true);
-        band.near.push(n);
-        band.shadowCasters.push(n);
+        const n = make(this.rockNear[v]!, this.rockMat, list, true);
+        cell.near.push(n);
+        cell.shadowCasters.push(n);
       });
       const rocks = b.rocks.flat();
-      if (rocks.length) band.mid.push(make(rockFar[0]!, rockMat, rocks, false));
-      if (b.logs.length) band.near.push(make(log, rockMat, b.logs, true));
-      if (b.stumps.length) band.near.push(make(stump, rockMat, b.stumps, true));
-      for (const m of new Set([...band.near, ...band.far, ...band.mid])) {
+      if (rocks.length) cell.mid.push(make(this.rockFar[0]!, this.rockMat, rocks, false));
+      if (b.logs.length) cell.near.push(make(this.logGeo, this.rockMat, b.logs, true));
+      if (b.stumps.length) cell.near.push(make(this.stumpGeo, this.rockMat, b.stumps, true));
+      for (const m of new Set([...cell.near, ...cell.far, ...cell.mid])) {
         m.visible = false;
         this.group.add(m);
       }
-      this.bands.push(band);
+      cells.push(cell);
     }
+    this.bands.set(band, cells);
   }
 
   get instanceCount(): number {
     let n = 0;
-    for (const b of this.bands) for (const m of b.near) n += m.count;
+    for (const cells of this.bands.values()) for (const c of cells) for (const m of c.near) n += m.count;
     return n;
   }
 
-  update(camPos: THREE.Vector3, time: number) {
+  update(camPos: THREE.Vector3, time: number, budgetMs = 2) {
     this.uTime.value = time;
-    for (const b of this.bands) {
-      const dx = Math.max(0, Math.abs(camPos.x - (b.x0 + CELL / 2)) - CELL / 2);
-      const dz = Math.max(0, Math.abs(camPos.z - (b.z0 + CELL / 2)) - CELL / 2);
-      const d = Math.hypot(dx, dz);
-      const near = d < this.nearDist;
-      const far = !near && d < this.farDist;
-      for (const m of b.far) m.visible = far;
-      for (const m of b.near) m.visible = near;
-      for (const m of b.mid) m.visible = far && d < 600;
-      const shadows = d < this.shadowDist;
-      for (const m of b.shadowCasters) m.castShadow = shadows;
+    if (this.queue.length) {
+      // nearest band first
+      this.queue.sort((a, b) => Math.abs(a.band * BAND + BAND / 2 - camPos.z) - Math.abs(b.band * BAND + BAND / 2 - camPos.z));
+      const t0 = performance.now();
+      do {
+        const q = this.queue.shift()!;
+        this.buildBand(q.band, q.list);
+      } while (this.queue.length && performance.now() - t0 < budgetMs);
     }
+    for (const cells of this.bands.values())
+      for (const b of cells) {
+        const dx = Math.max(0, Math.abs(camPos.x - (b.x0 + CELL / 2)) - CELL / 2);
+        const dz = Math.max(0, Math.abs(camPos.z - (b.z0 + BAND / 2)) - BAND / 2);
+        const d = Math.hypot(dx, dz);
+        const near = d < this.nearDist;
+        const far = !near && d < this.farDist;
+        for (const m of b.far) m.visible = far;
+        for (const m of b.near) m.visible = near;
+        for (const m of b.mid) m.visible = far && d < 600;
+        const shadows = d < this.shadowDist;
+        for (const m of b.shadowCasters) m.castShadow = shadows;
+      }
   }
 
   dispose() {
+    for (const band of [...this.bands.keys()]) this.dropBand(band);
     for (const g of this.geos) g.dispose();
     for (const m of this.mats) m.dispose();
-    for (const b of this.bands) for (const m of new Set([...b.near, ...b.far, ...b.mid])) m.dispose();
   }
 }

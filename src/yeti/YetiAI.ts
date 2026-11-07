@@ -16,7 +16,7 @@
 import * as THREE from 'three';
 import { clamp, damp, smoothstep, wrapAngle } from '../core/rng';
 import type { YetiMode } from '../core/types';
-import { centerX, halfWidth, routeX, slopeDegAt, type Mountain } from '../world/course';
+import type { Mountain } from '../world/course';
 import type { ObstacleField } from '../physics/obstacles';
 
 export const YETI = {
@@ -63,6 +63,8 @@ export class YetiAI {
   distance = Infinity;
   /** debug: last computed desired speed */
   desired = 0;
+  /** per-encounter pursuit scaling (1 = classic; Endless escalates) */
+  speedMul = 1;
 
   constructor(
     private mountain: Mountain,
@@ -80,6 +82,16 @@ export class YetiAI {
   place(x: number, z: number, heading: number, yOffset = 0) {
     this.pos.set(x, this.mountain.heightAt(x, z) + yOffset, z);
     this.heading = heading;
+  }
+
+  /** Stand down: the Yeti gives up (Endless checkpoint reached) and vanishes until the next cave. */
+  standDown() {
+    this.phase = 'dormant';
+    this.airborne = false;
+    this.vy = 0;
+    this.vel.set(0, 0, 0);
+    this.speed = 0;
+    this.setMode('hidden');
   }
 
   /** Begin the pursuit from the current position with a leap down onto the slope. */
@@ -130,7 +142,7 @@ export class YetiAI {
     const lead = clamp(dist / 30, 0, 0.8);
     const aheadZ = this.pos.z + clamp(dist, 15, 45);
     // far: follow the route corridor ahead; near: the skier (with lead)
-    const routeTX = THREE.MathUtils.lerp(routeX(aheadZ), target.pos.x, 0.35);
+    const routeTX = THREE.MathUtils.lerp(this.mountain.routeX(aheadZ), target.pos.x, 0.35);
     let tx = THREE.MathUtils.lerp(routeTX, target.pos.x + target.vel.x * lead, near);
     let tz = THREE.MathUtils.lerp(aheadZ, target.pos.z + target.vel.z * lead, near);
     // never target behind itself when the skier is ahead…
@@ -147,7 +159,7 @@ export class YetiAI {
     if (this.obstacles) {
       this.obstacles.grid.query(this.pos.x, this.pos.z + 4, 9, ids);
       for (const id of ids) {
-        const o = this.obstacles.list[id];
+        const o = this.obstacles.get(id);
         if (!o || o.kind === 'rock' || o.kind === 'stump' || o.kind === 'log') continue;
         const dx = this.pos.x - o.x;
         const dz = o.z - this.pos.z;
@@ -169,10 +181,11 @@ export class YetiAI {
     this.turn = damp(this.turn, clamp(-dh * 1.5, -1, 1), 6, dt);
 
     // --- speed model
-    const slope = slopeDegAt(this.pos.z);
+    const slope = this.mountain.slopeDeg(this.pos.z);
     const steepPenalty = 1 - 0.12 * smoothstep(17, 26, slope);
-    const d = Math.abs(this.pos.x - centerX(this.pos.z));
-    const offPiste = smoothstep(halfWidth(this.pos.z) * 0.85, halfWidth(this.pos.z) * 1.15, d);
+    const d = Math.abs(this.pos.x - this.mountain.centerX(this.pos.z));
+    const hw = this.mountain.halfWidth(this.pos.z);
+    const offPiste = smoothstep(hw * 0.85, hw * 1.15, d);
     const terrain = steepPenalty * (1 - 0.22 * offPiste) * (1 - 0.35 * canopy);
     const gap = target.pos.z - this.pos.z;
     // pressure: digs in when behind, harder when far behind (keeps it within earshot/sight),
@@ -180,7 +193,7 @@ export class YetiAI {
     const pressure = smoothstep(YETI.catchUpGap, YETI.catchUpGap + 120, gap) * YETI.catchUpBoost + smoothstep(105, 170, gap) * 7;
     // ramp in over the first seconds of the chase
     const warm = smoothstep(0, 4, this.chaseTime);
-    let desired = (YETI.baseSpeed + pressure) * terrain * (0.55 + 0.45 * warm);
+    let desired = (YETI.baseSpeed * this.speedMul + pressure) * terrain * (0.55 + 0.45 * warm);
     // on gentle ground a running beast is not much faster than a gliding skier
     if (slope < 12) desired = Math.min(desired, 13 + 0.5 * slope);
 
@@ -192,7 +205,7 @@ export class YetiAI {
       this.lungeCooldown = YETI.lungeCooldown;
     }
     if (this.lungeTimer > 0) desired += YETI.lungeBoost;
-    desired = Math.min(desired, YETI.maxSpeed + smoothstep(105, 170, gap) * 6 + (this.lungeTimer > 0 ? YETI.lungeBoost : 0));
+    desired = Math.min(desired, YETI.maxSpeed * this.speedMul + smoothstep(105, 170, gap) * 6 + (this.lungeTimer > 0 ? YETI.lungeBoost : 0));
     if (this.delay > 0) desired = 0;
     this.desired = desired;
 

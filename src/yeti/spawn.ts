@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Mountain, centerX } from '../world/course';
+import type { Mountain } from '../world/course';
 import { caveMouthXZ, type CaveAnchor } from '../world/caveTerrain';
 
 /**
@@ -12,7 +12,7 @@ export function yetiSpawnAfterCinematic(m: Mountain, anchor: CaveAnchor = m.cave
   const z = c.z + 1;
   const pos = new THREE.Vector3(x, m.heightAt(x, z), z);
   // leap toward the piste, slightly downhill
-  const tx = centerX(anchor.z + 14) + 18 * anchor.side;
+  const tx = m.centerX(anchor.z + 14) + 18 * anchor.side;
   const tz = anchor.z + 14;
   const heading = Math.atan2(tx - x, tz - z);
   const dist = Math.hypot(tx - x, tz - z);

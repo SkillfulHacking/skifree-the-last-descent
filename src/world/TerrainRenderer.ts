@@ -1,7 +1,12 @@
 /**
- * Chunked, LOD'd terrain streaming with skirts (no visible cracks), plus a coarse far-field mesh
- * for the distant ranges. Chunk builds are time-sliced (row by row) so streaming never hitches;
- * a chunk keeps showing its previous LOD until the replacement is complete.
+ * Streamed, LOD'd terrain with skirts (no visible cracks) plus streamed far-field tiles for the
+ * distant ranges. Works for any course length: only a window around the focus exists in memory.
+ *
+ * - Corridor chunks (128 m, LOD steps 1–16 m) cover x ∈ [−512, 512] in a z-window around the focus.
+ * - Far-field tiles (2048 m, 64 m step) cover x ∈ [−7168, 7168] with a hole for the corridor.
+ * - Vertex data is stored relative to each mesh's origin (mesh.position), so precision holds at
+ *   any distance down the mountain (see also World's floating origin).
+ * - Builds are time-sliced (row by row); a chunk keeps its previous LOD until the new one is ready.
  */
 import * as THREE from 'three';
 import type { QualityPreset } from '../core/types';
@@ -9,7 +14,10 @@ import type { Mountain } from './course';
 import { createSnowMaterial, type TerrainUniforms } from './snowMaterial';
 
 export const CHUNK = 128;
-export const CORRIDOR = { x0: -512, x1: 512, z0: -384, z1: 3712 };
+export const CORRIDOR_X = { x0: -512, x1: 512 } as const;
+const FAR_TILE = 2048;
+const FAR_STEP = 64;
+const FAR_X = 7168;
 const STEPS = [1, 2, 4, 8, 16] as const;
 
 interface Chunk {
@@ -21,6 +29,13 @@ interface Chunk {
   step: number;
   building: number; // step currently being built (0 = none)
   job: Generator<void, THREE.BufferGeometry, void> | null;
+}
+
+interface FarTile {
+  ix: number;
+  iz: number;
+  mesh: THREE.Mesh | null;
+  job: Generator<void, THREE.BufferGeometry | null, void> | null;
 }
 
 function lodRanges(q: QualityPreset): number[] {
@@ -41,10 +56,18 @@ export class TerrainRenderer {
   readonly group = new THREE.Group();
   readonly material: THREE.MeshStandardMaterial;
   readonly uniforms: TerrainUniforms;
-  private chunks: Chunk[] = [];
-  private far: THREE.Mesh | null = null;
+  private chunks = new Map<number, Chunk>();
+  private far = new Map<number, FarTile>();
   private ranges: number[];
   private queue: Chunk[] = [];
+  private farQueue: FarTile[] = [];
+  /** z-window of corridor chunks around the focus */
+  private behind = 1024;
+  private ahead: number;
+  private farBehind = 4096;
+  private farAhead: number;
+  /** Points that always get full terrain detail (e.g. cave notches). */
+  pinned: Array<{ x: number; z: number; r: number }> = [];
 
   constructor(
     private mountain: Mountain,
@@ -54,15 +77,13 @@ export class TerrainRenderer {
     this.material = m.material;
     this.uniforms = m.uniforms;
     this.ranges = lodRanges(quality);
-    for (let ix = CORRIDOR.x0 / CHUNK; ix < CORRIDOR.x1 / CHUNK; ix++) {
-      for (let iz = CORRIDOR.z0 / CHUNK; iz < CORRIDOR.z1 / CHUNK; iz++) {
-        this.chunks.push({ ix, iz, cx: ix * CHUNK + CHUNK / 2, cz: iz * CHUNK + CHUNK / 2, mesh: null, step: 0, building: 0, job: null });
-      }
-    }
+    this.ahead = { low: 2400, medium: 3000, high: 3600, ultra: 4200 }[quality];
+    this.farAhead = { low: 8192, medium: 10240, high: 12288, ultra: 14336 }[quality];
   }
 
-  /** Points that always get full terrain detail (e.g. the cave notch). */
-  pinned: Array<{ x: number; z: number; r: number }> = [];
+  private key(ix: number, iz: number) {
+    return (iz + 1_000_000) * 64 + (ix + 32);
+  }
 
   desiredStep(c: Chunk, px: number, pz: number): number {
     for (const p of this.pinned) {
@@ -83,23 +104,79 @@ export class TerrainRenderer {
     return 16;
   }
 
-  /** Build everything needed around a focus synchronously-ish (yields to the caller for progress). */
+  /** Create/destroy chunk records for the window around pz. */
+  private syncWindow(pz: number) {
+    const iz0 = Math.floor((pz - this.behind) / CHUNK);
+    const iz1 = Math.floor((pz + this.ahead) / CHUNK);
+    for (let iz = iz0; iz <= iz1; iz++)
+      for (let ix = CORRIDOR_X.x0 / CHUNK; ix < CORRIDOR_X.x1 / CHUNK; ix++) {
+        const k = this.key(ix, iz);
+        if (!this.chunks.has(k)) this.chunks.set(k, { ix, iz, cx: ix * CHUNK + CHUNK / 2, cz: iz * CHUNK + CHUNK / 2, mesh: null, step: 0, building: 0, job: null });
+      }
+    for (const [k, c] of this.chunks) {
+      if (c.iz >= iz0 - 1 && c.iz <= iz1 + 1) continue;
+      if (c.mesh) {
+        c.mesh.geometry.dispose();
+        this.group.remove(c.mesh);
+      }
+      c.job = null;
+      this.chunks.delete(k);
+      const qi = this.queue.indexOf(c);
+      if (qi >= 0) this.queue.splice(qi, 1);
+    }
+    // far tiles
+    const fz0 = Math.floor((pz - this.farBehind) / FAR_TILE);
+    const fz1 = Math.floor((pz + this.farAhead) / FAR_TILE);
+    for (let iz = fz0; iz <= fz1; iz++)
+      for (let ix = -FAR_X / FAR_TILE; ix < FAR_X / FAR_TILE; ix++) {
+        const k = this.key(ix, iz);
+        if (this.far.has(k)) continue;
+        const t: FarTile = { ix, iz, mesh: null, job: null };
+        t.job = this.buildFar(t);
+        this.far.set(k, t);
+        this.farQueue.push(t);
+      }
+    for (const [k, t] of this.far) {
+      if (t.iz >= fz0 - 1 && t.iz <= fz1 + 1) continue;
+      if (t.mesh) {
+        t.mesh.geometry.dispose();
+        this.group.remove(t.mesh);
+      }
+      this.far.delete(k);
+      const qi = this.farQueue.indexOf(t);
+      if (qi >= 0) this.farQueue.splice(qi, 1);
+    }
+  }
+
+  /** Build everything needed around a focus up front (yields to the caller for progress). */
   async prime(px: number, pz: number, onProgress: (f: number) => void): Promise<void> {
-    this.buildFar();
-    const todo = this.chunks.map((c) => ({ c, step: this.desiredStep(c, px, pz) }));
+    this.syncWindow(pz);
+    const todo = [...this.chunks.values()];
+    const total = todo.length + this.farQueue.length;
     let done = 0;
     let last = performance.now();
-    for (const t of todo) {
-      const g = this.buildGeometry(t.c, t.step);
-      let r = g.next();
-      while (!r.done) r = g.next();
-      this.swap(t.c, r.value, t.step);
+    const tick = async () => {
       done++;
       if (performance.now() - last > 30) {
-        onProgress(done / todo.length);
+        onProgress(done / total);
         await new Promise((res) => setTimeout(res, 0));
         last = performance.now();
       }
+    };
+    while (this.farQueue.length) {
+      const t = this.farQueue.shift()!;
+      let r = t.job!.next();
+      while (!r.done) r = t.job!.next();
+      this.swapFar(t, r.value);
+      await tick();
+    }
+    for (const c of todo) {
+      const step = this.desiredStep(c, px, pz);
+      const g = this.buildGeometry(c, step);
+      let r = g.next();
+      while (!r.done) r = g.next();
+      this.swap(c, r.value, step);
+      await tick();
     }
     onProgress(1);
   }
@@ -107,8 +184,8 @@ export class TerrainRenderer {
   /** Per-frame streaming. budgetMs limits CPU time spent building. */
   update(px: number, pz: number, budgetMs: number, time: number): void {
     this.uniforms.uTime.value = time;
-    // schedule rebuilds (desiredStep applies hysteresis); a job for a no-longer-wanted LOD is replaced
-    for (const c of this.chunks) {
+    this.syncWindow(pz);
+    for (const c of this.chunks.values()) {
       const want = this.desiredStep(c, px, pz);
       if (want !== c.step && want !== c.building) {
         c.building = want;
@@ -116,43 +193,79 @@ export class TerrainRenderer {
         if (!this.queue.includes(c)) this.queue.push(c);
       }
     }
-    if (this.queue.length === 0) return;
-    // nearest first
-    this.queue.sort((a, b) => Math.hypot(a.cx - px, a.cz - pz) - Math.hypot(b.cx - px, b.cz - pz));
     const t0 = performance.now();
-    while (this.queue.length && performance.now() - t0 < budgetMs) {
-      const c = this.queue[0]!;
-      if (!c.job) {
-        this.queue.shift();
-        continue;
+    if (this.queue.length) {
+      // nearest first
+      this.queue.sort((a, b) => Math.hypot(a.cx - px, a.cz - pz) - Math.hypot(b.cx - px, b.cz - pz));
+      while (this.queue.length && performance.now() - t0 < budgetMs) {
+        const c = this.queue[0]!;
+        if (!c.job) {
+          this.queue.shift();
+          continue;
+        }
+        const r = c.job.next();
+        if (r.done) {
+          this.swap(c, r.value, c.building);
+          c.job = null;
+          c.building = 0;
+          this.queue.shift();
+        }
       }
-      const r = c.job.next();
+    }
+    // far tiles get whatever budget is left (they are far away; a frame or two late is invisible)
+    while (this.farQueue.length && performance.now() - t0 < budgetMs * 1.2) {
+      const t = this.farQueue[0]!;
+      const r = t.job!.next();
       if (r.done) {
-        this.swap(c, r.value, c.building);
-        c.job = null;
-        c.building = 0;
-        this.queue.shift();
+        this.swapFar(t, r.value);
+        this.farQueue.shift();
       }
     }
   }
 
   get pending(): number {
-    return this.queue.length;
+    return this.queue.length + this.farQueue.length;
+  }
+  get chunkCount(): number {
+    return this.chunks.size;
+  }
+  get farCount(): number {
+    return this.far.size;
   }
 
   private swap(c: Chunk, geo: THREE.BufferGeometry, step: number) {
+    if (!this.chunks.has(this.key(c.ix, c.iz))) {
+      geo.dispose(); // chunk left the window while building
+      return;
+    }
     if (c.mesh) {
       c.mesh.geometry.dispose();
       c.mesh.geometry = geo;
     } else {
       c.mesh = new THREE.Mesh(geo, this.material);
       c.mesh.receiveShadow = true;
-      c.mesh.matrixAutoUpdate = false;
-      c.mesh.updateMatrix();
+      c.mesh.position.set(c.ix * CHUNK, (geo.userData['y0'] as number) ?? 0, c.iz * CHUNK);
       this.group.add(c.mesh);
     }
+    c.mesh.position.y = (geo.userData['y0'] as number) ?? 0;
+    c.mesh.updateMatrix();
+    c.mesh.matrixAutoUpdate = false;
     c.mesh.castShadow = step <= 2;
     c.step = step;
+  }
+
+  private swapFar(t: FarTile, geo: THREE.BufferGeometry | null) {
+    if (!geo) return;
+    if (!this.far.has(this.key(t.ix, t.iz))) {
+      geo.dispose();
+      return;
+    }
+    t.mesh = new THREE.Mesh(geo, this.material);
+    t.mesh.position.set(t.ix * FAR_TILE, (geo.userData['y0'] as number) ?? 0, t.iz * FAR_TILE);
+    t.mesh.updateMatrix();
+    t.mesh.matrixAutoUpdate = false;
+    t.mesh.receiveShadow = false;
+    this.group.add(t.mesh);
   }
 
   private *buildGeometry(c: Chunk, step: number): Generator<void, THREE.BufferGeometry, void> {
@@ -163,12 +276,14 @@ export class TerrainRenderer {
     const z0 = c.iz * CHUNK;
     // heights with a 1-vertex ring for normals
     const hs = vs + 2;
-    const H = new Float32Array(hs * hs);
+    const H = new Float64Array(hs * hs);
     for (let j = 0; j < hs; j++) {
       const z = z0 + (j - 1) * step;
       for (let i = 0; i < hs; i++) H[j * hs + i] = m.heightAt(x0 + (i - 1) * step, z);
       if ((j & 3) === 3) yield;
     }
+    // local vertical origin keeps vertex values small (precision on long courses)
+    const y0 = Math.round(H[(1 + (vs >> 1)) * hs + 1 + (vs >> 1)]!);
     const skirtCount = 4 * n;
     const vCount = vs * vs + skirtCount + 4;
     const pos = new Float32Array(vCount * 3);
@@ -180,10 +295,9 @@ export class TerrainRenderer {
       for (let i = 0; i < vs; i++) {
         const x = x0 + i * step;
         const hi = (j + 1) * hs + (i + 1);
-        const h = H[hi]!;
-        pos[k * 3] = x;
-        pos[k * 3 + 1] = h;
-        pos[k * 3 + 2] = z;
+        pos[k * 3] = i * step;
+        pos[k * 3 + 1] = H[hi]! - y0;
+        pos[k * 3 + 2] = j * step;
         const nx = H[hi - 1]! - H[hi + 1]!;
         const nz = H[hi - hs]! - H[hi + hs]!;
         const ny = 2 * step;
@@ -201,7 +315,6 @@ export class TerrainRenderer {
       }
       if ((j & 7) === 7) yield;
     }
-    // indices
     const quads = n * n;
     const idx = new Uint32Array(quads * 6 + skirtCount * 6);
     let t = 0;
@@ -223,10 +336,10 @@ export class TerrainRenderer {
     // skirts: duplicate border vertices pushed down; hides cracks between LODs
     const depth = 2 + step * 1.5;
     const border: number[] = [];
-    for (let i = 0; i < n; i++) border.push(i); // bottom edge (j=0)
-    for (let j = 0; j < n; j++) border.push(j * vs + n); // right edge
-    for (let i = n; i > 0; i--) border.push(n * vs + i); // top edge
-    for (let j = n; j > 0; j--) border.push(j * vs); // left edge
+    for (let i = 0; i < n; i++) border.push(i);
+    for (let j = 0; j < n; j++) border.push(j * vs + n);
+    for (let i = n; i > 0; i--) border.push(n * vs + i);
+    for (let j = n; j > 0; j--) border.push(j * vs);
     const skirtStart = k;
     for (const bi of border) {
       pos[k * 3] = pos[bi * 3]!;
@@ -245,7 +358,6 @@ export class TerrainRenderer {
       const b = border[(e + 1) % border.length]!;
       const as = skirtStart + e;
       const bs = skirtStart + ((e + 1) % border.length);
-      // double-sided via two windings is unnecessary: border loop is CCW from above → outward faces
       idx[t++] = a; idx[t++] = b; idx[t++] = as;
       idx[t++] = b; idx[t++] = bs; idx[t++] = as;
     }
@@ -254,60 +366,61 @@ export class TerrainRenderer {
     geo.setAttribute('normal', new THREE.BufferAttribute(nor.subarray(0, k * 3), 3));
     geo.setAttribute('aSurf', new THREE.BufferAttribute(surf.subarray(0, k * 3), 3));
     geo.setIndex(new THREE.BufferAttribute(idx.subarray(0, t), 1));
+    geo.userData['y0'] = y0;
     geo.computeBoundingSphere();
     geo.computeBoundingBox();
     return geo;
   }
 
-  /** Far field: coarse grid over the whole valley + ranges, with a hole where corridor chunks live. */
-  private buildFar() {
-    if (this.far) return;
+  /** Far-field tile with a hole where corridor chunks live. Returns null if fully inside the corridor. */
+  private *buildFar(tile: FarTile): Generator<void, THREE.BufferGeometry | null, void> {
     const m = this.mountain;
-    const step = 64;
-    const X0 = -7040;
-    const X1 = 7040;
-    const Z0 = -5120;
-    const Z1 = 10240;
-    const nx = (X1 - X0) / step;
-    const nz = (Z1 - Z0) / step;
-    const vs = nx + 1;
-    const pos = new Float32Array(vs * (nz + 1) * 3);
-    const surf = new Float32Array(vs * (nz + 1) * 3);
-    for (let j = 0; j <= nz; j++)
-      for (let i = 0; i <= nx; i++) {
+    const X0 = tile.ix * FAR_TILE;
+    const Z0 = tile.iz * FAR_TILE;
+    const n = FAR_TILE / FAR_STEP;
+    const vs = n + 1;
+    const H = new Float64Array(vs * vs);
+    for (let j = 0; j <= n; j++) {
+      for (let i = 0; i <= n; i++) H[j * vs + i] = m.heightAt(X0 + i * FAR_STEP, Z0 + j * FAR_STEP);
+      if ((j & 7) === 7) yield;
+    }
+    const y0 = Math.round(H[(vs >> 1) * vs + (vs >> 1)]!);
+    const pos = new Float32Array(vs * vs * 3);
+    const surf = new Float32Array(vs * vs * 3);
+    for (let j = 0; j <= n; j++)
+      for (let i = 0; i <= n; i++) {
         const k = j * vs + i;
-        const x = X0 + i * step;
-        const z = Z0 + j * step;
-        pos[k * 3] = x;
-        pos[k * 3 + 1] = m.heightAt(x, z);
-        pos[k * 3 + 2] = z;
+        pos[k * 3] = i * FAR_STEP;
+        pos[k * 3 + 1] = H[k]! - y0;
+        pos[k * 3 + 2] = j * FAR_STEP;
         surf[k * 3 + 1] = 0.6;
       }
     const idx: number[] = [];
-    for (let j = 0; j < nz; j++)
-      for (let i = 0; i < nx; i++) {
-        const x = X0 + i * step;
-        const z = Z0 + j * step;
-        const inside = x >= CORRIDOR.x0 && x + step <= CORRIDOR.x1 && z >= CORRIDOR.z0 && z + step <= CORRIDOR.z1;
+    for (let j = 0; j < n; j++)
+      for (let i = 0; i < n; i++) {
+        const x = X0 + i * FAR_STEP;
+        // corridor chunks cover x ∈ [−512, 512] for the whole streamed z-range
+        const inside = x >= CORRIDOR_X.x0 && x + FAR_STEP <= CORRIDOR_X.x1;
         if (inside) continue;
         const a = j * vs + i;
         idx.push(a, a + vs, a + vs + 1, a, a + vs + 1, a + 1);
       }
+    if (!idx.length) return null;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('aSurf', new THREE.BufferAttribute(surf, 3));
     geo.setIndex(idx);
     geo.computeVertexNormals();
     geo.computeBoundingSphere();
-    this.far = new THREE.Mesh(geo, this.material);
-    this.far.receiveShadow = false;
-    this.far.matrixAutoUpdate = false;
-    this.group.add(this.far);
+    geo.userData['y0'] = y0;
+    return geo;
   }
 
   dispose() {
-    for (const c of this.chunks) c.mesh?.geometry.dispose();
-    this.far?.geometry.dispose();
+    for (const c of this.chunks.values()) c.mesh?.geometry.dispose();
+    for (const t of this.far.values()) t.mesh?.geometry.dispose();
+    this.chunks.clear();
+    this.far.clear();
     this.material.dispose();
   }
 }

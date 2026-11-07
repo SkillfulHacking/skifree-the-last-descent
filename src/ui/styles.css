@@ -158,3 +158,29 @@ kbd {
 .hud-caption { position: absolute; left: 50%; bottom: calc(11vh + 64px); transform: translateX(-50%); padding: 6px 14px; border-radius: 8px; background: rgba(0,0,0,0.55); font-size: 15px; letter-spacing: 0.04em; opacity: 0; transition: opacity 0.25s !important; white-space: nowrap; }
 .hud-caption.on { opacity: 1; }
 .hud-center.run { top: 18%; font-size: clamp(44px, 7vw, 96px) !important; }
+
+/* ---------- main menu (pass 2): hero title outside the panel; fits without scrolling ---------- */
+.menu-root.main { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0;
+  padding: clamp(16px, 4%, 56px) 6vw; overflow: hidden;
+  background: linear-gradient(90deg, rgba(6,14,26,0.78) 0%, rgba(6,14,26,0.42) 40%, rgba(6,14,26,0) 68%); }
+.menu-hero { flex: 0 0 auto; padding: 0 0 0 4px; max-width: 100%; }
+.menu-hero .hero-title { margin: 0; font: 900 clamp(52px, min(9.5vw, 15vh), 150px)/0.92 var(--display); letter-spacing: 0.05em;
+  white-space: nowrap; color: #fff; text-shadow: 0 8px 40px rgba(0,0,0,0.35); padding-top: 0.04em; }
+.menu-hero .hero-tagline { font-weight: 800; letter-spacing: 0.55em; color: var(--ice); font-size: clamp(12px, min(1.5vw, 2.3vh), 20px); margin: 0.5em 0 0 0.2em; white-space: nowrap; }
+.main .menu-panel { flex: 0 1 auto; min-height: 0; max-height: none; width: min(520px, 88vw); margin-top: clamp(10px, 2.6vh, 30px); overflow-y: auto; padding: 2px 6px 2px 2px; }
+.main .menu-subtitle { margin: 0 0 8px 4px; }
+.main .menu-list { gap: clamp(2px, 0.5vh, 6px); }
+.main .menu-row { padding: clamp(6px, 1.05vh, 12px) 18px; }
+.main .menu-row.kind-button .label { font-size: clamp(15px, min(1.2vw, 2.2vh), 18px); }
+.main .menu-row.kind-button.primary { background: linear-gradient(90deg, rgba(255,106,43,0.92), rgba(255,140,60,0.78)); border-color: rgba(255,255,255,0.35); margin-bottom: 4px; }
+.main .menu-row.kind-button.primary .label { font-size: clamp(19px, min(1.6vw, 2.8vh), 24px); letter-spacing: 0.08em; }
+.main .menu-row.kind-button.primary.focus .label::before { color: #fff; }
+.main .menu-row.kind-info { padding: 2px 18px; }
+.main .menu-foot { margin-top: clamp(4px, 1vh, 14px); }
+.menu-aside { flex: 0 0 auto; margin-top: clamp(6px, 1.5vh, 16px); padding-left: 6px; font-size: 12px; color: var(--ink-dim); max-width: min(520px, 88vw); }
+.course-card { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; font-size: 12.5px; color: var(--ink-dim); line-height: 1.35; }
+.code, .course-card .code { font: 800 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; color: #fff; letter-spacing: 0.08em; background: rgba(255,255,255,0.1); padding: 1px 7px; border-radius: 5px; }
+.course-card .rec { flex-basis: 100%; }
+.menu-row .ctl input { width: 190px; font: 700 15px var(--font); color: #fff; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 5px 10px; outline: none; text-transform: uppercase; }
+.menu-row .ctl input:focus { border-color: var(--accent); background: rgba(255,255,255,0.14); }
+.menu-root.main .menu-row.kind-select .val { min-width: 150px; }

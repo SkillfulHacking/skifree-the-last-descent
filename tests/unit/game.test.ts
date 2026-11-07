@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { RunState } from '../../src/game/RunState';
-import { COURSE, Mountain, routeX, SEED_DEFAULT } from '../../src/world/course';
+import { COURSE, Mountain, SEED_DEFAULT } from '../../src/world/course';
+const CM = new Mountain();
+const routeX = (z: number) => CM.routeX(z);
 import { applyRun, DEFAULT_RECORDS, loadRecords, loadSettings, saveRecords, saveSettings, DEFAULT_SETTINGS, type KV } from '../../src/core/settings';
 import { generateObstacles, laneClearance } from '../../src/physics/obstacles';
 import { simulateRun } from '../../src/game/simulate';
@@ -133,8 +135,11 @@ describe('world generation & fairness', () => {
     for (let i = 0; i < 50; i++) expect(a.heightAt(i * 13 - 300, i * 61)).toBe(b.heightAt(i * 13 - 300, i * 61));
     const oa = generateObstacles(a, SEED_DEFAULT);
     const ob = generateObstacles(b, SEED_DEFAULT);
-    expect(oa.list.length).toBe(ob.list.length);
-    expect(oa.list[123]).toEqual(ob.list[123]);
+    const la = [...oa.all()];
+    const lb = [...ob.all()];
+    expect(la.length).toBe(lb.length);
+    expect(la.length).toBeGreaterThan(1000);
+    expect(la[123]).toEqual(lb[123]);
   });
 
   it('the course descends from summit to the finish with no uphill along the route', () => {
@@ -161,18 +166,18 @@ describe('world generation & fairness', () => {
     const fx = routeX(COURSE.finishZ);
     for (let z = COURSE.finishZ - 110; z <= COURSE.finishZ; z += 5) expect(Math.abs(routeX(z) - fx)).toBeLessThan(6);
     const m = new Mountain();
-    for (const k of m.features.kickers) expect(k.z).toBeLessThan(COURSE.finishZ - 150);
+    for (const k of m.profile.kickersNear(-1e9, 1e9, [])) expect(k.z).toBeLessThan(COURSE.finishZ - 150);
   });
 
   it('jump opportunities exist along the route', () => {
     const m = new Mountain();
-    const onRoute = m.features.kickers.filter((k) => Math.abs(k.d - (routeX(k.z) - (routeX(k.z) - k.d))) < 1e9);
+    const onRoute = m.profile.kickersNear(-1e9, 1e9, []).filter((k: { d: number; z: number }) => Math.abs(k.d - (routeX(k.z) - (routeX(k.z) - k.d))) < 1e9);
     expect(onRoute.length).toBeGreaterThanOrEqual(8);
   });
 });
 
 describe('pursuit fairness (full headless runs)', () => {
-  const style = (s: Parameters<typeof autopilotInput>[1]) => (st: Parameters<typeof autopilotInput>[0], t: number) => autopilotInput(st, s, t);
+  const style = (s: Parameters<typeof autopilotInput>[2]) => (st: Parameters<typeof autopilotInput>[1], t: number) => autopilotInput(CM, st, s, t);
 
   it('a skilled skier can escape and win', () => {
     const r = simulateRun(style('skilled'));

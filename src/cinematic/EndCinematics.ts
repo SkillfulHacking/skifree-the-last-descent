@@ -98,7 +98,7 @@ export class VictoryCinematic {
   readonly stopPoint = new THREE.Vector3();
 
   constructor(private st: Stage) {
-    const r = st.world.resort;
+    const r = st.world.resort!;
     r.getStopPoint(this.stopPoint);
     r.getYetiStopPoint(this.yetiStop);
     const fz = r.finishZ;
@@ -237,7 +237,7 @@ export class VictoryCinematic {
     if (this.trophyT >= 0) {
       this.trophyT += dt;
       const k = Math.min(1, this.trophyT / 1.2);
-      const trophy = st.world.resort.trophy;
+      const trophy = st.world.resort!.trophy;
       const handPos = new THREE.Vector3();
       st.skier.rightHandSocket.getWorldPosition(handPos);
       if (k < 1) {

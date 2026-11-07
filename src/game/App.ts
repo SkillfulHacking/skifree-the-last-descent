@@ -12,9 +12,10 @@ import { Input, ACTION_LABELS, keyName, type Action, DEFAULT_BINDINGS, type Game
 const NEUTRAL_INPUT: GameplayInput = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recoverPressed: false, lookBack: false, pausePressed: false, skipPressed: false, camX: 0, camY: 0 };
 import { Hud } from '../ui/Hud';
 import { MenuSystem, type Screen, type MenuItem } from '../ui/Menu';
-import { applyRun, loadRecords, loadSettings, saveRecords, saveSettings, type RunStats, type Settings, type Records } from '../core/settings';
+import { applyRun, loadRecordBook, loadSettings, recordsFor, saveRecordBook, saveSettings, type RecordBook, type RunStats, type Settings, type Records } from '../core/settings';
 import type { QualityPreset } from '../core/types';
-import { COURSE, SEED_DEFAULT, routeX } from '../world/course';
+import { LENGTH_INFO, LENGTH_MODES, addDays, courseId, courseLabel, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
+import { fmtDistance } from '../ui/Hud';
 import type { AutopilotStyle } from '../debug/autopilot';
 
 type Mode = 'loading' | 'menu' | 'playing' | 'paused' | 'results';
@@ -23,7 +24,11 @@ export class App {
   readonly renderer: THREE.WebGLRenderer;
   readonly camera: THREE.PerspectiveCamera;
   settings: Settings;
-  records: Records;
+  book: RecordBook;
+  /** records of the current course */
+  get records(): Records {
+    return recordsFor(this.book, courseId(this.currentCourse()));
+  }
   readonly input: Input;
   readonly audio = new AudioEngine();
   readonly hud: Hud;
@@ -46,7 +51,7 @@ export class App {
 
   constructor(container: HTMLElement) {
     this.settings = loadSettings();
-    this.records = loadRecords();
+    this.book = loadRecordBook();
     this.renderer = new THREE.WebGLRenderer({ antialias: this.settings.quality !== 'low', powerPreference: 'high-performance', stencil: false });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.AgXToneMapping;
@@ -140,20 +145,22 @@ export class App {
   }
 
   async start() {
-    await this.buildWorld(this.settings.quality, this.courseSeed());
+    await this.buildWorld(this.settings.quality, this.currentCourse());
     this.loop();
     if (new URLSearchParams(location.search).has('debug')) this.installDebug();
     this.toMenu();
     (window as unknown as { __ready: boolean }).__ready = true;
   }
 
-  private courseSeed(): number {
-    if (this.settings.course !== 'daily') return SEED_DEFAULT;
-    const d = new Date();
-    return (d.getUTCFullYear() * 10000 + (d.getUTCMonth() + 1) * 100 + d.getUTCDate()) ^ 0x5eed;
+  /** The course the menu currently selects (Daily follows the UTC date unless a past day is chosen). */
+  currentCourse(): CourseConfig {
+    const s = this.settings;
+    const today = utcDate();
+    const date = s.dailyDate && s.dailyDate < today ? s.dailyDate : today;
+    return makeCourse(s.course, s.courseLength, { date, customText: s.customSeed });
   }
 
-  private async buildWorld(q: QualityPreset, seed = SEED_DEFAULT) {
+  private async buildWorld(q: QualityPreset, course: CourseConfig) {
     this.mode = 'loading';
     this.loadingEl.classList.remove('hidden');
     const t0 = performance.now();
@@ -165,10 +172,10 @@ export class App {
     }
     this.skier?.dispose();
     this.yeti?.dispose();
-    const world = await World.create(this.renderer, q, (f, label) => {
+    const world = await World.create(this.renderer, q, course, (f, label) => {
       this.loadingBar.style.width = `${(f * 100).toFixed(0)}%`;
       this.loadingLabel.textContent = label;
-    }, seed);
+    });
     this.skier = new SkierModel({ quality: q });
     this.yeti = new YetiModel({ quality: q });
     world.scene.add(this.skier.root, this.yeti.root);
@@ -182,24 +189,25 @@ export class App {
     world.particles.setPixelRatio(this.renderer.getPixelRatio(), innerHeight);
     // warm up shaders to avoid first-frame hitches
     this.placeMenuSkier();
-    this.camera.position.set(routeX(0) + 20, world.mountain.heightAt(routeX(0), 0) + 10, -30);
-    this.camera.lookAt(routeX(0), world.mountain.heightAt(routeX(0), 0), 40);
+    const r0 = world.mountain.routeX(0);
+    this.camera.position.set(r0 + 20, world.mountain.heightAt(r0, 0) + 10, -30);
+    this.camera.lookAt(r0, world.mountain.heightAt(r0, 0), 40);
     // warm up every shader permutation (including shadow passes) to avoid hitches at first sight
     this.yeti.setVisible(true);
     world.showAllForWarmup();
-    world.resort.group.visible = true;
+    if (world.resort) world.resort.group.visible = true;
     this.renderer.compile(world.scene, this.camera);
     this.renderer.shadowMap.needsUpdate = true;
     this.renderer.render(world.scene, this.camera);
     this.yeti.setVisible(false);
     this.loadingBar.style.width = '100%';
-    console.info(`[skifree] world built in ${(performance.now() - t0).toFixed(0)} ms (${q}); trees+rocks: ${world.obstacles.list.length}`);
+    console.info(`[skifree] ${world.id} built in ${(performance.now() - t0).toFixed(0)} ms (${q}); obstacles loaded: ${world.obstacles.obstacleCount}`);
     this.loadingEl.classList.add('hidden');
   }
 
   private placeMenuSkier() {
     if (!this.world || !this.skier) return;
-    const x = routeX(1);
+    const x = this.world.mountain.routeX(1);
     this.skier.root.position.set(x, this.world.mountain.heightAt(x, 1), 1);
     this.skier.root.rotation.set(0, 0, 0);
     this.skier.setVisible(true);
@@ -217,43 +225,117 @@ export class App {
     this.audio.setMusicMode('menu');
     this.audio.setPaused(false);
     this.input.captureKeys = true;
+    this.menu.open(this.mainScreen());
+  }
+
+  private mainScreen(): Screen {
+    const st = this.settings;
+    const c = this.currentCourse();
     const r = this.records;
-    const best = r.bestTime !== null ? `Best time ${fmtTime(r.bestTime)} · ` : '';
-    this.menu.open({
+    const today = utcDate();
+    const changed = () => {
+      this.saveAll();
+      this.menu.replace(this.mainScreen());
+    };
+    const items: MenuItem[] = [
+      { kind: 'button', label: 'Start', hint: LENGTH_INFO[c.length].label, primary: true, action: () => void this.startRun(false) },
+      {
+        kind: 'select',
+        label: 'Mountain',
+        options: [
+          { value: 'classic', label: 'The Last Descent' },
+          { value: 'daily', label: 'Daily Mountain' },
+          { value: 'custom', label: 'Custom seed' },
+        ],
+        get: () => st.course,
+        set: (v) => {
+          st.course = v as CourseMode;
+          changed();
+        },
+      },
+      {
+        kind: 'select',
+        label: 'Length',
+        options: LENGTH_MODES.map((l) => ({ value: l, label: LENGTH_INFO[l].label })),
+        get: () => st.courseLength,
+        set: (v) => {
+          st.courseLength = v as LengthMode;
+          changed();
+        },
+      },
+    ];
+    if (st.course === 'daily') {
+      const days = Array.from({ length: 14 }, (_, i) => addDays(today, -i));
+      const hrs = Math.floor(msUntilRollover() / 3600000);
+      items.push({
+        kind: 'select',
+        label: 'Day (UTC)',
+        note: `new mountain in ${hrs} h · rolls over 00:00 UTC`,
+        options: days.map((d, i) => ({ value: d, label: i === 0 ? `Today · ${d}` : d })),
+        get: () => c.date ?? today,
+        set: (v) => {
+          st.dailyDate = v === today ? null : v;
+          changed();
+        },
+      });
+    } else if (st.course === 'custom') {
+      items.push({
+        kind: 'text',
+        label: 'Seed',
+        note: 'any word or number',
+        placeholder: 'POWDER',
+        maxLength: 24,
+        get: () => st.customSeed,
+        set: (v) => {
+          st.customSeed = v.toUpperCase().slice(0, 24);
+          changed();
+        },
+      });
+    }
+    const best = r.runs ? `Best ${r.bestScore.toLocaleString('en-US')} pts${r.bestTime !== null ? ` · ${fmtTime(r.bestTime)}` : ''} · ${fmtDistance(r.bestDistance)} · ${r.runs} run${r.runs === 1 ? '' : 's'}` : 'No runs on this course yet';
+    items.push(
+      { kind: 'info', html: `<div class="course-card"><span>Course code <span class="code">${courseId(c)}</span></span><span>seed ${c.seed}</span><span class="rec">${best} <i>(this device only)</i></span></div>` },
+      {
+        kind: 'text',
+        label: 'Enter a course code',
+        note: 'play a code a friend shared',
+        placeholder: 'DAILY-2026-11-07-STD',
+        maxLength: 32,
+        get: () => '',
+        set: (v) => {
+          const parsed = parseCourseId(v);
+          if (!parsed) {
+            this.hud.caption(`Unknown course code: ${v.slice(0, 32)}`, 3);
+            return;
+          }
+          st.course = parsed.mode;
+          st.courseLength = parsed.length;
+          if (parsed.mode === 'daily') st.dailyDate = parsed.date === today ? null : parsed.date;
+          if (parsed.mode === 'custom' && parsed.customText) st.customSeed = parsed.customText;
+          changed();
+        },
+      },
+      { kind: 'button', label: 'Controls', action: () => this.menu.push(this.controlsScreen()) },
+      { kind: 'button', label: 'Settings', action: () => this.menu.push(this.settingsScreen()) },
+      { kind: 'button', label: 'Credits & Licences', action: () => this.menu.push(this.creditsScreen()) },
+    );
+    return {
       id: 'main',
       cls: 'main',
       title: 'SKIFREE',
-      subtitle: `<span class="tld">THE LAST DESCENT</span><span class="records">${best}Best score ${r.bestScore.toLocaleString('en-US')} · Runs ${r.runs} · Survived ${r.wins}</span>`,
-      items: [
-        { kind: 'button', label: 'Start Game', primary: true, action: () => void this.startRun(false) },
-        {
-          kind: 'select',
-          label: 'Course',
-          note: 'Daily: a new mountain every day',
-          options: [
-            { value: 'classic', label: 'The Last Descent' },
-            { value: 'daily', label: `Daily ${new Date().toISOString().slice(0, 10)}` },
-          ],
-          get: () => this.settings.course,
-          set: (v) => {
-            this.settings.course = v as 'classic' | 'daily';
-            this.saveAll();
-          },
-        },
-        { kind: 'button', label: 'Controls', action: () => this.menu.push(this.controlsScreen()) },
-        { kind: 'button', label: 'Settings', action: () => this.menu.push(this.settingsScreen()) },
-        { kind: 'button', label: 'Credits & Licences', action: () => this.menu.push(this.creditsScreen()) },
-      ],
-    });
+      hero: { title: 'SKIFREE', tagline: 'THE LAST DESCENT' },
+      items,
+      aside: `${courseLabel(c)}`,
+    };
   }
 
   async startRun(retry: boolean) {
     void this.audio.unlock().then(() => this.applyVolumes());
-    const seed = this.courseSeed();
+    const course = this.currentCourse();
     const q = this.pendingQuality ?? this.settings.quality;
-    if (q !== this.world?.quality || seed !== this.world?.seed) {
+    if (q !== this.world?.quality || courseId(course) !== this.world?.id) {
       this.menu.close();
-      await this.buildWorld(q, seed);
+      await this.buildWorld(q, course);
       this.applyPixelRatio();
     }
     this.pendingQuality = null;
@@ -267,10 +349,10 @@ export class App {
       onResults: (stats, won) => this.showResults(stats, won),
       onPauseRequest: () => this.pause(),
     }, { skipIntro: retry });
-    this.session.recordsSeenCave = this.records.seenCaveCinematic;
+    this.session.recordsSeenCave = this.book.seenCaveCinematic;
     this.session.onCaveSeen = () => {
-      this.records.seenCaveCinematic = true;
-      saveRecords(this.records);
+      this.book.seenCaveCinematic = true;
+      saveRecordBook(this.book);
     };
     this.mode = 'playing';
   }
@@ -288,13 +370,25 @@ export class App {
       this.audio.setPaused(false);
       this.input.clearHeld();
     };
+    const s = this.session;
+    const retire: MenuItem[] = s.endless
+      ? [{ kind: 'button', label: 'Retire & bank', hint: `${s.banked.toLocaleString('en-US')} pts`, action: () => {
+          this.menu.close();
+          this.mode = 'playing';
+          s.paused = false;
+          this.audio.setPaused(false);
+          s.retire();
+        } }]
+      : [];
     this.menu.open({
       id: 'pause',
       cls: 'pause',
       title: 'PAUSED',
+      subtitle: `${courseLabel(this.world!.course)} · <span class="code">${this.world!.id}</span>`,
       onBack: resume,
       items: [
         { kind: 'button', label: 'Resume', primary: true, action: resume },
+        ...retire,
         { kind: 'button', label: 'Restart Run', action: () => void this.startRun(true) },
         { kind: 'button', label: 'Controls', action: () => this.menu.push(this.controlsScreen()) },
         { kind: 'button', label: 'Settings', action: () => this.menu.push(this.settingsScreen()) },
@@ -304,17 +398,21 @@ export class App {
   }
 
   private showResults(stats: RunStats, won: boolean) {
-    const { records, newBest } = applyRun(this.records, stats);
-    this.records = records;
-    saveRecords(records);
+    const id = stats.courseId ?? courseId(this.currentCourse());
+    const { records, newBest } = applyRun(recordsFor(this.book, id), stats);
+    this.book.courses[id] = records;
+    saveRecordBook(this.book);
+    const endless = !!this.session?.endless;
     this.mode = 'results';
     const nb = (k: string) => (newBest.includes(k) ? ' <em>NEW BEST</em>' : '');
     const row = (k: string, v: string) => `<div class="stat"><span>${k}</span><b>${v}</b></div>`;
     const html = `<div class="stats">
-      ${row('Result', won ? 'Reached the resort' : 'Caught by the Yeti')}
+      ${row('Course', `${courseLabel(this.world!.course)}`)}
+      ${row('Course code', `<span class="code">${id}</span> · seed ${stats.seed ?? this.world!.seed}`)}
+      ${row('Result', won ? 'Reached the resort' : stats.banked ? `Retired at refuge ${stats.checkpoints}` : endless ? `Caught after ${stats.checkpoints} refuge${stats.checkpoints === 1 ? '' : 's'}` : 'Caught by the Yeti')}
       ${row('Score', stats.score.toLocaleString('en-US') + nb('score'))}
       ${row('Time', fmtTime(stats.time) + (won ? nb('time') : ''))}
-      ${row('Distance', `${Math.round(stats.distance)} m` + nb('distance'))}
+      ${row('Distance', fmtDistance(stats.distance) + nb('distance'))}
       ${row('Max speed', `${Math.round(stats.maxSpeed * 3.6)} km/h`)}
       ${row('Airtime', `${stats.airtime.toFixed(1)} s (longest ${stats.longestAir.toFixed(1)} s)`)}
       ${row('Major crashes', String(stats.crashes))}
@@ -324,7 +422,7 @@ export class App {
     this.menu.open({
       id: 'results',
       cls: won ? 'results win' : 'results lose',
-      title: won ? 'YOU SURVIVED THE MOUNTAIN' : 'THE YETI WAS HUNGRY',
+      title: won ? 'YOU SURVIVED THE MOUNTAIN' : stats.banked ? 'RUN BANKED' : 'THE YETI WAS HUNGRY',
       items: [
         { kind: 'info', html },
         { kind: 'button', label: 'Retry', primary: true, action: () => void this.startRun(true) },
@@ -502,7 +600,7 @@ export class App {
       this.menuTime += dt;
       this.menu.update(this.input.menu(dt));
       // living mountain: slow crane around the summit
-      const cx = routeX(0);
+      const cx = w.mountain.routeX(0);
       const cy = w.mountain.heightAt(cx, 0);
       const a = this.menuTime * 0.04 + 2.4;
       this.camera.position.set(cx + Math.sin(a) * 26, cy + 6 + Math.sin(this.menuTime * 0.1) * 1.5, Math.cos(a) * 26 + 4);
@@ -522,7 +620,7 @@ export class App {
         this.session.frame(dt, NEUTRAL_INPUT, this.input.activeDevice);
       } else if (this.mode === 'playing') this.session.frame(dt, this.input.gameplay(dt), this.input.activeDevice);
       // only animate the resort (guests, steam, flames) when the camera is anywhere near it
-      if (Math.abs(this.camera.position.z - w.resort.finishZ) < 900) w.resort.update(dt, performance.now() / 1000, this.session.resortState);
+      if (w.resort && Math.abs(this.camera.position.z - w.resort.finishZ) < 900) w.resort.update(dt, performance.now() / 1000, this.session.resortState);
     }
     if (this.freeCam) {
       this.camera.position.copy(this.freeCam.pos);
@@ -531,8 +629,11 @@ export class App {
       this.camera.updateProjectionMatrix();
     }
     if (this.yetiRim) this.yetiRim.intensity = this.session && this.session.run.yetiReleased ? 6 : 0;
-    this.renderer.render(w.scene, this.camera);
-    this.renderRearView();
+    if (this.mode === 'menu' || this.mode === 'loading') w.updateOrigin(this.camera.position);
+    w.renderShifted([this.camera, this.rearCam], () => {
+      this.renderer.render(w.scene, this.camera);
+      this.renderRearView();
+    });
   }
 
   private yetiRim: THREE.PointLight | null = null;
@@ -622,7 +723,22 @@ export class App {
   // --- debug harness (only with ?debug in the URL; never shown in the UI) ---------
   private installDebug() {
     const api = {
-      state: () => ({ mode: this.mode, menu: this.menu.current?.id ?? null, session: this.session?.debugState() ?? null, records: this.records }),
+      state: () => ({ mode: this.mode, menu: this.menu.current?.id ?? null, session: this.session?.debugState() ?? null, records: this.records, course: this.world ? { id: this.world.id, label: courseLabel(this.world.course), seed: this.world.seed, finishZ: this.world.mountain.finishZ } : null }),
+      /** select a course like the menu does (persists to settings), e.g. setCourse('daily','sprint',{date}) */
+      setCourse: (mode: CourseMode, length: LengthMode, opts: { date?: string | null; custom?: string } = {}) => {
+        this.settings.course = mode;
+        this.settings.courseLength = length;
+        if (opts.date !== undefined) this.settings.dailyDate = opts.date;
+        if (opts.custom) this.settings.customSeed = opts.custom;
+        this.saveAll();
+        if (this.mode === 'menu') this.menu.replace(this.mainScreen());
+        return courseId(this.currentCourse());
+      },
+      currentCourse: () => ({ ...this.currentCourse(), id: courseId(this.currentCourse()) }),
+      toChase: () => this.session?.debugToChase(),
+      retire: () => this.session?.retire(),
+      menuFocus: (label: string) => this.menu.focusLabel(label),
+      menuFocusIndex: () => this.menu.focusIndex,
       perf: () => {
         const s = [...this.perf.samples].sort((a, b) => a - b);
         const i = this.renderer.info;
@@ -631,14 +747,17 @@ export class App {
       startRun: (skipIntro = true) => this.startRun(skipIntro),
       toMenu: () => this.toMenu(),
       teleport: (z: number, speed = 18) => this.session?.debugTeleport(z, speed),
-      toCave: () => this.session?.debugTeleport(COURSE.caveTriggerZ - 12, 16),
+      toCave: () => {
+        const e = this.session?.run.encounter;
+        if (e) this.session?.debugTeleport(e.triggerZ - 12, 16);
+      },
       advance: (sec: number) => this.session?.debugAdvance(sec),
       autopilot: (style: AutopilotStyle | null) => {
         if (this.session) this.session.autopilot = style;
       },
       placeYeti: (gap: number) => this.session?.debugPlaceYeti(gap),
       seenCave: (v: boolean) => {
-        this.records.seenCaveCinematic = v;
+        this.book.seenCaveCinematic = v;
         if (this.session) this.session.recordsSeenCave = v;
       },
       pause: () => this.pause(),
@@ -663,7 +782,8 @@ export class App {
         const out: Record<string, { meshes: number; tris: number }> = {};
         const w = this.world;
         if (!w) return out;
-        const groups: Record<string, THREE.Object3D> = { terrain: w.terrain.group, vegetation: w.vegetation.group, cave: w.cave.group, resort: w.resort.group, story: w.story.group, start: w.start.group, skier: this.skier!.root, yeti: this.yeti!.root };
+        const groups: Record<string, THREE.Object3D> = { terrain: w.terrain.group, vegetation: w.vegetation.group, cave: w.cave.group, start: w.start.group, skier: this.skier!.root, yeti: this.yeti!.root };
+        if (w.resort) groups['resort'] = w.resort.group;
         for (const [k, g] of Object.entries(groups)) {
           const r = { meshes: 0, tris: 0 };
           g.traverseVisible((o) => {

@@ -3,7 +3,7 @@
  * cinematics, scoring and results. Created fresh for every run; the World is reused.
  */
 import * as THREE from 'three';
-import { COURSE, routeX } from '../world/course';
+import type { Encounter, Sighting } from '../world/course';
 import { PHYS_DT, SkierPhysics, type SkierEvent, type SkierInput, DRIFT_MIN_SPEED } from '../physics/SkierPhysics';
 import { YetiAI } from '../yeti/YetiAI';
 import { RunState } from './RunState';
@@ -45,7 +45,7 @@ export interface SessionHooks {
 export class GameSession implements Stage {
   readonly phys: SkierPhysics;
   readonly yetiAI: YetiAI;
-  readonly run = new RunState();
+  readonly run: RunState;
   readonly follow: FollowCamera;
   poseOverride: Partial<SkierPose> = {};
   yetiAnim: YetiAnimState = { mode: 'hidden', modeTime: 0, speed: 0, turn: 0, time: 0 };
@@ -98,8 +98,12 @@ export class GameSession implements Stage {
     private hooks: SessionHooks,
     opts: { skipIntro?: boolean } = {},
   ) {
+    const m = world.mountain;
+    this.run = new RunState({ tutorialEndZ: m.profile.tutorialEndZ, finishZ: m.finishZ, encounters: (a, b) => m.profile.encounters(a, b) });
+    world.focusEncounter = null;
+    world.stream(2, true);
     this.phys = new SkierPhysics(world.mountain, world.obstacles, world.extraColliders);
-    this.phys.reset(routeX(2), 2, 0, 0);
+    this.phys.reset(m.routeX(2), 2, 0, 0);
     this.yetiAI = new YetiAI(world.mountain, world.obstacles);
     this.follow = new FollowCamera(camera, world.mountain, world.obstacles);
     this.follow.shakeScale = settings.cameraShake;
@@ -139,7 +143,7 @@ export class GameSession implements Stage {
 
   shakeTrees(center: THREE.Vector3, radius: number, max: number) {
     let n = 0;
-    for (const o of this.world.obstacles.list) {
+    for (const o of this.world.obstacles.inRange(center.z - radius, center.z + radius)) {
       if (o.kind !== 'tree') continue;
       if (Math.abs(o.z - center.z) > radius || Math.abs(o.x - center.x) > radius) continue;
       if (n++ > max) break;
@@ -163,7 +167,8 @@ export class GameSession implements Stage {
     const fl = new THREE.Vector3();
     this.follow.idealPose(this.followTarget(), fp, fl);
     tl.shot({ start: 0, end: 4.2, from: () => pose(P.clone().add(new THREE.Vector3(18, 9, 22)), P.clone().add(new THREE.Vector3(0, 1.2, 0)), 46), via: () => pose(P.clone().add(new THREE.Vector3(10, 4, -8)), P.clone().add(new THREE.Vector3(0, 1.4, 4)), 52), to: () => pose(fp, fl, 64), easing: ease.inOutCubic });
-    tl.at(0.2, () => this.hud.title('THE LAST DESCENT', 'Reach the resort at the bottom of the mountain.', 'intro', 3.4));
+    const goal = this.endless ? 'Survive as far as you can. Bank your run at the refuges.' : `Reach the resort, ${(this.world.mountain.finishZ / 1000).toFixed(0)} km down the mountain.`;
+    tl.at(0.2, () => this.hud.title('THE LAST DESCENT', goal, 'intro', 3.4));
     tl.at(4.2, () => {});
     this.intro = tl;
     this.hud.letterbox(true);
@@ -294,7 +299,7 @@ export class GameSession implements Stage {
 
   private mapInput(gi: GameplayInput) {
     if (this.autopilot) {
-      this.input = autopilotInput(this.phys.s, this.autopilot, this.time);
+      this.input = autopilotInput(this.world.mountain, this.phys.s, this.autopilot, this.time);
       return;
     }
     const ctl = this.run.controllable;
@@ -339,19 +344,72 @@ export class GameSession implements Stage {
       const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded };
       this.yetiAI.update(PHYS_DT, target);
       if (this.yetiAI.canCatch(target) && this.run.catchPlayer()) this.beginDefeat();
-      else if (s.pos.z >= COURSE.finishZ && this.run.reachFinish()) this.beginVictory();
+      else if (s.pos.z >= this.world.mountain.finishZ && this.run.reachFinish()) this.beginVictory();
+      else if (this.run.reachCheckpoint(s.pos.z)) this.onCheckpoint();
     }
 
-    // foreshadowing: growls & eerie ambience by progress
-    for (const gz of [960, 1120, 1250]) {
-      if (!this.growls.has(gz) && s.pos.z > gz && this.run.phase !== 'chase') {
-        this.growls.add(gz);
-        this.audio.playYetiGrowl(this.world.cave.mouth, gz < 1200);
-        this.hud.caption(gz < 1200 ? '[a distant growl echoes across the mountain]' : '[a deep growl, much closer]');
-        if (gz === 1120) this.audio.playBranchSnap(this.world.cave.mouth);
+    // foreshadowing: growls & eerie ambience by progress (relative to the coming cave)
+    const enc = this.run.encounter;
+    if (enc && this.run.phase !== 'chase' && this.run.phase !== 'caveCinematic') {
+      for (const off of [-390, -230, -100]) {
+        const gz = enc.caveZ + off;
+        const key = enc.index * 10 + (off === -390 ? 0 : off === -230 ? 1 : 2);
+        if (!this.growls.has(key) && s.pos.z > gz) {
+          this.growls.add(key);
+          const mouth = this.mouthOf(enc);
+          this.audio.playYetiGrowl(mouth, off < -150);
+          this.hud.caption(off < -150 ? '[a distant growl echoes across the mountain]' : '[a deep growl, much closer]');
+          if (off === -230) this.audio.playBranchSnap(mouth);
+        }
       }
+      this.eerie = smoothstep(enc.caveZ - 200, enc.caveZ - 10, s.pos.z);
+    } else this.eerie = 0;
+    // sightings on long courses: the Yeti is out there, watching (sound + caption)
+    if (this.run.phase === 'free' || this.run.phase === 'foreshadow') {
+      for (const sg of this.world.mountain.profile.sightings(s.pos.z - 20, s.pos.z)) this.sighting(sg);
     }
-    this.eerie = this.run.yetiReleased ? 0 : smoothstep(1150, 1340, s.pos.z);
+  }
+
+  private seenSightings = new Set<number>();
+  private sighting(sg: Sighting) {
+    if (this.seenSightings.has(sg.z)) return;
+    this.seenSightings.add(sg.z);
+    const m = this.world.mountain;
+    const z = sg.z + 160;
+    const x = m.centerX(z) + sg.side * (m.halfWidth(z) + 140);
+    const p = new THREE.Vector3(x, m.heightAt(x, z) + 4, z);
+    this.audio.playYetiGrowl(p, true);
+    this.hud.caption(sg.side > 0 ? '[a howl from the ridge to your right]' : '[a howl from the ridge to your left]', 3);
+  }
+
+  private mouthOf(e: Encounter): THREE.Vector3 {
+    return this.world.caveFor(e).cave.mouth;
+  }
+
+  /** Endless: the refuge at the end of a chase was reached — bank the run, the Yeti gives up. */
+  private onCheckpoint() {
+    this.banked = this.liveScore();
+    this.yetiAI.standDown();
+    this.yeti.setVisible(false);
+    this.yetiAnim.mode = 'hidden';
+    this.world.focusEncounter = null;
+    this.audio.setMusicMode('explore');
+    this.hud.title(`REFUGE ${this.run.checkpointsReached}`, `Run banked: ${this.banked.toLocaleString('en-US')} pts. Retire from the pause menu, or push on.`, 'intro', 4);
+    this.audio.playUiMove();
+  }
+
+  /** Endless: score safely banked at the last refuge */
+  banked = 0;
+
+  get endless(): boolean {
+    return !Number.isFinite(this.world.mountain.finishZ);
+  }
+
+  /** Endless: end the run now, keeping the banked score. */
+  retire(): boolean {
+    if (!this.endless || !this.run.retire()) return false;
+    this.sendResults(false);
+    return true;
   }
 
   private fixedStepVictory() {
@@ -436,6 +494,10 @@ export class GameSession implements Stage {
   // --- phases ---------------------------------------------------------------------
   private beginCave() {
     this.hud.setPrompt(null);
+    const e = this.run.encounter!;
+    this.world.focusEncounter = e;
+    this.world.caveFor(e);
+    this.yetiAI.speedMul = e.speedMul;
     this.cave = new CaveCinematic(this);
     this.cave.onRunPrompt = () => {};
     this.input.steer = 0;
@@ -479,12 +541,38 @@ export class GameSession implements Stage {
     this.hooks.onResults(this.stats(won), won);
   }
 
+  /** score of the run so far (before end-of-run bonuses) */
+  private liveScore(): number {
+    const s = this.phys.s;
+    const distance = clamp(s.pos.z, 0, this.world.mountain.finishZ);
+    return Math.round(distance * 2 + this.style + this.run.chaseTime * 25 + this.run.checkpointsReached * 2500);
+  }
+
   stats(won: boolean): RunStats {
     const s = this.phys.s;
-    const distance = clamp(s.pos.z - COURSE.startZ, 0, COURSE.finishZ);
+    const distance = clamp(s.pos.z, 0, this.world.mountain.finishZ);
     const survival = this.run.chaseTime;
-    const score = Math.round(distance * 2 + this.style + survival * 25 + (won ? 5000 : 0) + s.maxSpeed * 3.6 * 10);
-    return { won, time: this.run.runTime, distance, maxSpeed: s.maxSpeed, airtime: s.totalAir, longestAir: s.longestAir, crashes: s.crashes, survival, score };
+    let score = this.liveScore() + (won ? 5000 : 0) + Math.round(s.maxSpeed * 3.6 * 10);
+    if (this.endless) {
+      // Endless: retiring keeps the banked score; being caught keeps the bank plus half of the rest
+      const live = this.liveScore();
+      score = this.run.outcome === 'retired' ? this.banked : this.run.outcome === 'caught' ? this.banked + Math.round((live - this.banked) * 0.5) : live;
+    }
+    return {
+      won,
+      banked: this.endless && this.run.outcome === 'retired',
+      time: this.run.runTime,
+      distance,
+      maxSpeed: s.maxSpeed,
+      airtime: s.totalAir,
+      longestAir: s.longestAir,
+      crashes: s.crashes,
+      survival,
+      score,
+      courseId: this.world.id,
+      seed: this.world.seed,
+      checkpoints: this.run.checkpointsReached,
+    };
   }
 
   // --- visuals ----------------------------------------------------------------------
@@ -603,6 +691,7 @@ export class GameSession implements Stage {
     }
 
     const focus = this.run.phase === 'caveCinematic' ? this.world.cave.mouth : this.renderPos;
+    this.world.updateOrigin(focus);
     this.world.update(dt, this.time, focus, this.camera.position, 3.5);
   }
 
@@ -640,18 +729,25 @@ export class GameSession implements Stage {
 
   private updateHud(dt: number) {
     const s = this.phys.s;
+    const m = this.world.mountain;
+    const L = m.finishZ;
+    const enc = this.run.encounter;
+    const nextRefuge = this.endless ? (enc?.checkpointZ ?? null) : null;
     this.hud.update(dt, {
       speedKmh: s.speed * 3.6,
-      distanceToFinish: COURSE.finishZ - s.pos.z,
-      score: this.stats(false).score - Math.round(s.maxSpeed * 36),
+      distanceToFinish: L - s.pos.z,
+      endless: this.endless,
+      distance: Math.max(0, s.pos.z),
+      nextRefuge: nextRefuge !== null ? nextRefuge - s.pos.z : null,
+      score: this.liveScore(),
       multiplier: this.multiplier,
       yetiDistance: this.run.phase === 'chase' ? this.yetiAI.distance : null,
       chase: this.run.phase === 'chase',
       crashed: s.crashed,
       canRecover: s.crashTime > 1,
       airTime: s.grounded ? 0 : s.airTime,
-      progress: clamp(s.pos.z / COURSE.finishZ, 0, 1),
-      caveProgress: COURSE.caveZ / COURSE.finishZ,
+      progress: this.endless ? 0 : clamp(s.pos.z / L, 0, 1),
+      caveProgress: this.endless || !enc ? null : enc.caveZ / L,
     });
   }
 
@@ -673,7 +769,7 @@ export class GameSession implements Stage {
       yetiDistance: this.run.yetiReleased ? this.yetiAI.distance : null,
       yetiRunning: chase,
       chaseIntensity: chase ? clamp(1 - (this.yetiAI.distance - 5) / 110, 0, 1) : 0,
-      crowdLevel: smoothstep(COURSE.finishZ - 400, COURSE.finishZ, s.pos.z),
+      crowdLevel: this.world.resort ? smoothstep(this.world.mountain.finishZ - 400, this.world.mountain.finishZ, s.pos.z) : 0,
       eerie: this.run.phase === 'caveCinematic' ? 1 : this.eerie,
     };
     this.audio.update(dt, st);
@@ -681,25 +777,42 @@ export class GameSession implements Stage {
 
   /** victory cheer level for the resort */
   get resortState() {
-    return { cheer: this.victory ? this.victory.cheer : smoothstep(COURSE.finishZ - 150, COURSE.finishZ, this.phys.s.pos.z) * 0.4, lookAt: this.skier.root.position, welcome: this.victory?.welcome ?? 0 };
+    const fz = this.world.mountain.finishZ;
+    return { cheer: this.victory ? this.victory.cheer : smoothstep(fz - 150, fz, this.phys.s.pos.z) * 0.4, lookAt: this.skier.root.position, welcome: this.victory?.welcome ?? 0 };
   }
 
   // --- debug / test harness (not exposed in UI) -----------------------------------
   debugTeleport(z: number, speed = 18) {
-    const x = routeX(z);
-    this.phys.teleport(x, z, Math.atan2(routeX(z + 10) - x, 10), speed);
+    const m = this.world.mountain;
+    this.world.stream(z, true);
+    this.world.vegetation.flush();
+    const x = m.routeX(z);
+    this.phys.teleport(x, z, Math.atan2(m.routeX(z + 10) - x, 10), speed);
     this.prevPos.copy(this.phys.s.pos);
     this.follow.snap(this.followTarget());
     if (this.intro) this.endIntro();
-    // keep phase consistent with progress (never skip the cave)
-    this.run.progress(Math.min(z, COURSE.caveTriggerZ - 1), 0);
+    // keep phase consistent with progress (never skip the next cave)
+    // landing past a cave trigger plays that encounter's cinematic now (never skipped)
+    if (this.run.phase !== 'chase' && this.run.progress(z, 0)) this.beginCave();
+  }
+
+  /** Debug: run the next encounter's chase immediately (skips the cinematic). */
+  debugToChase() {
+    if (this.run.phase === 'chase') return;
+    const e = this.run.encounter;
+    if (!e) return;
+    this.debugTeleport(e.triggerZ + 1, 16);
+    if (this.cave) {
+      this.cave.tl.skip();
+      this.finishCave();
+    }
   }
 
   debugPlaceYeti(gap: number) {
     if (this.run.phase !== 'chase') return;
     const s = this.phys.s;
     const z = s.pos.z - gap;
-    this.yetiAI.place(routeX(z), z, 0);
+    this.yetiAI.place(this.world.mountain.routeX(z), z, 0);
     this.yetiAI.airborne = false;
   }
 
@@ -708,9 +821,11 @@ export class GameSession implements Stage {
     const n = Math.round(seconds / PHYS_DT);
     for (let i = 0; i < n; i++) {
       if (!this.run.simulating) break;
-      if (this.autopilot) this.input = autopilotInput(this.phys.s, this.autopilot, this.time);
+      if (i % 60 === 0) this.world.stream(this.phys.s.pos.z);
+      if (this.autopilot) this.input = autopilotInput(this.world.mountain, this.phys.s, this.autopilot, this.time);
       this.time += PHYS_DT;
       this.fixedStep();
+      if (this.cave) break; // a cave cinematic began: frames must drive it
     }
   }
 
@@ -738,6 +853,16 @@ export class GameSession implements Stage {
       cinematicTime: this.cave?.tl.time ?? this.victory?.tl.time ?? this.defeat?.tl.time ?? -1,
       crashes: s.crashes,
       intro: !!this.intro,
+      encounter: this.run.encounter?.index ?? null,
+      caveZ: this.run.encounter?.caveZ ?? null,
+      checkpoints: this.run.checkpointsReached,
+      finishZ: this.world.mountain.finishZ,
+      courseId: this.world.id,
+      origin: this.world.origin.toArray(),
+      bands: this.world.obstacles.bandCount,
+      vegBands: this.world.vegetation.bandCount,
+      chunks: this.world.terrain.chunkCount,
+      caves: this.world.caveCount,
     };
   }
 

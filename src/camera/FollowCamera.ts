@@ -158,7 +158,7 @@ export class FollowCamera {
       const dz = goal.z - t.pos.z;
       const len2 = dx * dx + dz * dz;
       for (const id of ids) {
-        const o = this.obstacles.list[id];
+        const o = this.obstacles.get(id);
         if (!o) continue;
         if (o.kind === 'rock' || o.kind === 'stump' || o.kind === 'log') continue;
         const r = o.kind === 'tree' ? Math.max(o.r + 0.5, o.softR * 0.55) : o.r + 0.4;

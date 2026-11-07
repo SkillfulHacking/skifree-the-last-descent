@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SkierPhysics, PHYS_DT, NO_INPUT, DRIFT_MIN_SPEED, type SkierInput, type SkierEvent } from '../../src/physics/SkierPhysics';
-import { Mountain, routeX } from '../../src/world/course';
+import { Mountain } from '../../src/world/course';
+const routeX = (z: number) => new Mountain().routeX(z);
 import type { Obstacle, ObstacleField } from '../../src/physics/obstacles';
 import { SpatialHash } from '../../src/physics/obstacles';
 
@@ -49,7 +50,7 @@ function fieldWith(...obs: Array<Partial<Obstacle> & Pick<Obstacle, 'kind' | 'x'
   const list: Obstacle[] = obs.map((o, id) => ({ id, y: groundY(o.z), r: 0.4, softR: 0, height: 9, rot: 0, scale: 1, variant: 0, halfLen: 0, collidable: true, ...o }));
   const grid = new SpatialHash(8);
   for (const o of list) grid.insert(o);
-  return { list, grid };
+  return { grid, get: (id: number) => list[id] } as unknown as ObstacleField;
 }
 
 describe('skier physics', () => {

@@ -1,6 +1,6 @@
 /** Summit start gate: timber posts, a start banner, a little hut and some fencing. */
 import * as THREE from 'three';
-import { routeX, type Mountain } from './course';
+import type { Mountain } from './course';
 
 export class StartArea {
   readonly group = new THREE.Group();
@@ -8,7 +8,7 @@ export class StartArea {
 
   constructor(m: Mountain) {
     const z = -4;
-    const cx = routeX(0);
+    const cx = m.routeX(0);
     const wood = new THREE.MeshStandardMaterial({ color: 0x6e4a2b, roughness: 0.85 });
     const snow = new THREE.MeshStandardMaterial({ color: 0xe9eef6, roughness: 0.9 });
     this.disposables.push(wood, snow);

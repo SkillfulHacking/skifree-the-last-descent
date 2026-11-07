@@ -113,6 +113,8 @@ export class Environment {
     this.sun.target.position.set(fx, fy, fz);
     this.sun.position.set(fx + this.sunDir.x * d, fy + this.sunDir.y * d, fz + this.sunDir.z * d);
     this.sun.target.updateMatrixWorld();
+    // the sky dome is finite (45 km): keep it centred on the viewer for any course length
+    this.sky.position.copy(camPos);
 
     const pos = this.snow.geometry.getAttribute('position') as THREE.BufferAttribute;
     const arr = pos.array as Float32Array;

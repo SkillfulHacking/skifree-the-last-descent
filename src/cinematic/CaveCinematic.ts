@@ -141,7 +141,7 @@ export class CaveCinematic {
       st.audio.setMusicMode('tension');
     });
     tl.at(14.6, () => {
-      const sp = yetiSpawnAfterCinematic(st.world.mountain);
+      const sp = yetiSpawnAfterCinematic(st.world.mountain, st.world.focusEncounter?.anchor);
       this.leap = { t: 0, from: sp.pos.clone(), vel: sp.leap.clone(), heading: sp.heading, landed: false };
       st.yeti.root.position.copy(sp.pos);
       st.yeti.root.rotation.set(0, sp.heading, 0);
@@ -225,7 +225,7 @@ export class CaveCinematic {
       st.yetiAI.place(p.x, p.z, this.leap.heading);
       st.yetiAI.startChase(null);
     } else {
-      const sp = yetiSpawnAfterCinematic(st.world.mountain);
+      const sp = yetiSpawnAfterCinematic(st.world.mountain, st.world.focusEncounter?.anchor);
       st.yetiAI.place(sp.pos.x, sp.pos.z, sp.heading, sp.pos.y - st.world.mountain.heightAt(sp.pos.x, sp.pos.z));
       st.yetiAI.startChase(sp.leap);
     }

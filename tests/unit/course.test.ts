@@ -1,0 +1,251 @@
+import { describe, expect, it } from 'vitest';
+import { Mountain } from '../../src/world/course';
+import { ENDLESS, chaseLength } from '../../src/world/profile';
+import { ObstacleField, laneClearance } from '../../src/physics/obstacles';
+import { simulateGenerated } from '../../src/game/simulate';
+import { autopilotInput } from '../../src/debug/autopilot';
+import { RunState } from '../../src/game/RunState';
+import {
+  LENGTH_INFO,
+  LENGTH_MODES,
+  addDays,
+  buildMountain,
+  courseId,
+  customSeed,
+  dailySeed,
+  isValidDate,
+  makeCourse,
+  msUntilRollover,
+  parseCourseId,
+  utcDate,
+} from '../../src/game/CourseConfig';
+import { applyRun, loadRecordBook, loadSettings, recordsFor, saveRecordBook, saveSettings, type KV, type RunStats } from '../../src/core/settings';
+
+const mem = (): KV & { data: Map<string, string> } => {
+  const data = new Map<string, string>();
+  return { data, getItem: (k) => data.get(k) ?? null, setItem: (k, v) => void data.set(k, v) };
+};
+
+const skilled = (m: Mountain) => (s: Parameters<typeof autopilotInput>[1], t: number) => autopilotInput(m, s, 'skilled', t);
+const careless = (m: Mountain) => (s: Parameters<typeof autopilotInput>[1], t: number) => autopilotInput(m, s, 'careless', t);
+
+describe('course config & daily mountain', () => {
+  it('daily seed is deterministic per UTC date and differs between days', () => {
+    expect(dailySeed('2026-11-07')).toBe(dailySeed('2026-11-07'));
+    const seeds = new Set(Array.from({ length: 60 }, (_, i) => dailySeed(addDays('2026-11-07', -i))));
+    expect(seeds.size).toBe(60);
+  });
+
+  it('rolls over at 00:00 UTC (not local midnight)', () => {
+    const before = Date.UTC(2026, 10, 7, 23, 59, 59);
+    const after = Date.UTC(2026, 10, 8, 0, 0, 1);
+    expect(utcDate(before)).toBe('2026-11-07');
+    expect(utcDate(after)).toBe('2026-11-08');
+    expect(makeCourse('daily', 'standard', { now: before }).seed).not.toBe(makeCourse('daily', 'standard', { now: after }).seed);
+    expect(msUntilRollover(before)).toBe(1000);
+    expect(msUntilRollover(Date.UTC(2026, 10, 8))).toBe(24 * 3600 * 1000);
+  });
+
+  it('date helpers handle month/year boundaries and reject bad dates', () => {
+    expect(addDays('2026-01-01', -1)).toBe('2025-12-31');
+    expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+    expect(isValidDate('2026-02-30')).toBe(false);
+    expect(isValidDate('2026-11-07')).toBe(true);
+    expect(isValidDate('nope')).toBe(false);
+  });
+
+  it('course ids round-trip and are shareable', () => {
+    for (const l of LENGTH_MODES) {
+      for (const c of [makeCourse('classic', l), makeCourse('daily', l, { date: '2026-10-31' }), makeCourse('custom', l, { customText: '424242' })]) {
+        const back = parseCourseId(courseId(c));
+        expect(back).not.toBeNull();
+        expect(back!.seed).toBe(c.seed);
+        expect(back!.length).toBe(c.length);
+        expect(courseId(back!)).toBe(courseId(c));
+      }
+    }
+    expect(courseId(makeCourse('daily', 'endurance', { date: '2026-11-07' }))).toBe('DAILY-2026-11-07-END');
+    expect(parseCourseId('daily-2026-11-07-std')!.date).toBe('2026-11-07');
+    expect(parseCourseId('DAILY-2026-02-30-STD')).toBeNull();
+    expect(parseCourseId('garbage')).toBeNull();
+  });
+
+  it('custom seeds: numbers are used directly, words are hashed case-insensitively', () => {
+    expect(customSeed('12345')).toBe(12345);
+    expect(customSeed('powder')).toBe(customSeed('POWDER'));
+    expect(customSeed('powder')).not.toBe(customSeed('powdery'));
+  });
+
+  it('different daily seeds produce meaningfully different geometry', () => {
+    const a = buildMountain(makeCourse('daily', 'standard', { date: '2026-11-07' }));
+    const b = buildMountain(makeCourse('daily', 'standard', { date: '2026-11-08' }));
+    let diff = 0;
+    for (let z = 500; z < 9500; z += 250) diff += Math.abs(a.centerX(z) - b.centerX(z)) + Math.abs(a.slopeDeg(z) - b.slopeDeg(z));
+    expect(diff / 36).toBeGreaterThan(5);
+    const segA = (a.profile as unknown as { segmentList: Array<{ type: string }> }).segmentList.map((s) => s.type).join();
+    const segB = (b.profile as unknown as { segmentList: Array<{ type: string }> }).segmentList.map((s) => s.type).join();
+    expect(segA).not.toBe(segB);
+  });
+
+  it('the same config always builds the same mountain', () => {
+    const c = makeCourse('custom', 'endurance', { customText: 'YETI' });
+    const a = buildMountain(c);
+    const b = buildMountain(c);
+    for (let i = 0; i < 80; i++) expect(a.heightAt(i * 7 - 200, i * 251)).toBe(b.heightAt(i * 7 - 200, i * 251));
+  });
+
+  it('settings persist course mode, length, seed text and past-day replay', () => {
+    const kv = mem();
+    const s = loadSettings(kv);
+    expect(s.courseLength).toBe('standard'); // the default
+    s.course = 'daily';
+    s.courseLength = 'expedition';
+    s.dailyDate = '2026-11-01';
+    s.customSeed = 'AVALANCHE';
+    saveSettings(s, kv);
+    const t = loadSettings(kv);
+    expect([t.course, t.courseLength, t.dailyDate, t.customSeed]).toEqual(['daily', 'expedition', '2026-11-01', 'AVALANCHE']);
+    kv.setItem('skifree-tld.settings.v1', JSON.stringify({ course: 'mars', courseLength: 'forever', dailyDate: 42 }));
+    const u = loadSettings(kv);
+    expect([u.course, u.courseLength, u.dailyDate]).toEqual(['classic', 'standard', null]);
+  });
+
+  it('records are kept separately per course and migrated from the old single set', () => {
+    const kv = mem();
+    kv.setItem('skifree-tld.records.v1', JSON.stringify({ bestScore: 999, runs: 3, wins: 1, seenCaveCinematic: true }));
+    const book = loadRecordBook(kv);
+    expect(book.seenCaveCinematic).toBe(true);
+    expect(recordsFor(book, 'CLASSIC-SPR').bestScore).toBe(999);
+    expect(recordsFor(book, 'CLASSIC-STD').runs).toBe(0);
+    const run: RunStats = { won: true, time: 300, distance: 10000, maxSpeed: 30, airtime: 3, longestAir: 1, crashes: 0, survival: 100, score: 50000 };
+    book.courses['DAILY-2026-11-07-STD'] = applyRun(recordsFor(book, 'DAILY-2026-11-07-STD'), run).records;
+    saveRecordBook(book, kv);
+    const again = loadRecordBook(kv);
+    expect(recordsFor(again, 'DAILY-2026-11-07-STD').bestScore).toBe(50000);
+    expect(recordsFor(again, 'DAILY-2026-11-08-STD').bestScore).toBe(0);
+    expect(recordsFor(again, 'CLASSIC-SPR').bestScore).toBe(999);
+  });
+});
+
+describe('configurable course lengths', () => {
+  it('Classic Sprint is the original hand-tuned course; other lengths are generated', () => {
+    expect(buildMountain(makeCourse('classic', 'sprint')).profile.kind).toBe('classic');
+    expect(buildMountain(makeCourse('classic', 'standard')).profile.kind).toBe('generated');
+  });
+
+  for (const l of ['sprint', 'standard', 'endurance', 'expedition'] as const) {
+    it(`${l}: finish at ${LENGTH_INFO[l].metres} m, a valid descending route with a clear lane, the cave late`, () => {
+      const L = LENGTH_INFO[l].metres;
+      const m = Mountain.generated(4242, L);
+      expect(m.finishZ).toBe(L);
+      const enc = m.profile.encounters(-Infinity, Infinity);
+      expect(enc.length).toBe(1);
+      expect(enc[0]!.caveZ).toBe(Math.max(1350, L - chaseLength(L)));
+      expect(enc[0]!.chaseEndZ).toBe(L);
+      // main confrontation in the final part of the course
+      if (L >= 10000) expect(enc[0]!.caveZ / L).toBeGreaterThan(0.6);
+      // the route descends everywhere (small bumps allowed)
+      let prev = m.heightAt(m.routeX(0), 0);
+      let worst = 0;
+      for (let z = 5; z <= L; z += 5) {
+        const h = m.heightAt(m.routeX(z), z);
+        worst = Math.max(worst, h - prev);
+        prev = h;
+      }
+      expect(worst).toBeLessThan(2.5);
+      // the guaranteed route stays inside the piste
+      for (let z = 0; z <= L; z += 20) expect(Math.abs(m.routeX(z) - m.centerX(z))).toBeLessThan(m.halfWidth(z));
+      // lane clear of solid obstacles (sampled windows for long courses)
+      const f = new ObstacleField(m, 4242);
+      const windows = L <= 10000 ? [[0, L]] : Array.from({ length: 8 }, (_, i) => [i * (L / 8), i * (L / 8) + 1200]);
+      for (const [a, b] of windows) {
+        expect(laneClearance(f, a!, b!)).toBeGreaterThan(4.5);
+        f.release(Infinity, Infinity);
+      }
+      // the route enters the finish chute straight
+      const fx = m.routeX(L);
+      for (let z = L - 110; z <= L; z += 5) expect(Math.abs(m.routeX(z) - fx)).toBeLessThan(6);
+      // segment variety
+      const types = new Set((m.profile as unknown as { segmentList: Array<{ type: string }> }).segmentList.map((s) => s.type));
+      expect(types.size).toBeGreaterThanOrEqual(L >= 10000 ? 6 : 3);
+    });
+  }
+});
+
+describe('long-course completion (headless, streaming obstacles)', () => {
+  for (const [l, maxTime] of [
+    ['sprint', 400],
+    ['standard', 1100],
+    ['endurance', 2100],
+    ['expedition', 5000],
+  ] as const) {
+    it(`a skilled skier completes ${l} (${LENGTH_INFO[l].metres / 1000} km) and wins`, { timeout: 240_000 }, () => {
+      const r = simulateGenerated(4242, LENGTH_INFO[l].metres, skilled, { maxTime });
+      expect(r.outcome).toBe('victory');
+      expect(r.distance).toBeGreaterThanOrEqual(LENGTH_INFO[l].metres);
+      expect(r.chaseTime).toBeGreaterThan(30);
+      // streaming keeps memory bounded however long the course is
+      expect(r.peakBands).toBeLessThanOrEqual(6);
+    });
+  }
+
+  it('a careless skier is caught on a generated course (loss is possible)', { timeout: 120_000 }, () => {
+    expect(simulateGenerated(4242, 10000, careless, { maxTime: 1100 }).outcome).toBe('caught');
+  });
+});
+
+describe('endless', () => {
+  it('generates segments, encounters and refuges without end, escalating', () => {
+    const m = Mountain.generated(99, Infinity);
+    expect(m.finishZ).toBe(Infinity);
+    const enc = m.profile.encounters(0, 200_000);
+    expect(enc.length).toBeGreaterThanOrEqual(20);
+    enc.forEach((e, i) => {
+      expect(e.caveZ).toBe(ENDLESS.firstCave + i * ENDLESS.cycle);
+      expect(e.checkpointZ).toBe(e.chaseEndZ);
+      if (i) expect(e.speedMul).toBeGreaterThanOrEqual(enc[i - 1]!.speedMul);
+    });
+    expect(enc.at(-1)!.speedMul).toBeLessThanOrEqual(1.22);
+    expect(m.profile.checkpoints(0, 200_000).length).toBe(enc.length);
+    // terrain stays finite and descending far down the mountain
+    const h1 = m.heightAt(m.routeX(150_000), 150_000);
+    const h2 = m.heightAt(m.routeX(150_500), 150_500);
+    expect(Number.isFinite(h1)).toBe(true);
+    expect(h2).toBeLessThan(h1);
+  });
+
+  it('a skilled skier crosses many segment boundaries and refuges; memory stays bounded', { timeout: 240_000 }, () => {
+    const m = Mountain.generated(99, Infinity);
+    const r = simulateGenerated(99, Infinity, skilled, { maxZ: 25_000, maxTime: 3000 });
+    expect(r.outcome).toBe('distance');
+    expect(r.distance).toBeGreaterThanOrEqual(25_000);
+    expect(r.encountersSurvived).toBeGreaterThanOrEqual(2);
+    expect(r.peakBands).toBeLessThanOrEqual(6);
+    const segs = (m.profile as unknown as { segmentList: Array<{ z0: number }> }).segmentList.filter((s) => s.z0 < 25_000);
+    expect(segs.length).toBeGreaterThan(10);
+  });
+
+  it('run state: refuges end a chase and the next encounter follows', () => {
+    const m = Mountain.generated(99, Infinity);
+    const r = new RunState({ tutorialEndZ: m.profile.tutorialEndZ, finishZ: m.finishZ, encounters: (a, b) => m.profile.encounters(a, b) });
+    r.endIntro();
+    const [e0, e1] = m.profile.encounters(0, 20000);
+    expect(r.progress(e0!.triggerZ, 0.1)).toBe(true);
+    expect(r.encounter!.index).toBe(0);
+    r.endCaveCinematic();
+    expect(r.reachCheckpoint(e0!.chaseEndZ - 1)).toBe(false);
+    expect(r.reachCheckpoint(e0!.chaseEndZ)).toBe(true);
+    expect(r.phase).toBe('free');
+    expect(r.checkpointsReached).toBe(1);
+    expect(r.reachFinish()).toBe(false);
+    expect(r.progress(e0!.chaseEndZ + 50, 0.1)).toBe(false);
+    expect(r.encounter!.index).toBe(1);
+    expect(r.progress(e1!.foreshadowZ + 1, 0.1)).toBe(false);
+    expect(r.phase).toBe('foreshadow');
+    expect(r.progress(e1!.triggerZ, 0.1)).toBe(true);
+    r.endCaveCinematic();
+    expect(r.retire()).toBe(true);
+    expect(r.outcome).toBe('retired');
+    expect(r.catchPlayer()).toBe(false);
+  });
+});

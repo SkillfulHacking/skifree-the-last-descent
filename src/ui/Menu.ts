@@ -9,6 +9,7 @@ export type MenuItem =
   | { kind: 'toggle'; label: string; get: () => boolean; set: (v: boolean) => void }
   | { kind: 'select'; label: string; options: Array<{ value: string; label: string }>; get: () => string; set: (v: string) => void; note?: string }
   | { kind: 'bind'; label: string; get: () => string; listen: (done: () => void) => void }
+  | { kind: 'text'; label: string; get: () => string; set: (v: string) => void; placeholder?: string; maxLength?: number; note?: string }
   | { kind: 'info'; html: string }
   | { kind: 'custom'; render: (el: HTMLElement) => void; update?: (el: HTMLElement) => void };
 
@@ -16,6 +17,10 @@ export interface Screen {
   id: string;
   title: string;
   subtitle?: string;
+  /** large title rendered outside the panel (main menu hero) — never clipped by the panel */
+  hero?: { title: string; tagline: string };
+  /** footer note under the panel */
+  aside?: string;
   items: MenuItem[];
   onBack?: () => void;
   cls?: string;
@@ -24,6 +29,8 @@ export interface Screen {
 export class MenuSystem {
   readonly root: HTMLDivElement;
   private panel: HTMLDivElement;
+  private hero: HTMLDivElement;
+  private aside: HTMLDivElement;
   private stack: Screen[] = [];
   private index = 0;
   private rows: HTMLElement[] = [];
@@ -34,9 +41,15 @@ export class MenuSystem {
   constructor(parent: HTMLElement) {
     this.root = document.createElement('div');
     this.root.className = 'menu-root hidden';
+    this.hero = document.createElement('div');
+    this.hero.className = 'menu-hero';
+    this.root.appendChild(this.hero);
     this.panel = document.createElement('div');
     this.panel.className = 'menu-panel';
     this.root.appendChild(this.panel);
+    this.aside = document.createElement('div');
+    this.aside.className = 'menu-aside';
+    this.root.appendChild(this.aside);
     parent.appendChild(this.root);
   }
 
@@ -53,6 +66,27 @@ export class MenuSystem {
     this.index = this.firstFocusable(s);
     this.render();
     this.root.classList.remove('hidden');
+  }
+
+  /** Replace the current screen in place, keeping the focused row (live-updating menus). */
+  replace(s: Screen) {
+    const keep = this.index;
+    this.stack[this.stack.length - 1] = s;
+    this.index = this.focusable(keep) ? keep : this.firstFocusable(s);
+    this.render();
+  }
+
+  /** Focus the row with this label (tests / restoring focus). */
+  focusLabel(label: string): boolean {
+    const i = this.current?.items.findIndex((it) => 'label' in it && it.label === label) ?? -1;
+    if (i < 0 || !this.focusable(i)) return false;
+    this.index = i;
+    this.highlight();
+    return true;
+  }
+
+  get focusIndex() {
+    return this.index;
   }
 
   push(s: Screen) {
@@ -90,10 +124,16 @@ export class MenuSystem {
     if (!s) return;
     this.root.className = `menu-root ${s.cls ?? ''}`;
     this.panel.innerHTML = '';
-    const h = document.createElement('h1');
-    h.className = 'menu-title';
-    h.textContent = s.title;
-    this.panel.appendChild(h);
+    this.hero.innerHTML = s.hero ? `<h1 class="hero-title" aria-label="${s.hero.title}">${s.hero.title}</h1><div class="hero-tagline">${s.hero.tagline}</div>` : '';
+    this.hero.classList.toggle('hidden', !s.hero);
+    this.aside.innerHTML = s.aside ?? '';
+    this.aside.classList.toggle('hidden', !s.aside);
+    if (!s.hero) {
+      const h = document.createElement('h1');
+      h.className = 'menu-title';
+      h.textContent = s.title;
+      this.panel.appendChild(h);
+    }
     if (s.subtitle) {
       const sub = document.createElement('div');
       sub.className = 'menu-subtitle';
@@ -163,6 +203,27 @@ export class MenuSystem {
       case 'bind':
         row.innerHTML = `<span class="label">${it.label}</span><span class="ctl"><kbd>${it.get()}</kbd></span>`;
         break;
+      case 'text': {
+        row.innerHTML = `<span class="label">${it.label}${it.note ? `<small>${it.note}</small>` : ''}</span><span class="ctl"><input type="text" spellcheck="false" autocomplete="off" maxlength="${it.maxLength ?? 24}" placeholder="${it.placeholder ?? ''}"></span>`;
+        const input = row.querySelector('input')!;
+        input.value = it.get();
+        input.addEventListener('focus', () => (this.listening = true));
+        input.addEventListener('blur', () => {
+          this.listening = false;
+          if (input.value.trim() && input.value !== it.get()) {
+            it.set(input.value.trim());
+            this.refresh();
+          } else input.value = it.get();
+        });
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === 'Escape') {
+            e.preventDefault();
+            if (e.key === 'Escape') input.value = it.get();
+            input.blur();
+          }
+        });
+        break;
+      }
       case 'info':
         row.innerHTML = it.html;
         break;
@@ -177,7 +238,17 @@ export class MenuSystem {
     if (!s) return;
     s.items.forEach((it, i) => {
       const row = this.rows[i];
-      if (row && it.kind !== 'custom') this.fill(row, it);
+      if (!row || it.kind === 'custom') return;
+      if (it.kind === 'text') {
+        const input = row.querySelector('input');
+        if (input && document.activeElement !== input) input.value = it.get();
+        return;
+      }
+      if (it.kind === 'info') {
+        if (row.innerHTML !== it.html) row.innerHTML = it.html;
+        return;
+      }
+      this.fill(row, it);
     });
     this.highlight();
   }
@@ -224,7 +295,11 @@ export class MenuSystem {
     if (it.kind === 'button') it.action();
     else if (it.kind === 'toggle') this.adjust(1);
     else if (it.kind === 'select') this.adjust(1);
-    else if (it.kind === 'bind') {
+    else if (it.kind === 'text') {
+      const input = this.rows[this.index]?.querySelector('input');
+      input?.focus();
+      input?.select();
+    } else if (it.kind === 'bind') {
       this.listening = true;
       const row = this.rows[this.index];
       if (row) row.querySelector('kbd')!.textContent = 'press a key…';
@@ -235,10 +310,20 @@ export class MenuSystem {
     }
   }
 
+  private lastDevicePad(_m: MenuInput): boolean {
+    return document.body.dataset['device'] !== undefined && document.body.dataset['device'] !== 'keyboard';
+  }
+
   /** Per-frame: navigation + live custom rows. */
   update(m: MenuInput) {
     if (!this.visible) return;
     if (this.listening) {
+      const active = document.activeElement as HTMLElement | null;
+      if (active && active.tagName === 'INPUT') {
+        // text entry: keyboard goes to the field; a controller can still leave it
+        if (m.back || (m.confirm && this.lastDevicePad(m))) active.blur();
+        return;
+      }
       // controller users can cancel a key-remap prompt
       if (m.back || m.confirm) {
         this.listening = false;

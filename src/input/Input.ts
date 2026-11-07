@@ -134,6 +134,9 @@ export class Input {
         cb(e.code);
         return;
       }
+      // typing in a text field (custom seed / course code) is not game input
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
       if (this.isGameKey(e.code)) e.preventDefault();
       if (!e.repeat || e.code.startsWith('Arrow')) this.pressedQ.add(e.code);
       this.down.add(e.code);
