@@ -16,7 +16,14 @@ export class CaveCinematic {
   private leap: { t: number; from: THREE.Vector3; vel: THREE.Vector3; heading: number; landed: boolean } | null = null;
   onRunPrompt: (() => void) | null = null;
 
+  /** exit-path samples: depth s (m inside the mouth; negative = out on the ledge) → floor point */
+  private path: Array<{ s: number; p: THREE.Vector3 }> = [];
+
   constructor(private st: Stage) {
+    {
+      const ep = st.world.cave.exitPath;
+      ep.forEach((p, i) => this.path.push({ s: i === ep.length - 1 ? LEDGE_AT : 14 - 0.75 * i, p }));
+    }
     const { world, camera, follow, phys } = st;
     const cave = world.cave;
     const M = cave.mouth.clone();
@@ -26,6 +33,10 @@ export class CaveCinematic {
     const startPose = pose(camera.position, follow.lookTarget, camera.fov);
     const at = (base: THREE.Vector3, ox: number, oy: number, oz: number) => base.clone().addScaledVector(O, ox).add(new THREE.Vector3(0, oy, oz));
     const yetiInside = cave.inside.clone();
+    // the Yeti walks the cave's own exit path (deep chamber → mouth → ledge); its feet are planted
+    // on the exact visible floor (cave.floorHeightAt) for the whole sequence
+    st.yeti.setGround((x, z) => cave.floorHeightAt(x, z));
+    const yetiRoot = () => st.yeti.root.position;
     const head = new THREE.Vector3();
     const followPos = new THREE.Vector3();
     const followLook = new THREE.Vector3();
@@ -36,7 +47,6 @@ export class CaveCinematic {
     };
     const toCave = new THREE.Vector3(M.x - P.x, 0, M.z - P.z).normalize();
     const reactionCam = pose(P.clone().addScaledVector(downhill, 3.0).addScaledVector(toCave, -2.2).add(new THREE.Vector3(0, 1.4, 0)), P.clone().add(new THREE.Vector3(0, 1.35, 0)), 46);
-    const yetiHeading = Math.atan2(O.x, O.z);
     const tl = this.tl;
 
     // Beat 1: the camera pulls away from the skier and turns toward the cliffside
@@ -44,7 +54,7 @@ export class CaveCinematic {
     // Beat 2: snow sloughs off the rocks around the cave
     tl.shot({ start: 2.4, end: 3.8, from: () => pose(at(M, 24, 3.5, 9), cave.lipTop, 40), to: () => pose(at(M, 21, 3.2, 7), cave.lipTop.clone().add(new THREE.Vector3(0, -1, 0)), 40), handheld: 0.03 });
     // Beats 3–4: a huge shadow moves in the darkness; two eyes appear
-    tl.shot({ start: 3.8, end: 6.6, from: () => pose(at(M, 12, 2.4, 1.5), yetiInside.clone().add(new THREE.Vector3(0, 2.2, 0)), 38), to: () => pose(at(M, 6.5, 2.3, 0.6), yetiInside.clone().add(new THREE.Vector3(-2, 2.4, 0)), 30), easing: ease.linear, handheld: 0.02 });
+    tl.shot({ start: 3.8, end: 6.6, from: () => pose(at(M, 12, 2.4, 1.5), yetiInside.clone().lerp(yetiRoot(), 0.6).add(new THREE.Vector3(0, 1.6, 0)), 38), to: () => pose(at(M, 6.5, 2.3, 0.6), yetiRoot().clone().add(new THREE.Vector3(0, 1.5, 0)), 30), easing: ease.linear, handheld: 0.02 });
     // Beat 5: a giant furry hand grips the cave entrance
     const hand = new THREE.Vector3();
     const handShot = (dist: number, fov: number) => () => {
@@ -85,9 +95,8 @@ export class CaveCinematic {
       st.audio.playYetiGrowl(M, false);
       st.yetiManual = true;
       st.yeti.setVisible(true);
-      st.yeti.root.position.copy(yetiInside);
-      st.yeti.root.rotation.set(0, yetiHeading, 0);
-      st.setYetiMode('lurk');
+      this.placeAt(CRAWL_FROM);
+      st.setYetiMode('crawl');
       st.poseOverride = { lookBack: 0 };
     });
     tl.at(2.45, () => {
@@ -102,10 +111,6 @@ export class CaveCinematic {
         st.world.particles.emit({ x: p.x + (Math.random() - 0.5) * 2, y: p.y + 6 + Math.random() * 6, z: p.z + (Math.random() - 0.5) * 14, vx: -0.6, vy: 0, vz: 0, spread: 0.6, size: 0.5, life: 2.2, count: 22, gravity: 0.5, drag: 0.4, grow: 0.5, alpha: 0.9 });
       });
     }
-    // shadow moves across the back of the cave
-    tl.at(3.8, () => {
-      st.yeti.root.position.copy(yetiInside).add(new THREE.Vector3(2, 0, -3));
-    });
     tl.at(4.9, () => {
       st.audio.playYetiGrowl(M, false);
       st.hud.caption('[something growls in the dark]');
@@ -113,7 +118,7 @@ export class CaveCinematic {
     tl.at(5.4, () => (this.eyeTarget = st.settings.reduceFlashes ? 0.55 : 1));
     tl.at(6.2, () => {
       // the grip pose settles while we are still on the eyes, so the insert finds the hand
-      st.yeti.root.position.copy(M).addScaledVector(O, -2.2);
+      this.placeAt(GRIP_AT);
       st.setYetiMode('grip');
     });
     tl.at(6.6, () => {
@@ -141,7 +146,7 @@ export class CaveCinematic {
       st.audio.setMusicMode('tension');
     });
     tl.at(14.6, () => {
-      const sp = yetiSpawnAfterCinematic(st.world.mountain, st.world.focusEncounter?.anchor);
+      const sp = yetiSpawnAfterCinematic(st.world.mountain, st.world.focusEncounter?.anchor, st.world.cave.ledge);
       this.leap = { t: 0, from: sp.pos.clone(), vel: sp.leap.clone(), heading: sp.heading, landed: false };
       st.yeti.root.position.copy(sp.pos);
       st.yeti.root.rotation.set(0, sp.heading, 0);
@@ -163,7 +168,6 @@ export class CaveCinematic {
   update(dt: number) {
     const st = this.st;
     const t = this.tl.time;
-    const M = st.world.cave.mouth;
     const O = st.world.cave.outward;
     if (this.leap) {
       const L = this.leap;
@@ -183,14 +187,18 @@ export class CaveCinematic {
       }
       st.yetiAnim.speed = L.landed ? 0 : 6;
     } else if (t >= 7.9 && t < 10.0) {
-      // walk out of the darkness onto the ledge
+      // heavy steps out of the darkness onto the ledge (root speed = real path speed)
       const k = (t - 7.9) / 2.1;
-      st.yeti.root.position.copy(M).addScaledVector(O, -2.2 + 3.6 * ease.out(k));
-      st.yeti.root.position.y = st.world.mountain.heightAt(st.yeti.root.position.x, st.yeti.root.position.z);
-      st.yetiAnim.speed = 1.6;
-    } else if (t >= 3.8 && t < 5.2) {
-      st.yeti.root.position.z += dt * 2.2; // shadow drifting across
-      st.yetiAnim.speed = 1.0;
+      const sNow = GRIP_AT + (LEDGE_AT - GRIP_AT) * ease.out(k);
+      const sPrev = GRIP_AT + (LEDGE_AT - GRIP_AT) * ease.out(Math.max(0, k - dt / 2.1));
+      this.placeAt(sNow);
+      st.yetiAnim.speed = Math.abs(sNow - sPrev) / Math.max(1e-3, dt);
+    } else if (t < 6.2) {
+      // a low prowl up the tunnel from the deep chamber (unseen until the eyes beat)
+      const k = Math.min(1, t / 6.2);
+      const sNow = CRAWL_FROM + (GRIP_AT + 0.6 - CRAWL_FROM) * k;
+      this.placeAt(sNow);
+      st.yetiAnim.speed = Math.abs(GRIP_AT + 0.6 - CRAWL_FROM) / 6.2;
     } else st.yetiAnim.speed = 0;
     // the light drops while we stare into the darkness (sky/ambient light would otherwise
     // wash the inside of the cave; the sun is already blocked by the tunnel's shadow)
@@ -211,6 +219,23 @@ export class CaveCinematic {
     }
   }
 
+  /** Put the Yeti root on the exit path at depth s, on the exact floor, facing out. */
+  private placeAt(s: number) {
+    const P = this.path;
+    if (!P.length) return;
+    let i = 0;
+    while (i < P.length - 2 && P[i + 1]!.s > s) i++;
+    const a = P[i]!;
+    const b = P[i + 1] ?? a;
+    const f = a.s === b.s ? 0 : Math.min(1, Math.max(0, (a.s - s) / (a.s - b.s)));
+    const root = this.st.yeti.root;
+    root.position.lerpVectors(a.p, b.p, f);
+    root.position.y = this.st.world.cave.floorHeightAt(root.position.x, root.position.z);
+    const dx = b.p.x - a.p.x;
+    const dz = b.p.z - a.p.z;
+    if (dx * dx + dz * dz > 1e-6) root.rotation.set(0, Math.atan2(dx, dz), 0);
+  }
+
   /** The spawn state handed to the chase when the cinematic ends (or is skipped). */
   finish() {
     const st = this.st;
@@ -225,10 +250,18 @@ export class CaveCinematic {
       st.yetiAI.place(p.x, p.z, this.leap.heading);
       st.yetiAI.startChase(null);
     } else {
-      const sp = yetiSpawnAfterCinematic(st.world.mountain, st.world.focusEncounter?.anchor);
+      const sp = yetiSpawnAfterCinematic(st.world.mountain, st.world.focusEncounter?.anchor, st.world.cave.ledge);
       st.yetiAI.place(sp.pos.x, sp.pos.z, sp.heading, sp.pos.y - st.world.mountain.heightAt(sp.pos.x, sp.pos.z));
       st.yetiAI.startChase(sp.leap);
     }
     st.yetiManual = false;
+    // the chase runs on the open mountain
+    const m = st.world.mountain;
+    st.yeti.setGround((x, z) => m.heightAt(x, z));
   }
 }
+
+/** exit-path depths (see Cave.exitPath): crawl start, grip point, ledge */
+const CRAWL_FROM = 11;
+const GRIP_AT = 2.2;
+const LEDGE_AT = -2.2;

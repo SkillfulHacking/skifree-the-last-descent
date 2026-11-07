@@ -56,6 +56,8 @@ export class World {
   /** render-space origin (see header) */
   readonly origin = new THREE.Vector3();
   private caves = new Map<number, CaveSlot>();
+  /** caves being built in time slices (one step per frame) */
+  private caveJobs = new Map<number, { enc: Encounter; job: Generator<void, Cave, void> }>();
   private lodges = new Map<number, Checkpoint>();
   private markers = new Map<number, AltMarkers>();
   /** the encounter the session cares about now (set by GameSession) */
@@ -134,6 +136,7 @@ export class World {
       this.streamZ = z;
       this.obstacles.release(z - 900, z + ahead + 400);
       this.syncCaves(z);
+      if (all) for (const j of [...this.caveJobs.values()]) this.buildCave(j.enc);
       this.syncLodges(z);
     }
   }
@@ -143,22 +146,54 @@ export class World {
     for (const e of this.mountain.profile.encounters(z - 400, z + 1800)) {
       if (e.caveZ < z - 400 || e.caveZ > z + 1800) continue;
       want.add(e.index);
-      if (!this.caves.has(e.index)) this.buildCave(e);
+      if (!this.caves.has(e.index) && !this.caveJobs.has(e.index)) this.caveJobs.set(e.index, { enc: e, job: Cave.buildSteps(this.mountain, e.anchor, this.quality) });
     }
     if (this.focusEncounter) want.add(this.focusEncounter.index);
+    // the next cave ahead always exists (built while loading, so its shaders are compiled with
+    // the rest of the scene and nothing has to be created mid-run for the first encounter)
+    const next = this.mountain.profile.encounters(z, z + 60000).find((e) => e.chaseEndZ > z);
+    if (next && !want.has(next.index)) {
+      want.add(next.index);
+      if (!this.caves.has(next.index) && !this.caveJobs.has(next.index)) this.caveJobs.set(next.index, { enc: next, job: Cave.buildSteps(this.mountain, next.anchor, this.quality) });
+    }
     for (const [i, slot] of this.caves) {
       if (want.has(i)) continue;
       this.disposeCave(slot);
       this.caves.delete(i);
     }
+    for (const i of [...this.caveJobs.keys()]) if (!want.has(i)) this.caveJobs.delete(i);
     this.terrain.pinned = [...this.caves.values()].map((s) => {
       const cm = caveMouthXZ(s.enc.anchor);
       return { x: cm.x + 10 * s.enc.anchor.side, z: cm.z, r: 20 };
     });
   }
 
+  /** Advance pending cave builds by one slice (called every frame). */
+  private stepCaves() {
+    for (const [i, j] of this.caveJobs) {
+      const r = j.job.next();
+      if (r.done) {
+        this.caveJobs.delete(i);
+        this.installCave(j.enc, r.value);
+      }
+      break; // one job at a time
+    }
+  }
+
   private buildCave(e: Encounter): CaveSlot {
-    const cave = new Cave(this.mountain, e.anchor);
+    // needed right now (cinematic, loading, teleport): finish any slices synchronously
+    const pending = this.caveJobs.get(e.index);
+    let cave: Cave;
+    if (pending) {
+      let r = pending.job.next();
+      while (!r.done) r = pending.job.next();
+      cave = r.value;
+      this.caveJobs.delete(e.index);
+    } else cave = new Cave(this.mountain, e.anchor, this.quality);
+    return this.installCave(e, cave);
+  }
+
+  private installCave(e: Encounter, cave: Cave): CaveSlot {
     const story = new StoryProps(this.mountain, this.footprints, e.anchor);
     this.scene.add(cave.group, story.group);
     const slot = { enc: e, cave, story };
@@ -249,6 +284,7 @@ export class World {
 
   update(dt: number, time: number, focus: THREE.Vector3, camPos: THREE.Vector3, terrainBudgetMs: number) {
     this.stream(focus.z);
+    this.stepCaves();
     this.terrain.update(focus.x, focus.z, terrainBudgetMs, time);
     this.vegetation.update(camPos, time);
     this.env.update(dt, focus, camPos, time);
@@ -301,6 +337,7 @@ export class World {
   dispose() {
     for (const s of this.caves.values()) this.disposeCave(s);
     this.caves.clear();
+    this.caveJobs.clear();
     for (const c of this.lodges.values()) c.dispose();
     this.lodges.clear();
     for (const mk of this.markers.values()) mk.dispose();
