@@ -13,6 +13,13 @@ import { Mountain, SEED_DEFAULT } from '../world/course';
 
 export type CourseMode = 'classic' | 'daily' | 'custom';
 export type LengthMode = 'sprint' | 'standard' | 'endurance' | 'expedition' | 'endless';
+/** Pursuit difficulty: scales the Yeti's speed in every encounter. */
+export type Difficulty = 'relaxed' | 'normal' | 'hard';
+export const DIFFICULTY: Record<Difficulty, { yetiSpeed: number; label: string; code: string }> = {
+  relaxed: { yetiSpeed: 0.93, label: 'Relaxed', code: 'R' },
+  normal: { yetiSpeed: 1, label: 'Normal', code: '' },
+  hard: { yetiSpeed: 1.07, label: 'Hard', code: 'H' },
+};
 
 export const LENGTH_MODES: readonly LengthMode[] = ['sprint', 'standard', 'endurance', 'expedition', 'endless'];
 
@@ -32,6 +39,7 @@ export interface CourseConfig {
   date: string | null;
   /** Custom only: what the player typed */
   customText: string | null;
+  difficulty: Difficulty;
 }
 
 /** UTC calendar date (YYYY-MM-DD) for a timestamp. */
@@ -85,16 +93,17 @@ export function customSeed(text: string): number {
   return hashString(`skifree-tld/custom/${t.toUpperCase()}`);
 }
 
-export function makeCourse(mode: CourseMode, length: LengthMode, opts: { date?: string; customText?: string; now?: number } = {}): CourseConfig {
+export function makeCourse(mode: CourseMode, length: LengthMode, opts: { date?: string; customText?: string; now?: number; difficulty?: Difficulty } = {}): CourseConfig {
+  const difficulty = opts.difficulty ?? 'normal';
   if (mode === 'daily') {
     const date = opts.date && isValidDate(opts.date) ? opts.date : utcDate(opts.now ?? Date.now());
-    return { mode, length, seed: dailySeed(date), date, customText: null };
+    return { mode, length, seed: dailySeed(date), date, customText: null, difficulty };
   }
   if (mode === 'custom') {
     const text = (opts.customText ?? '').trim() || 'POWDER';
-    return { mode, length, seed: customSeed(text), date: null, customText: text };
+    return { mode, length, seed: customSeed(text), date: null, customText: text, difficulty };
   }
-  return { mode: 'classic', length, seed: SEED_DEFAULT, date: null, customText: null };
+  return { mode: 'classic', length, seed: SEED_DEFAULT, date: null, customText: null, difficulty };
 }
 
 /**
@@ -102,7 +111,7 @@ export function makeCourse(mode: CourseMode, length: LengthMode, opts: { date?: 
  * Examples: CLASSIC-STD, DAILY-2026-11-07-END, SEED-1234567-SPR.
  */
 export function courseId(c: CourseConfig): string {
-  const len = LENGTH_INFO[c.length].short;
+  const len = LENGTH_INFO[c.length].short + (DIFFICULTY[c.difficulty ?? 'normal'].code ? `-${DIFFICULTY[c.difficulty].code}` : '');
   if (c.mode === 'daily') return `DAILY-${c.date}-${len}`;
   if (c.mode === 'custom') return `SEED-${c.seed}-${len}`;
   return `CLASSIC-${len}`;
@@ -112,28 +121,61 @@ export function courseId(c: CourseConfig): string {
 export function parseCourseId(id: string): CourseConfig | null {
   const s = id.trim().toUpperCase();
   const len = (code: string) => LENGTH_MODES.find((l) => LENGTH_INFO[l].short === code) ?? null;
-  let m = /^CLASSIC-([A-Z]{3})$/.exec(s);
+  const diff = (code: string | undefined): Difficulty | null => (!code ? 'normal' : code === 'R' ? 'relaxed' : code === 'H' ? 'hard' : null);
+  let m = /^CLASSIC-([A-Z]{3})(?:-([RH]))?$/.exec(s);
   if (m) {
     const l = len(m[1]!);
-    return l ? makeCourse('classic', l) : null;
+    const d = diff(m[2]);
+    return l && d ? makeCourse('classic', l, { difficulty: d }) : null;
   }
-  m = /^DAILY-(\d{4}-\d{2}-\d{2})-([A-Z]{3})$/.exec(s);
+  m = /^DAILY-(\d{4}-\d{2}-\d{2})-([A-Z]{3})(?:-([RH]))?$/.exec(s);
   if (m) {
     const l = len(m[2]!);
+    const d = diff(m[3]);
     // future days do not exist yet (B10)
-    return l && isValidDate(m[1]!) && m[1]! <= utcDate() ? makeCourse('daily', l, { date: m[1]! }) : null;
+    return l && d && isValidDate(m[1]!) && m[1]! <= utcDate() ? makeCourse('daily', l, { date: m[1]!, difficulty: d }) : null;
   }
-  m = /^SEED-(\d{1,10})-([A-Z]{3})$/.exec(s);
+  m = /^SEED-(\d{1,10})-([A-Z]{3})(?:-([RH]))?$/.exec(s);
   if (m) {
     const l = len(m[2]!);
-    return l ? makeCourse('custom', l, { customText: m[1]! }) : null;
+    const d = diff(m[3]);
+    return l && d && Number(m[1]) <= 0xffffffff ? makeCourse('custom', l, { customText: m[1]!, difficulty: d }) : null;
   }
   return null;
 }
 
 export function courseLabel(c: CourseConfig): string {
   const name = c.mode === 'daily' ? `Daily Mountain · ${c.date} (UTC)` : c.mode === 'custom' ? `Custom seed “${c.customText}”` : 'The Last Descent';
-  return `${name} · ${LENGTH_INFO[c.length].label}`;
+  const d = c.difficulty && c.difficulty !== 'normal' ? ` · ${DIFFICULTY[c.difficulty].label}` : '';
+  return `${name} · ${LENGTH_INFO[c.length].label}${d}`;
+}
+
+/**
+ * The full, serialisable description of a course: the config plus everything derived from it
+ * (segment plan, guaranteed route samples, encounters, refuges, alternate lines, finish).
+ * Endless courses are described up to `upToZ`.
+ */
+export function courseSpec(c: CourseConfig, upToZ = 60000) {
+  const m = buildMountain(c);
+  const P = m.profile;
+  const end = Number.isFinite(m.finishZ) ? m.finishZ + 400 : upToZ;
+  P.ensure(end);
+  const segs = (P as unknown as { segmentList?: ReadonlyArray<{ type: string; z0: number; z1: number }> }).segmentList ?? [{ type: 'classic', z0: -400, z1: m.finishZ }];
+  const route: Array<[number, number, number, number]> = [];
+  for (let z = 0; z <= Math.min(end, m.finishZ); z += 100) route.push([z, +m.routeX(z).toFixed(2), +m.heightAt(m.routeX(z), z).toFixed(2), +m.halfWidth(z).toFixed(1)]);
+  return {
+    version: 1,
+    id: courseId(c),
+    config: c,
+    profile: P.kind,
+    finishZ: Number.isFinite(m.finishZ) ? m.finishZ : null,
+    difficulty: { name: c.difficulty, yetiSpeed: DIFFICULTY[c.difficulty].yetiSpeed },
+    segments: segs.filter((s) => s.z0 < end).map((s) => ({ type: s.type, z0: Math.round(s.z0), z1: Number.isFinite(s.z1) ? Math.round(s.z1) : null })),
+    encounters: P.encounters(-Infinity, end).map((e) => ({ index: e.index, caveZ: e.caveZ, side: e.anchor.side, chaseEndZ: e.chaseEndZ, refugeZ: e.checkpointZ, yetiSpeed: +(e.speedMul * DIFFICULTY[c.difficulty].yetiSpeed).toFixed(3) })),
+    refuges: P.checkpoints(-Infinity, end),
+    alternateLines: P.altRoutes(-Infinity, end).map((a) => ({ type: a.type, z0: Math.round(a.z0), z1: Math.round(a.z1) })),
+    route,
+  };
 }
 
 export function sameCourse(a: CourseConfig, b: CourseConfig): boolean {

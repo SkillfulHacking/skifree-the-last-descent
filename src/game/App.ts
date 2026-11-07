@@ -14,7 +14,7 @@ import { Hud } from '../ui/Hud';
 import { MenuSystem, type Screen, type MenuItem } from '../ui/Menu';
 import { applyRun, loadRecordBook, loadSettings, recordsFor, saveRecordBook, saveSettings, type RecordBook, type RunStats, type Settings, type Records } from '../core/settings';
 import type { QualityPreset } from '../core/types';
-import { LENGTH_INFO, LENGTH_MODES, addDays, courseId, courseLabel, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
+import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
 import { fmtDistance } from '../ui/Hud';
 import type { AutopilotStyle } from '../debug/autopilot';
 
@@ -157,7 +157,7 @@ export class App {
     const s = this.settings;
     const today = utcDate();
     const date = s.dailyDate && s.dailyDate < today ? s.dailyDate : today;
-    return makeCourse(s.course, s.courseLength, { date, customText: s.customSeed });
+    return makeCourse(s.course, s.courseLength, { date, customText: s.customSeed, difficulty: s.difficulty });
   }
 
   private async buildWorld(q: QualityPreset, course: CourseConfig) {
@@ -264,6 +264,16 @@ export class App {
         },
       },
     ];
+    items.push({
+      kind: 'select',
+      label: 'Yeti',
+      options: (Object.keys(DIFFICULTY) as Difficulty[]).map((d) => ({ value: d, label: DIFFICULTY[d].label })),
+      get: () => st.difficulty,
+      set: (v) => {
+        st.difficulty = v as Difficulty;
+        changed();
+      },
+    });
     if (st.course === 'daily') {
       const days = Array.from({ length: 14 }, (_, i) => addDays(today, -i));
       const hrs = Math.floor(msUntilRollover() / 3600000);
@@ -310,6 +320,7 @@ export class App {
           }
           st.course = parsed.mode;
           st.courseLength = parsed.length;
+          st.difficulty = parsed.difficulty;
           if (parsed.mode === 'daily') st.dailyDate = parsed.date === today ? null : parsed.date;
           if (parsed.mode === 'custom' && parsed.customText) st.customSeed = parsed.customText;
           changed();

@@ -40,5 +40,5 @@ Severity: **C** = critical/blocking · **M** = major · **m** = minor.
 | B8 | m | Daily | Retrying after 00:00 UTC silently switches to the new day's course. | fixed-unverified (retry reuses the world's course) |
 | B9 | m | Records | Corrupt record values are not cleaned; `dailyDate` is checked only by regex. | fixed-unverified (`cleanRecords`; real date validation) |
 | B10 | m | Codes | Future-day codes are accepted; numeric seeds wrap. | fixed-unverified (future days rejected; numbers above 2³²−1 are hashed). A word seed still shows as its number after a code round-trip (by design, documented) |
-| B11 | m | Config | The serialisable config has no difficulty field and the segment plan can't be exported. | open |
+| B11 | m | Config | The serialisable config has no difficulty field and the segment plan can't be exported. | fixed-unverified (Relaxed/Normal/Hard Yeti difficulty in config, menu, course id and records; `courseSpec()` exports the derived plan as JSON) |
 | B12 | m | Precision | Particles, tracks and instances store absolute float32 positions. | wontfix (under 4 mm at 50 km; about 3 cm beyond 250 km of Endless; documented) |

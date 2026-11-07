@@ -4,6 +4,7 @@
  */
 import * as THREE from 'three';
 import type { Encounter, Sighting } from '../world/course';
+import { DIFFICULTY } from './CourseConfig';
 import { PHYS_DT, SkierPhysics, type SkierEvent, type SkierInput, DRIFT_MIN_SPEED } from '../physics/SkierPhysics';
 import { YetiAI } from '../yeti/YetiAI';
 import { RunState } from './RunState';
@@ -509,7 +510,7 @@ export class GameSession implements Stage {
     const e = this.run.encounter!;
     this.world.focusEncounter = e;
     this.world.caveFor(e);
-    this.yetiAI.speedMul = e.speedMul;
+    this.yetiAI.speedMul = e.speedMul * DIFFICULTY[this.world.course.difficulty].yetiSpeed;
     this.cave = new CaveCinematic(this);
     this.cave.onRunPrompt = () => {};
     this.input.steer = 0;

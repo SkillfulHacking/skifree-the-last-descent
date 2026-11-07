@@ -45,6 +45,8 @@ export interface SimOptions {
   maxZ?: number;
   /** stream obstacles in a window instead of using a pre-generated field */
   streaming?: boolean;
+  /** difficulty scale on the Yeti's speed (1 = normal) */
+  yetiSpeed?: number;
 }
 
 export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierState, t: number) => SkierInput, opts: SimOptions = {}): SimResult {
@@ -106,7 +108,7 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
         if (done.has(e.index) || s.pos.z < e.triggerZ || s.pos.z > e.chaseEndZ) continue;
         // cinematic happens here (simulation frozen) — then the yeti leaps out of the cave
         const sp = yetiSpawnAfterCinematic(m, e.anchor);
-        yeti.speedMul = e.speedMul;
+        yeti.speedMul = e.speedMul * (opts.yetiSpeed ?? 1);
         yeti.place(sp.pos.x, sp.pos.z, sp.heading, sp.pos.y - m.heightAt(sp.pos.x, sp.pos.z));
         yeti.startChase(new THREE.Vector3(sp.leap.x, sp.leap.y, sp.leap.z));
         chaseStart = t;

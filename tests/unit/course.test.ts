@@ -18,6 +18,7 @@ import {
   msUntilRollover,
   parseCourseId,
   utcDate,
+  courseSpec,
 } from '../../src/game/CourseConfig';
 import { applyRun, loadRecordBook, loadSettings, recordsFor, saveRecordBook, saveSettings, type KV, type RunStats } from '../../src/core/settings';
 
@@ -68,6 +69,27 @@ describe('course config & daily mountain', () => {
     expect(parseCourseId('daily-2026-11-07-std')!.date).toBe('2026-11-07');
     expect(parseCourseId('DAILY-2026-02-30-STD')).toBeNull();
     expect(parseCourseId('garbage')).toBeNull();
+  });
+
+  it('difficulty is part of the course identity and round-trips', () => {
+    const h = makeCourse('daily', 'standard', { date: '2026-11-01', difficulty: 'hard' });
+    expect(courseId(h)).toBe('DAILY-2026-11-01-STD-H');
+    expect(parseCourseId('DAILY-2026-11-01-STD-H')!.difficulty).toBe('hard');
+    expect(parseCourseId('CLASSIC-SPR-R')!.difficulty).toBe('relaxed');
+    expect(parseCourseId('CLASSIC-SPR-X')).toBeNull();
+    expect(courseId(makeCourse('classic', 'sprint'))).toBe('CLASSIC-SPR'); // normal adds no suffix
+  });
+
+  it('the whole course is exportable as a serialisable spec', () => {
+    const spec = courseSpec(makeCourse('custom', 'endurance', { customText: 'YETI' }));
+    const json = JSON.parse(JSON.stringify(spec));
+    expect(json.id).toBe(spec.id);
+    expect(json.finishZ).toBe(20000);
+    expect(json.segments.length).toBeGreaterThan(10);
+    expect(json.encounters.length).toBe(2);
+    expect(json.refuges.length).toBe(1);
+    expect(json.route.length).toBeGreaterThan(150);
+    expect(JSON.stringify(courseSpec(makeCourse('custom', 'endurance', { customText: 'YETI' })))).toBe(JSON.stringify(spec));
   });
 
   it('custom seeds: numbers are used directly, words are hashed case-insensitively', () => {
@@ -245,6 +267,14 @@ describe('long-course completion (headless, streaming obstacles)', () => {
       expect(r.peakBands).toBeLessThanOrEqual(6);
     });
   }
+
+  it('difficulty matters: Relaxed is escapable for an intermediate skier, Hard is measurably tougher', { timeout: 240_000 }, () => {
+    const inter = (m: Mountain) => (st: Parameters<typeof autopilotInput>[1], t: number) => autopilotInput(m, st, 'intermediate', t);
+    const relaxed = simulateGenerated(4242, 10000, inter, { maxTime: 1100, yetiSpeed: 0.93 });
+    const hard = simulateGenerated(4242, 10000, inter, { maxTime: 1100, yetiSpeed: 1.07 });
+    expect(relaxed.outcome).toBe('victory');
+    expect(hard.outcome === 'caught' || hard.finalGap < relaxed.finalGap - 10).toBe(true);
+  });
 
   it('a careless skier is caught on a generated course (loss is possible)', { timeout: 120_000 }, () => {
     expect(simulateGenerated(4242, 10000, careless, { maxTime: 1100 }).outcome).toBe('caught');
