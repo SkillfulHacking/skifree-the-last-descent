@@ -212,8 +212,10 @@ export class TerrainRenderer {
         }
       }
     }
-    // far tiles get whatever budget is left (they are far away; a frame or two late is invisible)
-    while (this.farQueue.length && performance.now() - t0 < budgetMs * 1.2) {
+    // far tiles: whatever budget is left, but always at least a small guaranteed slice so the
+    // distant ranges can never starve behind a long corridor queue
+    const tf = performance.now();
+    while (this.farQueue.length && (performance.now() - t0 < budgetMs * 1.2 || performance.now() - tf < 0.75)) {
       const t = this.farQueue[0]!;
       const r = t.job!.next();
       if (r.done) {
@@ -221,6 +223,33 @@ export class TerrainRenderer {
         this.farQueue.shift();
       }
     }
+  }
+
+  /** Build every missing far tile now (after a teleport; loading screens). */
+  flushFar() {
+    while (this.farQueue.length) {
+      const t = this.farQueue.shift()!;
+      let r = t.job!.next();
+      while (!r.done) r = t.job!.next();
+      this.swapFar(t, r.value);
+    }
+  }
+
+  /** Synchronously bring every chunk around a focus to its wanted LOD (teleports). */
+  flushAround(px: number, pz: number) {
+    this.syncWindow(pz);
+    this.flushFar();
+    for (const c of this.chunks.values()) {
+      const want = this.desiredStep(c, px, pz);
+      if (c.mesh && c.step <= Math.max(want, 4)) continue;
+      const g = this.buildGeometry(c, want);
+      let r = g.next();
+      while (!r.done) r = g.next();
+      this.swap(c, r.value, want);
+      c.job = null;
+      c.building = 0;
+    }
+    this.queue = this.queue.filter((c) => c.job);
   }
 
   get pending(): number {

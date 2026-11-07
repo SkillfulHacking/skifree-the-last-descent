@@ -325,7 +325,6 @@ export class App {
       title: 'SKIFREE',
       hero: { title: 'SKIFREE', tagline: 'THE LAST DESCENT' },
       items,
-      aside: `${courseLabel(c)}`,
     };
   }
 

@@ -184,3 +184,4 @@ kbd {
 .menu-row .ctl input { width: 190px; font: 700 15px var(--font); color: #fff; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 5px 10px; outline: none; text-transform: uppercase; }
 .menu-row .ctl input:focus { border-color: var(--accent); background: rgba(255,255,255,0.14); }
 .menu-root.main .menu-row.kind-select .val { min-width: 150px; }
+.menu-row .ctl input::placeholder { color: rgba(255,255,255,0.38); font-size: 13px; letter-spacing: 0.02em; }

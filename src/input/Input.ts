@@ -289,14 +289,14 @@ export class Input {
     };
     const p = this.pad;
     if (p) {
-      m.up ||= this.padPressed(PAD.UP);
-      m.down ||= this.padPressed(PAD.DOWN);
-      m.left ||= this.padPressed(PAD.LEFT);
-      m.right ||= this.padPressed(PAD.RIGHT);
+      // edge-detect the D-pad too (keeps the pressed-state tracking up to date); the move itself
+      // comes from the held-direction logic below, which auto-repeats like the stick
+      for (const b of [PAD.UP, PAD.DOWN, PAD.LEFT, PAD.RIGHT]) this.padPressed(b);
       m.confirm ||= this.padPressed(PAD.A);
       m.back ||= this.padPressed(PAD.B) || this.padPressed(PAD.START);
-      const ay = p.axes[1] ?? 0;
-      const ax = p.axes[0] ?? 0;
+      const held = (b: number) => !!p.buttons[b] && (p.buttons[b]!.pressed || p.buttons[b]!.value > 0.5);
+      const ay = held(PAD.UP) ? -1 : held(PAD.DOWN) ? 1 : (p.axes[1] ?? 0);
+      const ax = held(PAD.LEFT) ? -1 : held(PAD.RIGHT) ? 1 : (p.axes[0] ?? 0);
       const dir = Math.abs(ay) > 0.6 ? Math.sign(ay) * 2 : Math.abs(ax) > 0.6 ? Math.sign(ax) : 0;
       if (dir !== this.lastMenuAxis) {
         this.menuRepeat = 0.35;

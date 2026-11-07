@@ -82,12 +82,15 @@ function tanIntegral(t0: number, t1: number, L: number, x: number): number {
 
 /** Slope track (degrees) with the analytic base height (descending toward +Z). */
 export class SlopeTrack extends KeyTrack {
-  // may be filled by push() during super() (keys passed to the constructor): keep that array
-  private H: number[] = this.H ?? [];
+  // filled by push(), which may run inside super() (keys passed to the constructor), so it must
+  // not be a class field with an initializer (that would reset it after super() returns)
+  private declare _H: number[] | undefined;
+  private get H(): number[] {
+    return (this._H ??= []);
+  }
   private zeroOffset = 0;
 
   override push(z: number, v: number) {
-    this.H ??= [];
     const n = this.zs.length;
     super.push(z, v);
     if (this.zs.length === n) {

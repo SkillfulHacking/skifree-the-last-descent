@@ -238,6 +238,15 @@ export class GameSession implements Stage {
     }
     this.syncVisuals(dt);
 
+    // the ending cinematics can be skipped straight to the results (after a beat)
+    if ((this.victory || this.defeat) && !this.resultsSent) {
+      const tl = (this.victory ?? this.defeat)!.tl;
+      this.hud.setSkipHint(tl.time > 1.2 ? `Skip  ${this.hud.g('skip')}` : null);
+      if (tl.time > 1.2 && gi.skipPressed) {
+        this.hud.setSkipHint(null);
+        this.sendResults(!!this.victory);
+      }
+    } else if (this.resultsSent && (this.victory || this.defeat)) this.hud.setSkipHint(null);
     if (this.defeat) {
       this.defeat.tl.advance(dt);
       this.defeat.update(dt);
@@ -786,6 +795,7 @@ export class GameSession implements Stage {
     const m = this.world.mountain;
     this.world.stream(z, true);
     this.world.vegetation.flush();
+    this.world.terrain.flushAround(m.routeX(z), z);
     const x = m.routeX(z);
     this.phys.teleport(x, z, Math.atan2(m.routeX(z + 10) - x, 10), speed);
     this.prevPos.copy(this.phys.s.pos);
