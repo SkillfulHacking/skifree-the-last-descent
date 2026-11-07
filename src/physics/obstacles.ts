@@ -188,6 +188,7 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
   const cps = P.checkpoints(zA - 200, zB + 200);
   const kickers = P.kickersNear(zA - 40, zB + 40, []);
   const caves = P.encounters(zA - 60, zB + 60).map((e) => ({ x: e.anchor.centerX + e.anchor.side * e.anchor.d, z: e.anchor.z, side: e.anchor.side, d: e.anchor.d }));
+  const hasAlt = P.altRoutes(zA - 10, zB + 10).length > 0;
   const nearKicker = (x: number, z: number) => kickers.some((k) => z > k.z - k.run - 18 && z < k.z + 26 && Math.abs(x - (m.centerX(k.z) + k.d)) < k.width * 0.5 + 6);
   let local = 0;
   const add = (o: Omit<Obstacle, 'id' | 'collidable' | 'y'>) => {
@@ -210,6 +211,8 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
       const ad = Math.abs(d);
       const lane = Math.abs(x - m.routeX(z));
       if (lane < LANE_HALF + 1.5) continue; // primary route stays clear
+      const alt = hasAlt ? P.altRouteX(z) : null;
+      if (alt !== null && Math.abs(x - alt) < LANE_HALF + 1.0) continue; // alternate lines too
       if (Number.isFinite(finishZ) && z > finishZ - 60 && ad < 140) continue; // finish chute & resort
       if (cps.some((c) => Math.abs(z - c) < 120 && ad < 110)) continue; // Endless checkpoint lodges
       if (z < 40 && z > -60 && ad < 40) continue; // start platform

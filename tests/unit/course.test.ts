@@ -172,6 +172,51 @@ describe('configurable course lengths', () => {
   }
 });
 
+describe('alternate lines', () => {
+  it('generated courses offer alternate lines: inside the piste, skiable, clear, and shorter than the route', () => {
+    let total = 0;
+    let shorter = 0;
+    for (const seed of [4242, 7, 99, 2026]) {
+      const m = Mountain.generated(seed, 20000);
+      const alts = m.profile.altRoutes(0, 20000);
+      total += alts.length;
+      const f = new ObstacleField(m, seed);
+      for (const a of alts) {
+        let prevH = Infinity;
+        let altLen = 0;
+        let routeLen = 0;
+        for (let z = a.z0; z <= a.z1; z += 5) {
+          const x = m.profile.altRouteX(z)!;
+          expect(x).not.toBeNull();
+          expect(Math.abs(x - m.centerX(z))).toBeLessThan(m.halfWidth(z));
+          const h = m.heightAt(x, z);
+          if (prevH !== Infinity) expect(h - prevH, `seed ${seed} z ${z}`).toBeLessThan(2.5);
+          prevH = h;
+          if (z > a.z0) {
+            altLen += Math.hypot(x - m.profile.altRouteX(z - 5)!, 5);
+            routeLen += Math.hypot(m.routeX(z) - m.routeX(z - 5), 5);
+          }
+        }
+        if (altLen < routeLen) shorter++;
+        // no solid obstacle in the alternate lane
+        f.ensure(a.z0, a.z1);
+        for (const o of f.inRange(a.z0, a.z1)) {
+          if (!o.collidable || o.kind === 'log') continue;
+          const x = m.profile.altRouteX(o.z);
+          if (x !== null) expect(Math.abs(o.x - x) - o.r, `seed ${seed} obstacle at z ${o.z.toFixed(0)}`).toBeGreaterThan(4.5);
+        }
+        f.release(Infinity, Infinity);
+      }
+    }
+    expect(total).toBeGreaterThanOrEqual(8);
+    expect(shorter / total).toBeGreaterThan(0.8);
+  });
+
+  it('the hand-tuned classic course is unchanged (no alternate lines added)', () => {
+    expect(new Mountain().profile.altRoutes(0, 3000)).toEqual([]);
+  });
+});
+
 describe('long-course completion (headless, streaming obstacles)', () => {
   for (const [l, maxTime] of [
     ['sprint', 400],

@@ -130,7 +130,7 @@ test('a course code typed into the menu selects that course', async ({ page }) =
   await page.setViewportSize({ width: 1920, height: 1080 });
   await boot(page);
   const input = page.locator('.menu-row', { hasText: 'Enter a course code' }).locator('input');
-  await input.click();
+  await input.focus();
   await input.fill('seed-777-end');
   await input.press('Enter');
   const c = await page.evaluate(() => (window as unknown as MW).__skifree.currentCourse());

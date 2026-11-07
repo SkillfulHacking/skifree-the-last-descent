@@ -234,6 +234,22 @@ export interface CourseProfile {
   sightings(z0: number, z1: number): Sighting[];
   checkpoints(z0: number, z1: number): number[];
   segmentAt(z: number): SegmentType;
+  /** alternate lines (shortcuts through bends / tree runs) overlapping [z0, z1] */
+  altRoutes(z0: number, z1: number): AltRoute[];
+  /** x of an alternate line at z, or null where there is none */
+  altRouteX(z: number): number | null;
+}
+
+/**
+ * An alternate line through a segment: a straight chord between two points of the guaranteed
+ * route that cuts the inside of its bends (shorter, but closer to the trees and banks), kept
+ * inside the piste and cleared of solid obstacles like the main route.
+ */
+export interface AltRoute {
+  z0: number;
+  z1: number;
+  /** segment type it belongs to */
+  type: SegmentType;
 }
 
 function between<T extends { z: number }>(arr: readonly T[], z0: number, z1: number, out: T[]): T[] {
@@ -388,6 +404,12 @@ export class ClassicProfile implements CourseProfile {
   checkpoints() {
     return [];
   }
+  altRoutes(): AltRoute[] {
+    return [];
+  }
+  altRouteX(): number | null {
+    return null;
+  }
   segmentAt(): SegmentType {
     return 'classic';
   }
@@ -470,6 +492,7 @@ export class GeneratedProfile implements CourseProfile {
   private enc: Encounter[] = [];
   private sight: Sighting[] = [];
   private cps: number[] = [];
+  private alts: AltRoute[] = [];
   private zDone = -400;
   private phase: [number, number, number, number];
   private rngPlan: Rng;
@@ -637,6 +660,11 @@ export class GeneratedProfile implements CourseProfile {
       const band = o > 0 ? { dMin: -(hw - 6), dMax: o - 13 } : { dMin: o + 13, dMax: hw - 6 };
       if (band.dMax - band.dMin > 8) this.cliffs.push({ z, drop: rng.range(3.5, 6), ...band });
     }
+    // an alternate line on wide, flowing segments (decided from this segment's own rng, so the
+    // plan does not depend on generation order)
+    if ((type === 'forest' || type === 'powder' || type === 'basin' || type === 'alpine' || type === 'highspeed') && len > 380 && rng.chance(0.65)) {
+      this.alts.push({ z0: z0 + edge + 10, z1: z1 - edge - 10, type });
+    }
     this.kick.sort((p, q) => p.z - q.z);
     this.cliffs.sort((p, q) => p.z - q.z);
   }
@@ -757,6 +785,40 @@ export class GeneratedProfile implements CourseProfile {
     this.ensure(z1);
     return this.cps.filter((c) => c >= z0 && c <= z1);
   }
+  altRoutes(z0: number, z1: number): AltRoute[] {
+    this.ensure(z1 + 200);
+    return this.alts.filter((a) => a.z1 >= z0 && a.z0 <= z1 && this.altUseful(a));
+  }
+
+  private altOk = new Map<AltRoute, boolean>();
+  /** an alternate line only counts where it really is a different line from the route */
+  private altUseful(a: AltRoute): boolean {
+    let v = this.altOk.get(a);
+    if (v === undefined) {
+      let apart = 0;
+      let n = 0;
+      for (let z = a.z0; z <= a.z1; z += 10, n++) if (Math.abs(this.altAt(a, z) - this.routeX(z)) > 10) apart++;
+      v = apart / Math.max(1, n) > 0.35;
+      this.altOk.set(a, v);
+    }
+    return v;
+  }
+
+  private altAt(a: AltRoute, z: number): number {
+    const x0 = this.routeX(a.z0);
+    const x1 = this.routeX(a.z1);
+    const t = (z - a.z0) / (a.z1 - a.z0);
+    const chord = x0 + (x1 - x0) * t;
+    const c = this.centerX(z);
+    const hw = this.halfWidth(z) - 9;
+    return Math.min(c + hw, Math.max(c - hw, chord));
+  }
+
+  altRouteX(z: number): number | null {
+    for (const a of this.altRoutes(z, z)) if (z >= a.z0 && z <= a.z1) return this.altAt(a, z);
+    return null;
+  }
+
   segmentAt(z: number): SegmentType {
     this.ensure(z);
     for (let i = this.segs.length - 1; i >= 0; i--) if (this.segs[i]!.z0 <= z) return this.segs[i]!.type;
