@@ -11,6 +11,7 @@ import { caveTerrainHeight, CAVE_INFLUENCE_Z, type CaveAnchor } from './caveTerr
 import { CLASSIC, ClassicProfile, GeneratedProfile, type CliffBand, type CourseProfile, type Kicker } from './profile';
 
 export type { Kicker, CliffBand, CourseProfile, Encounter, Sighting, SegmentType, AltRoute } from './profile';
+import type { AltRoute } from './profile';
 export { CAVE_D, CAVE_FLOOR_RAISE } from './caveTerrain';
 
 export const SEED_DEFAULT = 20261106;
@@ -65,6 +66,33 @@ export class Mountain {
   }
   get finishZ() {
     return this.profile.finishZ;
+  }
+
+  private altCache: { z0: number; z1: number; list: AltRoute[] } = { z0: 1, z1: 0, list: [] };
+  /** Alternate lines overlapping [z0, z1] (cached per 256 m window). */
+  altsNear(z0: number, z1: number): AltRoute[] {
+    const c = this.altCache;
+    if (z0 >= c.z0 && z1 <= c.z1) return c.list;
+    const w0 = Math.floor(z0 / 256) * 256 - 256;
+    const w1 = Math.ceil(z1 / 256) * 256 + 256;
+    this.altCache = { z0: w0, z1: w1, list: this.profile.altRoutes(w0, w1) };
+    return this.altCache.list;
+  }
+
+  /**
+   * Alternate-line shaping at (x, z): 0..1 lane weight (1 on the line, 0 beyond 7 m, faded in/out
+   * over 40 m at the ends). The line is a hard-packed, slightly sunken chute: fast, low grip.
+   */
+  altLane(x: number, z: number): number {
+    const list = this.altsNear(z, z);
+    for (const a of list) {
+      if (z < a.z0 || z > a.z1) continue;
+      const dx = Math.abs(x - this.profile.altX(a, z));
+      if (dx > 7) continue;
+      const ends = smoothstep(a.z0, a.z0 + 40, z) * (1 - smoothstep(a.z1 - 40, a.z1, z));
+      return (1 - smoothstep(3.5, 7, dx)) * ends;
+    }
+    return 0;
   }
 
   /** Cave anchors whose influence overlaps [z0, z1] (cached per 256 m window). */
@@ -162,6 +190,12 @@ export class Mountain {
     // caves cut into cliffs (terrain cut and cave mesh share src/world/caveTerrain.ts)
     for (const c of this.cavesNear(z, z)) if (Math.abs(z - c.z) < CAVE_INFLUENCE_Z) h = caveTerrainHeight(c, x, z, d, h, s);
 
+    // alternate lines: a shallow sunken chute (reads as a line, channels the skier)
+    if (P.kind === 'generated') {
+      const al = this.altLane(x, z);
+      if (al > 0) h -= 0.7 * al;
+    }
+
     // resort / checkpoint run-outs: flatten
     const flat = P.flatten(z);
     if (flat > 0) {
@@ -211,6 +245,14 @@ export class Mountain {
     const pb = P.powderBias(z);
     const powder = clamp(smoothstep(w * 0.78, w * 1.05, ad) + smoothstep(0.35 - 0.2 * pb, 0.5 - 0.2 * pb, powderNoise) * smoothstep(w * (0.45 - 0.25 * pb), w * (0.7 - 0.25 * pb), ad), 0, 1) * (1 - ice);
     const groomed = (1 - smoothstep(w * 0.3, w * 0.5, Math.abs(x - P.routeX(z)))) * (1 - ice) * (1 - powder);
+    if (P.kind === 'generated') {
+      // alternate lines are hard-packed, partly icy: faster, less grip (risk for the time saved)
+      const al = this.altLane(x, z);
+      if (al > 0) {
+        const ice2 = Math.max(ice, 0.75 * al);
+        return { ice: ice2, powder: powder * (1 - al), groomed: groomed * (1 - al) };
+      }
+    }
     return { ice, powder, groomed };
   }
 }

@@ -37,3 +37,21 @@ registries, and it avoids every licensing question.
 and a Yeti that chases you. It uses none of the original's graphics, sprites, sounds, code or
 character designs. "SkiFree — The Last Descent" is a working title; before any public or commercial
 release, check whether the name can be used.
+
+## Pass 2: licensed-asset investigation (2026-11-07)
+
+The pass-2 brief asked us to investigate licensed assets (PBR textures, trees, characters, HDRIs) for
+visual quality, without fabricating any licence. Findings:
+
+- **Network:** only the npm/PyPI/GitHub package registries are reachable from the build machine.
+  Asset sites (Poly Haven, ambientCG, Sketchfab, Quixel, etc.) are blocked, so nothing could be
+  downloaded from them, and we did not try to route around the block.
+- **npm:** `@pmndrs/assets` 1.7.0 (declared CC0) bundles a few Poly Haven HDRIs, Inter fonts,
+  test models, and normal maps by "emmelleppi". We could not verify the upstream licence of those
+  normal maps from the package alone. Nothing alpine is included (no snow/rock PBR sets, conifers
+  or characters), and no other npm package offered alpine assets with a verifiable licence.
+- **Decision:** stay fully procedural. Every visual improvement in pass 2 (cave geology, Yeti face
+  and fur, trees, terrain shading, atmosphere) is original code in this repository. No third-party
+  art is bundled, so no third-party art licence applies. If real scanned assets are wanted later,
+  CC0 sources such as Poly Haven and ambientCG are good candidates, but each asset's page must be
+  checked and recorded here before use.

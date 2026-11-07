@@ -80,7 +80,8 @@ export function dailySeed(date: string): number {
 /** Seed from free text: a plain number is used as-is, anything else is hashed. */
 export function customSeed(text: string): number {
   const t = text.trim();
-  if (/^\d{1,10}$/.test(t)) return Number(t) >>> 0;
+  // plain numbers within the 32-bit range are used as-is (no silent wrap-around, B10)
+  if (/^\d{1,10}$/.test(t) && Number(t) <= 0xffffffff) return Number(t);
   return hashString(`skifree-tld/custom/${t.toUpperCase()}`);
 }
 
@@ -119,7 +120,8 @@ export function parseCourseId(id: string): CourseConfig | null {
   m = /^DAILY-(\d{4}-\d{2}-\d{2})-([A-Z]{3})$/.exec(s);
   if (m) {
     const l = len(m[2]!);
-    return l && isValidDate(m[1]!) ? makeCourse('daily', l, { date: m[1]! }) : null;
+    // future days do not exist yet (B10)
+    return l && isValidDate(m[1]!) && m[1]! <= utcDate() ? makeCourse('daily', l, { date: m[1]! }) : null;
   }
   m = /^SEED-(\d{1,10})-([A-Z]{3})$/.exec(s);
   if (m) {

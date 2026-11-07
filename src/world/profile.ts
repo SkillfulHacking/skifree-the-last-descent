@@ -238,6 +238,8 @@ export interface CourseProfile {
   altRoutes(z0: number, z1: number): AltRoute[];
   /** x of an alternate line at z, or null where there is none */
   altRouteX(z: number): number | null;
+  /** x of a given alternate line at z (z within [a.z0, a.z1]) */
+  altX(a: AltRoute, z: number): number;
 }
 
 /**
@@ -410,6 +412,9 @@ export class ClassicProfile implements CourseProfile {
   altRouteX(): number | null {
     return null;
   }
+  altX(): number {
+    return 0;
+  }
   segmentAt(): SegmentType {
     return 'classic';
   }
@@ -463,6 +468,9 @@ export function chaseLength(length: number): number {
   if (length <= 20000) return 3400;
   return 3800;
 }
+
+/** chase length of a mid-course skirmish on long finite courses (cave → refuge) */
+export const SKIRMISH_CHASE = 2200;
 
 export const ENDLESS = { firstCave: 5200, cycle: 9000, chase: 3400 } as const;
 
@@ -520,9 +528,19 @@ export class GeneratedProfile implements CourseProfile {
     if (!this.endless) {
       const L = length;
       const caveZ = Math.max(1350, L - chaseLength(L));
-      this.addEncounter(0, caveZ, L, null, 1);
-      // sightings on long courses: the Yeti shows itself on a ridge long before the cave
-      for (let z = 2600; z < caveZ - 1500; z += this.rngPlan.range(3600, 5200)) this.sight.push({ z, side: this.rngPlan.chance(0.5) ? 1 : -1 });
+      // long courses: earlier skirmishes from other caves, each ending at a refuge where the Yeti
+      // loses the trail; the main confrontation stays at the end (B4)
+      const skirm = L >= 45000 ? [0.24, 0.5, 0.72] : L >= 18000 ? [0.4] : [];
+      skirm.forEach((f, i) => {
+        const c = Math.round((L * f) / 10) * 10;
+        const cp = c + SKIRMISH_CHASE;
+        this.addEncounter(i, c, cp, cp, 0.94 + 0.02 * i);
+        this.cps.push(cp);
+      });
+      this.addEncounter(skirm.length, caveZ, L, null, 1);
+      // sightings: the Yeti shows itself on a ridge between the encounters
+      const busy = (z: number) => this.enc.some((e) => z > e.foreshadowZ - 900 && z < e.chaseEndZ + 600);
+      for (let z = 2600; z < caveZ - 1500; z += this.rngPlan.range(3600, 5200)) if (!busy(z)) this.sight.push({ z, side: this.rngPlan.chance(0.5) ? 1 : -1 });
     }
     this.ensure(this.endless ? 12000 : length + 3000);
     // fix the tutorial kicker to the actual route
@@ -585,12 +603,19 @@ export class GeneratedProfile implements CourseProfile {
       const caveZ = ENDLESS.firstCave + k * ENDLESS.cycle;
       if (caveZ - 320 > zTarget + ENDLESS.cycle) break;
       const cp = caveZ + ENDLESS.chase;
-      this.addEncounter(k, caveZ, cp, cp, Math.min(1.22, 1 + 0.045 * k));
+      // escalation: each encounter's Yeti is faster, up to +30 % from the 7th on (B7)
+      this.addEncounter(k, caveZ, cp, cp, Math.min(1.3, 1 + 0.05 * k));
       this.cps.push(cp);
       const prevEnd = k === 0 ? 1200 : ENDLESS.firstCave + (k - 1) * ENDLESS.cycle + ENDLESS.chase + 800;
       for (let z = prevEnd + 1400; z < caveZ - 1400; z += this.rngPlan.range(2600, 3600)) this.sight.push({ z, side: this.rngPlan.chance(0.5) ? 1 : -1 });
     }
-    while (this.zDone < zTarget) this.generateNext();
+    if (this.generating) return;
+    this.generating = true;
+    try {
+      while (this.zDone < zTarget) this.generateNext();
+    } finally {
+      this.generating = false;
+    }
   }
 
   private generateNext() {
@@ -712,16 +737,25 @@ export class GeneratedProfile implements CourseProfile {
   }
 
   // --- queries ------------------------------------------------------------------------------
+  private generating = false;
+  /** queries near/past the generated frontier extend the plan first (B5: never sample stale keys) */
+  private reach(z: number) {
+    if (z > this.zDone - 300 && !this.generating) this.ensure(z + 600);
+  }
   slopeDeg(z: number) {
+    this.reach(z);
     return this.slope.at(z);
   }
   baseHeight(z: number) {
+    this.reach(z);
     return this.slope.base(z);
   }
   halfWidth(z: number) {
+    this.reach(z);
     return this.width.at(z);
   }
   centerX(z: number) {
+    this.reach(z);
     const a = this.amp.at(z);
     if (a < 1e-3) return 0;
     const p = this.phase;
@@ -797,14 +831,14 @@ export class GeneratedProfile implements CourseProfile {
     if (v === undefined) {
       let apart = 0;
       let n = 0;
-      for (let z = a.z0; z <= a.z1; z += 10, n++) if (Math.abs(this.altAt(a, z) - this.routeX(z)) > 10) apart++;
+      for (let z = a.z0; z <= a.z1; z += 10, n++) if (Math.abs(this.altX(a, z) - this.routeX(z)) > 10) apart++;
       v = apart / Math.max(1, n) > 0.35;
       this.altOk.set(a, v);
     }
     return v;
   }
 
-  private altAt(a: AltRoute, z: number): number {
+  altX(a: AltRoute, z: number): number {
     const x0 = this.routeX(a.z0);
     const x1 = this.routeX(a.z1);
     const t = (z - a.z0) / (a.z1 - a.z0);
@@ -815,7 +849,7 @@ export class GeneratedProfile implements CourseProfile {
   }
 
   altRouteX(z: number): number | null {
-    for (const a of this.altRoutes(z, z)) if (z >= a.z0 && z <= a.z1) return this.altAt(a, z);
+    for (const a of this.altRoutes(z, z)) if (z >= a.z0 && z <= a.z1) return this.altX(a, z);
     return null;
   }
 

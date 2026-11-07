@@ -330,7 +330,8 @@ export class App {
 
   async startRun(retry: boolean) {
     void this.audio.unlock().then(() => this.applyVolumes());
-    const course = this.currentCourse();
+    // a retry replays exactly the same course, even if the Daily day rolled over meanwhile (B8)
+    const course = retry && this.world ? this.world.course : this.currentCourse();
     const q = this.pendingQuality ?? this.settings.quality;
     if (q !== this.world?.quality || courseId(course) !== this.world?.id) {
       this.menu.close();
@@ -629,9 +630,12 @@ export class App {
     }
     if (this.yetiRim) this.yetiRim.intensity = this.session && this.session.run.yetiReleased ? 6 : 0;
     if (this.mode === 'menu' || this.mode === 'loading') w.updateOrigin(this.camera.position);
+    // the rear-view pose is computed in absolute coordinates BEFORE the origin shift, so both
+    // cameras are shifted together with the scene (B2)
+    const rear = this.prepareRearView();
     w.renderShifted([this.camera, this.rearCam], () => {
       this.renderer.render(w.scene, this.camera);
-      this.renderRearView();
+      if (rear) this.renderRearView(rear);
     });
   }
 
@@ -640,7 +644,7 @@ export class App {
   private rearPose = { pos: new THREE.Vector3(), look: new THREE.Vector3() };
   private rearFrame: HTMLDivElement | null = null;
   /** A small "glance back" window during the chase so the threat is visible, not just a HUD bar. */
-  private renderRearView() {
+  private prepareRearView(): { x: number; y: number; w: number; h: number } | null {
     const s = this.session;
     const k = s && this.mode === 'playing' && this.settings.rearView && this.world?.quality !== 'low' && !s.isCinematic() ? s.rearView(this.rearPose) : 0;
     if (!this.rearFrame) {
@@ -649,7 +653,7 @@ export class App {
       document.body.appendChild(this.rearFrame);
     }
     this.rearFrame.style.opacity = String(k);
-    if (k <= 0.02 || !this.world) return;
+    if (k <= 0.02 || !this.world) return null;
     const W = innerWidth;
     const H = innerHeight;
     const w = Math.round(Math.min(420, W * 0.3));
@@ -661,12 +665,21 @@ export class App {
     this.rearCam.lookAt(this.rearPose.look);
     this.rearCam.aspect = w / h;
     this.rearCam.updateProjectionMatrix();
+    this.rearCam.updateMatrixWorld();
+    return { x, y: H - top - h, w, h };
+  }
+
+  private renderRearView(v: { x: number; y: number; w: number; h: number }) {
+    if (!this.world) return;
+    const { x, w, h } = v;
+    const W = innerWidth;
+    const H = innerHeight;
     const r = this.renderer;
     const auto = r.shadowMap.autoUpdate;
     r.shadowMap.autoUpdate = false; // reuse this frame's shadow map
     r.setScissorTest(true);
-    r.setViewport(x, H - top - h, w, h);
-    r.setScissor(x, H - top - h, w, h);
+    r.setViewport(x, v.y, w, h);
+    r.setScissor(x, v.y, w, h);
     r.autoClear = false;
     r.clearDepth();
     r.render(this.world.scene, this.rearCam);

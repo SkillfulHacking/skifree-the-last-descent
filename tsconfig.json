@@ -17,5 +17,6 @@
     "types": ["vite/client"],
     "noEmit": true
   },
-  "include": ["src", "tests", "preview"]
+  "include": ["src", "tests", "preview"],
+  "exclude": ["tests/review/vitest.config.ts"]
 }

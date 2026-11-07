@@ -134,7 +134,7 @@ export function sanitize(s: Settings): Settings {
   if (s.course !== 'classic' && s.course !== 'daily' && s.course !== 'custom') s.course = 'classic';
   if (!['sprint', 'standard', 'endurance', 'expedition', 'endless'].includes(s.courseLength)) s.courseLength = d.courseLength;
   if (typeof s.customSeed !== 'string' || !s.customSeed.trim() || s.customSeed.length > 40) s.customSeed = d.customSeed;
-  if (s.dailyDate !== null && !(typeof s.dailyDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.dailyDate))) s.dailyDate = null;
+  if (s.dailyDate !== null && !(typeof s.dailyDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.dailyDate) && new Date(`${s.dailyDate}T00:00:00Z`).toISOString().startsWith(s.dailyDate))) s.dailyDate = null;
   for (const k of Object.keys(d.bindings) as Array<keyof Settings['bindings']>) {
     const v = s.bindings?.[k];
     s.bindings[k] = Array.isArray(v) && v.every((c) => typeof c === 'string') && v.length > 0 ? v : [...d.bindings[k]];
@@ -180,19 +180,33 @@ export function loadRecordBook(kv: KV | null = storage()): RecordBook {
     if (raw) {
       const p = JSON.parse(raw) as Partial<RecordBook>;
       book.seenCaveCinematic = p.seenCaveCinematic === true;
-      if (p.courses && typeof p.courses === 'object') for (const [k, v] of Object.entries(p.courses)) if (v && typeof v === 'object') book.courses[k] = { ...DEFAULT_RECORDS, ...v };
+      if (p.courses && typeof p.courses === 'object') for (const [k, v] of Object.entries(p.courses)) if (v && typeof v === 'object') book.courses[k] = cleanRecords(v);
       return book;
     }
     const old = kv?.getItem(KEY_R);
     if (old) {
       const r = { ...DEFAULT_RECORDS, ...(JSON.parse(old) as Partial<Records>) };
       book.seenCaveCinematic = r.seenCaveCinematic;
-      if (r.runs > 0) book.courses['CLASSIC-SPR'] = r;
+      if (r.runs > 0) book.courses['CLASSIC-SPR'] = cleanRecords(r);
     }
   } catch {
     /* corrupt: start fresh */
   }
   return book;
+}
+
+/** Repair a stored record set: every field gets the right type and a sane range (B9). */
+export function cleanRecords(v: Partial<Records>): Records {
+  const n = (x: unknown, def: number) => (typeof x === 'number' && Number.isFinite(x) && x >= 0 ? x : def);
+  return {
+    bestTime: typeof v.bestTime === 'number' && Number.isFinite(v.bestTime) && v.bestTime > 0 ? v.bestTime : null,
+    bestScore: n(v.bestScore, 0),
+    bestDistance: n(v.bestDistance, 0),
+    bestSurvival: n(v.bestSurvival, 0),
+    runs: Math.floor(n(v.runs, 0)),
+    wins: Math.floor(n(v.wins, 0)),
+    seenCaveCinematic: v.seenCaveCinematic === true,
+  };
 }
 
 export function saveRecordBook(b: RecordBook, kv: KV | null = storage()) {

@@ -111,6 +111,7 @@ export class GameSession implements Stage {
     this.prevPos.copy(this.phys.s.pos);
     this.skier.setVisible(true);
     this.yeti.setVisible(false);
+    this.yeti.setGround((x, z) => m.heightAt(x, z));
     this.yeti.onFootstep = (side, p, strength) => {
       this.world.yetiPrints.add(p.x, p.z, this.yetiAI.heading, side, 1.1);
       this.audio.playYetiFootstep(p, strength);
@@ -395,15 +396,17 @@ export class GameSession implements Stage {
     return this.world.caveFor(e).cave.mouth;
   }
 
-  /** Endless: the refuge at the end of a chase was reached — bank the run, the Yeti gives up. */
+  /** A refuge at the end of a chase was reached (Endless: bank the run). The Yeti gives up for now. */
   private onCheckpoint() {
-    this.banked = this.liveScore();
+    if (this.endless) this.banked = this.liveScore();
     this.yetiAI.standDown();
     this.yeti.setVisible(false);
     this.yetiAnim.mode = 'hidden';
     this.world.focusEncounter = null;
     this.audio.setMusicMode('explore');
-    this.hud.title(`REFUGE ${this.run.checkpointsReached}`, `Run banked: ${this.banked.toLocaleString('en-US')} pts. Retire from the pause menu, or push on.`, 'intro', 4);
+    if (this.endless) this.hud.title(`REFUGE ${this.run.checkpointsReached}`, `Run banked: ${this.banked.toLocaleString('en-US')} pts. Retire from the pause menu, or push on.`, 'intro', 4);
+    else this.hud.title(`REFUGE ${this.run.checkpointsReached}`, 'The Yeti lost your trail… for now. The resort is still a long way down.', 'intro', 4);
+    this.hud.caption('[a furious howl fades behind you]', 3);
     this.audio.playUiMove();
   }
 

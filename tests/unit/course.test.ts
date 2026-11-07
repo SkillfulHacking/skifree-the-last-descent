@@ -139,11 +139,18 @@ describe('configurable course lengths', () => {
       const m = Mountain.generated(4242, L);
       expect(m.finishZ).toBe(L);
       const enc = m.profile.encounters(-Infinity, Infinity);
-      expect(enc.length).toBe(1);
-      expect(enc[0]!.caveZ).toBe(Math.max(1350, L - chaseLength(L)));
-      expect(enc[0]!.chaseEndZ).toBe(L);
+      const main = enc.at(-1)!;
+      // long courses add earlier skirmishes that end at refuges; the main one ends at the finish
+      expect(enc.length).toBe(L >= 45000 ? 4 : L >= 18000 ? 2 : 1);
+      expect(main.caveZ).toBe(Math.max(1350, L - chaseLength(L)));
+      expect(main.chaseEndZ).toBe(L);
+      expect(main.checkpointZ).toBeNull();
+      for (const e of enc.slice(0, -1)) {
+        expect(e.checkpointZ).toBe(e.chaseEndZ);
+        expect(e.chaseEndZ).toBeLessThan(main.foreshadowZ);
+      }
       // main confrontation in the final part of the course
-      if (L >= 10000) expect(enc[0]!.caveZ / L).toBeGreaterThan(0.6);
+      if (L >= 10000) expect(main.caveZ / L).toBeGreaterThan(0.6);
       // the route descends everywhere (small bumps allowed)
       let prev = m.heightAt(m.routeX(0), 0);
       let worst = 0;
@@ -198,6 +205,11 @@ describe('alternate lines', () => {
           }
         }
         if (altLen < routeLen) shorter++;
+        // a hard-packed, slightly sunken line: fast but low grip
+        const zm = (a.z0 + a.z1) / 2;
+        const xm = m.profile.altRouteX(zm)!;
+        expect(m.surfaceAt(xm, zm)).toBe('ice');
+        expect(m.heightAt(xm, zm)).toBeLessThan(m.heightAt(xm + 9, zm) + 0.2);
         // no solid obstacle in the alternate lane
         f.ensure(a.z0, a.z1);
         for (const o of f.inRange(a.z0, a.z1)) {
@@ -250,7 +262,8 @@ describe('endless', () => {
       expect(e.checkpointZ).toBe(e.chaseEndZ);
       if (i) expect(e.speedMul).toBeGreaterThanOrEqual(enc[i - 1]!.speedMul);
     });
-    expect(enc.at(-1)!.speedMul).toBeLessThanOrEqual(1.22);
+    expect(enc.at(-1)!.speedMul).toBeLessThanOrEqual(1.3);
+    expect(enc.at(-1)!.speedMul).toBeGreaterThan(1.25);
     expect(m.profile.checkpoints(0, 200_000).length).toBe(enc.length);
     // terrain stays finite and descending far down the mountain
     const h1 = m.heightAt(m.routeX(150_000), 150_000);

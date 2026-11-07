@@ -25,3 +25,20 @@ Severity: **C** = critical/blocking · **M** = major · **m** = minor.
 | P4 | M | Perf | Review D (pass 1) | GPU frame rate has never been measured on real hardware. | — | open (environment has no GPU) |
 | P5 | m | Controls | Review E (pass 1) | Controller buttons can't be remapped; D-pad buttons don't auto-repeat in menus. | — | open |
 | P6 | m | Cinematic | Review C (pass 1) | The victory sequence (about 18 s) can't be skipped or paused. | — | fixed-unverified (skip to results after 1.2 s, victory and defeat) |
+
+### Round 1 — Reviewer B (internal), commit 0631c26 (`round1/B_systems.md`)
+
+| ID | Sev | Area | Defect | Status |
+|---|---|---|---|---|
+| B1 | C | Build | The committed `Cave.ts` is still the pass-1 version, so `tsc` and `vite build` fail on the branch. | open (the cave specialist's rebuild is still uncommitted; it lands together with the cinematic integration) |
+| B2 | M | Chase | The rear-view camera is broken once the floating origin shifts. | fixed-unverified (the rear pose is computed before the shift; both cameras shift together) |
+| B3 | M | Course | Alternate lines are shortcuts in name only. | fixed-unverified (a hard-packed, icy, slightly sunken chute: faster but low grip; trail markers; still only a few metres shorter) |
+| B4 | M | Pacing | Long courses have one encounter, at the end. | fixed-unverified (Endurance adds 1 skirmish, Expedition 3. Each ends at a refuge; the main chase is still last) |
+| B5 | m | Endless | Sampling past the generated frontier gives stale values. | fixed-unverified (queries near the frontier extend the plan first) |
+| B6 | m | Endless | Plan arrays (keys, segments, encounters) grow with distance. | wontfix for now: about 1.5–1.7× slower lookups at 1,000 km; documented in KNOWN_ISSUES |
+| B7 | m | Endless | Escalation stops early and is barely measurable. | fixed-unverified (+5 % per encounter up to +30 %) |
+| B8 | m | Daily | Retrying after 00:00 UTC silently switches to the new day's course. | fixed-unverified (retry reuses the world's course) |
+| B9 | m | Records | Corrupt record values are not cleaned; `dailyDate` is checked only by regex. | fixed-unverified (`cleanRecords`; real date validation) |
+| B10 | m | Codes | Future-day codes are accepted; numeric seeds wrap. | fixed-unverified (future days rejected; numbers above 2³²−1 are hashed). A word seed still shows as its number after a code round-trip (by design, documented) |
+| B11 | m | Config | The serialisable config has no difficulty field and the segment plan can't be exported. | open |
+| B12 | m | Precision | Particles, tracks and instances store absolute float32 positions. | wontfix (under 4 mm at 50 km; about 3 cm beyond 250 km of Endless; documented) |
