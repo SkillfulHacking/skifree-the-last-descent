@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import type { QualityPreset } from '../core/types';
+import { atmosphere } from './look/atmosphere';
+import { DistantRanges } from './look/ranges';
 
 export class Environment {
   readonly sun: THREE.DirectionalLight;
@@ -17,6 +19,7 @@ export class Environment {
   private shadowSize: number;
   private envRT: THREE.WebGLRenderTarget | null = null;
   private baseFogDensity: number;
+  readonly ranges: DistantRanges;
 
   constructor(
     private scene: THREE.Scene,
@@ -26,8 +29,8 @@ export class Environment {
     this.sky = new Sky();
     this.sky.scale.setScalar(45000);
     const u = this.sky.material.uniforms;
-    u['turbidity']!.value = 3.2;
-    u['rayleigh']!.value = 1.15;
+    u['turbidity']!.value = 2.6;
+    u['rayleigh']!.value = 1.5;
     u['mieCoefficient']!.value = 0.004;
     u['mieDirectionalG']!.value = 0.82;
     // low winter sun, from behind-left of the descending skier so faces read well
@@ -84,6 +87,11 @@ export class Environment {
     this.baseFogDensity = 0.00036;
     this.fog = new THREE.FogExp2(new THREE.Color(0.72, 0.8, 0.9), this.baseFogDensity);
     scene.fog = this.fog;
+    atmosphere.uAtmSunDir.value.copy(this.sunDir);
+
+    // distant skyline beyond the playable terrain + horizon haze (follows the viewer)
+    this.ranges = new DistantRanges(this.sunDir, new THREE.Color(1.0, 0.86, 0.7), new THREE.Color(0.5, 0.6, 0.8));
+    scene.add(this.ranges.group);
 
     // ambient drifting snow (a box of flakes around the camera)
     const count = { low: 600, medium: 1400, high: 2400, ultra: 3600 }[quality];
@@ -115,6 +123,9 @@ export class Environment {
     this.sun.target.updateMatrixWorld();
     // the sky dome is finite (45 km): keep it centred on the viewer for any course length
     this.sky.position.copy(camPos);
+    this.ranges.update(focus, camPos, dt);
+    atmosphere.uFogColor.value.copy(this.fog.color);
+    atmosphere.uFogExp.value = this.fog.density;
 
     const pos = this.snow.geometry.getAttribute('position') as THREE.BufferAttribute;
     const arr = pos.array as Float32Array;
@@ -159,7 +170,8 @@ export class Environment {
     (this.snow.material as THREE.Material).dispose();
     this.sky.geometry.dispose();
     this.sky.material.dispose();
-    this.scene.remove(this.sky, this.sun, this.hemi, this.snow);
+    this.ranges.dispose();
+    this.scene.remove(this.sky, this.sun, this.hemi, this.snow, this.ranges.group);
   }
 }
 

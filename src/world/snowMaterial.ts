@@ -6,6 +6,7 @@
  * uOrigin) to stay locked to the ground across origin shifts.
  */
 import * as THREE from 'three';
+import { ATMOSPHERE_GLSL, addAtmosphereUniforms } from './look/atmosphere';
 
 export const GLSL_NOISE = /* glsl */ `
 float sf_hash(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
@@ -40,6 +41,7 @@ export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra')
     shader.uniforms.uDetail = uniforms.uDetail;
     shader.uniforms.uSunDir = uniforms.uSunDir;
     shader.uniforms.uOrigin = uniforms.uOrigin;
+    addAtmosphereUniforms(shader.uniforms);
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -72,7 +74,9 @@ varying vec3 vWPos;
 varying vec3 vWNormal;
 varying vec3 vSurf;
 ${GLSL_NOISE}
+${ATMOSPHERE_GLSL}
 float sf_rock = 0.0;
+float sf_wind = 0.0;
 float sf_ice = 0.0;
 float sf_powder = 0.0;
 float sf_dist = 0.0;
@@ -93,26 +97,50 @@ vec2 sf_pp = vec2(0.0);
   sf_pp = pp;
   float n1 = sf_fbm(pp * 0.045);
   float n2 = sf_noise(pp * 0.6);
-  // rock exposure on steep faces, with strata, snow lingering on ledges
-  float rockEdge = 0.42 + 0.24 * (n1 - 0.5) + 0.05 * (n2 - 0.5);
-  sf_rock = smoothstep(rockEdge, rockEdge + 0.08, slope);
+  // km-scale snowpack regions: wind-packed slab (greyer, bluer, smoother) vs deep powder fields
+  float L1 = sf_fbm(wp.xz * 0.0019 + 3.7);
+  float L2 = sf_noise(wp.xz * 0.00055 + 1.3);
+  sf_wind = smoothstep(0.42, 0.68, L1 * 0.65 + L2 * 0.35);
+  // geology: dipping strata (bands tens of metres thick) with hard, cliff-forming layers
+  float dip = wp.y + 0.18 * wp.x - 0.11 * wp.z + 22.0 * sf_noise(wp.xz * 0.004);
+  float band = dip * 0.034 + 0.8 * sf_noise(wp.xz * 0.0021 + 9.0);
+  float bandId = floor(band);
+  float bandF = fract(band);
+  float hard = step(0.45, sf_hash(vec2(bandId, 7.0)));
+  float tone = sf_hash(vec2(bandId, 3.0));
+  // rock exposure on steep faces; hard layers stay bare on gentler slopes, soft layers hold snow
+  float rockEdge = 0.44 + 0.22 * (n1 - 0.5) + 0.05 * (n2 - 0.5) - 0.1 * hard + 0.06 * (1.0 - hard) * smoothstep(0.6, 0.95, bandF);
+  sf_rock = smoothstep(rockEdge, rockEdge + 0.07, slope);
   sf_ice = vSurf.x; sf_powder = vSurf.y; float groomed = vSurf.z;
   // snow albedo: very slightly blue-white, subtle large-scale tint variation (never pure white)
   vec3 snow = vec3(0.9, 0.92, 0.95);
   snow *= 0.94 + 0.08 * n1;
+  snow = mix(snow, vec3(0.84, 0.87, 0.92), sf_wind * 0.55 * (1.0 - groomed));        // wind slab
+  snow *= 1.0 + 0.035 * (L2 - 0.5);
   snow = mix(snow, vec3(0.80, 0.84, 0.90), groomed * (0.35 + 0.25 * n2));       // packed piste: slightly greyer-blue
-  snow = mix(snow, vec3(0.90, 0.915, 0.94), sf_powder * 0.6);                     // powder: brighter, softer
+  snow = mix(snow, vec3(0.91, 0.925, 0.95), sf_powder * 0.6);                     // powder: brighter, softer
   // groomed corduroy lines along the fall line, fading with distance
   float cord = smoothstep(0.35, 0.5, abs(fract(wp.x * 3.2 + n1 * 2.0) - 0.5)) * groomed * (1.0 - smoothstep(10.0, 45.0, sf_dist)) * uDetail;
   snow *= 1.0 - 0.06 * cord;
   vec3 ice = vec3(0.62, 0.70, 0.78) * (0.92 + 0.12 * n2);
   snow = mix(snow, ice, sf_ice * 0.85);
-  float strata = sf_noise(vec2(wp.y * 0.55 + n1 * 3.0, (wp.x + wp.z) * 0.03));
-  float crack = smoothstep(0.42, 0.5, abs(sf_noise(pp * 0.25) - 0.5));
-  vec3 rock = mix(vec3(0.2, 0.19, 0.19), vec3(0.37, 0.35, 0.33), strata) * (0.78 + 0.35 * n2) * (1.0 - 0.35 * crack);
-  // snow clinging in cracks and on ledges of the rock
-  rock = mix(rock, snow * 0.92, smoothstep(0.55, 0.8, sf_fbm(pp * 0.18)) * (1.0 - smoothstep(0.45, 0.75, slope)));
-  rock = mix(rock, vec3(0.12, 0.13, 0.15), smoothstep(0.55, 0.95, slope) * 0.5);
+  // rock colour: per-band tone (cool grey / warm grey-brown / dark), fine bedding fades with distance
+  vec3 rockA = vec3(0.24, 0.235, 0.235);
+  vec3 rockB = vec3(0.33, 0.29, 0.25);
+  vec3 rockC = vec3(0.14, 0.14, 0.155);
+  vec3 rock = tone < 0.45 ? mix(rockA, rockB, tone / 0.45) : mix(rockB, rockC, (tone - 0.45) / 0.55);
+  float fineFade = 1.0 - smoothstep(60.0, 260.0, sf_dist);
+  float bedding = sf_noise(vec2(dip * 0.5, (wp.x + wp.z) * 0.02));
+  rock *= mix(1.0, 0.82 + 0.3 * bedding, fineFade);
+  // vertical joints (cracks) on the vertical projection, stronger in hard layers
+  float joint = smoothstep(0.43, 0.5, abs(sf_noise(vec2(pp.x * 0.22, pp.y * 0.03)) - 0.5));
+  rock *= 1.0 - (0.25 + 0.2 * hard) * joint * mix(0.5, 1.0, fineFade);
+  rock *= 0.82 + 0.3 * n2 * fineFade + 0.15 * n1;
+  // snow on the ledge at the top of each band and in cracks; less on vertical faces
+  float ledge = smoothstep(0.86, 0.97, bandF) * (1.0 - smoothstep(0.5, 0.8, slope)) * smoothstep(0.45, 0.75, sf_noise(pp * 0.05 + bandId));
+  float cling = max(smoothstep(0.55, 0.8, sf_fbm(pp * 0.18)) * (1.0 - smoothstep(0.45, 0.72, slope)), ledge * 0.45);
+  rock = mix(rock, snow * 0.92, cling);
+  rock = mix(rock, rock * 0.6, smoothstep(0.6, 0.95, slope) * 0.6);
   vec3 col = mix(snow, rock, sf_rock);
   // drifting cloud shadows
   float cloud = sf_fbm(wp.xz * 0.0016 + vec2(uTime * 0.004, uTime * 0.0025));
@@ -125,9 +153,17 @@ vec2 sf_pp = vec2(0.0);
 `,
       )
       .replace(
+        '#include <lights_fragment_end>',
+        `#include <lights_fragment_end>
+// skylight is blue: shadowed snow reads cold while the sunlit side stays warm
+reflectedLight.indirectDiffuse *= mix(vec3(0.88, 0.97, 1.2), vec3(1.0), sf_rock * 0.5);`,
+      )
+      .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vWPos);')
+      .replace(
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>
 roughnessFactor = mix(0.82, 0.93, sf_powder);
+roughnessFactor = mix(roughnessFactor, 0.74, sf_wind * (1.0 - sf_powder));
 roughnessFactor = mix(roughnessFactor, 0.32, sf_ice);
 roughnessFactor = mix(roughnessFactor, 0.78, sf_rock);
 `,
@@ -158,7 +194,7 @@ if (uDetail > 0.0) {
   float h0 = SF_H(p);
   float hx = SF_H(p + vec2(e, 0.0));
   float hz = SF_H(p + vec2(0.0, e));
-  float amp = (0.055 + 0.09 * sf_rock + 0.02 * sf_powder) * fade * uDetail;
+  float amp = (0.05 + 0.09 * sf_rock + 0.02 * sf_powder + 0.03 * sf_wind) * fade * uDetail;
   vec3 wn = normalize(vWNormal);
   wn = normalize(vec3(wn.x - (hx - h0) / e * amp, wn.y, wn.z - (hz - h0) / e * amp));
   normal = normalize((viewMatrix * vec4(wn, 0.0)).xyz);
@@ -166,6 +202,6 @@ if (uDetail > 0.0) {
 `,
       );
   };
-  material.customProgramCacheKey = () => 'skifree-snow-v2';
+  material.customProgramCacheKey = () => 'skifree-snow-v3';
   return { material, uniforms };
 }
