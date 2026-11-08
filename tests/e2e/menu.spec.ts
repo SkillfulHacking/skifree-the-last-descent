@@ -133,6 +133,7 @@ test('keyboard, mouse and gamepad drive the course controls; the choice persists
 });
 
 test('a course code typed into the menu selects that course', async ({ page }) => {
+  test.setTimeout(45 * 60 * 1000); // several steps, each a few software-rendered frames
   await page.setViewportSize({ width: 1920, height: 1080 });
   await boot(page);
   const input = page.locator('.menu-row', { hasText: 'Enter a course code' }).locator('input');
@@ -157,17 +158,17 @@ test('a course code typed into the menu selects that course', async ({ page }) =
   await input3.focus();
   await input3.fill('');
   await page.keyboard.type('ALSO-WRONG', { delay: 20 });
-  await page.locator('.menu-row.primary').click();
+  await page.locator('.menu-row.primary').click({ force: true }); // software rendering: the focus transition never reports 'stable'
   await page.waitForTimeout(1500);
   expect(await page.evaluate(() => (window as unknown as MW).__skifree.state().mode)).toBe('menu');
   await expect(page.locator('.course-card .err')).toContainText('ALSO-WRONG');
   // typing a seed then clicking Start straight away starts that course (E2: the click isn't lost)
   await page.evaluate(() => (window as unknown as MW).__skifree.setCourse('custom', 'sprint'));
-  const seed = page.locator('.menu-row', { hasText: 'Seed' }).locator('input');
+  const seed = page.locator('.menu-row.kind-text', { hasText: 'any word or number' }).locator('input');
   await seed.focus();
   await seed.fill('');
   await page.keyboard.type('AVALANCHE', { delay: 20 });
-  await page.locator('.menu-row.primary').click();
+  await page.locator('.menu-row.primary').click({ force: true }); // software rendering: the focus transition never reports 'stable'
   await page.waitForFunction(() => (window as unknown as MW).__skifree.state().mode === 'playing', null, { timeout: 600_000, polling: 1000 });
   expect(await page.evaluate(() => (window as unknown as { __skifree: { state(): { course: { label: string } } } }).__skifree.state().course.label)).toContain('AVALANCHE');
 });
