@@ -219,6 +219,9 @@ export class CaveCinematic {
     // through the mouth and light the Yeti like a stage (the reveal needs darkness and eyes)
     st.world.env.sun.intensity = this.sunBase * (1 - 0.82 * this.dim);
     st.world.terrain.uniforms.uCloudShadow.value = 1 + 1.5 * this.dim;
+    // no sun glints and no falling flakes against the black interior (they read as stars, C9/A8)
+    st.world.terrain.uniforms.uGlint.value = 1 - this.dim;
+    st.world.env.setFlakes(this.dim < 0.2);
     this.eye += (this.eyeTarget - this.eye) * (1 - Math.exp(-3 * dt));
     st.yeti.setEyeGlow(this.eye);
     if (this.shakeLevel > 0) {
@@ -260,6 +263,8 @@ export class CaveCinematic {
     st.world.env.setAmbientScale(1);
     st.world.env.sun.intensity = this.sunBase;
     st.world.terrain.uniforms.uCloudShadow.value = 1;
+    st.world.terrain.uniforms.uGlint.value = 1;
+    st.world.env.setFlakes(true);
     st.hud.letterbox(false);
     st.hud.gameplayWidgets(true);
     st.poseOverride = {};

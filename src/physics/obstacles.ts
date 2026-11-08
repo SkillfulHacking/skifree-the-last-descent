@@ -240,6 +240,14 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
       }
       if (lane < LANE_HALF + 6) treeDensity *= 0.35;
 
+      // no forests on cliffs: trees thin out on steep ground and are gone above ~45° (only
+      // sampled for candidates that would otherwise grow, so it costs little)
+      if (roll < treeDensity && !onPiste) {
+        const gx2 = m.heightAt(x + 2, z) - m.heightAt(x - 2, z);
+        const gz2 = m.heightAt(x, z + 2) - m.heightAt(x, z - 2);
+        const steep = Math.hypot(gx2, gz2) / 4; // tan(slope)
+        treeDensity *= 1 - smoothstep(0.55, 1.0, steep);
+      }
       if (roll < treeDensity) {
         // size/age variety: saplings, mature trees and old giants (clumped by noise)
         const age = hash2(Math.floor(x * 3), Math.floor(z * 3), seed + 77);
