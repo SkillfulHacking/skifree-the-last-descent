@@ -88,9 +88,9 @@ export class CaveCinematic {
     tl.shot({ start: 13.7, end: 14.6, from: () => reactionCam, to: () => pose(reactionCam.pos.clone().add(new THREE.Vector3(0, 0.1, 0.4)), reactionCam.look, 44) });
     // Beat 10b: he leaps from the ledge toward the piste — seen past the skier's shoulder
     // over the skier's shoulder: camera behind the skier on the line to the cave, framing both
-    const leapCam = P.clone().addScaledVector(toCave, -3.4).addScaledVector(downhill, 0.8).add(new THREE.Vector3(0, 1.9, 0));
+    const leapCam = P.clone().addScaledVector(toCave, -3.8).addScaledVector(downhill, 1.2).add(new THREE.Vector3(0, 1.7, 0));
     const skierHead = P.clone().add(new THREE.Vector3(0, 1.5, 0));
-    const yetiLook = () => st.yeti.root.position.clone().add(new THREE.Vector3(0, 1.6, 0)).lerp(skierHead, 0.18);
+    const yetiLook = () => st.yeti.root.position.clone().add(new THREE.Vector3(0, 1.6, 0)).lerp(skierHead, 0.26);
     tl.shot({ start: 14.6, end: 15.8, from: () => pose(leapCam, yetiLook(), 44), to: () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.3, 0)), yetiLook(), 50) });
     // Beat 11: swing back into third person
     tl.shot({ start: 15.8, end: 17.0, from: () => pose(leapCam, yetiLook(), 38), via: () => pose(P.clone().addScaledVector(downhill, -5).add(new THREE.Vector3(0, 3, 0)), P.clone().add(new THREE.Vector3(0, 1.2, 4)), 58), to: followPose, easing: ease.inOutCubic });
