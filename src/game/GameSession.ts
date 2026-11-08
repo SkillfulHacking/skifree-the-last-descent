@@ -810,6 +810,14 @@ export class GameSession implements Stage {
     if (this.run.phase !== 'chase' && this.run.progress(z, 0)) this.beginCave();
   }
 
+  /** Debug: skip a cave cinematic that is playing. */
+  debugSkipCave() {
+    if (this.cave) {
+      this.cave.tl.skip();
+      this.finishCave();
+    }
+  }
+
   /** Debug: run the next encounter's chase immediately (skips the cinematic). */
   debugToChase() {
     if (this.run.phase === 'chase') return;
