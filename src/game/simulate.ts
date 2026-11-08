@@ -9,6 +9,7 @@ import { ObstacleField, generateObstacles } from '../physics/obstacles';
 import { PHYS_DT, SkierPhysics, type SkierInput, type SkierState } from '../physics/SkierPhysics';
 import { YetiAI } from '../yeti/YetiAI';
 import { yetiSpawnAfterCinematic } from '../yeti/spawn';
+import { SnowballBarrage, SNOWBALL, clampToPiste, type SnowballEvent } from '../yeti/Snowballs';
 
 export interface SimResult {
   outcome: 'victory' | 'caught' | 'timeout' | 'distance';
@@ -25,6 +26,8 @@ export interface SimResult {
   encountersSurvived: number;
   /** peak number of obstacle bands resident at once (streaming check) */
   peakBands: number;
+  /** snowballs thrown / direct hits / near misses (Hard) */
+  snowballs?: { throws: number; hits: number; near: number };
 }
 
 let cached: { seed: number; m: Mountain; f: ObstacleField } | null = null;
@@ -47,6 +50,10 @@ export interface SimOptions {
   streaming?: boolean;
   /** difficulty scale on the Yeti's speed (1 = normal) */
   yetiSpeed?: number;
+  /** Hard: the Yeti throws snowballs (the driver does not dodge them) */
+  snowballs?: boolean;
+  /** with snowballs: the driver reads the marked landing zones and changes line (a player who watches) */
+  dodge?: boolean;
 }
 
 export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierState, t: number) => SkierInput, opts: SimOptions = {}): SimResult {
@@ -58,6 +65,8 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
   const phys = new SkierPhysics(m, f);
   phys.reset(m.routeX(0), 0, 0, 0);
   const yeti = new YetiAI(m, f);
+  const balls = opts.snowballs ? new SnowballBarrage(m.seed, (x, z) => m.heightAt(x, z), (x, z) => clampToPiste(m, x, z)) : null;
+  const ballEv: SnowballEvent[] = [];
   let t = 0;
   let chaseStart = -1;
   let firstChase = -1;
@@ -87,6 +96,7 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
       distance: phys.s.pos.z,
       encountersSurvived: survived,
       peakBands,
+      snowballs: balls ? { throws: balls.throws, hits: balls.hits, near: balls.nearMisses } : undefined,
     };
   };
   while (t < maxTime) {
@@ -96,7 +106,23 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
       f.release(s.pos.z - 400, s.pos.z + 800);
       peakBands = Math.max(peakBands, f.bandCount);
     }
-    phys.step(driver(s, t), PHYS_DT);
+    const inp = driver(s, t);
+    if (balls && opts.dodge && !s.crashed) {
+      // read the marks: if the current line runs through a landing zone, steer out of it
+      for (const b of balls.balls) {
+        const rem = b.flight - b.t;
+        const px = s.pos.x + s.vel.x * rem;
+        const pz = s.pos.z + s.vel.z * rem;
+        const d = Math.hypot(px - b.to.x, pz - b.to.z);
+        if (d < SNOWBALL.hitRadius + 1.5) {
+          const toCentre = m.centerX(b.to.z) - b.to.x;
+          const dir = Math.abs(px - b.to.x) > 0.6 ? Math.sign(px - b.to.x) : Math.sign(toCentre) || 1;
+          inp.steer = -dir * 0.55;
+          break;
+        }
+      }
+    }
+    phys.step(inp, PHYS_DT);
     for (const e of phys.drainEvents()) if (e.type === 'crash' && log) log.push(`${t.toFixed(1)}s z=${s.pos.z.toFixed(0)} ${e.reason}`);
     t += PHYS_DT;
     if (s.pos.z > nextEncCheck) {
@@ -111,6 +137,7 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
         yeti.speedMul = Math.min(1.33, e.speedMul * (opts.yetiSpeed ?? 1));
         yeti.place(sp.pos.x, sp.pos.z, sp.heading, sp.pos.y - m.heightAt(sp.pos.x, sp.pos.z));
         yeti.startChase(new THREE.Vector3(sp.leap.x, sp.leap.y, sp.leap.z));
+        balls?.reset();
         chaseStart = t;
         if (firstChase < 0) firstChase = t;
         active = e;
@@ -128,6 +155,15 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
       }
       target.airborne = !s.grounded;
       yeti.update(PHYS_DT, target);
+      if (balls) {
+        ballEv.length = 0;
+        balls.update(PHYS_DT, yeti.pos, s, yeti.phase === 'chase' && !yeti.airborne, ballEv);
+        for (const e of ballEv) {
+          if (e.type !== 'land' || e.hit === 'miss') continue;
+          phys.knock(e.hit === 'direct' ? SNOWBALL.directKeep : SNOWBALL.nearKeep, e.hit === 'direct' ? 1 : 0.4);
+          if (log) log.push(`${t.toFixed(1)}s snowball ${e.hit} (${e.distance.toFixed(1)} m)`);
+        }
+      }
       chaseDist += s.speed * PHYS_DT;
       if (yeti.phase === 'chase' && !yeti.airborne) {
         minGap = Math.min(minGap, yeti.distance);

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 — Hard-mode snowballs, one-time tutorial (2026-11-08)
+- **Hard: the Yeti throws snowballs** during the chase (`src/yeti/Snowballs.ts`, shared by the game
+  and the headless balance runs; rendering in `src/yeti/SnowballView.ts`).
+  - Thrown at mid range (25–150 m behind you) every 4.5–7.5 s, after a 3.5 s grace period.
+  - Aimed where you will be when it lands (your velocity × flight time, with spread), mostly a few
+    metres ahead, kept on the piste.
+  - The landing zone is marked at the throw: red ring and fill on the slope plus a light column,
+    pulsing faster as impact nears (1.6–2.3 s flight). The column fades when the camera is on top of it.
+  - Direct hit (< 2.2 m): 45 % of your speed kept, heavy wobble, combo reset ("SNOWBALLED!").
+    Near miss (< 4 m): 97 % kept, light wobble. Never an outright crash.
+- Balance (headless, Hard Sprint, skilled autopilot, 5 seeds): reading the marks, 4/5 wins and no
+  direct hits; ignoring them, 2/5 wins. Normal and Relaxed are unchanged.
+- **The tutorial is shown on the first playthrough only.** After a run that showed it (or once
+  every lesson is done) Settings → Tutorial prompts switches off; turn it on to see it again.
+
 ## 0.2.1 — Early Yeti cave (2026-11-08)
 - **The Yeti's cave is always in the first 10 % of the course,** with its trigger line before the
   10 % mark: Sprint (Classic and generated) at 260 m, Standard at 960 m, Endurance at 1.96 km,

@@ -91,6 +91,9 @@ test('full loop: start → learn → cave cinematic → chase → caught → ret
   await page.keyboard.up('KeyD');
   const h1 = (await page.evaluate(() => (window.__skifree.state().session as unknown as { heading: number }).heading)) as number;
   expect(h1).toBeLessThan(h0 - 0.05);
+  // first playthrough: the tutorial is on (unset means the default, on)
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('skifree-tld.settings.v1') ?? '{}').showTutorial)).not.toBe(false);
+  expect(await page.locator('.hud-prompt.on').isVisible()).toBe(true);
   await page.screenshot({ path: 'docs/screenshots/e2e_tutorial.png' });
 
   // ski down to the cave with the autopilot (fast-forwarded, deterministic)
@@ -137,6 +140,8 @@ test('full loop: start → learn → cave cinematic → chase → caught → ret
   await page.evaluate(() => window.__skifree.frames(160));
   await page.waitForFunction(() => window.__skifree.state().menu === 'results');
   await expect(page.locator('.menu-title')).toHaveText('THE YETI WAS HUNGRY');
+  // the controls are taught once: the first run showed the tutorial, so it is now switched off
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('skifree-tld.settings.v1')!).showTutorial)).toBe(false);
   // a caught player can't subsequently win: teleporting past the finish does nothing
   await page.evaluate(() => window.__skifree.teleport(3010, 10));
   expect((await st(page)).session?.outcome).toBe('caught');
