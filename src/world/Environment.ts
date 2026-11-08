@@ -158,6 +158,11 @@ export class Environment {
     this.scene.environmentIntensity = 0.3 * k;
   }
 
+  /** Show/hide the ambient falling snow (hidden in the dark cave shots, where it reads as stars). */
+  setFlakes(visible: boolean) {
+    this.snow.visible = visible;
+  }
+
   setFogBoost(f: number) {
     this.fog.density = this.baseFogDensity * (1 + f);
   }

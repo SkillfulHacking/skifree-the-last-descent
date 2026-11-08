@@ -26,3 +26,5 @@
 - 22:xx session 3: verification renders at 960x540 in /tmp/y2/v (main 723,017; overlay 818,021)
 - crawl (3/4, front, back, top) checked: head on travel line, hind legs under the body -> A19 OK as-is. dark shade .15: body near-black + glowing eyes -> A9/C4 OK.
 - A16: HEAD_SCALE 1.42->1.55, HEAD_LIFT (0,.1,.04)->(0,.14,.05): visible neck in side view, roar head ~85px vs ~230 shoulders @960. (/tmp/y2/v/mont4.png)
+- preview: face cams back off ×1.22 (fdist=) for the bigger head. tsc clean, vitest 107/107 after A16 change. Next: final 1920 evidence.
+- 1920 evidence: face_front, face_34, body_front, body_side written (22:01). Remaining run via /tmp/y2/final.sh -> /tmp/y2/final.log

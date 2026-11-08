@@ -478,6 +478,11 @@ switch (camName) {
     camera.position.set(4.6 * widen, 2.1, 5.6 * widen);
     break;
 }
+if (camName.startsWith('face')) {
+  // face presets were authored for HEAD_SCALE 1.3: back off with the bigger head (fdist=<k> overrides)
+  const fd = parseFloat(q.get('fdist') ?? '1.22');
+  camera.position.sub(target).multiplyScalar(fd).add(target);
+}
 if (!camName.startsWith('face') && camName !== 'hand' && camName !== 'foot') {
   // presets are authored around the origin: follow the root (and its yaw) when it moved
   const yaw = yeti.root.rotation.y;

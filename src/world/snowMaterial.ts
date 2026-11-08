@@ -58,6 +58,8 @@ export interface TerrainUniforms {
   uDetail: { value: number };
   uSunDir: { value: THREE.Vector3 };
   uOrigin: { value: THREE.Vector3 };
+  /** multiplier on the sparse sun-glint sparkles (0 = off; the cave cinematic dims them) */
+  uGlint: { value: number };
 }
 
 export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra'): { material: THREE.MeshStandardMaterial; uniforms: TerrainUniforms } {
@@ -67,6 +69,7 @@ export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra')
     uDetail: { value: quality === 'low' ? 0.0 : quality === 'medium' ? 0.6 : 1.0 },
     uSunDir: { value: new THREE.Vector3(0, 1, 0) },
     uOrigin: { value: new THREE.Vector3() },
+    uGlint: { value: 1 },
   };
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0 });
   material.onBeforeCompile = (shader) => {
@@ -75,6 +78,7 @@ export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra')
     shader.uniforms.uDetail = uniforms.uDetail;
     shader.uniforms.uSunDir = uniforms.uSunDir;
     shader.uniforms.uOrigin = uniforms.uOrigin;
+    shader.uniforms.uGlint = uniforms.uGlint;
     addAtmosphereUniforms(shader.uniforms);
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -103,6 +107,7 @@ uniform float uTime;
 uniform float uCloudShadow;
 uniform float uDetail;
 uniform vec3 uSunDir;
+uniform float uGlint;
 varying vec3 vNPos;
 varying vec3 vWPos;
 varying vec3 vWNormal;
@@ -296,7 +301,7 @@ roughnessFactor = mix(roughnessFactor, 0.78, sf_rock);
   vec3 R = reflect(-uSunDir, sf_wn);
   float cell = sf_h2(floor(gq) + floor(mod(vNPos.y, 1024.0) * 38.0));
   float glint = step(0.996, cell) * pow(max(dot(R, V), 0.0), 24.0) * (1.0 - smoothstep(4.0, 30.0, sf_dist)) * (1.0 - smoothstep(0.3, 0.7, gfp)) * (1.0 - sf_rock);
-  totalEmissiveRadiance += vec3(1.0, 0.97, 0.92) * glint * 1.6 * uDetail;
+  totalEmissiveRadiance += vec3(1.0, 0.97, 0.92) * glint * 1.6 * uDetail * uGlint;
 }
 `,
       )
@@ -307,6 +312,6 @@ normal = normalize((viewMatrix * vec4(sf_wn, 0.0)).xyz);
 `,
       );
   };
-  material.customProgramCacheKey = () => 'skifree-snow-v5';
+  material.customProgramCacheKey = () => 'skifree-snow-v6';
   return { material, uniforms };
 }
