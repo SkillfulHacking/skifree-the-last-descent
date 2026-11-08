@@ -85,6 +85,10 @@ human reviewers.
 - **Grounding:** the Yeti's soles do not penetrate the floor in any captured frame of the cave
   cinematic.
 
+**Internal visual gate, after three review rounds:** 8 of 10 areas pass. Two are half a point under
+the 7/10 mark: the cave interior and cinematic angles (6.5) and the Yeti close-up model (6.5). Details
+are in `docs/reviews/pass2/final/FINAL_REVIEW_A_CE.md` and the QUALITY_REPORT.
+
 **Still open or unverified:**
 - **No GPU frame rates.** Scene cost went up in pass 2: near conifers are about 650–840 triangles,
   and a High gameplay frame is about 4–5.6 M triangles including shadow passes. It must be measured

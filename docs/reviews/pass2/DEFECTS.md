@@ -116,3 +116,30 @@ Severity: **C** = critical/blocking · **M** = major · **m** = minor.
 | E7 | m | Placeholder contrast | fixed-unverified (0.58) |
 | B3, B7 | m | No risk on alternate lines; escalation is speed-only | partial / wontfix (documented) |
 | E4, E5 | M | e2e evidence pending | the run is in progress (`/tmp/menu_e2e3.log`) |
+
+### Final round 3: internal Reviewers A and C/E (commit 820b280; see `final/FINAL_REVIEW_A_CE.md`)
+
+**Scores:**
+- Passing: cave geology 7 ✔, grounding 8 ✔, trees 7 ✔, terrain shading 7 ✔, atmosphere 7 ✔, cohesion 7 ✔, cinematic and grounding 8 ✔, menu and UX 8 ✔.
+- Failing: **cave interior 6.5 ✘** and **Yeti model 6.5 ✘**.
+
+**Verified in round 3:** A3, A6, A21, A30, A34, A38, A39, A40, C7, C10 (with caveats), C11, C12, E1, E2, E4, E5, E7, E12, E14.
+
+**Changed after round 3, not re-reviewed:**
+- C4/A9: dimming now starts before the 3.8 s cut. The re-capture `final/cine_check/cine_t3_8.png` shows the Yeti as a dark shape.
+- C13: no double move on the hand-off frame.
+- E15: the UI-scale test now checks a row in the middle of the list.
+- Post-landing speed is gentler, and the AI's start beat is kept (the reviewer's note on the 9 m chase start).
+
+**Still open:**
+- **Cave interior:** A8, A10, A11, A12 (grey orbs near the head), A13.
+- **Yeti:** A15, A17, A35 (fur fills the mouth at the close-up roar angle), A36 (forehead "brim"), A42 (forehead whorl), A44 (ruff reads as a feather boa).
+- **Environment:** A2, A24, A29, A31, A37, A41, A43, A45.
+- **Systems:** B3, B6, B7, B12, E6 and E13 (partial).
+
+All open items are listed in `docs/KNOWN_ISSUES.md`.
+
+**End-to-end runs on the final build:**
+- `game.spec.ts`: 3/3 pass (menu; the full loop of cave, caught, retry, victory; pause and hot-plug).
+- `menu.spec.ts`: 7/7 pass across runs.
+- Unit tests: 109/109.

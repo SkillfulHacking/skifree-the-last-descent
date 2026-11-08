@@ -19,7 +19,7 @@ authority to reject. No external human has reviewed or played this build.
 
 | Area | Final status | Evidence |
 |---|---|---|
-| **U1/U2 Menu** (fit, title, no overflow, input) | **PASS** (internal C/E: 8/10) | All 7 Playwright menu tests green (`e2e/menu_results.md`) at 1366×768, 1920×900, 1920×1080, 2560×1440, 125 % zoom and 150 % UI scale, with keyboard, mouse and gamepad. Screenshots in `menu/`. |
+| **U1/U2 Menu** (fit, title, no overflow, input) | **PASS** (internal C/E: 8/10) | All 7 Playwright menu tests green (`e2e/RESULTS.md`) at 1366×768, 1920×900, 1920×1080, 2560×1440, 125 % zoom and 150 % UI scale, with keyboard, mouse and gamepad. Screenshots in `menu/`. |
 | **U5/U6 Course length** | **PASS** (internal B: 8/10) | Sprint 3 / Standard 10 (default) / Endurance 20 / Expedition 50 km / Endless. Headless wins at every length and losses are possible (`tests/unit/course.test.ts`). Long courses add skirmishes that end at refuges. Alternate lines save time (`review_regressions.test.ts`). |
 | **Endless** | **PASS** | 120 km browser session: GPU geometries 324–382, textures ≤ 21, JS heap 58–86 MB with no trend, 13 refuges, 0 errors (`endless_memory.json`). Floating origin is verified to 120 km. Escalation is capped at +33 %, a documented ceiling. |
 | **U7 Daily** | **PASS** (internal B: 9/10) | UTC rollover, 14-day replay, course codes, custom seeds, Relaxed/Normal/Hard difficulty, records per course code, migration and sanitising. All covered by tests. |

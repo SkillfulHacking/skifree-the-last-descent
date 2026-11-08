@@ -27,3 +27,11 @@ All 7 tests in tests/e2e/menu.spec.ts passed across runs on 2026-11-08. The mach
 ```
 
 Run 3: the UI-scale test timed out because two software-rendered pages starved rAF. It was fixed (one page at a time) and passed in run 4. Run 4's course-code failure was a click 'stable' wait under software rendering (now force-clicked); the rest of that test passed in run 7 with a longer timeout.
+
+## Game e2e (pass-1 flows, re-run on the pass-2 build)
+```
+  ✓  1 tests/e2e/game.spec.ts:57:1 › main menu loads with a rendered 3D background and no fatal errors (2.3m)
+  ✓  2 tests/e2e/game.spec.ts:71:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory (14.7m)
+  ✓  3 tests/e2e/game.spec.ts:185:1 › pause/resume and gamepad hot-plug do not break the game (3.4m)
+  3 passed (20.4m)
+```
