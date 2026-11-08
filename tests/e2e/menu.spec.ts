@@ -88,7 +88,8 @@ test('browser zoom 125% and UI scale 150% keep the menu usable (scroll only if n
   expect(l.overflowX).toBe(0);
   expect(l.titleClipped).toBe(false);
   // whatever does not fit scrolls inside the panel, and navigation keeps the focus visible
-  for (let i = 0; i < 8; i++) await press(page, 'ArrowDown');
+  for (let i = 0; i < 5; i++) await press(page, 'ArrowDown'); // lands mid-list (the list wraps) — E15
+  expect(await page.evaluate(() => document.querySelector('.menu-row.focus .label')?.textContent)).not.toBe('Start');
   const focusVisible = await page.evaluate(() => {
     const f = document.querySelector('.menu-row.focus')!.getBoundingClientRect();
     return f.top >= 0 && f.bottom <= innerHeight;

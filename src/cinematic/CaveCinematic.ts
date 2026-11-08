@@ -203,7 +203,7 @@ export class CaveCinematic {
         // keep running after the landing (no freeze between touchdown and the hand-off, C10):
         // decelerate from the flight's ground speed to a chase run along the leap direction
         const p = st.yeti.root.position;
-        const target = 13;
+        const target = 9; // a heavy jog after the drop; the chase AI accelerates from there
         L.runV += (target - L.runV) * (1 - Math.exp(-2.5 * dt));
         p.x += Math.sin(L.heading) * L.runV * dt;
         p.z += Math.cos(L.heading) * L.runV * dt;
@@ -227,7 +227,8 @@ export class CaveCinematic {
     } else st.yetiAnim.speed = 0;
     // the light drops while we stare into the darkness (sky/ambient light would otherwise
     // wash the inside of the cave; the sun is already blocked by the tunnel's shadow)
-    const dim = t > 3.6 && t < 7.9 ? 1 : 0;
+    // starts dimming well before the cut to the dark interior (3.8 s), so that shot opens dark (C4)
+    const dim = t > 2.9 && t < 7.9 ? 1 : 0;
     this.dim += (dim - this.dim) * (1 - Math.exp(-2.5 * dt));
     st.world.env.setAmbientScale(1 - 0.85 * this.dim);
     // during the dark beats the Yeti is a shape in the shadow wherever he stands (eyes stay lit, A9)
@@ -302,7 +303,8 @@ export class CaveCinematic {
       // carry the running speed over: no stop at the hand-off
       st.yetiAI.speed = L.runV;
       st.yetiAI.vel.set(Math.sin(L.heading) * L.runV, 0, Math.cos(L.heading) * L.runV);
-      st.yetiAI.delay = 0;
+      // keep the AI's short start delay: the skier gets a beat to react after the cinematic
+      st.yetiAI.speed = Math.min(st.yetiAI.speed, 9);
     } else if (this.leap) {
       // still in the air when the cinematic ends: hand the flight over as it is (no reset, no
       // second leap — C1)

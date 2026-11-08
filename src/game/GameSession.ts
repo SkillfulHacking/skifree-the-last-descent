@@ -218,12 +218,19 @@ export class GameSession implements Stage {
         this.cave.tl.apply(this.camera, undefined);
         this.applyCineShake(dt);
       }
-      if (this.cave.tl.done) this.finishCave();
+      if (this.cave.tl.done) {
+        this.finishCave();
+        // the cinematic already moved the Yeti this frame: start simulating next frame (C13)
+        this.handoffFrame = true;
+      }
     }
 
     // player input → physics input
     this.mapInput(gi);
-    if (this.run.simulating && !this.intro) {
+    if (this.handoffFrame) {
+      this.handoffFrame = false;
+      this.acc = 0;
+    } else if (this.run.simulating && !this.intro) {
       this.acc += dt;
       let steps = 0;
       while (this.acc >= PHYS_DT && steps < 12) {
@@ -273,6 +280,7 @@ export class GameSession implements Stage {
   }
 
   recordsSeenCave = false;
+  private handoffFrame = false;
 
   /** Rear-view framing (skier in the foreground, the yeti behind), or null when not needed. */
   rearView(out: { pos: THREE.Vector3; look: THREE.Vector3 }): number {
