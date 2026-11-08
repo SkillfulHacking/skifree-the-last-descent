@@ -480,7 +480,7 @@ switch (camName) {
 }
 if (camName.startsWith('face')) {
   // face presets were authored for HEAD_SCALE 1.3: back off with the bigger head (fdist=<k> overrides)
-  const fd = parseFloat(q.get('fdist') ?? '1.22');
+  const fd = parseFloat(q.get('fdist') ?? '1.6');
   camera.position.sub(target).multiplyScalar(fd).add(target);
 }
 if (!camName.startsWith('face') && camName !== 'hand' && camName !== 'foot') {
