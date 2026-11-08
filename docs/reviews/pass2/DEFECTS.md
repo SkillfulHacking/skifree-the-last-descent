@@ -83,3 +83,36 @@ Severity: **C** = critical/blocking · **M** = major · **m** = minor.
 | E9 | m | Retire has no confirmation | fixed-unverified: two-step confirmation |
 | E10 | m | Text is small at 2560×1440 | fixed-unverified: larger caps and a large-screen rule |
 | E11 | m | `fmtDistance(999.6)` shows "1000 m" | fixed-unverified |
+
+### Round 2: internal reviews on commit 79f95d2 (`round2/`)
+
+**Reviewer A (visual), rejected; 5 of 8 areas fail.**
+- Scores: cave geology 6, cave interior 5, Yeti model 6, grounding 8 ✔, trees 7 ✔, terrain shading 6, atmosphere 7 ✔, cohesion 6.
+- Verified fixed by the reviewer: A4, A7, A14, A16, A18, A19, A22, A23, A25, A26, A28, A33.
+
+| ID | Sev | Defect | Status |
+|---|---|---|---|
+| A9 | M | The Yeti looks lit in the "dark" beats (regressed) | fixed-unverified (0380d2b/77c2735): darkening now follows the dark beats wherever he stands, not only his depth in the cave |
+| A12 / C9 | M | Bright orbs at hand contacts | fixed-unverified: no snow-puff particles inside the cave; glints and flakes are off in the dark beats |
+| A38 / C11 | m | The landing is never on screen; the letterbox drops at 15.8 s | fixed-unverified: the leap shot holds to 16.95 s; letterbox until the swing |
+| A39 / C7 | m | Only the top of the skier's helmet is in the over-the-shoulder shot | fixed-unverified: camera lowered and the look point moved toward the skier |
+| A34, A29, A10, A37, A40, A6, A2, A3, A30, A31 | M/m | Quilted rock creases, pancake rocks, floor lip, snow facets, sticker claw marks, footprints, smears, spiky hills, flat distant ranges | open (round-3 environment engineer) |
+| A35, A36, A15, A17 | M | Fur cards across the open mouth, rubber-mask face with a "helmet" edge, piano-key teeth, fur look at mid distance | open (round-3 creature engineer) |
+| A8, A11, A13, A20, A21, A24, A27, A32 | M/m | Partial or no evidence | open |
+
+**Reviewers B/C/E (systems, cinematic, UI): P4 8 ✔, P5 9 ✔, cinematic 8 ✔ (conditional on C10), menu 7.5 ✘.**
+- Verified: B1, B2, B4, B5, B9, B10, B11, C1, C2, C3 (with caveats), C5, C6, C8, E3, E8, E9, E11 (and E10, partly).
+
+| ID | Sev | Defect | Status |
+|---|---|---|---|
+| C10 | M | The Yeti freezes for about 0.9 s after landing; speed is lost at the hand-off | fixed-unverified: he keeps running after touchdown, and speed and velocity carry into the AI (no start delay) |
+| C12 | m | The hand insert crops the planted hand | fixed-unverified (reframed) |
+| E12 | M | An invalid typed code plus Start starts the old course | fixed-unverified: a text field can reject its value, which aborts the button; unit test plus e2e assertion |
+| E13 | m | A stale draft and error survive | fixed-unverified (cleared when a run starts) |
+| E14 | m | The RUN banner overlaps the rear view | fixed-unverified (moved down) |
+| B8 | m | The menu card goes stale across a UTC rollover | fixed-unverified (refreshes at the day change) |
+| B13 | m | Hard on Endless reaches ×1.39 | fixed-unverified: a documented ceiling of ×1.33 in the game and the simulation |
+| B14 | m | No repo tests for the B2 and B3 fixes | B3 and E12 ported to `tests/unit/review_regressions.test.ts`; B2 verified by the reviewer's probe and the `final/game_chase.png` capture |
+| E7 | m | Placeholder contrast | fixed-unverified (0.58) |
+| B3, B7 | m | No risk on alternate lines; escalation is speed-only | partial / wontfix (documented) |
+| E4, E5 | M | e2e evidence pending | the run is in progress (`/tmp/menu_e2e3.log`) |
