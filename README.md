@@ -62,7 +62,11 @@ there is no CDN, no API key and no telemetry.
   **Endless**. On Endless there is no finish: the Yeti returns again and again, faster each time,
   and refuges along the way bank your score. You can retire from the pause menu and keep the banked
   score.
-- **Yeti:** Relaxed / Normal / Hard pursuit difficulty.
+- **Yeti:** Relaxed / Normal / Hard pursuit difficulty. On **Hard** the Yeti also hurls snowballs during the
+  chase. Each one is aimed at (or just ahead of) where you are heading, and its landing zone is marked on
+  the snow the moment it is thrown: a red ring with a light column that fills and pulses faster as it
+  comes down. Change line to get out of it. A direct hit staggers you and costs about half your speed;
+  a near miss costs a little.
 - **Course codes:** every course has a code, such as `DAILY-2026-11-07-STD` or `SEED-777-END-H`.
   Type a friend's code into the menu to ski the same mountain. Records are kept per code on this
   device only; there is no online leaderboard.
@@ -84,7 +88,8 @@ sometimes have an **alternate line**: a shorter, icy, slightly sunken chute mark
 orange and blue poles. It is faster but has less grip.
 
 1. **Summit:** a short intro, then contextual tutorial prompts for steering, pizza, french fries,
-   drift and the pop jump.
+   drift and the pop jump. The tutorial runs on your first playthrough only; turn it back on under
+   Settings → Tutorial prompts.
 2. **Free skiing:** open alpine slopes, then forest, moguls, rollers, kickers, ice, deep powder and
    cliff drops.
 3. **Foreshadowing:** huge footprints across the piste, snapped trees, a clawed warning sign, distant

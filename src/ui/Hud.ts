@@ -151,7 +151,7 @@ export class Hud {
   }
 
   popTrick(text: string, points: number) {
-    this.trick.innerHTML = `<span>${text}</span><b>+${points}</b>`;
+    this.trick.innerHTML = points ? `<span>${text}</span><b>+${points}</b>` : `<span>${text}</span>`;
     this.trick.classList.remove('pop');
     void this.trick.offsetWidth;
     this.trick.classList.add('pop');

@@ -635,6 +635,18 @@ export class SkierPhysics {
     if (fresh || vn > 1.5) this.emit({ type: 'impact', kind: kind === 'tree-heavy' ? 'branch' : 'rock-light', intensity: clamp(vn / heavyAt, 0.1, 0.4), x: ox, z: oz });
   }
 
+  /** Struck by something (a Yeti snowball): keep `keep` of the speed and stagger. */
+  knock(keep: number, wobble: number) {
+    const s = this.s;
+    if (s.crashed) return;
+    s.vel.x *= keep;
+    s.vel.z *= keep;
+    s.wobble = Math.max(s.wobble, wobble);
+    s.tuck = 0;
+    s.drifting = false;
+    s.driftAmount = 0;
+  }
+
   /** Test hook: force a crash (used by balance simulations). */
   forceCrash(reason = 'test') {
     this.crash(reason, 1);

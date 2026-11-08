@@ -23,6 +23,8 @@ import type { Hud } from '../ui/Hud';
 import type { Settings, RunStats } from '../core/settings';
 import type { Device, GameplayInput } from '../input/Input';
 import type { Stage } from './Stage';
+import { SnowballBarrage, SNOWBALL, clampToPiste, type SnowballEvent } from '../yeti/Snowballs';
+import { SnowballView } from '../yeti/SnowballView';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -106,6 +108,11 @@ export class GameSession implements Stage {
     this.phys = new SkierPhysics(world.mountain, world.obstacles, world.extraColliders);
     this.phys.reset(m.routeX(2), 2, 0, 0);
     this.yetiAI = new YetiAI(world.mountain, world.obstacles);
+    this.snowballs = world.course.difficulty === 'hard' ? new SnowballBarrage(world.seed, (x, z) => m.heightAt(x, z), (x, z) => clampToPiste(m, x, z)) : null;
+    if (this.snowballs) {
+      this.snowView = new SnowballView((x, z, out) => m.normalAt(x, z, out));
+      world.scene.add(this.snowView.group);
+    }
     this.follow = new FollowCamera(camera, world.mountain, world.obstacles);
     this.follow.shakeScale = settings.cameraShake;
     this.follow.reduceMotion = settings.reduceCameraMotion;
@@ -364,6 +371,7 @@ export class GameSession implements Stage {
     if (this.run.phase === 'chase') {
       const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded };
       this.yetiAI.update(PHYS_DT, target);
+      this.stepSnowballs();
       if (this.yetiAI.canCatch(target) && this.run.catchPlayer()) this.beginDefeat();
       else if (s.pos.z >= this.world.mountain.finishZ && this.run.reachFinish()) this.beginVictory();
       else if (this.run.reachCheckpoint(s.pos.z)) this.onCheckpoint();
@@ -411,6 +419,7 @@ export class GameSession implements Stage {
   private onCheckpoint() {
     if (this.endless) this.banked = this.liveScore();
     this.yetiAI.standDown();
+    this.snowballs?.reset();
     this.yeti.setVisible(false);
     this.yetiAnim.mode = 'hidden';
     this.world.focusEncounter = null;
@@ -514,6 +523,44 @@ export class GameSession implements Stage {
     }
   }
 
+  /** Hard: snowballs from the Yeti — throws, landing zones, hits (fixed step). */
+  private stepSnowballs() {
+    const b = this.snowballs;
+    if (!b) return;
+    const s = this.phys.s;
+    const ai = this.yetiAI;
+    this.snowEv.length = 0;
+    b.update(PHYS_DT, ai.pos, s, ai.phase === 'chase' && !ai.airborne, this.snowEv);
+    const fx = this.world.particles;
+    for (const e of this.snowEv) {
+      const p = e.ball.to;
+      if (e.type === 'throw') {
+        const f = e.ball.from;
+        fx.emit({ x: f.x, y: f.y, z: f.z, vx: 0, vy: 1.2, vz: 2, spread: 1.2, size: 0.45, life: 0.7, count: 16, gravity: 0.4, drag: 2, grow: 1.3, alpha: 0.7 });
+        this.audio.playYetiGrowl(this.yeti.root.position, false);
+        if (b.throws === 1) this.hud.caption('[the Yeti hurls a snowball — watch the red marks]', 2.6);
+        continue;
+      }
+      // impact: a burst of snow where it lands
+      fx.emit({ x: p.x, y: p.y + 0.3, z: p.z, vx: 0, vy: 3, vz: 0, spread: 2.5, size: 0.7, life: 1.3, count: 60, gravity: 0.7, drag: 1.6, grow: 1.3, alpha: 0.9 });
+      this.audio.playLanding(e.hit === 'miss' ? 0.5 : 0.9, true);
+      if (e.hit === 'miss') {
+        if (e.distance < 9) this.shake(0.12);
+        continue;
+      }
+      const direct = e.hit === 'direct';
+      this.phys.knock(direct ? SNOWBALL.directKeep : SNOWBALL.nearKeep, direct ? 1 : 0.4);
+      this.shake(direct ? 0.9 : 0.35);
+      if (direct) {
+        this.audio.playExertion('yelp');
+        this.hud.popTrick('SNOWBALLED!', 0);
+        this.multiplier = 1;
+        this.cleanTime = 0;
+        fx.emit({ x: s.pos.x, y: s.pos.y + 1.4, z: s.pos.z, vx: s.vel.x * 0.5, vy: 1.5, vz: s.vel.z * 0.5, spread: 1.6, size: 0.5, life: 1, count: 40, gravity: 0.6, drag: 2, grow: 1.2, alpha: 0.9 });
+      }
+    }
+  }
+
   // --- phases ---------------------------------------------------------------------
   private beginCave() {
     this.hud.setPrompt(null);
@@ -533,6 +580,7 @@ export class GameSession implements Stage {
     this.cave.finish();
     this.cave = null;
     this.run.endCaveCinematic();
+    this.snowballs?.reset();
     this.recordsSeenCave = true;
     this.onCaveSeen?.();
     this.hud.setSkipHint(null);
@@ -544,6 +592,14 @@ export class GameSession implements Stage {
   }
 
   onCaveSeen: (() => void) | null = null;
+  /** fired once when the tutorial has been through all its lessons */
+  onTutorialDone: (() => void) | null = null;
+  /** the tutorial was shown in this run (first playthrough) */
+  tutorialShown = false;
+  /** Hard: the Yeti throws snowballs during the chase */
+  readonly snowballs: SnowballBarrage | null;
+  private snowView: SnowballView | null = null;
+  private snowEv: SnowballEvent[] = [];
 
   private beginDefeat() {
     this.hud.setPrompt(null);
@@ -661,6 +717,7 @@ export class GameSession implements Stage {
       if (this.run.phase === 'chase') this.setYetiMode(this.yetiAI.mode);
     }
     this.yetiAnim.modeTime += dt;
+    this.snowView?.update(this.run.phase === 'chase' ? this.snowballs : null, this.time, this.camera.position);
     if (this.yeti.root.visible) {
       // fur shells are the costliest pixels in the game: only render them when the yeti is close enough to read
       this.yeti.setFurVisible(this.camera.position.distanceTo(this.yeti.root.position) < 140);
@@ -734,6 +791,7 @@ export class GameSession implements Stage {
     }
     const step = TUTORIAL[this.tutIndex];
     if (!step) return;
+    this.tutorialShown = true;
     // the pop lesson is shown on approach to the tutorial kicker
     if (step.key === 'pop' && s.pos.z < this.world.mountain.profile.tutorialEndZ - 90) return;
     // drift needs speed: wait until fast enough
@@ -749,6 +807,7 @@ export class GameSession implements Stage {
       this.tutHold = 0;
       this.hud.setPrompt(null);
       this.audio.playUiMove();
+      if (this.tutIndex >= TUTORIAL.length) this.onTutorialDone?.();
     }
   }
 
@@ -901,6 +960,8 @@ export class GameSession implements Stage {
   }
 
   dispose() {
+    this.snowView?.dispose();
+    this.snowView = null;
     for (const t of this.timers) clearTimeout(t);
     this.world.env.setAmbientScale(1);
     this.timers = [];

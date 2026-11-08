@@ -384,7 +384,16 @@ export class App {
       this.book.seenCaveCinematic = true;
       saveRecordBook(this.book);
     };
+    // the controls are taught once: after a run that showed the tutorial (or once every lesson is
+    // done) it is switched off; Settings → Tutorial prompts turns it back on for another pass
+    this.session.onTutorialDone = () => this.retireTutorial();
     this.mode = 'playing';
+  }
+
+  private retireTutorial() {
+    if (!this.settings.showTutorial) return;
+    this.settings.showTutorial = false;
+    saveSettings(this.settings);
   }
 
   pause() {
@@ -435,6 +444,7 @@ export class App {
   }
 
   private showResults(stats: RunStats, won: boolean) {
+    if (this.session?.tutorialShown) this.retireTutorial();
     const id = stats.courseId ?? courseId(this.currentCourse());
     const { records, newBest } = applyRun(recordsFor(this.book, id), stats);
     this.book.courses[id] = records;
@@ -780,11 +790,12 @@ export class App {
     const api = {
       state: () => ({ mode: this.mode, menu: this.menu.current?.id ?? null, session: this.session?.debugState() ?? null, records: this.records, course: this.world ? { id: this.world.id, label: courseLabel(this.world.course), seed: this.world.seed, finishZ: this.world.mountain.finishZ } : null }),
       /** select a course like the menu does (persists to settings), e.g. setCourse('daily','sprint',{date}) */
-      setCourse: (mode: CourseMode, length: LengthMode, opts: { date?: string | null; custom?: string } = {}) => {
+      setCourse: (mode: CourseMode, length: LengthMode, opts: { date?: string | null; custom?: string; difficulty?: Difficulty } = {}) => {
         this.settings.course = mode;
         this.settings.courseLength = length;
         if (opts.date !== undefined) this.settings.dailyDate = opts.date;
         if (opts.custom) this.settings.customSeed = opts.custom;
+        if (opts.difficulty) this.settings.difficulty = opts.difficulty;
         this.saveAll();
         if (this.mode === 'menu') this.menu.replace(this.mainScreen());
         return courseId(this.currentCourse());
