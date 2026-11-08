@@ -401,7 +401,7 @@ export class TerrainRenderer {
     return geo;
   }
 
-  /** Far-field tile with a hole where corridor chunks live. Returns null if fully inside the corridor. */
+  /** Far-field tile; over the corridor strip it is sunk below the detailed chunks (see above). */
   private *buildFar(tile: FarTile): Generator<void, THREE.BufferGeometry | null, void> {
     const m = this.mountain;
     const X0 = tile.ix * FAR_TILE;
@@ -419,18 +419,19 @@ export class TerrainRenderer {
     for (let j = 0; j <= n; j++)
       for (let i = 0; i <= n; i++) {
         const k = j * vs + i;
+        const x = X0 + i * FAR_STEP;
+        // inside the corridor strip the far tile is a sunk backstop: the detailed chunks win
+        // wherever they exist, and beyond their streaming window the valley floor still exists
+        // (no gap or cut wall edges at the end of the view)
+        const sunk = x > CORRIDOR_X.x0 && x < CORRIDOR_X.x1 ? 28 : 0;
         pos[k * 3] = i * FAR_STEP;
-        pos[k * 3 + 1] = H[k]! - y0;
+        pos[k * 3 + 1] = H[k]! - y0 - sunk;
         pos[k * 3 + 2] = j * FAR_STEP;
         surf[k * 3 + 1] = 0.6;
       }
     const idx: number[] = [];
     for (let j = 0; j < n; j++)
       for (let i = 0; i < n; i++) {
-        const x = X0 + i * FAR_STEP;
-        // corridor chunks cover x ∈ [−512, 512] for the whole streamed z-range
-        const inside = x >= CORRIDOR_X.x0 && x + FAR_STEP <= CORRIDOR_X.x1;
-        if (inside) continue;
         const a = j * vs + i;
         idx.push(a, a + vs, a + vs + 1, a, a + vs + 1, a + 1);
       }

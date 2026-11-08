@@ -62,7 +62,8 @@ export class Vegetation {
     quality: QualityPreset,
     private seed: number,
   ) {
-    this.nearDist = { low: 110, medium: 170, high: 230, ultra: 320 }[quality];
+    // near LOD trees are ~600–800 triangles since the pass-2 conifers: keep the near ring tight
+    this.nearDist = { low: 100, medium: 140, high: 185, ultra: 280 }[quality];
     this.farDist = { low: 1300, medium: 1900, high: 2500, ultra: 3200 }[quality];
     this.shadowDist = { low: 60, medium: 90, high: 120, ultra: 160 }[quality];
     // the original static build scattered 6k/10k/15k decorative trees over ~4.5 km

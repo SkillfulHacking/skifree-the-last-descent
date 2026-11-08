@@ -50,13 +50,33 @@ there is no CDN, no API key and no telemetry.
 
 ## Options worth knowing
 
-- **Course:** choose "The Last Descent" (classic) or **Daily** (a new deterministic mountain each day) on the main menu.
+- **Mountain** (main menu):
+  - **The Last Descent** — the fixed classic mountain. At Sprint length it is the original
+    hand-tuned 3 km course.
+  - **Daily Mountain** — a new deterministic course every UTC day. It rolls over at 00:00 UTC for
+    everyone, and the last 14 days can be replayed.
+  - **Custom seed** — type any word or number.
+- **Length:** Sprint 3 km, **Standard 10 km** (the default), Endurance 20 km, Expedition 50 km, or
+  **Endless**. On Endless there is no finish: the Yeti returns again and again, faster each time,
+  and refuges along the way bank your score. You can retire from the pause menu and keep the banked
+  score.
+- **Yeti:** Relaxed / Normal / Hard pursuit difficulty.
+- **Course codes:** every course has a code, such as `DAILY-2026-11-07-STD` or `SEED-777-END-H`.
+  Type a friend's code into the menu to ski the same mountain. Records are kept per code on this
+  device only; there is no online leaderboard.
 - **Chase helpers:** a "BEHIND YOU" rear-view window appears when the Yeti is within about 110 m. You can turn it off in Settings.
 - **Accessibility:** sound captions, interface text size, camera shake, reduce camera motion, reduce flashes, and tutorial on/off.
 
 ## How a run plays out
 
 The game moves to each phase when you reach a point on the course, not after a set time.
+
+Courses are assembled from segment types (beginner, open alpine, forest, ridgeline, basin, chute,
+moguls, powder, high-speed, cliffside), each with its own slope, width and hazards. The whole course
+comes deterministically from its code. Long courses add earlier skirmishes from other caves; those
+end at a refuge where the Yeti loses your trail, and the main chase stays at the end. Wide segments
+sometimes have an **alternate line**: a shorter, icy, slightly sunken chute marked with
+orange and blue poles. It is faster but has less grip.
 
 1. **Summit:** a short intro, then contextual tutorial prompts for steering, pizza, french fries,
    drift and the pop jump.
@@ -130,3 +150,6 @@ npm run build && npm run test:e2e   # browser tests (Playwright)
 - `docs/reviews/` holds the critical review reports.
 - `docs/KNOWN_ISSUES.md` lists the gaps that remain.
 - `CHANGELOG.md` is the development log.
+- `docs/reviews/pass2/` holds the Pass 2 evidence and reviews: menu metrics and screenshots, cave
+  and cinematic frames, the grounding report and visual before/after pairs. The consolidated defect
+  tracker is `DEFECTS.md`.

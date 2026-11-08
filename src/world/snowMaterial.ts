@@ -109,8 +109,11 @@ vec2 sf_pp = vec2(0.0);
   float hard = step(0.45, sf_hash(vec2(bandId, 7.0)));
   float tone = sf_hash(vec2(bandId, 3.0));
   // rock exposure on steep faces; hard layers stay bare on gentler slopes, soft layers hold snow
-  float rockEdge = 0.44 + 0.22 * (n1 - 0.5) + 0.05 * (n2 - 0.5) - 0.1 * hard + 0.06 * (1.0 - hard) * smoothstep(0.6, 0.95, bandF);
-  sf_rock = smoothstep(rockEdge, rockEdge + 0.07, slope);
+  // high-frequency terms and hard thresholds alias into stippled contour lines at distance:
+  // fade them out and soften the rock/snow transition with distance
+  float farA = smoothstep(120.0, 700.0, sf_dist);
+  float rockEdge = 0.44 + 0.22 * (n1 - 0.5) + 0.05 * (n2 - 0.5) * (1.0 - farA) - 0.1 * hard + 0.06 * (1.0 - hard) * smoothstep(0.6, 0.95, bandF);
+  sf_rock = smoothstep(rockEdge - 0.06 * farA, rockEdge + 0.07 + 0.16 * farA, slope);
   sf_ice = vSurf.x; sf_powder = vSurf.y; float groomed = vSurf.z;
   // snow albedo: very slightly blue-white, subtle large-scale tint variation (never pure white)
   vec3 snow = vec3(0.9, 0.92, 0.95);
@@ -138,7 +141,8 @@ vec2 sf_pp = vec2(0.0);
   rock *= 0.82 + 0.3 * n2 * fineFade + 0.15 * n1;
   // snow on the ledge at the top of each band and in cracks; less on vertical faces
   float ledge = smoothstep(0.86, 0.97, bandF) * (1.0 - smoothstep(0.5, 0.8, slope)) * smoothstep(0.45, 0.75, sf_noise(pp * 0.05 + bandId));
-  float cling = max(smoothstep(0.55, 0.8, sf_fbm(pp * 0.18)) * (1.0 - smoothstep(0.45, 0.72, slope)), ledge * 0.45);
+  float clingN = mix(sf_fbm(pp * 0.18), 0.62, farA); // its detail aliases far away: average it out
+  float cling = max(smoothstep(0.55, 0.8, clingN) * (1.0 - smoothstep(0.45, 0.72, slope)), ledge * 0.45 * (1.0 - 0.6 * farA));
   rock = mix(rock, snow * 0.92, cling);
   rock = mix(rock, rock * 0.6, smoothstep(0.6, 0.95, slope) * 0.6);
   vec3 col = mix(snow, rock, sf_rock);
@@ -202,6 +206,6 @@ if (uDetail > 0.0) {
 `,
       );
   };
-  material.customProgramCacheKey = () => 'skifree-snow-v3';
+  material.customProgramCacheKey = () => 'skifree-snow-v4';
   return { material, uniforms };
 }

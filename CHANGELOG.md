@@ -1,5 +1,55 @@
 # Changelog
 
+## 0.2.0 — Production improvement pass 2 (2026-11-07, branch `pass2`)
+
+### User-reported defects
+- **Menu (U1, U2):** the hero title now sits outside the panel and the menu was re-laid-out. It fits
+  without scrolling at 1366×768, 1920×900, 1920×1080 and 2560×1440, the title is not clipped and
+  there is no horizontal overflow. This is checked by measured metrics and by Playwright tests
+  (`tests/e2e/menu.spec.ts`), including 125 % zoom and a 150 % UI scale.
+- **Cave (U3):** rebuilt as one continuous rock mass: an SDF with strata and fractures, meshed with
+  surface nets. It has:
+  - a dark interior and a rubble floor that blends into the snow;
+  - snow on ledges and icicles under the brow;
+  - one terrain cut shared with the heightfield, so there is no seam.
+  It is built in time slices so later caves can stream in.
+- **Yeti grounding (U4):** a single ground contract. Feet are locked and the soles are probed
+  against the surface the Yeti stands on, and the pelvis and hands adapt to the terrain. The
+  cinematic walks the Yeti along the cave's own exit path on the exact visible floor:
+  - it crawls up from the deep chamber, plants on the threshold, steps out, stands, roars and leaps;
+  - measured sole penetration was 0 cm across every visible frame of the sequence
+    (`tools/cinematic.mjs`, `docs/reviews/pass2/cinematic/grounding_report.json`).
+- **Course length (U5, U6):** Sprint 3 km, Standard 10 km (default), Endurance 20 km, Expedition
+  50 km and Endless, saved in settings.
+- **Daily (U7):** the daily seed now drives the whole generated course: segment plan, route, slopes,
+  caves and finish. It rolls over explicitly at UTC midnight and you can replay past days. There are
+  course codes, custom seeds, Relaxed/Normal/Hard difficulty, and records kept separately per
+  course code (old records are migrated to `CLASSIC-SPR`).
+- **Visuals (U8):** a dedicated visual pass covering conifers, terrain shading, atmosphere and the
+  distant skyline. Before/after pairs are in `docs/reviews/pass2/visual/`.
+
+### Systems
+- `CourseProfile`:
+  - `ClassicProfile` is the original course, unchanged;
+  - `GeneratedProfile` builds a deterministic, lazy segment plan with encounters, refuges, sightings
+    and alternate lines;
+  - `courseSpec()` exports a course as JSON.
+- Streaming world:
+  - obstacle bands (256 m), vegetation, terrain chunks and far tiles, caves (one per encounter) and
+    refuges exist only in a window around the player;
+  - a render-time floating origin keeps GPU maths precise 50 km and more down the mountain.
+- The run state is generalised to several encounters: skirmishes ending at refuges on long courses,
+  escalating Endless cycles, and retire-and-bank on Endless.
+- Endings can be skipped. D-pad auto-repeats in menus. The rear-view window is correct under the
+  floating origin.
+- Tests: 107 unit tests, including headless completion of 3/10/20/50 km courses, wins and losses,
+  Endless crossing segments and refuges with bounded resident data, and Daily determinism and
+  rollover.
+
+### Reviews
+- Internal reviewers (other model instances, not external humans) under `docs/reviews/pass2/`,
+  with the consolidated tracker in `DEFECTS.md`.
+
 ## 0.1.0 — first complete build (2026-11-06)
 
 ### Milestone 1 — Foundation
