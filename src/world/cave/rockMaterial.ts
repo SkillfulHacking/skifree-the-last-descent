@@ -142,7 +142,7 @@ float cv_fracture(vec3 p, float tw){
   // bedding partings, at the bed boundary and an occasional sub-bed split
   float dB = min(bf, 1.0 - bf) * 2.3 + 0.06 * wob + 0.22 * (cv_n3(vec3(p.x * 0.35, p.y * 0.2, p.z * 0.35) + 6.0) - 0.5);
   float sub = abs(fract(tw / 0.77 + 0.3 * fract(bed * 0.618)) - 0.5) * 0.77;
-  float mB = smoothstep(0.5, 0.75, cv_n3(vec3(p.x * 0.09, bed * 3.7, p.z * 0.09))) * (0.55 + 0.45 * cv_n3(vec3(p.x * 0.5, bed, p.z * 0.5)));
+  float mB = smoothstep(0.56, 0.8, cv_n3(vec3(p.x * 0.09, bed * 3.7, p.z * 0.09))) * (0.55 + 0.45 * cv_n3(vec3(p.x * 0.5, bed, p.z * 0.5)));
   float mS = smoothstep(0.62, 0.8, cv_n3(vec3(p.x * 0.11, tw * 0.9, p.z * 0.11) + 3.0));
   float wv = 0.4 + 1.2 * cv_n3(vec3(p.x * 0.35, tw, p.z * 0.35) + 17.0);
   float f = cv_groove(abs(dB), 0.05 * wv) * mB;
@@ -206,7 +206,7 @@ float cv_fracture(vec3 p, float tw){
   rock *= 1.0 + 0.16 * (cv_n3(ap * 9.0) - 0.5) * cv_near;
   // sparse oriented fractures (bedding partings + two joint sets), the same field that creases the
   // shading normals; they fade with distance (no texture-like lattice from afar), depth/darkness varies
-  float frac = cv_fracture(ap, tw) * (1.0 - smoothstep(35.0, 90.0, cv_dist)) * (1.0 - kind);
+  float frac = cv_fracture(ap, tw) * (1.0 - smoothstep(18.0, 60.0, cv_dist)) * (1.0 - kind);
   rock *= 1.0 - frac * (0.32 + 0.25 * cv_n3(ap * 0.33 + 4.0));
   // partings between beds: dark, irregular, open only in places (they follow the strata)
   float seam = (1.0 - smoothstep(0.0, 0.05 + 0.05 * cv_n3(ap * 0.4), bedF)) * smoothstep(0.35, 0.6, cv_n3(ap * 0.15 + 2.0));

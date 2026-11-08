@@ -23,9 +23,9 @@ interface Layer {
 }
 
 const LAYERS: Layer[] = [
-  { radius: 10900, h0: 500, h1: 2100, freq: 5.5, haze: 0.5, seed: 31 },
-  { radius: 9700, h0: 350, h1: 1650, freq: 8, haze: 0.4, seed: 57 },
-  { radius: 8500, h0: 200, h1: 1250, freq: 12, haze: 0.3, seed: 83 },
+  { radius: 10900, h0: 500, h1: 2100, freq: 5.5, haze: 0.45, seed: 31 },
+  { radius: 9700, h0: 350, h1: 1650, freq: 8, haze: 0.33, seed: 57 },
+  { radius: 8500, h0: 200, h1: 1250, freq: 12, haze: 0.22, seed: 83 },
 ];
 
 const SEG = 480;
@@ -61,7 +61,8 @@ function ringGeometry(L: Layer): THREE.BufferGeometry {
     // sub-ridges: spurs running down the face
     for (let r = 0; r < nR; r++) {
       const [f, back] = ROWS[r]!;
-      const spur = r > 0 && r < nR - 1 ? 0.12 * h * gnoise(a * 60 + r * 1.7, r * 3.1, L.seed + 9) : 0;
+      // spurs and buttresses running down the face (more depth relief: A31 "flat cards")
+      const spur = r > 0 && r < nR - 1 ? 0.22 * h * gnoise(a * 60 + r * 1.7, r * 3.1, L.seed + 9) : 0;
       const y = f < 0 ? -2600 : f * h + (r === 1 ? 0 : spur * 0.5);
       const rad = L.radius + back * (h / 1800) + spur;
       const k = (i * nR + r) * 3;
@@ -149,7 +150,7 @@ void main() {
   float streak = sf_noise(vec2(q.x * 0.045 + uSeed, q.y * 0.0009));
   float big = sf_noise(vec2(q.x * 0.0021 + uSeed * 3.0, q.y * 0.0011));
   // relief: ribs/gullies and buttresses as a screen-derivative bump (the mesh is only 5 rows)
-  float Hr = rib * 260.0 + streak * 90.0 + big * 380.0;
+  float Hr = rib * 340.0 + streak * 110.0 + big * 420.0;
   vec3 dpx = dFdx(vW);
   vec3 dpy = dFdy(vW);
   vec3 r1 = cross(dpy, n0);
@@ -169,7 +170,7 @@ void main() {
   float ndl = max(dot(n, uSun), 0.0);
   float detail = 0.88 + 0.24 * sf_fbm(vec2(q.x * 0.03, q.y * 0.012) + uSeed);
   // stronger key/fill contrast so faces turned from the sun read as relief, not a flat card
-  vec3 col = alb * detail * (uSunCol * ndl * 1.55 + uSkyCol * (0.5 + 0.35 * n.y));
+  vec3 col = alb * detail * (uSunCol * ndl * 1.7 + uSkyCol * (0.36 + 0.4 * n.y));
   // sun-side rim along the crests
   vec2 hn = normalize(n.xz + 1e-4);
   float rim = smoothstep(0.72, 0.98, h) * pow(max(dot(hn, normalize(uSun.xz + 1e-4)), 0.0), 2.0) * (1.0 - rock * 0.5);

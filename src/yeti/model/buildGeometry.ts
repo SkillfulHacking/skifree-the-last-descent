@@ -262,6 +262,8 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
       else col = p.z > 0.33 ? COL.gum : COL.palate;
       bare = 1;
     }
+    // no shell strands hanging from the gums / palate / underside of the upper lip (they showed over the teeth)
+    if (p.y < MY + 0.03 && n.y < -0.25 && p.z < 0.43 && Math.abs(p.x) < 0.2) cov = 0;
     // walls of the carved mouth cavity (back of the throat, inner cheeks): bare, dark — no pelt inside the mouth
     const inward = n.y < -0.25 || (n.z > 0.35 && p.z < 0.3) || (Math.abs(n.x) > 0.45 && n.x * p.x < 0);
     if (p.y < MY + 0.015 && p.z > 0.06 && p.z < 0.42 && Math.abs(p.x) < 0.205 && inward) {
@@ -723,7 +725,12 @@ function buildCards(body: GeoArrays, parts: BuiltPart[], count: number, fringe: 
   const N = new THREE.Vector3();
   const F = new THREE.Vector3();
   const SEG = 4;
-  for (let c = 0; c < count; c++) {
+  // the mouth slot (bind space): no lock may be rooted in it or pass through it (A35: locks across the open mouth)
+  const inMouth = (q: THREE.Vector3): boolean =>
+    (Math.abs(q.x) < 0.16 && q.y > MY - 0.06 && q.y < MY + 0.06 && q.z > 0.04 && q.z < 0.43) ||
+    // in front of the mouth corners (seen from 3/4 the cheek locks hung over the lips)
+    (Math.abs(q.x) < 0.23 && q.y > MY - 0.07 && q.y < MY + 0.05 && q.z > 0.22 && q.z < 0.5);
+  for (let c = 0, tries = 0; c < count && tries < count * 4; tries++) {
     const k = pick();
     const v = cand[k];
     const part = candPart[k];
@@ -762,6 +769,19 @@ function buildCards(body: GeoArrays, parts: BuiltPart[], count: number, fringe: 
     const lock = Math.floor(rnd() * LOCK_VARIANTS);
     const si = [body.skinIndex[v * 4], body.skinIndex[v * 4 + 1], body.skinIndex[v * 4 + 2], body.skinIndex[v * 4 + 3]];
     const sw = [body.skinWeight[v * 4], body.skinWeight[v * 4 + 1], body.skinWeight[v * 4 + 2], body.skinWeight[v * 4 + 3]];
+    if ((part === 'head' || part === 'jaw') && inMouth(P)) continue;
+    if (part === 'head' || part === 'jaw') {
+      let q = P.clone();
+      let dq = dir.clone();
+      let hit = false;
+      for (let i = 1; i <= SEG && !hit; i++) {
+        dq = dq.addScaledVector(F, 0.22).addScaledVector(N, -0.12).normalize();
+        q = q.addScaledVector(dq, len / SEG);
+        hit = inMouth(q);
+      }
+      if (hit) continue;
+    }
+    c++;
     const start = g.pos.length / 3;
     // rooted inside the shell undercoat, so no lock floats detached from the skin
     let cur = P.clone().addScaledVector(N, -0.008);
