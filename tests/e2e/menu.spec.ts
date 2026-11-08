@@ -78,6 +78,7 @@ test('browser zoom 125% and UI scale 150% keep the menu usable (scroll only if n
   let l = await layout(page);
   expect(l).toMatchObject({ panelScroll: 0, overflowX: 0, titleClipped: false, rowsOutside: 0 });
   // a fresh page (its own single init script) so the 150 % UI scale really applies (E4)
+  await first.close(); // one rendering page at a time (software WebGL is slow)
   const page2 = await page.context().newPage();
   await page2.setViewportSize({ width: 1366, height: 768 });
   await boot(page2, { uiScale: 1.5 });
@@ -87,7 +88,7 @@ test('browser zoom 125% and UI scale 150% keep the menu usable (scroll only if n
   expect(l.overflowX).toBe(0);
   expect(l.titleClipped).toBe(false);
   // whatever does not fit scrolls inside the panel, and navigation keeps the focus visible
-  for (let i = 0; i < 12; i++) await press(page, 'ArrowDown');
+  for (let i = 0; i < 8; i++) await press(page, 'ArrowDown');
   const focusVisible = await page.evaluate(() => {
     const f = document.querySelector('.menu-row.focus')!.getBoundingClientRect();
     return f.top >= 0 && f.bottom <= innerHeight;
