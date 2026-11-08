@@ -9,7 +9,10 @@ import type { QualityPreset } from '../core/types';
 import { Rng, fbm, smoothstep } from '../core/rng';
 import { BAND, type Obstacle, type ObstacleField } from '../physics/obstacles';
 import type { Mountain } from './course';
-import { createFoliageMaterial, logGeometry, pineGeometry, rockGeometry, stumpGeometry } from './props';
+import { createFoliageMaterial, createRockMaterial, logGeometry, pineGeometry, rockGeometry, stumpGeometry } from './props';
+
+/** rock geometry variants (see rockGeometry: boulder, blocky, slab, split block, dome, wedge) */
+const ROCK_VARIANTS = 6;
 
 const CELL = 256;
 
@@ -30,9 +33,21 @@ interface Inst {
   sx: number;
   sy: number;
   sz: number;
+  /** optional tilt (rocks) */
+  rx?: number;
+  rz?: number;
 }
 
-type Bucket = { trees: Inst[][]; rocks: Inst[][]; logs: Inst[]; stumps: Inst[]; farTrees: Inst[][] };
+/** small deterministic hash → [0,1) */
+function hash01(a: number, b: number, c = 0): number {
+  let h = Math.imul(Math.floor(a * 7.31) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(Math.floor(b * 3.17) + c * 0x27d4eb2d, 0xc2b2ae35);
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x2c1b3c6d);
+  h ^= h >>> 12;
+  return (h >>> 0) / 4294967296;
+}
+
+type Bucket = { trees: Inst[][]; rocks: Inst[][]; pebbles: Inst[]; logs: Inst[]; stumps: Inst[]; farTrees: Inst[][] };
 
 export class Vegetation {
   readonly group = new THREE.Group();
@@ -49,6 +64,7 @@ export class Vegetation {
   private foliage: THREE.Material;
   private foliageFar: THREE.Material;
   private rockMat: THREE.Material;
+  private woodMat: THREE.Material;
   private treeNear: THREE.BufferGeometry[];
   private treeFar: THREE.BufferGeometry[];
   private rockNear: THREE.BufferGeometry[];
@@ -70,13 +86,14 @@ export class Vegetation {
     this.decorPerBand = Math.round(({ low: 6000, medium: 10000, high: 15000, ultra: 15000 }[quality] * BAND) / 4500);
     this.foliage = createFoliageMaterial(this.uTime, quality !== 'low');
     this.foliageFar = createFoliageMaterial(this.uTime, false);
-    this.rockMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, flatShading: true });
-    this.mats.push(this.foliage, this.foliageFar, this.rockMat);
+    this.rockMat = createRockMaterial();
+    this.woodMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
+    this.mats.push(this.foliage, this.foliageFar, this.rockMat, this.woodMat);
 
     this.treeNear = [0, 1, 2].map((v) => pineGeometry(v, true));
     this.treeFar = [0, 1, 2].map((v) => pineGeometry(v, false));
-    this.rockNear = [0, 1, 2, 3].map((v) => rockGeometry(v, true));
-    this.rockFar = [0, 1, 2, 3].map((v) => rockGeometry(v, false));
+    this.rockNear = Array.from({ length: ROCK_VARIANTS }, (_, v) => rockGeometry(v, true, { snow: 0 }));
+    this.rockFar = [rockGeometry(0, false, { snow: 0 })];
     this.logGeo = logGeometry();
     this.stumpGeo = stumpGeometry();
     this.geos.push(...this.treeNear, ...this.treeFar, ...this.rockNear, ...this.rockFar, this.logGeo, this.stumpGeo);
@@ -123,7 +140,7 @@ export class Vegetation {
     const get = (x: number) => {
       const b = Math.floor(x / CELL);
       let v = buckets.get(b);
-      if (!v) buckets.set(b, (v = { trees: [[], [], []], rocks: [[], [], [], []], logs: [], stumps: [], farTrees: [[], [], []] }));
+      if (!v) buckets.set(b, (v = { trees: [[], [], []], rocks: Array.from({ length: ROCK_VARIANTS }, () => []), pebbles: [], logs: [], stumps: [], farTrees: [[], [], []] }));
       return v;
     };
     for (const o of obstacles) {
@@ -135,11 +152,33 @@ export class Vegetation {
           b.trees[o.variant % 3]!.push(base);
           break;
         case 'rock':
-        case 'boulder':
-          base.y -= 0.12 * o.scale;
-          base.sy = o.scale * 0.95;
-          b.rocks[o.variant % 4]!.push(base);
+        case 'boulder': {
+          // per-instance character: variant, footprint aspect (within ±25 % of the collision
+          // scale), height, burial depth and tilt are hashed from the position (deterministic)
+          const h1 = hash01(o.x, o.z, 1);
+          const h2 = hash01(o.x, o.z, 2);
+          const h3 = hash01(o.x, o.z, 3);
+          const sc = o.scale;
+          base.sx = sc * (0.85 + 0.35 * h1);
+          base.sz = sc * (0.85 + 0.35 * h2);
+          base.sy = sc * (0.78 + 0.4 * h3) * 0.95;
+          base.y = o.y - sc * (0.08 + 0.22 * hash01(o.x, o.z, 4));
+          base.rx = (hash01(o.x, o.z, 5) - 0.5) * 0.45;
+          base.rz = (hash01(o.x, o.z, 6) - 0.5) * 0.45;
+          b.rocks[(o.variant + Math.floor(h3 * 3) * 2) % ROCK_VARIANTS]!.push(base);
+          // a few small, half-buried satellite stones (render only; power-law sizes) so rocks
+          // read as clusters/talus instead of an even sprinkle
+          const nSat = Math.floor(hash01(o.x, o.z, 7) * (o.kind === 'boulder' ? 5 : 3));
+          for (let k = 0; k < nSat; k++) {
+            const a = hash01(o.x, o.z, 10 + k) * Math.PI * 2;
+            const d = sc * (1.0 + 1.4 * hash01(o.x, o.z, 20 + k));
+            const sz = Math.min(0.32 * sc, 0.1 * sc * Math.pow(1 / Math.max(0.08, hash01(o.x, o.z, 30 + k)), 0.55));
+            const x = o.x + Math.cos(a) * d;
+            const z = o.z + Math.sin(a) * d;
+            get(x).pebbles.push({ x, y: mountain.heightAt(x, z) - sz * 0.35, z, rot: a * 3, sx: sz, sy: sz * 0.8, sz: sz * 1.1, rx: 0.3 * (hash01(o.x, o.z, 50 + k) - 0.5), rz: 0.3 * (hash01(o.x, o.z, 60 + k) - 0.5) });
+          }
           break;
+        }
         case 'log':
           b.logs.push({ ...base, sx: 1, sy: 1, sz: o.halfLen * 2, y: o.y - 0.05 });
           break;
@@ -171,7 +210,42 @@ export class Vegetation {
         const rel = y - mountain.heightAt(cx, z);
         const dens = smoothstep(260, 120, rel) * (0.5 + 0.5 * smoothstep(-0.3, 0.3, fbm(x / 140, z / 140, seed + 3, 2))) * (0.35 + 0.65 * mountain.profile.treeLine(z));
         if (r1 > dens) continue;
+        // no forest on cliffs: thin with the local slope (gone above ~45°)
+        const g = Math.hypot(mountain.heightAt(x + 4, z) - y, mountain.heightAt(x, z + 4) - y) / 4;
+        if (r1 > dens * (1 - smoothstep(0.55, 1.0, g))) continue;
         get(x).farTrees[v]!.push({ x, y: y - 0.4, z, rot, sx: s, sy: s * sy, sz: s });
+      }
+      // talus: clusters of decorative rocks where moderate slopes sit below steeper ground
+      // (cliff bases); sizes follow a power law, so a few big blocks and many small ones
+      const talus = Math.round(this.decorPerBand * 0.08);
+      for (let i = 0; i < talus; i++) {
+        const z = zA + rng.float() * BAND;
+        const side = rng.chance(0.5) ? 1 : -1;
+        const cx = mountain.centerX(z);
+        const x = cx + side * (mountain.halfWidth(z) + 60 + rng.float() * 700);
+        const n = 3 + rng.int(0, 5);
+        const seedA = rng.float();
+        if (Math.abs(x) < 560 || z < -300) continue;
+        const y = mountain.heightAt(x, z);
+        const gx = (mountain.heightAt(x + 6, z) - y) / 6;
+        const gz = (mountain.heightAt(x, z + 6) - y) / 6;
+        const g = Math.hypot(gx, gz);
+        if (g < 0.3 || g > 1.0) continue;
+        // ground 30 m uphill must be clearly steeper
+        const ux = x + (gx / g) * 30;
+        const uz = z + (gz / g) * 30;
+        const yu = mountain.heightAt(ux, uz);
+        const gu = Math.hypot(mountain.heightAt(ux + 6, uz) - yu, mountain.heightAt(ux, uz + 6) - yu) / 6;
+        if (gu < g + 0.35) continue;
+        for (let k = 0; k < n; k++) {
+          const a = rng.float() * Math.PI * 2;
+          const d = rng.float() * 14;
+          const rx = x + Math.cos(a) * d;
+          const rz = z + Math.sin(a) * d * 0.6;
+          const sz = Math.min(3.2, 0.45 * Math.pow(1 / Math.max(0.06, rng.float()), 0.7));
+          const vv = Math.floor(((seedA * 7 + k * 0.37) % 1) * ROCK_VARIANTS);
+          get(rx).rocks[vv]!.push({ x: rx, y: mountain.heightAt(rx, rz) - sz * 0.3, z: rz, rot: rng.float() * 6.28, sx: sz * rng.range(0.85, 1.25), sy: sz * rng.range(0.6, 1.0), sz: sz, rx: rng.range(-0.3, 0.3), rz: rng.range(-0.3, 0.3) });
+        }
       }
     }
 
@@ -183,7 +257,7 @@ export class Vegetation {
     const make = (geo: THREE.BufferGeometry, mat: THREE.Material, list: Inst[], shadow: boolean) => {
       const im = new THREE.InstancedMesh(geo, mat, list.length);
       list.forEach((it, i) => {
-        e.set(0, it.rot, 0);
+        e.set(it.rx ?? 0, it.rot, it.rz ?? 0);
         q.setFromEuler(e);
         p.set(it.x, it.y, it.z);
         sc.set(it.sx, it.sy, it.sz);
@@ -217,10 +291,12 @@ export class Vegetation {
         cell.near.push(n);
         cell.shadowCasters.push(n);
       });
+      // small satellite stones: cheap far-LOD geometry, near ring only
+      if (b.pebbles.length) cell.near.push(make(this.rockFar[0]!, this.rockMat, b.pebbles, false));
       const rocks = b.rocks.flat();
       if (rocks.length) cell.mid.push(make(this.rockFar[0]!, this.rockMat, rocks, false));
-      if (b.logs.length) cell.near.push(make(this.logGeo, this.rockMat, b.logs, true));
-      if (b.stumps.length) cell.near.push(make(this.stumpGeo, this.rockMat, b.stumps, true));
+      if (b.logs.length) cell.near.push(make(this.logGeo, this.woodMat, b.logs, true));
+      if (b.stumps.length) cell.near.push(make(this.stumpGeo, this.woodMat, b.stumps, true));
       for (const m of new Set([...cell.near, ...cell.far, ...cell.mid])) {
         m.visible = false;
         this.group.add(m);
@@ -256,7 +332,7 @@ export class Vegetation {
         const far = !near && d < this.farDist;
         for (const m of b.far) m.visible = far;
         for (const m of b.near) m.visible = near;
-        for (const m of b.mid) m.visible = far && d < 600;
+        for (const m of b.mid) m.visible = far && d < 480;
         const shadows = d < this.shadowDist;
         for (const m of b.shadowCasters) m.castShadow = shadows;
       }

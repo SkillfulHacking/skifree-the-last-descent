@@ -159,14 +159,24 @@ export class RockField {
           chamberQuery(u, v, hit);
           const cd = hit.dist - chamberHalfWidth(hit.s);
           const rim = pitRim(hillY);
-          const lid = 1 - smoothstep(rim + 1.6, rim + 3.6, cd + 0.8 * gnoise(u * 0.15, v * 0.15, sd + 36));
+          // the lid lies just under/at the snow surface and dives under it at a shallow angle (no raised
+          // shelf with a rock rim): it only has to stand above the pit, which ends at cd = rim
+          const lid = 1 - smoothstep(rim + 0.6, rim + 5.5, cd + 0.8 * gnoise(u * 0.15, v * 0.15, sd + 36));
           if (lid > 0) {
-            const lt = hillY + 0.75 + 0.35 * gnoise(u * 0.2, v * 0.2, sd + 37) - 3.0 * (1 - lid);
+            const lt = hillY + 0.3 + 0.15 * gnoise(u * 0.2, v * 0.2, sd + 37) - 1.8 * (1 - lid);
             if (lt > top) {
               top = lt;
               lidK = lid;
             }
           }
+        }
+        // the heightfield's own cliff step (its ramp up to the band top, STEP_IN … STEP_IN + 3 behind the
+        // face) is steep: wherever the benches leave it uncovered the rock lies over it (snow-capped, just
+        // proud of it) and only dives under the hillside once the ramp is over
+        const cover = hillY + 0.45 + 0.2 * gnoise(uc * 0.3, v * 0.3, sd + 38) - 3.2 * smoothstep(STEP_IN + 3.2, STEP_IN + 5.6, t);
+        if (cover > top) {
+          top = cover;
+          lidK = Math.max(lidK, 1 - smoothstep(STEP_IN + 3.2, STEP_IN + 5.6, t));
         }
         this.cTop[ci] = top;
         this.cLid[ci] = lidK;
@@ -279,8 +289,13 @@ export class RockField {
         dch = (rr - 1) * Math.max(0.3, Math.min(hw, cy));
         // lobes and notches around the opening (breakdown along joints and beds)
         if (mw > 0) {
-          dch += 1.0 * mw * noise3(Math.atan2(Yf - yb, lsig) * 1.4, s * 0.25, 2.5, sd + 57);
+          const ang = Math.atan2(Yf - yb, lsig);
+          dch += 1.0 * mw * noise3(ang * 1.4, s * 0.25, 2.5, sd + 57);
+          // blocks broken out of the jambs and the arch along the joints: higher-frequency notches
+          dch += 0.55 * mw * noise3(ang * 4.2, s * 0.5, 7.5, sd + 59);
           dch += 0.45 * mw * noise3(x * 0.9, y * 0.9, z * 0.9, sd + 58);
+          // a buttress juts into the +l jamb at mid height (the opening is wider low down on that side)
+          dch += 1.1 * mw * smoothstep(-0.6, 1.2, lsig / Math.max(0.3, hw)) * Math.exp(-(((Yf - 3.1) / 1.0) ** 2)) * smoothstep(-2.5, -0.5, s) * (1 - smoothstep(1.5, 4.0, s));
         }
       }
       dch += 0.34 * noise3(x * 0.45, y * 0.45, z * 0.45, sd + 98);

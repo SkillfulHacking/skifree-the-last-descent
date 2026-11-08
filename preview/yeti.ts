@@ -6,6 +6,7 @@
  *             quality=low|medium|high|ultra glow=<0..1> from=<YetiMode> (cross-fade test: plays `from` for 1 s first)
  *             dark=1 (night lighting for the eye-glow reveal)
  *             ground=flat|slope|bumpy|cave  terrain passed to YetiModel.setGround (root placed on it)
+ *             lift=<m> raise the root after simulating (airborne leap frames)  hide=<mesh,…> hide layers
  *             debug=1  grounding debug overlay (root cross, sole contacts, ground samples)
  *             seq=<s>  play the cave sequence crawl 3 s → emerge 2 s → stand 1.2 s → roar 2.5 s at 30 fps along a
  *                      sloped bumpy path (default ground=cave) and stop at <s> (seq=end for the whole sequence).
@@ -344,6 +345,9 @@ for (let k = 0; k < strip; k++) {
   yeti.setEyeGlow(glow);
   if (q.get('shade') !== null) yeti.setShade(parseFloat(q.get('shade')!));
   if (q.get('nofur') === '1') yeti.setFurVisible(false);
+  // hide=<mesh name>[,…] (YetiBody, YetiShellFur, YetiFurCards, YetiTeethClaws, YetiEyes): isolate layers
+  const hide = (q.get('hide') ?? '').split(',').filter(Boolean);
+  if (hide.length) yeti.root.traverse((o) => { if (hide.includes(o.name)) o.visible = false; });
   yeti.onFootstep = (_side, pos, strength) => {
     footsteps++;
     const m = new THREE.Mesh(printGeo, printMat);
@@ -396,6 +400,9 @@ for (let k = 0; k < strip; k++) {
     yeti.root.position.copy(start);
     for (let c = printsBefore; c < scene.children.length; c++) scene.children[c].position.z -= travelled;
   }
+  // lift=<m>: raise the root after the simulation (airborne leap frames: the game carries the root along the arc)
+  const lift = parseFloat(q.get('lift') ?? '0');
+  if (lift) yeti.root.position.y += lift;
 }
 console.log(`build+sim ${(performance.now() - tBuild).toFixed(0)} ms`);
 const yeti = yetis[Math.floor((strip - 1) / 2)];

@@ -177,6 +177,7 @@ export class Cave {
     yield* field.buildSteps(tk);
     phase('field');
     this.stats.fieldEvals = field.evals;
+    (this as unknown as { __field: RockField }).__field = field;
     const nets = yield* surfaceNetsSteps(field, tk);
 
     phase('nets');
@@ -640,7 +641,7 @@ function* bakeAttr(tk: Tick, g: THREE.BufferGeometry, f: RockField, ground: Grou
     let b = 0;
     if (u > -4 && u < 26 && v > -10 && v < 24) {
       chamberQuery(u, v, hit);
-      if (hit.dist < chamberHalfWidth(hit.s) + 1.5) b = Math.exp(-Math.max(0, hit.s + 0.5) / 5.0);
+      if (hit.dist < chamberHalfWidth(hit.s) + 1.5) b = Math.exp(-Math.max(0, hit.s + 0.5) / 7.5);
     }
     out[i * 4 + 3] = b;
   }

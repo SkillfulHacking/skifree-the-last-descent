@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Rng, gnoise } from '../core/rng';
 import { ATMOSPHERE_GLSL, addAtmosphereUniforms } from './look/atmosphere';
+import { GLSL_NOISE_BL } from './snowMaterial';
 
 function colorize(g: THREE.BufferGeometry, fn: (p: THREE.Vector3, n: THREE.Vector3) => THREE.Color): THREE.BufferGeometry {
   // indexed input keeps smooth shared normals; non-indexed stays faceted
@@ -104,7 +105,6 @@ const SHAPES: TreeShape[] = [
 ];
 
 const BARK = new THREE.Color(0.17, 0.12, 0.09);
-const _up = new THREE.Vector3(0, 1, 0);
 
 function addTrunk(tb: TreeBuilder, h: number, r0: number, sides: number, rings: number[], rng: Rng, lean: (y: number) => THREE.Vector3) {
   // rings: list of heights (fraction of h); radius tapers, flare at the root
@@ -140,90 +140,129 @@ function addTrunk(tb: TreeBuilder, h: number, r0: number, sides: number, rings: 
 }
 
 /**
- * One branch spray: a drooping, tapering frond with a tent-shaped cross-section (upper faces carry
- * snow, the underside stays dark), a lobed outline and a pointed tip.
+ * One branch tier ("skirt") of a conifer: a closed, drooping, lobed umbrella around the trunk.
+ * Upper surface: inner collar → snow-pillow ring → lobed rim (branch tips droop, notches lift);
+ * underside: rim → back to the trunk lower down (dark, so depth reads without a visible core).
+ * The lobes (branches) have individual lengths, angles and snow loads, so no two tiers or trees
+ * are radially symmetric.
  */
-function addFrond(
+function addSkirt(
   tb: TreeBuilder,
-  A: THREE.Vector3,
-  ang: number,
+  soft: number[],
+  center: THREE.Vector3,
   L: number,
-  W: number,
-  H: number,
-  lift: number,
-  droop: number,
-  segs: number,
+  drop: number,
+  lobes: number,
+  rot: number,
   needle: THREE.Color,
   snowLoad: number,
-  ph: number,
+  rng: Rng,
+  segPerLobe: number,
+  underside: boolean,
 ) {
-  const dir = new THREE.Vector3(Math.cos(ang), 0, Math.sin(ang));
-  const side = new THREE.Vector3(-Math.sin(ang), 0, Math.cos(ang));
-  const C = new THREE.Vector3();
-  const p = new THREE.Vector3();
-  const col = new THREE.Color();
-  const rings: number[][] = [];
-  const centers: THREE.Vector3[] = [];
-  // tips curl up a little after drooping (spruce "J" shape)
-  const yAt = (t: number) => L * (lift * t - droop * t * t + 0.18 * droop * t * t * t);
-  for (let i = 0; i < segs; i++) {
-    const t = i / segs;
-    C.copy(A).addScaledVector(dir, L * t);
-    C.y += yAt(t);
-    centers.push(C.clone());
-    const w = W * (0.3 + 0.7 * Math.sin(Math.PI * Math.min(1, 0.12 + t * 1.05))) * (1 + 0.2 * Math.sin(t * 9 + ph));
-    const h = H * (1 - 0.55 * t);
-    const ao = 0.5 + 0.5 * t; // dark near the trunk
-    const tipLight = 1 + 0.35 * t * t;
-    const sAmt = snowLoad * THREE.MathUtils.smoothstep(t, 0.02, 0.45) * (0.75 + 0.25 * Math.sin(ph * 3 + t * 7));
-    const hang = 0.32 * h + 0.42 * w;
-    // T (ridge, carries the snow pillow), R, B (underside), L
-    p.copy(C).addScaledVector(_up, 0.5 * h + 0.05 * L * sAmt);
-    const iT = tb.vert(p, col.copy(needle).multiplyScalar(ao * tipLight * 1.1), Math.min(1, sAmt * 1.05));
-    p.copy(C).addScaledVector(side, w).addScaledVector(_up, -hang);
-    const iR = tb.vert(p, col.copy(needle).multiplyScalar(ao * tipLight * (0.95 + 0.1 * Math.sin(ph + t * 5))), sAmt * 0.55);
-    p.copy(C).addScaledVector(_up, -0.5 * h);
-    const iB = tb.vert(p, col.copy(needle).multiplyScalar(ao * 0.55), 0);
-    p.copy(C).addScaledVector(side, -w).addScaledVector(_up, -hang);
-    const iL = tb.vert(p, col.copy(needle).multiplyScalar(ao * tipLight * (0.95 + 0.1 * Math.cos(ph + t * 4))), sAmt * 0.55);
-    rings.push([iT, iR, iB, iL]);
+  const S = lobes * segPerLobe;
+  const lobeLen: number[] = [];
+  const lobeSnow: number[] = [];
+  const lobeAng: number[] = [];
+  for (let i = 0; i < lobes; i++) {
+    // ragged branches: mostly full length, some short (wind-broken), a few long
+    const r = rng.float();
+    lobeLen.push(r < 0.15 ? rng.range(0.55, 0.75) : rng.range(0.85, 1.12));
+    lobeSnow.push(snowLoad * rng.range(0.55, 1.1));
+    lobeAng.push(rng.range(-0.28, 0.28));
   }
-  const tipC = new THREE.Vector3().copy(A).addScaledVector(dir, L);
-  tipC.y += yAt(1);
-  const iTip = tb.vert(tipC, col.copy(needle).multiplyScalar(1.35), snowLoad * 0.35);
-  const out = new THREE.Vector3();
-  const fc = new THREE.Vector3();
-  const faceOut = (ia: number, ib: number, ci: THREE.Vector3) => {
-    fc.set((tb.pos[ia * 3]! + tb.pos[ib * 3]!) / 2, (tb.pos[ia * 3 + 1]! + tb.pos[ib * 3 + 1]!) / 2, (tb.pos[ia * 3 + 2]! + tb.pos[ib * 3 + 2]!) / 2);
-    return out.subVectors(fc, ci);
-  };
-  for (let i = 0; i + 1 < rings.length; i++) {
-    const a = rings[i]!;
-    const b = rings[i + 1]!;
-    for (let k = 0; k < 4; k++) {
-      const k1 = (k + 1) % 4;
-      tb.quad(a[k]!, a[k1]!, b[k1]!, b[k]!, faceOut(a[k]!, a[k1]!, centers[i]!));
+  const inner: number[] = [];
+  const mid: number[] = [];
+  const rim: number[] = [];
+  const under: number[] = [];
+  const p = new THREE.Vector3();
+  const c = new THREE.Color();
+  const yTop = center.y;
+  for (let s = 0; s < S; s++) {
+    const u = s / segPerLobe; // lobe coordinate
+    const li = Math.round(u) % lobes;
+    const d = Math.abs(u - Math.round(u)); // 0 at a tip, 0.5 at a notch
+    const shape = Math.pow(Math.cos(Math.PI * d), 2);
+    const a = rot + ((s + lobeAng[li]! * segPerLobe * (1 - 2 * d)) / S) * Math.PI * 2;
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    const len = lobeLen[li]!;
+    const r = L * (0.5 + 0.5 * shape) * len;
+    const sn = lobeSnow[li]!;
+    const tipDrop = drop * (0.55 + 0.45 * shape) * (0.85 + 0.3 * len - 0.15) + rng.range(-0.05, 0.05) * drop;
+    // inner collar (hugs the trunk)
+    p.set(center.x + ca * 0.12, yTop + 0.04 * L, center.z + sa * 0.12);
+    inner.push(tb.vert(p, c.copy(needle).multiplyScalar(0.62), sn * 0.5));
+    soft.push(1);
+    // snow pillow ring: convex upper surface carries the load
+    const rm = r * 0.52;
+    p.set(center.x + ca * rm, yTop - tipDrop * 0.22 + 0.06 * L * sn, center.z + sa * rm);
+    mid.push(tb.vert(p, c.copy(needle).multiplyScalar(0.85 + 0.15 * shape + rng.range(-0.06, 0.06)), Math.min(1, sn * (1.0 + 0.25 * shape))));
+    soft.push(1);
+    // rim: tips droop, notches lift a little
+    p.set(center.x + ca * r, yTop - tipDrop, center.z + sa * r);
+    rim.push(tb.vert(p, c.copy(needle).multiplyScalar(1.05 + 0.2 * shape + rng.range(-0.08, 0.08)), sn * (0.25 + 0.2 * (1 - shape))));
+    soft.push(1);
+    if (underside) {
+      const ru = 0.18 + r * 0.12;
+      p.set(center.x + ca * ru, yTop - tipDrop * 0.75, center.z + sa * ru);
+      under.push(tb.vert(p, c.copy(needle).multiplyScalar(0.42), 0));
+      soft.push(0.6);
     }
   }
-  const last = rings[rings.length - 1]!;
-  const lc = centers[centers.length - 1]!;
-  for (let k = 0; k < 4; k++) {
-    const k1 = (k + 1) % 4;
-    const o = faceOut(last[k]!, last[k1]!, lc).clone().normalize().addScaledVector(dir, 0.3);
-    tb.tri(last[k]!, last[k1]!, iTip, o);
+  const out = new THREE.Vector3();
+  for (let s = 0; s < S; s++) {
+    const s1 = (s + 1) % S;
+    const a = rot + ((s + 0.5) / S) * Math.PI * 2;
+    out.set(Math.cos(a), 0.8, Math.sin(a));
+    tb.quad(inner[s]!, inner[s1]!, mid[s1]!, mid[s]!, out);
+    out.set(Math.cos(a), 0.35, Math.sin(a));
+    tb.quad(mid[s]!, mid[s1]!, rim[s1]!, rim[s]!, out);
+    if (underside) {
+      out.set(Math.cos(a) * 0.3, -1, Math.sin(a) * 0.3);
+      tb.quad(rim[s]!, rim[s1]!, under[s1]!, under[s]!, out);
+    }
   }
 }
 
 /**
- * A conifer. `detailed` = near LOD (individual drooping branch sprays in whorls round a visible
- * trunk, snow pillows on the upper surfaces); otherwise a very cheap far LOD (lobed, drooping star
- * tiers). Colours carry needle/bark albedo; `aSnow` carries snow propensity (composited per
- * instance in the foliage shader).
+ * Soft ("volumetric") foliage normals: blend each foliage vertex's geometric normal with the
+ * normal of the crown's cone envelope, so tiers shade as one smooth soft mass instead of facets.
+ */
+function softenNormals(g: THREE.BufferGeometry, soft: number[], H: number, baseR: number) {
+  const pos = g.getAttribute('position') as THREE.BufferAttribute;
+  const nor = g.getAttribute('normal') as THREE.BufferAttribute;
+  const n = new THREE.Vector3();
+  const e = new THREE.Vector3();
+  const k = baseR / H;
+  for (let i = 0; i < pos.count; i++) {
+    const w = soft[i] ?? 0;
+    if (w <= 0) continue;
+    n.fromBufferAttribute(nor, i);
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    const r = Math.hypot(x, z) || 1;
+    e.set(x / r, k * 1.6 + 0.25, z / r).normalize();
+    // the underside keeps more of its own (downward) normal
+    const t = n.y < -0.2 ? 0.35 * w : 0.62 * w;
+    n.multiplyScalar(1 - t).addScaledVector(e, t).normalize();
+    nor.setXYZ(i, n.x, n.y, n.z);
+  }
+  nor.needsUpdate = true;
+}
+
+/**
+ * A conifer. `detailed` = near LOD: a trunk plus 8–10 closed, drooping, lobed branch tiers with
+ * per-branch length/angle/snow variation and soft envelope normals (no flat facets), topped by a
+ * thin leader with two small droop tufts. Otherwise a cheap far LOD (lobed drooping cones with the
+ * same soft normals). Colours carry needle/bark albedo; `aSnow` carries snow propensity
+ * (composited per instance and per pixel in the foliage shader).
  */
 export function pineGeometry(variant: number, detailed: boolean): THREE.BufferGeometry {
   const sh = SHAPES[((variant % SHAPES.length) + SHAPES.length) % SHAPES.length]!;
   const rng = new Rng(9001 + variant * 77 + (detailed ? 0 : 5));
   const tb = new TreeBuilder();
+  const soft: number[] = [];
   const H = sh.height;
   const leanDir = rng.range(0, Math.PI * 2);
   const lean = (y: number) => {
@@ -231,71 +270,57 @@ export function pineGeometry(variant: number, detailed: boolean): THREE.BufferGe
     return new THREE.Vector3(Math.cos(leanDir) * k, 0, Math.sin(leanDir) * k);
   };
   const crown0 = H * sh.crownBase;
+  const pad = () => {
+    while (soft.length < tb.pos.length / 3) soft.push(0);
+  };
   if (detailed) {
-    addTrunk(tb, H * 0.93, 0.27, 7, [0, 0.06, 0.3, 1], rng, lean);
-    // dark inner crown core: fills the gaps between sprays so the tree reads dense
-    {
-      const sides = 7;
-      const y0 = crown0 + 0.4;
-      const ring: number[] = [];
-      const p = new THREE.Vector3();
-      const c = new THREE.Color().copy(sh.needle).multiplyScalar(0.3);
-      for (let s = 0; s < sides; s++) {
-        const a = (s / sides) * Math.PI * 2;
-        p.set(Math.cos(a) * sh.baseR * 0.42, y0, Math.sin(a) * sh.baseR * 0.42);
-        ring.push(tb.vert(p, c, 0));
-      }
-      const top = tb.vert(p.set(0, H * 0.9, 0).add(lean(H * 0.9)), c, 0);
-      const out = new THREE.Vector3();
-      for (let s = 0; s < sides; s++) {
-        const a = ((s + 0.5) / sides) * Math.PI * 2;
-        tb.tri(ring[s]!, ring[(s + 1) % sides]!, top, out.set(Math.cos(a), 0.4, Math.sin(a)));
-      }
-    }
-    const nW = sh.whorls;
+    addTrunk(tb, H * 0.9, 0.27, 7, [0, 0.06, 0.3, 1], rng, lean);
+    pad();
+    const nT = sh.whorls;
     let rot = rng.range(0, Math.PI * 2);
-    for (let k = 0; k < nW; k++) {
-      const f = k / (nW - 1);
-      const y = crown0 + (H * 0.94 - crown0) * Math.pow(f, 0.92) + rng.range(-0.22, 0.22);
-      const nB = Math.max(3, Math.round(THREE.MathUtils.lerp(sh.maxBranches, 3.2, f) + rng.range(-0.7, 0.7)));
-      // conical envelope, slightly convex low down, narrow spire at the top
-      const env = Math.pow(1 - f, 0.95) * (1 - 0.12 * Math.pow(1 - f, 4));
-      rot += rng.range(1.9, 2.9); // ~golden-angle offsets: no visible tiers
+    const top = H * 0.86;
+    for (let k = 0; k < nT; k++) {
+      const f = k / (nT - 1);
+      const y = crown0 + (top - crown0) * Math.pow(f, 0.9) + rng.range(-0.12, 0.12) * (1 - f);
+      const env = Math.pow(1 - f, 0.92) * (1 - 0.1 * Math.pow(1 - f, 4));
+      const L = Math.max(0.35, sh.baseR * env * rng.range(0.9, 1.08) + 0.22);
+      const dy = (top - crown0) / (nT - 1);
       const droop = THREE.MathUtils.lerp(sh.droop0, sh.droop1, f);
-      const lift = THREE.MathUtils.lerp(0.12, 0.32, f);
-      const segs = f < 0.5 ? 3 : 2;
-      for (let b = 0; b < nB; b++) {
-        if (k < nW - 2 && rng.chance(sh.gap)) continue;
-        const ang = rot + (b / nB) * Math.PI * 2 + rng.range(-0.3, 0.3) * ((Math.PI * 2) / nB);
-        const L = Math.max(0.45, sh.baseR * env * rng.range(0.78, 1.12) + 0.25);
-        const A = lean(y).add(new THREE.Vector3(Math.cos(ang) * 0.12, y, Math.sin(ang) * 0.12));
-        const W = L * rng.range(0.4, 0.5) + 0.1;
-        const Ht = Math.max(0.2, L * 0.26);
-        const snowLoad = rng.range(0.75, 1.0) * (0.85 + 0.15 * (1 - f));
-        addFrond(tb, A, ang, L, W, Ht, lift, droop * rng.range(0.8, 1.2), segs, sh.needle, snowLoad, rng.range(0, 6.28));
-      }
+      // each tier's rim falls below the next tier's collar: no core shows between tiers
+      const drop = Math.max(dy * rng.range(1.05, 1.3), L * (0.32 + droop * 0.9));
+      const lobes = Math.max(3, Math.round(THREE.MathUtils.lerp(sh.maxBranches + 1, 3.4, f) + rng.range(-0.6, 0.6)));
+      rot += rng.range(1.9, 2.9);
+      const snowLoad = rng.range(0.6, 1.0) * (0.85 + 0.15 * (1 - f));
+      addSkirt(tb, soft, lean(y).setY(y), L, drop, lobes, rot, sh.needle, snowLoad, rng, f < 0.5 ? 3 : 2, f < 0.6);
     }
-    // leader shoot
+    // natural top: two small droop tufts round a thin, slightly bent leader
+    for (let t = 0; t < 2; t++) {
+      const y = top + (H - top) * (0.3 + 0.32 * t);
+      addSkirt(tb, soft, lean(y).setY(y), 0.42 - 0.12 * t, 0.42, 3, rng.range(0, 6.28), sh.needle, 0.7, rng, 2, false);
+    }
     {
       const p = new THREE.Vector3();
       const ring: number[] = [];
-      const y0 = H * 0.9;
-      const c = new THREE.Color().copy(sh.needle).multiplyScalar(1.2);
-      for (let s = 0; s < 5; s++) {
-        const a = (s / 5) * Math.PI * 2;
-        p.set(Math.cos(a) * 0.32, y0, Math.sin(a) * 0.32).add(lean(y0));
-        ring.push(tb.vert(p, c, 0.6));
+      const y0 = top;
+      const c = new THREE.Color().copy(sh.needle).multiplyScalar(1.1);
+      for (let s = 0; s < 4; s++) {
+        const a = (s / 4) * Math.PI * 2;
+        p.set(Math.cos(a) * 0.09, y0, Math.sin(a) * 0.09).add(lean(y0));
+        ring.push(tb.vert(p, c, 0.3));
       }
-      const top = tb.vert(p.set(0, H * 1.04, 0).add(lean(H)), c, 0.2);
+      const bend = new THREE.Vector3(rng.range(-0.15, 0.15), 0, rng.range(-0.15, 0.15));
+      const tip = tb.vert(p.set(0, H * 1.05, 0).add(lean(H)).add(bend), c, 0.1);
       const out = new THREE.Vector3();
-      for (let s = 0; s < 5; s++) {
-        const a = ((s + 0.5) / 5) * Math.PI * 2;
-        tb.tri(ring[s]!, ring[(s + 1) % 5]!, top, out.set(Math.cos(a), 0.3, Math.sin(a)));
+      for (let s = 0; s < 4; s++) {
+        const a = ((s + 0.5) / 4) * Math.PI * 2;
+        tb.tri(ring[s]!, ring[(s + 1) % 4]!, tip, out.set(Math.cos(a), 0.2, Math.sin(a)));
       }
+      pad();
     }
   } else {
-    // far LOD: 3-sided trunk stub + 3 lobed star tiers (drooping tips, raised notches)
+    // far LOD: 3-sided trunk stub + 3 lobed drooping cones (tips droop, notches lift)
     addTrunk(tb, crown0 + 1.2, 0.3, 3, [0, 1], rng, lean);
+    pad();
     const tiers = 3;
     const nb = 5 + (variant % 2);
     let rot = rng.range(0, 6.28);
@@ -307,16 +332,18 @@ export function pineGeometry(variant: number, detailed: boolean): THREE.BufferGe
       const yb = crown0 + 0.2 + (H - crown0) * f * 0.86;
       const r = sh.baseR * (1 - f * 0.78) * rng.range(0.92, 1.06);
       const yTop = t === tiers - 1 ? H * 1.03 : yb + (H - crown0) * 0.5;
-      const apex = tb.vert(p.set(0, yTop, 0).add(lean(yTop)), c.copy(sh.needle).multiplyScalar(1.1), 0.55);
+      const apex = tb.vert(p.set(0, yTop, 0).add(lean(yTop)), c.copy(sh.needle).multiplyScalar(1.0), 0.55);
+      soft.push(1);
       rot += rng.range(0.4, 1.0);
       const rim: number[] = [];
       for (let i = 0; i < nb * 2; i++) {
         const tip = i % 2 === 0;
         const a = rot + (i / (nb * 2)) * Math.PI * 2 + (tip ? rng.range(-0.15, 0.15) : 0);
-        const rr = tip ? r * rng.range(0.92, 1.08) : r * 0.58;
-        const dy = tip ? -r * THREE.MathUtils.lerp(sh.droop0, sh.droop1, f) * 0.55 : r * 0.12;
+        const rr = tip ? r * rng.range(0.88, 1.1) : r * 0.7;
+        const dy = tip ? -r * THREE.MathUtils.lerp(sh.droop0, sh.droop1, f) * 0.55 : r * 0.08;
         p.set(Math.cos(a) * rr, yb + dy, Math.sin(a) * rr).add(lean(yb));
-        rim.push(tb.vert(p, c.copy(sh.needle).multiplyScalar(tip ? 1.15 : 0.7), tip ? 0.15 : 0.45));
+        rim.push(tb.vert(p, c.copy(sh.needle).multiplyScalar(tip ? 1.1 : 0.8), tip ? 0.2 : 0.5));
+        soft.push(1);
       }
       for (let i = 0; i < rim.length; i++) {
         const a = rot + ((i + 0.5) / rim.length) * Math.PI * 2;
@@ -324,12 +351,21 @@ export function pineGeometry(variant: number, detailed: boolean): THREE.BufferGe
       }
     }
   }
-  return tb.build();
+  pad();
+  const g = tb.build();
+  softenNormals(g, soft, H, sh.baseR);
+  return g;
 }
 
-/** A craggy rock with snow on top. Unit size (~1 m radius). */
+/**
+ * A rock, unit size (~1 m radius). Variants differ in character, not just noise seed:
+ * 0 rounded boulder, 1 blocky (cleaved by a few planes), 2 flat slab, 3 tall split block,
+ * 4 low weathered dome, 5 angular wedge. Welded vertices → smooth (stylised-soft) shading.
+ * `opts.snow` = 0 bakes bare rock (the rock shader then adds snow by world normal).
+ */
 export function rockGeometry(variant: number, detailed: boolean, opts: { flatten?: number; snow?: number; detail?: number } = {}): THREE.BufferGeometry {
-  const flatten = opts.flatten ?? 0.62;
+  const kind = ((variant % 6) + 6) % 6;
+  const flatten = opts.flatten ?? [0.62, 0.7, 0.4, 0.95, 0.45, 0.75][kind]!;
   const snowAmt = opts.snow ?? 1;
   const ico = new THREE.IcosahedronGeometry(1, opts.detail ?? (detailed ? 2 : 1));
   ico.deleteAttribute('uv');
@@ -338,21 +374,105 @@ export function rockGeometry(variant: number, detailed: boolean, opts: { flatten
   const g = mergeVertices(ico);
   const pos = g.getAttribute('position') as THREE.BufferAttribute;
   const v = new THREE.Vector3();
+  const rng = new Rng(4711 + variant * 31);
+  // cleavage planes (fractured faces) for the blocky kinds
+  const planes: Array<{ n: THREE.Vector3; d: number }> = [];
+  const nPlanes = [0, 4, 2, 5, 0, 3][kind]!;
+  for (let i = 0; i < nPlanes; i++) {
+    const n = new THREE.Vector3(rng.range(-1, 1), rng.range(-0.4, 0.9), rng.range(-1, 1)).normalize();
+    planes.push({ n, d: rng.range(0.55, 0.8) });
+  }
+  const stretch = new THREE.Vector3([1, 1.1, 1.35, 0.8, 1.2, 1.3][kind]!, 1, [1, 0.9, 1.1, 0.85, 1.15, 0.8][kind]!);
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i);
-    const n = gnoise(v.x * 1.3 + variant * 3, v.z * 1.3 + v.y, 41 + variant) * 0.32 + gnoise(v.x * 3.5, v.y * 3.5 + v.z, 42) * 0.12 + gnoise(v.x * 8, v.y * 8 + v.z * 2, 43) * 0.04;
+    const n = gnoise(v.x * 1.3 + variant * 3, v.z * 1.3 + v.y, 41 + variant) * 0.3 + gnoise(v.x * 3.5, v.y * 3.5 + v.z, 42 + variant) * 0.1 + gnoise(v.x * 8, v.y * 8 + v.z * 2, 43) * 0.035;
     v.multiplyScalar(1 + n);
-    // facets
+    for (const pl of planes) {
+      const dd = v.dot(pl.n) - pl.d;
+      if (dd > 0) v.addScaledVector(pl.n, -dd * 0.92);
+    }
+    v.multiply(stretch);
     v.y *= flatten;
     if (v.y < -0.1) v.y = -0.1 + (v.y + 0.1) * 0.3;
     pos.setXYZ(i, v.x, v.y, v.z);
   }
   return colorize(g, (p, n) => {
     const s = 0.5 + 0.5 * gnoise(p.x * 3, p.y * 6 + p.z * 3, 7 + variant) * (0.7 + 0.3 * gnoise(p.x * 11, p.z * 11, 3));
-    const rock = new THREE.Color(0.26 * s, 0.25 * s, 0.24 * s);
+    // darker, damp underside / base
+    const base = 0.75 + 0.25 * THREE.MathUtils.smoothstep(p.y, -0.1, 0.25);
+    const rock = new THREE.Color(0.27 * s * base, 0.26 * s * base, 0.25 * s * base);
+    if (snowAmt <= 0) return rock;
     const snow = THREE.MathUtils.smoothstep(n.y + 0.2 * gnoise(p.x * 5, p.z * 5, 9), 0.45 + (1 - snowAmt) * 0.4, 0.75 + (1 - snowAmt) * 0.2) * snowAmt;
     return rock.lerp(SNOW, snow);
   });
+}
+
+/**
+ * Rock material: bare-rock vertex colours, tinted per instance towards the terrain's strata tones
+ * (cool grey / warm grey-brown / dark), with lichen/weathering detail and a snow cap computed from
+ * the *world* normal (so tilted instances still hold snow on top), with a noisy band-limited edge.
+ */
+export function createRockMaterial(): THREE.MeshStandardMaterial {
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86, metalness: 0 });
+  mat.onBeforeCompile = (shader) => {
+    addAtmosphereUniforms(shader.uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vRW;\nvarying vec3 vRN;\nvarying vec3 vRTint;\nvarying float vRSnow;\nvarying vec3 vRP;')
+      .replace(
+        '#include <fog_vertex>',
+        `#include <fog_vertex>
+  {
+    vec4 sw = vec4(transformed, 1.0);
+    vec3 sn = objectNormal;
+#ifdef USE_INSTANCING
+    sw = instanceMatrix * sw;
+    sn = mat3(instanceMatrix) * sn;
+    vec3 ip = instanceMatrix[3].xyz;
+#else
+    vec3 ip = vec3(0.0);
+#endif
+    vRW = (modelMatrix * sw).xyz;
+    vRN = normalize(mat3(modelMatrix) * sn);
+    float h1 = fract(sin(dot(mod(ip.xz, 4096.0), vec2(12.9898, 78.233))) * 43758.5453);
+    float h2 = fract(h1 * 23.17 + 0.31);
+    vec3 cool = vec3(0.95, 0.97, 1.02), warm = vec3(1.18, 1.06, 0.92), dark = vec3(0.62, 0.62, 0.66);
+    vRTint = (h1 < 0.45 ? mix(cool, warm, h1 / 0.45) : mix(warm, dark, (h1 - 0.45) / 0.55)) * (0.85 + 0.3 * h2);
+    vRSnow = fract(h1 * 7.13 + 0.5);
+    vRP = transformed + vec3(h1 * 31.0, 0.0, h2 * 17.0);
+  }`,
+      );
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec3 vRW;
+varying vec3 vRN;
+varying vec3 vRTint;
+varying float vRSnow;
+varying vec3 vRP;
+${ATMOSPHERE_GLSL}
+${GLSL_NOISE_BL}`,
+      )
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+{
+  vec3 q = vRP * 1.6;
+  float fp = max(max(fwidth(q.x), fwidth(q.y)), fwidth(q.z));
+  float w1 = 0.5 * sf_fbmBL(q.xz + q.y * 0.7, fp) + 0.5 * sf_fbmBL(q.zy * vec2(1.0, 2.2) + 9.0, fp * 2.2);
+  vec3 rc = diffuseColor.rgb * vRTint * (0.72 + 0.56 * w1);
+  // lichen / weathering stains on the rock
+  rc = mix(rc, rc * vec3(1.08, 1.1, 0.85), smoothstep(0.6, 0.8, w1) * 0.5);
+  vec3 wn = normalize(vRN);
+  float lim = mix(0.32, 0.62, vRSnow);
+  float s = smoothstep(lim - 0.08, lim + 0.08, wn.y + 0.35 * (w1 - 0.5));
+  diffuseColor.rgb = mix(rc, vec3(0.88, 0.9, 0.94) * (0.93 + 0.07 * w1), s);
+}`,
+      )
+      .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vRW);');
+  };
+  mat.customProgramCacheKey = () => 'rock-v1';
+  return mat;
 }
 
 export function logGeometry(): THREE.BufferGeometry {
@@ -415,8 +535,10 @@ function bakeSnow(g: THREE.BufferGeometry, threshold: number): THREE.BufferGeome
 /**
  * Shared vegetation material. Per instance (hashed from the instance's absolute position, so it is
  * stable across floating-origin shifts) it varies the needle tint and how much snow the tree holds:
- * `aSnow` (snow propensity baked per vertex) is thresholded per tree, so some trees are freshly
- * loaded and others wind-stripped. Optional gentle wind sway, height-weighted.
+ * `aSnow` (snow propensity baked per vertex) is thresholded per tree — and broken up per pixel by
+ * needle-clump noise, so snow edges are irregular rather than following polygon edges. The same
+ * clump noise darkens the gaps between needle clusters (band-limited: it fades to its mean when
+ * sub-pixel, so distant trees never shimmer). Optional gentle wind sway, height-weighted.
  */
 export function createFoliageMaterial(uTime: { value: number }, sway: boolean): THREE.MeshStandardMaterial {
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 });
@@ -424,10 +546,35 @@ export function createFoliageMaterial(uTime: { value: number }, sway: boolean): 
     shader.uniforms.uTime = uTime;
     addAtmosphereUniforms(shader.uniforms);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec3 vAtmW;\n${ATMOSPHERE_GLSL}`)
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec3 vAtmW;
+varying vec3 vTreeP;
+varying float vSnowP;
+varying float vSnowThr;
+${ATMOSPHERE_GLSL}
+${GLSL_NOISE_BL}`,
+      )
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+{
+  // needle clumps (two projections of band-limited value noise in tree space, ~0.35 m cells)
+  vec3 q = vTreeP * 2.8;
+  float fp = max(max(fwidth(q.x), fwidth(q.y)), fwidth(q.z));
+  float cl = 0.5 * sf_vnBL(q.xy, fp) + 0.5 * sf_vnBL(q.zy + 17.0, fp);
+  float cl2 = sf_vnBL(q.xz * 2.3 + q.y * 1.7, fp * 2.3);
+  float clump = 0.65 * cl + 0.35 * cl2;
+  diffuseColor.rgb *= 0.74 + 0.52 * clump;
+  float sn = smoothstep(vSnowThr, vSnowThr + 0.16, vSnowP + 0.32 * (clump - 0.5));
+  vec3 snowC = vec3(0.86, 0.89, 0.94) * (0.88 + 0.12 * vSnowP) * (0.94 + 0.1 * cl2);
+  diffuseColor.rgb = mix(diffuseColor.rgb, snowC, sn);
+}`,
+      )
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vAtmW);');
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;\nattribute float aSnow;\nvarying vec3 vAtmW;')
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nattribute float aSnow;\nvarying vec3 vAtmW;\nvarying vec3 vTreeP;\nvarying float vSnowP;\nvarying float vSnowThr;')
       .replace(
         '#include <fog_vertex>',
         `#include <fog_vertex>
@@ -453,9 +600,10 @@ export function createFoliageMaterial(uTime: { value: number }, sway: boolean): 
     float h3 = fract(h1 * 31.7 + 0.71);
     // needle tint: blue-green fir .. olive spruce, darker/lighter individuals
     vec3 tint = mix(vec3(0.82, 1.0, 1.08), vec3(1.18, 1.06, 0.82), h1) * (0.75 + 0.5 * h2);
-    float thr = mix(0.12, 0.62, h3);
-    float sn = smoothstep(thr, thr + 0.18, aSnow);
-    vColor.rgb = mix(vColor.rgb * tint, vec3(0.86, 0.89, 0.94) * (0.9 + 0.1 * aSnow), sn);
+    vColor.rgb *= tint;
+    vSnowThr = mix(0.12, 0.62, h3);
+    vSnowP = aSnow;
+    vTreeP = position + vec3(h1 * 37.0, 0.0, h2 * 23.0);
   }`,
       );
     if (sway)
@@ -475,6 +623,6 @@ export function createFoliageMaterial(uTime: { value: number }, sway: boolean): 
   }`,
       );
   };
-  mat.customProgramCacheKey = () => (sway ? 'foliage-v2-sway' : 'foliage-v2');
+  mat.customProgramCacheKey = () => (sway ? 'foliage-v3-sway' : 'foliage-v3');
   return mat;
 }

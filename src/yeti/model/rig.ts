@@ -115,7 +115,7 @@ export const HEAD_CENTER = new THREE.Vector3(0, 2.93, 0.15);
  * and the head bone sits HEAD_LIFT higher/further forward than its bind pivot, so the stretch of the neck-to-head
  * skin blend reads as a neck under a head that is big enough for the shoulders.
  */
-export const HEAD_SCALE = 1.3;
+export const HEAD_SCALE = 1.42;
 export const HEAD_LIFT = new THREE.Vector3(0, 0.1, 0.04);
 
 export function bindPositions(): THREE.Vector3[] {

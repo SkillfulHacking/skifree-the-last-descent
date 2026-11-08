@@ -76,7 +76,7 @@ export const FORM_V1 = 70;
 export const BAND_H = 16.5;
 /** The hillside above and behind the band rises HILL_R over the scale length HILL_L (initial slope ≈ R/L). */
 const HILL_R = 18;
-const HILL_L = 28;
+const HILL_L = 36;
 /** The heightfield's (hidden) cliff step sits this far behind the rock face line. */
 export const STEP_IN = 3.2;
 /** Thickness of the bedding planes (rock and the stepped benches above the face). */

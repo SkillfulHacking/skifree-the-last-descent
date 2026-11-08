@@ -90,12 +90,14 @@ uniforms.uSunDir.value.copy(env.sunDir);
   const mesh = new THREE.Mesh(g, snowMat);
   mesh.receiveShadow = true;
   mesh.castShadow = true;
+  mesh.visible = params.get('terrain') !== '0';
   scene.add(mesh);
 }
 
 const cave = new Cave(m, anchor, quality);
 window.__cave = cave;
 scene.add(cave.group);
+if (params.get('rock') === '0') cave.group.visible = false;
 if (debug) cave.setDebug(true);
 
 const M = cave.mouth.clone();
@@ -259,6 +261,7 @@ const presets: Record<string, Shot> = {
   above: view(() => ({ pos: at(M, 38, 42, 18), look: M.clone().add(new THREE.Vector3(0, 6, 4)), fov: 50 })),
   closeup: view(() => ({ pos: at(M, 4.5, 2.2, -7.5), look: M.clone().add(new THREE.Vector3(0, 3.2, -3.5)), fov: 45 })),
   wide: view(() => ({ pos: at(M, 70, 14, 4), look: M.clone().add(new THREE.Vector3(0, 8, 4)), fov: 60 })),
+  plan: view(() => ({ pos: M.clone().add(new THREE.Vector3(0, 140, 8)).addScaledVector(O, -6), look: M.clone().add(new THREE.Vector3(0, 0, 8)).addScaledVector(O, -6.01), fov: 45 })),
   side: view(() => ({ pos: at(M, 30, 12, 60), look: M.clone().add(new THREE.Vector3(0, 8, 10)), fov: 55 })),
   piste: view(() => ({ pos: P.clone().add(new THREE.Vector3(0, 1.7, -30)), look: M.clone().add(new THREE.Vector3(0, 6, 0)), fov: 60 })),
   ...shots,

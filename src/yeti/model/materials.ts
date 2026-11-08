@@ -224,11 +224,17 @@ ${FUR_PALETTE_GLSL}`,
         /* glsl */ `#include <color_fragment>
   if (vFurLen < 0.004 || vFurCov < 0.01) discard;
   vec3 P = vFurP;
+  // combed pelt: the strand/clump lattice is stretched along the comb direction (hangs down the body, sweeps back
+  // from the face over the skull), so each shell slice is a short dash along the hair and the stack reads as
+  // directional hair rather than a uniform plush
+  vec3 fHead = normalize(vec3(P.x, P.y - 2.86, P.z - 0.55)) + vec3(0.0, -0.55, 0.0);
+  vec3 F = normalize(mix(vec3(0.0, -1.0, -0.25), normalize(fHead), smoothstep(2.6, 2.72, P.y)));
+  vec3 Pf = P - F * (dot(P, F) * 0.62);
   // clumping: strands converge toward clump centres toward their tips (tufts, not dots)
-  vec4 cl = yCell(P * uClumpDensity);
+  vec4 cl = yCell(Pf * uClumpDensity);
   vec3 cpos = cl.xyz / uClumpDensity;
   float clump = uClump * (0.55 + 0.45 * cl.w);
-  vec3 Pc = P + (cpos - P) * clump * vFurH;
+  vec3 Pc = Pf + (cpos - Pf) * clump * vFurH;
   vec4 st = yCell(Pc * uDensity);
   float d = length(st.xyz - Pc * uDensity);
   // toward the face the pelt does not thin into scattered single strands (they read as confetti over the dark
@@ -249,7 +255,9 @@ ${FUR_PALETTE_GLSL}`,
   a *= zone;
   diffuseColor.a = a;
   vec3 fc = yFurColor(P, fract(st.w * 7.13), cl.w);
-  float ao = mix(0.8, 1.0, pow(vFurH, 0.6)) * mix(vFurAO, 1.0, 0.5 + 0.5 * vFurH);
+  // self-shadowing toward the roots: the gaps between strands read darker, so the combed strands show as texture
+  // (not a flat plush) — kept moderate so it does not turn into salt-and-pepper
+  float ao = mix(0.6, 1.0, pow(vFurH, 0.8)) * mix(vFurAO, 1.0, 0.5 + 0.5 * vFurH);
   diffuseColor.rgb = fc * ao * diffuse;`,
       )
       .replace('#include <aomap_fragment>', FUR_SCATTER)
@@ -263,7 +271,7 @@ ${FUR_PALETTE_GLSL}`,
       );
     injectShade(shader, shade);
   };
-  m.customProgramCacheKey = () => 'yeti-shell-fur-v3';
+  m.customProgramCacheKey = () => 'yeti-shell-fur-v4';
   return m;
 }
 

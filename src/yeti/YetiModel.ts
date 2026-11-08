@@ -169,6 +169,19 @@ export class YetiModel {
     this.cards.castShadow = false;
     this.cards.receiveShadow = true;
     this.cards.renderOrder = 2;
+    // Alpha-to-coverage materials write their (fractional) coverage alpha into the colour buffer. Where the
+    // drawing buffer's alpha is not ignored by the compositor (seen with SwiftShader/headless Chrome), the page
+    // background then bleeds through every fur pixel as a dark/blue "screen-door" speckle — even in a pitch-black
+    // cave. The fur draws therefore never write alpha (the coverage mask still comes from the fragment alpha).
+    for (const m of [this.shells, this.cards]) {
+      m.onBeforeRender = (r) => {
+        r.state.buffers.color.setMask(true);
+        r.getContext().colorMask(true, true, true, false);
+      };
+      m.onAfterRender = (r) => {
+        r.getContext().colorMask(true, true, true, true);
+      };
+    }
 
     // ---- teeth & claws
     const hardGeo = toBufferGeometry(geo.hard);

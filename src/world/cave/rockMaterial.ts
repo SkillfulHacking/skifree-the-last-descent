@@ -57,7 +57,9 @@ export function createCaveRockMaterial(o: CaveMaterialOptions): THREE.MeshStanda
     uDetail: { value: o.detail },
     uPowder: { value: o.powder },
     /** occlusion floor right inside the mouth (the bounce fades with depth) */
-    uBounce: { value: 0.12 },
+    uBounce: { value: 0.14 },
+    /** faint self-lit cold bounce inside (survives the cinematic's ambient dimming: depth cues, not a void) */
+    uGlow: { value: 0.035 },
   };
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -88,6 +90,7 @@ uniform vec3 uClawO; uniform vec3 uClawT; uniform vec3 uClawU; uniform vec3 uCla
 uniform float uDetail;
 uniform float uPowder;
 uniform float uBounce;
+uniform float uGlow;
 varying vec4 vCave;
 varying vec3 vCWPos;
 varying vec3 vAPos;
@@ -145,8 +148,17 @@ float cv_clawDepth(vec3 wp){
   vec3 rock = tone < 0.45 ? mix(rockA, rockB, tone / 0.45) : mix(rockB, rockC, (tone - 0.45) / 0.55);
   // lamination inside the bed, weathering blotches at two scales, lichen-dark speckle
   rock *= 0.86 + 0.22 * cv_n3(vec3(ap.x * 0.09, tw * 2.6, ap.z * 0.09));
-  rock *= 0.78 + 0.38 * cv_f3(ap * 0.21);
+  // weathering: elongated along the beds (not isotropic blobs, which read as pale sheets laid over the rock)
+  rock *= 0.88 + 0.22 * cv_f3(vec3(ap.x * 0.12, tw * 0.55, ap.z * 0.12));
   rock *= 1.0 - 0.2 * smoothstep(0.62, 0.78, cv_n3(ap * 2.3));
+  // fine grain (close range only)
+  float cv_near = 1.0 - smoothstep(8.0, 40.0, length(cameraPosition - vCWPos));
+  rock *= 1.0 + 0.16 * (cv_n3(ap * 9.0) - 0.5) * cv_near;
+  // hairline fractures: the same ridged noise that creases the shading normals (bedding-parallel set and
+  // a vertical joint set), so the dark lines sit in the creases and never trace polygon edges
+  float frB = pow(1.0 - abs(2.0 * cv_n3(vec3(ap.x * 0.3, ap.y * 0.9, ap.z * 0.3)) - 1.0), 22.0);
+  float frJ = pow(1.0 - abs(2.0 * cv_n3(vec3(ap.x * 0.9, ap.y * 0.16, ap.z * 0.9) + 9.0) - 1.0), 26.0);
+  rock *= 1.0 - (0.45 * frB + 0.4 * frJ) * (0.4 + 0.6 * cv_near);
   // partings between beds: dark, irregular, open only in places (they follow the strata)
   float seam = (1.0 - smoothstep(0.0, 0.05 + 0.05 * cv_n3(ap * 0.4), bedF)) * smoothstep(0.35, 0.6, cv_n3(ap * 0.15 + 2.0));
   rock *= 1.0 - 0.4 * seam;
@@ -249,9 +261,16 @@ reflectedLight.indirectDiffuse *= mix(vec3(0.88, 0.97, 1.2), vec3(1.0), (1.0 - c
   reflectedLight.directSpecular *= deep;
 }`,
       )
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+// light scattered in from the bright snow outside, falling off with depth (vCave.w), only where the sky
+// itself is not seen; tints the rock's own albedo, so the strata stay readable as the chamber recedes
+totalEmissiveRadiance += diffuseColor.rgb * vec3(0.62, 0.72, 0.95) * uGlow * vCave.w * (1.0 - smoothstep(0.1, 0.4, vCave.x)) * (1.0 - cv_rim);`,
+      )
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vCWPos);');
   };
-  mat.customProgramCacheKey = () => 'skifree-cave-rock-v2';
+  mat.customProgramCacheKey = () => 'skifree-cave-rock-v3';
   return mat;
 }
 

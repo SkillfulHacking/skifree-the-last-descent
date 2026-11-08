@@ -127,9 +127,9 @@ const FUR_BY_BONE: Record<string, number> = {
 };
 const CARDS_BY_BONE: Record<string, number> = {
   rig: 0,
-  hips: 0.35,
-  spine1: 0.15,
-  spine2: 0.5,
+  hips: 0.6,
+  spine1: 0.55,
+  spine2: 0.75,
   spine3: 1,
   neck: 1,
   head: 0.9,
@@ -141,7 +141,7 @@ const CARDS_BY_BONE: Record<string, number> = {
   fingers: 0,
   fingers2: 0,
   thumb: 0,
-  thigh: 0.45,
+  thigh: 0.7,
   shin: 0.95,
   foot: 0.6,
   toes: 0,
@@ -207,7 +207,7 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
   if (part === 'body') {
     const chest = n.z > 0.35 && p.y > 1.45 && p.y < 2.35 && Math.abs(p.x) < 0.5 ? 1 : 0;
     fur *= 1 - 0.3 * chest;
-    cards *= 1 - 0.35 * chest;
+    cards *= 1 - 0.15 * chest;
     if (p.y > 2.15 && n.y > 0.1) fur *= 1.35; // mane over the shoulders / hump
     const fore = (bw[B.forearmL] + bw[B.forearmR]) * Math.max(0, -n.z * 0.7 + Math.abs(n.x) * 0.5);
     fur *= 1 + 0.35 * fore;
@@ -296,14 +296,18 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
       // palm side bare; the back of the hand and the backs of the fingers carry short fur
       // (only the palm face itself and the finger pads: the sides of the hand and of the thumb are furred too)
       bare = u > 0.22 ? smoothstep(0.004, 0.022, v) : smoothstep(0.018, 0.042, v);
-      fur = u > 0.22 ? 0.032 : 0.065;
+      // digits (fingers and thumb): only the pads — the side facing the palm — are bare; the backs carry a short,
+      // close-lying coat so each digit keeps its own outline (no mitten)
+      const thumbW = bw[B.thumbL] + bw[B.thumbR];
+      if (u > 0.22 || thumbW > 0.3) bare = smoothstep(0.05, 0.45, n.dot(f.n));
+      fur = u > 0.22 || thumbW > 0.3 ? 0.02 : 0.065;
     }
   } else if (part.startsWith('foot')) {
     col = COL.pad;
     // only the sole and the toe pads are bare; the top of the foot and the toes are furred
     bare = Math.max(smoothstep(0.04, 0.018, p.y), p.z > 0.2 ? smoothstep(-0.35, -0.7, n.y) : 0);
     if (p.y > 0.24) fur = 0.12;
-    else if (p.z > 0.2) fur = 0.035;
+    else if (p.z > 0.2) fur = 0.02; // toes: short, so each toe keeps its outline
     else fur = 0.065;
   }
   if (part !== 'head' && part !== 'jaw') cov = 1 - bare;
@@ -723,7 +727,8 @@ function buildCards(body: GeoArrays, parts: BuiltPart[], count: number, fringe: 
         d = d.addScaledVector(F, 0.22).addScaledVector(N, -0.12).normalize();
         cur = cur.clone().addScaledVector(d, len / SEG);
       }
-      const ao = (0.5 + 0.5 * Math.pow(t, 0.7)) * (0.55 + 0.45 * ao0);
+      // root occlusion kept mild: a dark root on a lying lock reads as a grey dash on the pelt
+      const ao = (0.7 + 0.3 * Math.pow(t, 0.7)) * (0.65 + 0.35 * ao0);
       const cc = [col[0] * bright * ao, col[1] * bright * ao, col[2] * bright * ao];
       const w = width * (1 - 0.3 * t) * 0.5;
       for (const sgn of [-1, 1]) {

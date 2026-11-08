@@ -342,14 +342,14 @@ function gallop(o: PoseSample, c: AnimCtx): void {
   const und = Math.sin(TAU * (P - 0.2));
   // a long, low, stretched body (shoulders well ahead of the hips) so that the four limbs read as separate
   // columns in silhouette rather than bunching under the chest
-  o.hips.y += -0.04 + 0.08 * Math.sin(TAU * (P - 0.35));
-  o.hips.z += -0.22;
-  o.add('hips', 0.62 + 0.1 * und);
-  o.add('spine1', 0.22 + 0.09 * und);
-  o.add('spine2', 0.17 + 0.08 * und);
-  o.add('spine3', 0.08 + 0.05 * und);
-  o.add('neck', -0.62 - 0.05 * und);
-  o.add('head', -0.45);
+  o.hips.y += -0.1 + 0.08 * Math.sin(TAU * (P - 0.35));
+  o.hips.z += -0.26;
+  o.add('hips', 0.8 + 0.08 * und);
+  o.add('spine1', 0.2 + 0.07 * und);
+  o.add('spine2', 0.12 + 0.06 * und);
+  o.add('spine3', 0.02 + 0.04 * und);
+  o.add('neck', -0.72 - 0.05 * und);
+  o.add('head', -0.5);
   const hDuty = 0.27;
   const fDuty = GALLOP_FOOT_DUTY;
   // stance travel = speed × stance time for hands and feet alike (no skating)
@@ -362,7 +362,8 @@ function gallop(o: PoseSample, c: AnimCtx): void {
     footCycle(ph, hDuty, len, 0.5, fc);
     const swing = ph >= hDuty ? (ph - hDuty) / (1 - hDuty) : 0;
     o.armIK[i] = 1;
-    o.hand[i].set(0.5 * s, 0.33 + fc[1] * 1.25, 1.42 + fc[0]);
+    // the recovering hand swings low and forward (not up to the chin): the fore limbs read as legs
+    o.hand[i].set(0.5 * s, 0.33 + fc[1] * 0.75, 1.6 + fc[0]);
     o.elbow[i].set(0.6 * s, -0.3, -1);
     o.handAim[i] = 1;
     const reach = Math.sin(Math.PI * swing);
@@ -376,7 +377,7 @@ function gallop(o: PoseSample, c: AnimCtx): void {
     const pf = frac(P - 0.5 - (i === R ? 0.1 : 0));
     footCycle(pf, fDuty, lenF, 0.4, fc);
     o.plant[i] = gaitPlant(pf, fDuty);
-    o.foot[i].set(0.36 * s, 0.2 + fc[1], -0.3 + fc[0]);
+    o.foot[i].set(0.36 * s, 0.2 + fc[1], -0.42 + fc[0]);
     o.footPitch[i] = fc[2];
     o.toes[i] = -fc[2] * 0.7;
     o.knee[i].set(0.3 * s, -0.2, 1);
@@ -565,10 +566,13 @@ function leap(o: PoseSample, t: number, c: AnimCtx): void {
   const br = Math.sin(TAU * 1.3 * c.time);
   posture(o, 1.0 + 0.5 * crouch - 0.6 * launch + 0.25 * air);
   o.hips.y += -0.42 * crouch + 0.08 * launch;
-  o.add('hips', 0.12 * air);
-  o.add('spine1', 0.08 * air);
-  o.add('spine2', 0.15 * crouch - 0.05 * launch + 0.1 * air);
-  o.add('spine3', 0.1 * crouch - 0.1 * launch + 0.05 * air);
+  // in flight the whole body pitches toward the landing (a pounce, chest leading, back long)
+  o.add('hips', 0.42 * air);
+  o.add('spine1', 0.1 * air);
+  o.add('spine2', 0.15 * crouch - 0.05 * launch + 0.08 * air);
+  o.add('spine3', 0.1 * crouch - 0.1 * launch);
+  o.add('neck', -0.35 * air);
+  o.add('head', -0.15 * air);
   const bindHipY = 1.42;
   const hipY = bindHipY + o.hips.y;
   for (let i = 0; i < 2; i++) {
@@ -578,8 +582,8 @@ function leap(o: PoseSample, t: number, c: AnimCtx): void {
     const ground = new THREE.Vector3(0.36 * s, 0.2, 0.0);
     const push = new THREE.Vector3(0.3 * s, hipY - 1.3, -0.45);
     const pounce = lead
-      ? new THREE.Vector3(0.3 * s, hipY - 0.62, 0.42)
-      : new THREE.Vector3(0.3 * s, hipY - 1.0, -0.62);
+      ? new THREE.Vector3(0.32 * s, hipY - 0.55, 0.5)
+      : new THREE.Vector3(0.3 * s, hipY - 0.8, -0.85);
     const p = ground.clone().lerp(push, launch * (1 - air * 0.5));
     p.lerp(pounce, air);
     o.foot[i].copy(p);
@@ -591,7 +595,7 @@ function leap(o: PoseSample, t: number, c: AnimCtx): void {
     o.addSide('upperArm', i, 0.7 * crouch - 1.2 * launch * (1 - air));
     o.addSide('forearm', i, -0.3 * launch * (1 - air));
     o.armIK[i] = air;
-    o.hand[i].set(0.4 * s, hipY + 0.3 + 0.05 * br * (lead ? 1 : -1), 1.22 + (lead ? 0.1 : 0));
+    o.hand[i].set(0.42 * s, hipY + 0.05 + 0.05 * br * (lead ? 1 : -1), 1.45 + (lead ? 0.12 : 0));
     o.elbow[i].set(0.45 * s, -0.4, -0.8);
     o.handAim[i] = air;
     o.handDir[i].set(0.1 * s, -0.55, 1).normalize();

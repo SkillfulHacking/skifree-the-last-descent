@@ -139,7 +139,7 @@ varying vec2 vH;
 ${GLSL_NOISE}
 ${ATMOSPHERE_GLSL}
 void main() {
-  vec3 n = normalize(vN);
+  vec3 n0 = normalize(vN);
   // pattern coordinates: around the ring (metres of arc) and height
   float ang = atan(vL.z, vL.x);
   vec2 q = vec2(ang * 1600.0, vL.y);
@@ -147,18 +147,33 @@ void main() {
   // couloirs and rock ribs: streaks running down the fall line, more rock on steep faces
   float rib = sf_fbm(vec2(q.x * 0.012 + uSeed, q.y * 0.0022));
   float streak = sf_noise(vec2(q.x * 0.045 + uSeed, q.y * 0.0009));
+  float big = sf_noise(vec2(q.x * 0.0021 + uSeed * 3.0, q.y * 0.0011));
+  // relief: ribs/gullies and buttresses as a screen-derivative bump (the mesh is only 5 rows)
+  float Hr = rib * 260.0 + streak * 90.0 + big * 380.0;
+  vec3 dpx = dFdx(vW);
+  vec3 dpy = dFdy(vW);
+  vec3 r1 = cross(dpy, n0);
+  vec3 r2 = cross(n0, dpx);
+  float det = dot(dpx, r1);
+  vec3 n = normalize(abs(det) * n0 - sign(det) * (dFdx(Hr) * r1 + dFdy(Hr) * r2));
+  if (dot(n, n0) < 0.25) n = n0;
   float steep = 1.0 - clamp(n.y, 0.0, 1.0);
-  float rock = smoothstep(0.5, 0.75, steep + 0.45 * (rib - 0.5) + 0.25 * (streak - 0.5));
-  rock = max(rock, smoothstep(0.62, 0.8, rib) * smoothstep(0.08, 0.3, h) * 0.85);
+  float rock = smoothstep(0.45, 0.72, steep + 0.45 * (rib - 0.5) + 0.25 * (streak - 0.5));
+  rock = max(rock, smoothstep(0.6, 0.8, rib) * smoothstep(0.08, 0.3, h) * 0.85);
   // lower slopes: forested / rocky (dark), fading in under the snowline
   float low = 1.0 - smoothstep(0.02, 0.2, h + 0.1 * (rib - 0.5));
   vec3 snow = vec3(0.92, 0.94, 0.98);
-  vec3 stone = mix(vec3(0.18, 0.18, 0.2), vec3(0.32, 0.3, 0.3), rib);
+  vec3 stone = mix(vec3(0.15, 0.15, 0.17), vec3(0.32, 0.3, 0.29), rib) * (0.8 + 0.4 * big);
   vec3 alb = mix(snow, stone, rock);
   alb = mix(alb, vec3(0.1, 0.13, 0.13), low * 0.8);
   float ndl = max(dot(n, uSun), 0.0);
   float detail = 0.88 + 0.24 * sf_fbm(vec2(q.x * 0.03, q.y * 0.012) + uSeed);
-  vec3 col = alb * detail * (uSunCol * ndl * 1.3 + uSkyCol * (0.75 + 0.35 * n.y));
+  // stronger key/fill contrast so faces turned from the sun read as relief, not a flat card
+  vec3 col = alb * detail * (uSunCol * ndl * 1.55 + uSkyCol * (0.5 + 0.35 * n.y));
+  // sun-side rim along the crests
+  vec2 hn = normalize(n.xz + 1e-4);
+  float rim = smoothstep(0.72, 0.98, h) * pow(max(dot(hn, normalize(uSun.xz + 1e-4)), 0.0), 2.0) * (1.0 - rock * 0.5);
+  col += uSunCol * rim * 0.22;
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -170,6 +185,8 @@ void main() {
   // can never show through gaps in the streamed terrain; summits are clearest
   float above = (rel.y - 80.0) / 1500.0;
   float f = mix(1.0, uHaze * 0.45, smoothstep(0.0, 1.0, above));
+  // aerial gradient within each layer: lighter, hazier towards its base
+  f = max(f, uHaze * 0.45 + (1.0 - uHaze * 0.45) * 0.55 * pow(1.0 - clamp(h, 0.0, 1.0), 2.0));
   gl_FragColor.rgb = mix(gl_FragColor.rgb, sf_fogColor(v), clamp(f, 0.0, 1.0));
 }`,
     fog: false,
