@@ -286,7 +286,9 @@ export function liftMask(u: number, v: number, cd: number): number {
   // the ledge: a rounded, irregular apron in front of the mouth
   const eu = (u + 1.2) / (u < -1.2 ? 3.6 : 6), ev = (v - 0.4) / 6.0;
   const ed = Math.sqrt(eu * eu + ev * ev) + 0.12 * gnoise(v * 0.45, u * 0.45, 909);
-  const ledge = 1 - smoothstep(0.8, 1.7, ed);
+  // a wide, gentle fall-off: a 1 m-scale drop at the apron edge was drawn by the terrain grid as triangle
+  // facets in the snow beside the mouth (A37)
+  const ledge = 1 - smoothstep(0.75, 2.1, ed);
   const chamber = (1 - smoothstep(0.8, 2.8, cd)) * smoothstep(-3.4, -1.4, u);
   return Math.max(ledge, chamber);
 }

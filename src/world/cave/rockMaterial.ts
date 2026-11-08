@@ -281,7 +281,7 @@ if (uDetail > 0.0) {
     // knobs and grain, plus sharp creases: bedding-parallel fractures and vertical joints (shading only)
     // smooth knobs stretched along the beds (no abs()/ridged creases: those closed into quilted cells),
     // fine grain, the sparse fracture grooves and the claw gouges
-    #define CV_H(p) (cv_n3(vec3((p).x * 0.55, cv_tw(p) * 1.3, (p).z * 0.55)) * 0.5 + cv_n3((p) * 3.3) * 0.12 + cv_n3((p) * 7.1) * 0.05 - 0.11 * cv_fracture(p, cv_tw(p)) - 0.6 * cv_clawDepth(p))
+    #define CV_H(p) (cv_n3(vec3((p).x * 0.55, cv_tw(p) * 1.3, (p).z * 0.55)) * 0.5 + cv_n3((p) * 1.7) * 0.22 + cv_n3((p) * 3.3) * 0.16 + cv_n3((p) * 7.1) * 0.05 - 0.11 * cv_fracture(p, cv_tw(p)) - 0.6 * cv_clawDepth(p))
     float h0 = CV_H(wp);
     vec3 g = vec3(CV_H(wp + vec3(e, 0.0, 0.0)) - h0, CV_H(wp + vec3(0.0, e, 0.0)) - h0, CV_H(wp + vec3(0.0, 0.0, e)) - h0) / e;
     vec3 wn = normalize(vCWN);
