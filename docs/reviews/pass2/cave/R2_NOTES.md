@@ -26,3 +26,10 @@ Capture script: tools/cavecap.tmp.mjs (preview, __setCam batch).
   total, max step 38 ms CPU; low 136 steps, 605 ms, max 31 ms. 42.6k tris (high), 2 draw calls.
 - [ ] final evidence: r2_{front,threequarter,wide,approach,inside,closeup} at 1920x1080 and
   r2_c1..c12 at 960x540 (preview, PREVIEWS=1 build on :5333) — running /tmp/runfinal.sh
+- [x] r2_front.png (1920x1080) rendered (~13 min/frame under load). Remaining renders stopped at the
+  lead's 30-minute limit: no r2_threequarter/wide/approach/inside/closeup/c* frames, no in-game
+  cinematic re-run (the round-2 grounding report is still owed).
+- Visible in r2_front: opening is now irregular/asymmetric (no straight jambs); the face's crease lines
+  form rounded "quilted" cells (fracture noise too regular); the floor still shows a darker lip at the
+  mouth (A10 not verified fixed); prints read as small dotted paw icons (A6 not fixed); snow faceting on
+  the ledge in the preview (0.5 m preview terrain + terrain shader).

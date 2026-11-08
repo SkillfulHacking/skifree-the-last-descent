@@ -177,7 +177,6 @@ export class Cave {
     yield* field.buildSteps(tk);
     phase('field');
     this.stats.fieldEvals = field.evals;
-    (this as unknown as { __field: RockField }).__field = field;
     const nets = yield* surfaceNetsSteps(field, tk);
 
     phase('nets');
