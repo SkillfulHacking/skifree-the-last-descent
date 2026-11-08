@@ -39,6 +39,13 @@ async function boot(page: Page) {
   page.on('console', (m) => {
     if (m.type() === 'error' && !/favicon|404/.test(m.text())) errors.push(m.text());
   });
+  // these flows were written for the original 3 km course: Classic + Sprint (pass-2 default is Standard 10 km)
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('seeded')) {
+      sessionStorage.setItem('seeded', '1');
+      localStorage.setItem('skifree-tld.settings.v1', JSON.stringify({ course: 'classic', courseLength: 'sprint' }));
+    }
+  });
   await page.goto('/?debug');
   await page.waitForFunction(() => window.__ready === true, null, { timeout: 240_000, polling: 1000 });
 }
