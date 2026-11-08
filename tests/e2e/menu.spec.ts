@@ -151,6 +151,15 @@ test('a course code typed into the menu selects that course', async ({ page }) =
   await page.keyboard.press('Enter');
   await expect(page.locator('.course-card .err')).toContainText('NOPE-123');
   await expect(page.locator('.menu-row', { hasText: 'Enter a course code' }).locator('input')).toHaveValue('NOPE-123');
+  // an invalid code typed but not confirmed blocks Start, and says why (E12)
+  const input3 = page.locator('.menu-row', { hasText: 'Enter a course code' }).locator('input');
+  await input3.focus();
+  await input3.fill('');
+  await page.keyboard.type('ALSO-WRONG', { delay: 20 });
+  await page.locator('.menu-row.primary').click();
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => (window as unknown as MW).__skifree.state().mode)).toBe('menu');
+  await expect(page.locator('.course-card .err')).toContainText('ALSO-WRONG');
   // typing a seed then clicking Start straight away starts that course (E2: the click isn't lost)
   await page.evaluate(() => (window as unknown as MW).__skifree.setCourse('custom', 'sprint'));
   const seed = page.locator('.menu-row', { hasText: 'Seed' }).locator('input');
