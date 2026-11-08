@@ -13,6 +13,7 @@ export class CaveCinematic {
   private eyeTarget = 0;
   private shakeLevel = 0;
   private dim = 0;
+  private dimShade = 1;
   private sunBase: number;
   private leap: { t: number; from: THREE.Vector3; vel: THREE.Vector3; heading: number; landed: boolean } | null = null;
   onRunPrompt: (() => void) | null = null;
@@ -88,12 +89,12 @@ export class CaveCinematic {
     tl.shot({ start: 13.7, end: 14.6, from: () => reactionCam, to: () => pose(reactionCam.pos.clone().add(new THREE.Vector3(0, 0.1, 0.4)), reactionCam.look, 44) });
     // Beat 10b: he leaps from the ledge toward the piste — seen past the skier's shoulder
     // over the skier's shoulder: camera behind the skier on the line to the cave, framing both
-    const leapCam = P.clone().addScaledVector(toCave, -3.8).addScaledVector(downhill, 1.2).add(new THREE.Vector3(0, 1.7, 0));
+    const leapCam = P.clone().addScaledVector(toCave, -3.6).addScaledVector(downhill, 1.3).add(new THREE.Vector3(0, 1.35, 0));
     const skierHead = P.clone().add(new THREE.Vector3(0, 1.5, 0));
-    const yetiLook = () => st.yeti.root.position.clone().add(new THREE.Vector3(0, 1.6, 0)).lerp(skierHead, 0.26);
-    tl.shot({ start: 14.6, end: 15.8, from: () => pose(leapCam, yetiLook(), 44), to: () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.3, 0)), yetiLook(), 50) });
+    const yetiLook = () => st.yeti.root.position.clone().add(new THREE.Vector3(0, 1.6, 0)).lerp(skierHead, 0.34);
+    tl.shot({ start: 14.6, end: 16.95, from: () => pose(leapCam, yetiLook(), 44), to: () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.3, 0)), yetiLook(), 52) });
     // Beat 11: swing back into third person
-    tl.shot({ start: 15.8, end: 17.0, from: () => pose(leapCam, yetiLook(), 38), via: () => pose(P.clone().addScaledVector(downhill, -5).add(new THREE.Vector3(0, 3, 0)), P.clone().add(new THREE.Vector3(0, 1.2, 4)), 58), to: followPose, easing: ease.inOutCubic });
+    tl.shot({ start: 16.95, end: 18.0, from: () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.3, 0)), yetiLook(), 52), via: () => pose(P.clone().addScaledVector(downhill, -5).add(new THREE.Vector3(0, 3, 0)), P.clone().add(new THREE.Vector3(0, 1.2, 4)), 58), to: followPose, easing: ease.inOutCubic });
 
     // --- actors & sound
     tl.at(0, () => {
@@ -167,7 +168,7 @@ export class CaveCinematic {
       st.poseOverride = { lookBack: 0 };
       st.hud.letterbox(false);
     });
-    tl.at(17.0, () => {
+    tl.at(18.0, () => {
       st.hud.gameplayWidgets(true);
       st.poseOverride = {};
       this.onRunPrompt?.();
@@ -215,6 +216,9 @@ export class CaveCinematic {
     const dim = t > 3.6 && t < 7.9 ? 1 : 0;
     this.dim += (dim - this.dim) * (1 - Math.exp(-2.5 * dt));
     st.world.env.setAmbientScale(1 - 0.85 * this.dim);
+    // during the dark beats the Yeti is a shape in the shadow wherever he stands (eyes stay lit, A9)
+    this.dimShade = 1 - 0.82 * this.dim;
+    this.applyShade();
     // a cloud crosses the sun while we stare into the cave: low sun would otherwise reach in
     // through the mouth and light the Yeti like a stage (the reveal needs darkness and eyes)
     st.world.env.sun.intensity = this.sunBase * (1 - 0.82 * this.dim);
@@ -237,6 +241,12 @@ export class CaveCinematic {
   }
 
   /** Put the Yeti root on the exit path at depth s, on the exact floor, facing out. */
+  private curS = 0;
+  private applyShade() {
+    const s = this.curS;
+    this.st.yeti.setShade(this.leap ? 1 : Math.min(this.dimShade, 1 - 0.88 * Math.min(1, Math.max(0, (s - 0.5) / 6))));
+  }
+
   private placeAt(s: number) {
     const P = this.path;
     if (!P.length) return;
@@ -247,7 +257,8 @@ export class CaveCinematic {
     const f = a.s === b.s ? 0 : Math.min(1, Math.max(0, (a.s - s) / (a.s - b.s)));
     const root = this.st.yeti.root;
     // deeper in the tunnel = darker (the sky light cannot reach in there)
-    this.st.yeti.setShade(1 - 0.88 * Math.min(1, Math.max(0, (s - 0.5) / 6)));
+    this.curS = s;
+    this.applyShade();
     root.position.lerpVectors(a.p, b.p, f);
     root.position.y = this.st.world.cave.floorHeightAt(root.position.x, root.position.z);
     const dx = b.p.x - a.p.x;

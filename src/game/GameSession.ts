@@ -117,7 +117,9 @@ export class GameSession implements Stage {
       this.world.yetiPrints.add(p.x, p.z, this.yetiAI.heading, side, 1.1);
       this.audio.playYetiFootstep(p, strength);
       if (this.yetiAI.distance < 45 && this.run.phase === 'chase') this.hud.caption('[heavy footsteps behind you]', 1.2);
-      this.world.particles.emit({ x: p.x, y: p.y + 0.1, z: p.z, vx: 0, vy: 0.8, vz: 0, spread: 1.2 * strength, size: 0.55, life: 0.9, count: Math.round(6 + 8 * strength), gravity: 0.4, drag: 2, grow: 1.2, alpha: 0.6 });
+      // snow puffs only on open snow: inside the dark cave the unlit particles glow like orbs (A12)
+      const inCave = this.run.phase === 'caveCinematic' && Number.isFinite(this.world.cave.clearanceAt(p.x, p.z));
+      if (!inCave) this.world.particles.emit({ x: p.x, y: p.y + 0.1, z: p.z, vx: 0, vy: 0.8, vz: 0, spread: 1.2 * strength, size: 0.55, life: 0.9, count: Math.round(6 + 8 * strength), gravity: 0.4, drag: 2, grow: 1.2, alpha: 0.6 });
       const d = this.yetiAI.distance;
       if (d < 30) this.shake(0.12 * strength * (1 - d / 30));
     };
