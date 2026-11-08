@@ -110,6 +110,13 @@ export const JAW_BONE_POS = new THREE.Vector3(0, 2.865, 0.1);
 /** Mouth line (between the lips) in bind space. */
 export const MOUTH_POS = new THREE.Vector3(0, 2.785, 0.39);
 export const HEAD_CENTER = new THREE.Vector3(0, 2.93, 0.15);
+/**
+ * Head proportions: the head is sculpted at bind scale and enlarged about the head bone (HEAD_BONE_POS) at runtime,
+ * and the head bone sits HEAD_LIFT higher/further forward than its bind pivot, so the stretch of the neck-to-head
+ * skin blend reads as a neck under a head that is big enough for the shoulders.
+ */
+export const HEAD_SCALE = 1.3;
+export const HEAD_LIFT = new THREE.Vector3(0, 0.1, 0.04);
 
 export function bindPositions(): THREE.Vector3[] {
   const p: THREE.Vector3[] = new Array<THREE.Vector3>(BONE_COUNT);

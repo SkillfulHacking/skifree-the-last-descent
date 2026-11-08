@@ -10,6 +10,7 @@ import type { QualityPreset } from '../../core/types';
 import { bodyPart, footPart, handFrame, handPart, headPart, jawPart, FINGERS, fingerTip, thumbPoints, TOES, toeTip } from './anatomy';
 import { evalField, meshPart, skinPart, type PartSpec } from './sdf';
 import { B, BONE_COUNT, BONE_NAMES, MOUTH_POS, SIDES, legFrame, sideSign } from './rig';
+import { LOCK_VARIANTS } from './materials';
 
 export interface GeoArrays {
   position: Float32Array;
@@ -23,6 +24,8 @@ export interface GeoArrays {
   /** fur comb (bind space): extra tip displacement per metre of fur length (fringe falling over the face) */
   comb?: Float32Array;
   uv?: Float32Array;
+  /** lock cards: x = 0 at the root .. 1 at the tip, y = lock length (m) — drives droop/trail in the shader */
+  card?: Float32Array;
 }
 
 export interface YetiGeometrySet {
@@ -41,20 +44,24 @@ export interface QualityConfig {
   bodyH: number;
   headH: number;
   limbH: number;
+  /** shell count of the short undercoat */
   shells: number;
+  /** clumped lock cards over the body (the long shag) */
   cards: number;
+  /** short fringe locks around the face */
+  fringe: number;
 }
 
 export function qualityConfig(q: QualityPreset): QualityConfig {
   switch (q) {
     case 'low':
-      return { bodyH: 0.042, headH: 0.016, limbH: 0.022, shells: 6, cards: 350 };
+      return { bodyH: 0.042, headH: 0.016, limbH: 0.022, shells: 4, cards: 4200, fringe: 160 };
     case 'medium':
-      return { bodyH: 0.0445, headH: 0.015, limbH: 0.022, shells: 8, cards: 700 };
+      return { bodyH: 0.0445, headH: 0.015, limbH: 0.022, shells: 6, cards: 8000, fringe: 260 };
     case 'high':
-      return { bodyH: 0.038, headH: 0.0125, limbH: 0.019, shells: 12, cards: 1300 };
+      return { bodyH: 0.038, headH: 0.0125, limbH: 0.019, shells: 9, cards: 19000, fringe: 420 };
     case 'ultra':
-      return { bodyH: 0.0272, headH: 0.01, limbH: 0.013, shells: 22, cards: 2400 };
+      return { bodyH: 0.0272, headH: 0.01, limbH: 0.013, shells: 14, cards: 44000, fringe: 700 };
   }
 }
 
@@ -109,14 +116,14 @@ const FUR_BY_BONE: Record<string, number> = {
   clav: 0.15,
   upperArm: 0.1,
   forearm: 0.13,
-  hand: 0.05,
-  fingers: 0.02,
-  fingers2: 0.015,
-  thumb: 0.02,
+  hand: 0.06,
+  fingers: 0.035,
+  fingers2: 0.028,
+  thumb: 0.03,
   thigh: 0.095,
   shin: 0.115,
-  foot: 0.05,
-  toes: 0.02,
+  foot: 0.06,
+  toes: 0.035,
 };
 const CARDS_BY_BONE: Record<string, number> = {
   rig: 0,
@@ -130,13 +137,13 @@ const CARDS_BY_BONE: Record<string, number> = {
   clav: 1,
   upperArm: 0.6,
   forearm: 1.1,
-  hand: 0.08,
+  hand: 0.45,
   fingers: 0,
   fingers2: 0,
   thumb: 0,
   thigh: 0.45,
   shin: 0.95,
-  foot: 0.3,
+  foot: 0.6,
   toes: 0,
 };
 const baseName = (i: number): string => BONE_NAMES[i].replace(/[LR]$/, '');
@@ -144,13 +151,15 @@ const FUR_TABLE = Float32Array.from(BONE_NAMES.map((_, i) => FUR_BY_BONE[baseNam
 const CARD_TABLE = Float32Array.from(BONE_NAMES.map((_, i) => CARDS_BY_BONE[baseName(i)] ?? 0));
 
 const COL = {
-  under: [0.3, 0.31, 0.33],
+  // skin under the pelt: light and warm, so gaps between strands read as fur roots, not as dark holes
+  under: [0.56, 0.54, 0.5],
   skin: [0.15, 0.142, 0.15],
   lip: [0.05, 0.05, 0.06],
   gum: [0.36, 0.1, 0.12],
   palate: [0.2, 0.05, 0.065],
   tongue: [0.42, 0.14, 0.17],
-  pad: [0.14, 0.145, 0.17],
+  // palms and soles: dusky leather (only these stay dark: the backs of hands and feet are furred)
+  pad: [0.2, 0.2, 0.24],
 };
 
 interface VertAttr {
@@ -198,7 +207,7 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
   if (part === 'body') {
     const chest = n.z > 0.35 && p.y > 1.45 && p.y < 2.35 && Math.abs(p.x) < 0.5 ? 1 : 0;
     fur *= 1 - 0.3 * chest;
-    cards *= 1 - 0.7 * chest;
+    cards *= 1 - 0.35 * chest;
     if (p.y > 2.15 && n.y > 0.1) fur *= 1.35; // mane over the shoulders / hump
     const fore = (bw[B.forearmL] + bw[B.forearmR]) * Math.max(0, -n.z * 0.7 + Math.abs(n.x) * 0.5);
     fur *= 1 + 0.35 * fore;
@@ -221,8 +230,9 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
     const noseD = Math.hypot(p.x / 0.09, (p.y - 2.89) / 0.055, (p.z - 0.41) / 0.06);
     cov *= smoothstep(1.0, 1.6, noseD);
     if (p.y < 2.835 && p.z > 0.32) cov *= 1 - smoothstep(0.32, 0.35, p.z);
-    // skin shows through where the fur is sparse
-    bare = 1 - smoothstep(0.08, 0.8, cov);
+    // skin shows where the coat ends (the shell coat edge sits at cov ≈ 0.66): dark leather right up to the
+    // edge, hidden under it — no half-tone grey band between the fur and the face
+    bare = 1 - smoothstep(0.52, 0.72, cov);
     // fur framing the face starts short and lengthens away from it, with a band of long fringe hairs
     // (brow, cheeks) at the thinning edge that falls over onto the skin
     fur *= 0.45 + 0.55 * smoothstep(0.95, 1.6, rr);
@@ -248,9 +258,8 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
     }
     if (p.y < 2.88 && p.z < 0.25) fur *= 1.45; // ruff around the face / mane
     if (Math.abs(p.x) > 0.14 && p.z > 0.0) fur *= 1.3;
-    cards *= smoothstep(0.7, 1.0, cov);
-    // nothing may hang over the face from the forehead
-    if (p.z > 0.08 && p.y > 2.9) cards = 0;
+    cards *= smoothstep(0.7, 1.0, cov) * 3.2;
+    // the crown and brow carry locks too, but they are combed back/up (flowAt), so none hangs over the face
   } else if (part === 'jaw') {
     col = COL.skin;
     // only the lower lip rim is bare leather; the chin carries a beard that hangs over it
@@ -265,14 +274,14 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
     }
     // cheeks partially bare where the mouth stretches
     if (Math.abs(p.x) > 0.09 && p.y > 2.77 && p.z > 0.21) cov = Math.min(cov, 0.45);
-    bare = 1 - smoothstep(0.08, 0.8, cov);
+    bare = 1 - smoothstep(0.52, 0.72, cov);
     fur *= 1.2;
     // beard: longer under the chin, combed down and slightly forward
     const beard = smoothstep(2.78, 2.7, p.y) * smoothstep(0.12, 0.3, p.z) * cov;
     fur *= 1 + 0.7 * beard;
     fringe = beard;
     comb = [0, -0.75 * beard, 0.25 * beard];
-    cards *= smoothstep(0.75, 1.0, cov);
+    cards *= smoothstep(0.75, 1.0, cov) * 2.0;
   } else if (part.startsWith('hand')) {
     const s = part.endsWith('L') ? 1 : -1;
     const f = handFrame(s);
@@ -284,15 +293,18 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
       bare = 0;
       fur = 0.11;
     } else {
-      bare = smoothstep(-0.03, 0.0, v + (u > 0.22 ? 0.012 : 0));
-      fur = u > 0.22 ? 0.022 : 0.05;
+      // palm side bare; the back of the hand and the backs of the fingers carry short fur
+      // (only the palm face itself and the finger pads: the sides of the hand and of the thumb are furred too)
+      bare = u > 0.22 ? smoothstep(0.004, 0.022, v) : smoothstep(0.018, 0.042, v);
+      fur = u > 0.22 ? 0.032 : 0.065;
     }
   } else if (part.startsWith('foot')) {
     col = COL.pad;
-    bare = Math.max(smoothstep(0.045, 0.02, p.y), p.z > 0.2 ? smoothstep(-0.2, -0.6, n.y) : 0);
+    // only the sole and the toe pads are bare; the top of the foot and the toes are furred
+    bare = Math.max(smoothstep(0.04, 0.018, p.y), p.z > 0.2 ? smoothstep(-0.35, -0.7, n.y) : 0);
     if (p.y > 0.24) fur = 0.12;
-    else if (p.z > 0.2) fur = 0.022;
-    else fur = 0.05;
+    else if (p.z > 0.2) fur = 0.035;
+    else fur = 0.065;
   }
   if (part !== 'head' && part !== 'jaw') cov = 1 - bare;
   if (cov < 0.02) cov = 0;
@@ -392,6 +404,7 @@ class GeoBuilder {
   sw: number[] = [];
   idx: number[] = [];
   uv: number[] = [];
+  card: number[] = [];
   vert(p: THREE.Vector3, n: THREE.Vector3, c: number[], bone: number, bone2 = -1, w2 = 0): number {
     this.pos.push(p.x, p.y, p.z);
     this.nrm.push(n.x, n.y, n.z);
@@ -414,6 +427,7 @@ class GeoBuilder {
       skinWeight: new Float32Array(this.sw),
       index: new Uint32Array(this.idx),
       uv: this.uv.length ? new Float32Array(this.uv) : undefined,
+      card: this.card.length ? new Float32Array(this.card) : undefined,
     };
   }
 }
@@ -590,11 +604,43 @@ function buildEyes(): GeoArrays {
 }
 
 // ---------------------------------------------------------------- fur cards
-function buildCards(body: GeoArrays, parts: BuiltPart[], count: number): GeoArrays {
+const CARD_TINTS = [
+  [0.95, 0.93, 0.88],
+  [0.96, 0.91, 0.82],
+  [0.82, 0.8, 0.76],
+  [0.92, 0.9, 0.87],
+  [0.9, 0.86, 0.8],
+];
+
+/**
+ * Comb direction of the pelt at a bind-space point (unit, tangent to the skin): on the body the hair hangs and
+ * parts outward over the shoulders and the hump (the limbs are in an A-pose in bind, so "down" runs along them);
+ * on the head it sweeps back from the face over the crown and down the cheeks into the beard.
+ */
+function flowAt(part: string, p: THREE.Vector3, n: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
+  if (part === 'head' || part === 'jaw') {
+    out.set(p.x, p.y - 2.86, p.z - 0.55).normalize();
+    out.y -= 0.55;
+  } else {
+    const r = Math.hypot(p.x, p.z * 0.6) || 1;
+    out.set((p.x / r) * 0.3, -1, -0.18 + (p.z * 0.6 * 0.3) / r);
+  }
+  out.addScaledVector(n, -out.dot(n));
+  if (out.lengthSq() < 0.02) out.set(0, 0, -1).addScaledVector(n, -n.z);
+  return out.normalize();
+}
+
+/**
+ * The long shag: narrow, clumped lock cards (aspect ≥ 1:5, a converging bundle of strands in the texture) rooted
+ * in the skin, combed along flowAt() and layered densely so that they overlap like a pelt. In the shader the tips
+ * droop with gravity and trail with motion (see createCardMaterial).
+ */
+function buildCards(body: GeoArrays, parts: BuiltPart[], count: number, fringe: number): GeoArrays {
   const g = new GeoBuilder();
   const rnd = mulberry32(1337);
   // candidate vertices with area-normalised weight
   const cand: number[] = [];
+  const candPart: string[] = [];
   const cw: number[] = [];
   let vo = 0;
   let total = 0;
@@ -603,10 +649,11 @@ function buildCards(body: GeoArrays, parts: BuiltPart[], count: number): GeoArra
     const area = p.h * p.h;
     for (let v = 0; v < n; v++) {
       const a = p.attrs[v];
-      if (a.cards <= 0.02 || a.fur < 0.03) continue;
+      if (a.cards <= 0.02 || a.fur < 0.025) continue;
       const w = a.cards * area;
       total += w;
       cand.push(vo + v);
+      candPart.push(p.name);
       cw.push(total);
     }
     vo += n;
@@ -620,58 +667,65 @@ function buildCards(body: GeoArrays, parts: BuiltPart[], count: number): GeoArra
       if (cw[mid] < r) lo = mid + 1;
       else hi = mid;
     }
-    return cand[lo];
+    return lo;
   };
-  const tints = [
-    [0.93, 0.95, 0.99],
-    [0.96, 0.92, 0.83],
-    [0.78, 0.8, 0.84],
-    [0.9, 0.9, 0.9],
-  ];
   const P = new THREE.Vector3();
   const N = new THREE.Vector3();
-  const down = new THREE.Vector3(0, -1, 0);
-  const SEG = 3;
+  const F = new THREE.Vector3();
+  const SEG = 4;
   for (let c = 0; c < count; c++) {
-    const v = pick();
+    const k = pick();
+    const v = cand[k];
+    const part = candPart[k];
     P.fromArray(body.position, v * 3);
     N.fromArray(body.normal, v * 3);
+    // a little jitter so cards picked at the same vertex do not stack
+    P.addScaledVector(new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5), 0.02);
     const fur = body.fur![v * 4];
-    let len = Math.min(0.38, Math.max(0.09, fur * 2.1 + 0.05)) * (0.7 + 0.6 * rnd());
-    const width = len * (0.38 + 0.25 * rnd());
-    if (N.z < -0.4 && P.y > 2.0) len *= 0.72; // keep the back hackles from spiking when hunched
-    // locks lie along the body, flowing downward (and backward on top surfaces)
-    const flow = new THREE.Vector3(0, -1, -0.35);
-    flow.addScaledVector(N, -flow.dot(N));
-    if (flow.lengthSq() < 0.05) flow.set(0, 0, -1).addScaledVector(N, -N.z);
-    flow.normalize();
-    const dir = N.clone()
-      .multiplyScalar(0.6)
-      .addScaledVector(flow, 0.8)
-      .add(new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).multiplyScalar(0.3))
+    const ao0 = body.fur![v * 4 + 2];
+    const extremity = part.startsWith('hand') || part.startsWith('foot');
+    let len = Math.min(extremity ? 0.1 : 0.34, Math.max(0.05, fur * 1.75 + 0.025)) * (0.7 + 0.6 * rnd());
+    // shorter on the face and the back of the skull's front half
+    if ((part === 'head' || part === 'jaw') && P.z > 0.12) len *= 0.75;
+    // brow/crown locks: shorter, lying flat (they are combed up and back away from the eyes)
+    const brow = part === 'head' && P.y > 2.9 && P.z > 0.0;
+    if (brow) len *= 0.7;
+    const width = len * (0.15 + 0.07 * rnd());
+    flowAt(part, P, N, F);
+    // locks leave the skin at a shallow angle and lie along the comb direction (layered, not bristling)
+    // mane over the shoulders / hump and the ruff around the neck: longer and standing off the body (the
+    // menacing bulk of the silhouette), clumps still combed down and outward
+    const mane = part === 'body' && P.y > 2.1 && N.y > -0.15 ? smoothstep(2.1, 2.45, P.y) : 0;
+    len *= 1 + 0.35 * mane;
+    const lift = (brow ? 0.15 : 0.3) + 0.35 * rnd() + 0.25 * mane;
+    const dir = F.clone()
+      .addScaledVector(N, lift)
+      .add(new THREE.Vector3(rnd() - 0.5, rnd() - 0.5, rnd() - 0.5).multiplyScalar(0.22))
       .normalize();
+    // card plane ~tangent to the skin (cross-wise to the strand), randomly twisted so silhouettes catch some
     let wax = new THREE.Vector3().crossVectors(dir, N);
     if (wax.lengthSq() < 1e-4) wax.set(1, 0, 0);
     wax.normalize();
-    wax = wax.applyAxisAngle(dir, (rnd() - 0.5) * 1.6);
-    const col = tints[Math.floor(rnd() * tints.length)];
-    const bright = 0.85 + 0.2 * rnd();
-    const lock = Math.floor(rnd() * 4);
+    wax = wax.applyAxisAngle(dir, (rnd() - 0.5) * 1.1);
+    const col = CARD_TINTS[Math.floor(rnd() * CARD_TINTS.length)];
+    const bright = 0.88 + 0.16 * rnd();
+    const lock = Math.floor(rnd() * LOCK_VARIANTS);
     const si = [body.skinIndex[v * 4], body.skinIndex[v * 4 + 1], body.skinIndex[v * 4 + 2], body.skinIndex[v * 4 + 3]];
     const sw = [body.skinWeight[v * 4], body.skinWeight[v * 4 + 1], body.skinWeight[v * 4 + 2], body.skinWeight[v * 4 + 3]];
     const start = g.pos.length / 3;
-    const root = P.clone().addScaledVector(N, -0.012);
-    let cur = root.clone();
+    // rooted inside the shell undercoat, so no lock floats detached from the skin
+    let cur = P.clone().addScaledVector(N, -0.008);
     let d = dir.clone();
     for (let i = 0; i <= SEG; i++) {
       const t = i / SEG;
       if (i > 0) {
-        d = d.addScaledVector(down, 0.25).addScaledVector(N, -0.12).normalize();
+        // each segment bends further along the comb and back toward the body (the lock lies down)
+        d = d.addScaledVector(F, 0.22).addScaledVector(N, -0.12).normalize();
         cur = cur.clone().addScaledVector(d, len / SEG);
       }
-      const ao = 0.45 + 0.55 * t;
+      const ao = (0.5 + 0.5 * Math.pow(t, 0.7)) * (0.55 + 0.45 * ao0);
       const cc = [col[0] * bright * ao, col[1] * bright * ao, col[2] * bright * ao];
-      const w = width * (1 - 0.25 * t) * 0.5;
+      const w = width * (1 - 0.3 * t) * 0.5;
       for (const sgn of [-1, 1]) {
         const p = cur.clone().addScaledVector(wax, sgn * w);
         g.pos.push(p.x, p.y, p.z);
@@ -679,7 +733,8 @@ function buildCards(body: GeoArrays, parts: BuiltPart[], count: number): GeoArra
         g.col.push(cc[0], cc[1], cc[2]);
         g.si.push(si[0], si[1], si[2], si[3]);
         g.sw.push(sw[0], sw[1], sw[2], sw[3]);
-        g.uv.push((lock + (sgn < 0 ? 0.02 : 0.98)) / 4, 1 - t * 0.98);
+        g.uv.push((lock + (sgn < 0 ? 0.02 : 0.98)) / LOCK_VARIANTS, 1 - t * 0.98);
+        g.card.push(t, len);
       }
     }
     for (let i = 0; i < SEG; i++) {
@@ -687,7 +742,7 @@ function buildCards(body: GeoArrays, parts: BuiltPart[], count: number): GeoArra
       g.idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
     }
   }
-  buildFringe(g, body, parts, Math.round(count * 0.09), rnd, tints);
+  buildFringe(g, body, parts, fringe, rnd, CARD_TINTS);
   return g.build();
 }
 
@@ -705,7 +760,8 @@ function buildFringe(g: GeoBuilder, body: GeoArrays, parts: BuiltPart[], count: 
     if (p.name === 'head' || p.name === 'jaw') {
       for (let v = 0; v < n; v++) {
         const a = p.attrs[v];
-        if (a.fringe < 0.25 || a.cov < 0.15 || a.cov > 0.85 || a.fur < 0.02) continue;
+        // rooted in the coat just inside its edge (cov ≈ 0.66), falling over onto the skin
+        if (a.fringe < 0.05 || a.cov < 0.56 || a.cov > 0.95 || a.fur < 0.015) continue;
         total += a.fringe;
         cand.push(vo + v);
         cw.push(total);
@@ -748,13 +804,13 @@ function buildFringe(g: GeoBuilder, body: GeoArrays, parts: BuiltPart[], count: 
     if (Math.hypot(tip.x / 0.09, (tip.y - 2.89) / 0.05, (tip.z - 0.41) / 0.06) < 1.2) continue;
     if (tip.y < 2.84 && tip.y > 2.72 && tip.z > 0.33 && Math.abs(tip.x) < 0.13) continue;
     made++;
-    const width = len * (0.3 + 0.15 * rnd());
+    const width = len * (0.17 + 0.08 * rnd());
     let wax = new THREE.Vector3().crossVectors(dir, N);
     if (wax.lengthSq() < 1e-4) wax.set(1, 0, 0);
     wax.normalize().applyAxisAngle(dir, (rnd() - 0.5) * 0.8);
     const col = tints[Math.floor(rnd() * tints.length)];
     const bright = 0.8 + 0.2 * rnd();
-    const lock = Math.floor(rnd() * 4);
+    const lock = Math.floor(rnd() * LOCK_VARIANTS);
     const si = [body.skinIndex[v * 4], body.skinIndex[v * 4 + 1], body.skinIndex[v * 4 + 2], body.skinIndex[v * 4 + 3]];
     const sw = [body.skinWeight[v * 4], body.skinWeight[v * 4 + 1], body.skinWeight[v * 4 + 2], body.skinWeight[v * 4 + 3]];
     const start = g.pos.length / 3;
@@ -776,7 +832,9 @@ function buildFringe(g: GeoBuilder, body: GeoArrays, parts: BuiltPart[], count: 
         g.col.push(cc[0], cc[1], cc[2]);
         g.si.push(si[0], si[1], si[2], si[3]);
         g.sw.push(sw[0], sw[1], sw[2], sw[3]);
-        g.uv.push((lock + (sgn < 0 ? 0.02 : 0.98)) / 4, 1 - t * 0.98);
+        g.uv.push((lock + (sgn < 0 ? 0.02 : 0.98)) / LOCK_VARIANTS, 1 - t * 0.98);
+        // fringe locks are short and combed: no shader droop
+        g.card.push(t, 0);
       }
     }
     for (let i = 0; i < SEG; i++) {
@@ -812,7 +870,7 @@ export function buildYetiGeometry(q: QualityPreset): YetiGeometrySet {
     body,
     shellIndex: new Uint32Array(si),
     hard: buildHard(),
-    cards: buildCards(body, parts, cfg.cards),
+    cards: buildCards(body, parts, cfg.cards, cfg.fringe),
     eyes: buildEyes(),
     eyeCenters: EYE_CENTERS,
     eyeRadius: EYE_RADIUS,
@@ -837,6 +895,7 @@ export function toBufferGeometry(a: GeoArrays): THREE.BufferGeometry {
   if (a.fur) g.setAttribute('furData', new THREE.BufferAttribute(a.fur, 4));
   if (a.comb) g.setAttribute('furComb', new THREE.BufferAttribute(a.comb, 3));
   if (a.uv) g.setAttribute('uv', new THREE.BufferAttribute(a.uv, 2));
+  if (a.card) g.setAttribute('cardData', new THREE.BufferAttribute(a.card, 2));
   g.setIndex(new THREE.BufferAttribute(a.index, 1));
   return g;
 }

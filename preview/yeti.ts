@@ -1,6 +1,8 @@
 /**
  * Yeti preview harness.
- * URL params: mode=<YetiMode> t=<s into mode> speed=<m/s> turn=<-1..1> cam=front|side|threequarter|face|back|low
+ * URL params: mode=<YetiMode> t=<s into mode> speed=<m/s> turn=<-1..1> cam=front|side|threequarter|face|back|low|hand|foot
+ *             (hand/foot: close-up of the left hand/foot; ang=<deg> orbit angle around it, dist=<m>)
+ *             shade=<0..1> YetiModel.setShade (depth darkening)
  *             quality=low|medium|high|ultra glow=<0..1> from=<YetiMode> (cross-fade test: plays `from` for 1 s first)
  *             dark=1 (night lighting for the eye-glow reveal)
  *             ground=flat|slope|bumpy|cave  terrain passed to YetiModel.setGround (root placed on it)
@@ -340,6 +342,7 @@ for (let k = 0; k < strip; k++) {
   if (camName === 'front') yeti.root.position.x = off;
   else yeti.root.position.z = -off;
   yeti.setEyeGlow(glow);
+  if (q.get('shade') !== null) yeti.setShade(parseFloat(q.get('shade')!));
   if (q.get('nofur') === '1') yeti.setFurVisible(false);
   yeti.onFootstep = (_side, pos, strength) => {
     footsteps++;
@@ -449,12 +452,26 @@ switch (camName) {
     camera.position.copy(head).add(new THREE.Vector3(1.45, 0.0, 0.1));
     break;
   }
+  case 'hand':
+  case 'foot': {
+    camera.fov = 30;
+    const fc = { left: new THREE.Vector3(), right: new THREE.Vector3() };
+    if (camName === 'hand') yeti.getHandWorldPosition('left', target);
+    else {
+      yeti.getFootContacts(fc);
+      target.copy(fc.left).add(new THREE.Vector3(0, 0.12, 0));
+    }
+    const ang = (parseFloat(q.get('ang') ?? '40') * Math.PI) / 180 + yeti.root.rotation.y;
+    const dist = parseFloat(q.get('dist') ?? '1.1');
+    camera.position.copy(target).add(new THREE.Vector3(Math.sin(ang) * dist, 0.25 * dist, Math.cos(ang) * dist));
+    break;
+  }
   case 'threequarter':
   default:
     camera.position.set(4.6 * widen, 2.1, 5.6 * widen);
     break;
 }
-if (!camName.startsWith('face')) {
+if (!camName.startsWith('face') && camName !== 'hand' && camName !== 'foot') {
   // presets are authored around the origin: follow the root (and its yaw) when it moved
   const yaw = yeti.root.rotation.y;
   const rel = camera.position.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);

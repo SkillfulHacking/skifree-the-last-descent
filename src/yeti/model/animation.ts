@@ -242,7 +242,7 @@ export function bipedFreq(v: number): number {
   return 0.55 + 0.11 * v;
 }
 export function gallopFreq(v: number): number {
-  return 1.2 + 0.06 * v;
+  return 1.35 + 0.07 * v;
 }
 export const CRAWL_DUTY = 0.68;
 /** longest distance a foot travels (relative to the body) while planted, m */
@@ -340,15 +340,17 @@ function gallop(o: PoseSample, c: AnimCtx): void {
   const v = c.speed;
   const P = c.phase;
   const und = Math.sin(TAU * (P - 0.2));
-  o.hips.y += -0.1 + 0.08 * Math.sin(TAU * (P - 0.35));
-  o.hips.z += -0.12;
-  o.add('hips', 0.55 + 0.1 * und);
-  o.add('spine1', 0.26 + 0.12 * und);
-  o.add('spine2', 0.2 + 0.1 * und);
-  o.add('spine3', 0.12 + 0.06 * und);
-  o.add('neck', -0.55 - 0.05 * und);
+  // a long, low, stretched body (shoulders well ahead of the hips) so that the four limbs read as separate
+  // columns in silhouette rather than bunching under the chest
+  o.hips.y += -0.04 + 0.08 * Math.sin(TAU * (P - 0.35));
+  o.hips.z += -0.22;
+  o.add('hips', 0.62 + 0.1 * und);
+  o.add('spine1', 0.22 + 0.09 * und);
+  o.add('spine2', 0.17 + 0.08 * und);
+  o.add('spine3', 0.08 + 0.05 * und);
+  o.add('neck', -0.62 - 0.05 * und);
   o.add('head', -0.45);
-  const hDuty = 0.32;
+  const hDuty = 0.27;
   const fDuty = GALLOP_FOOT_DUTY;
   // stance travel = speed × stance time for hands and feet alike (no skating)
   const len = Math.min(1.9, (v * hDuty) / Math.max(0.5, c.freq));
@@ -360,7 +362,7 @@ function gallop(o: PoseSample, c: AnimCtx): void {
     footCycle(ph, hDuty, len, 0.5, fc);
     const swing = ph >= hDuty ? (ph - hDuty) / (1 - hDuty) : 0;
     o.armIK[i] = 1;
-    o.hand[i].set(0.52 * s, 0.33 + fc[1] * 1.1, 1.05 + fc[0]);
+    o.hand[i].set(0.5 * s, 0.33 + fc[1] * 1.25, 1.42 + fc[0]);
     o.elbow[i].set(0.6 * s, -0.3, -1);
     o.handAim[i] = 1;
     const reach = Math.sin(Math.PI * swing);
@@ -374,10 +376,10 @@ function gallop(o: PoseSample, c: AnimCtx): void {
     const pf = frac(P - 0.5 - (i === R ? 0.1 : 0));
     footCycle(pf, fDuty, lenF, 0.4, fc);
     o.plant[i] = gaitPlant(pf, fDuty);
-    o.foot[i].set(0.38 * s, 0.2 + fc[1], 0.12 + fc[0]);
+    o.foot[i].set(0.36 * s, 0.2 + fc[1], -0.3 + fc[0]);
     o.footPitch[i] = fc[2];
     o.toes[i] = -fc[2] * 0.7;
-    o.knee[i].set(0.45 * s, 0, 1);
+    o.knee[i].set(0.3 * s, -0.2, 1);
     o.addSide('clav', i, 0, -0.15 * s * reach, 0.1 * s * reach);
   }
   const lean = c.turn * 0.3;
@@ -550,42 +552,57 @@ function roar(o: PoseSample, t: number, c: AnimCtx): void {
   o.look = 0;
 }
 
-function leap(o: PoseSample, t: number, _c: AnimCtx): void {
+/**
+ * Leap: crouch → launch → a held pounce for the whole flight (no starfish): the torso is pitched toward the
+ * landing, both arms reach forward and down with the claws spread (elbows bent, close to the body line), one
+ * knee is drawn up under the chest and the other leg trails behind — a compact, asymmetric, readable silhouette
+ * from the side and from behind. The pose holds until the game switches mode on landing.
+ */
+function leap(o: PoseSample, t: number, c: AnimCtx): void {
   const crouch = smooth(0, 0.22, t) * (1 - smooth(0.24, 0.38, t));
-  const launch = smooth(0.22, 0.38, t) * (1 - smooth(0.45, 0.6, t));
-  const tuck = smooth(0.42, 0.6, t) * (1 - smooth(0.72, 0.9, t));
-  const ext = smooth(0.72, 0.95, t);
-  const air = smooth(0.3, 0.42, t);
-  posture(o, 1.0 + 0.5 * crouch - 0.6 * launch + 0.2 * tuck);
+  const launch = smooth(0.22, 0.36, t) * (1 - smooth(0.42, 0.6, t));
+  const air = smooth(0.3, 0.5, t);
+  const br = Math.sin(TAU * 1.3 * c.time);
+  posture(o, 1.0 + 0.5 * crouch - 0.6 * launch + 0.25 * air);
   o.hips.y += -0.42 * crouch + 0.08 * launch;
-  o.add('spine2', 0.15 * crouch - 0.05 * launch + 0.1 * tuck);
-  o.add('spine3', 0.1 * crouch - 0.1 * launch);
+  o.add('hips', 0.12 * air);
+  o.add('spine1', 0.08 * air);
+  o.add('spine2', 0.15 * crouch - 0.05 * launch + 0.1 * air);
+  o.add('spine3', 0.1 * crouch - 0.1 * launch + 0.05 * air);
   const bindHipY = 1.42;
   const hipY = bindHipY + o.hips.y;
   for (let i = 0; i < 2; i++) {
     const s = SGN[i];
-    // feet: ground stance -> trailing push -> tucked under -> reaching forward for the landing
+    const lead = i === L;
+    // feet: ground stance -> trailing push -> pounce (left knee drawn up, right leg trailing)
     const ground = new THREE.Vector3(0.36 * s, 0.2, 0.0);
     const push = new THREE.Vector3(0.3 * s, hipY - 1.3, -0.45);
-    const tucked = new THREE.Vector3(0.38 * s, hipY - 0.7, 0.35);
-    const reach = new THREE.Vector3(0.4 * s, hipY - 1.05, 0.5 + 0.05 * i);
-    const p = ground.clone().lerp(push, launch * air);
-    p.lerp(tucked, tuck);
-    p.lerp(reach, ext);
+    const pounce = lead
+      ? new THREE.Vector3(0.3 * s, hipY - 0.62, 0.42)
+      : new THREE.Vector3(0.3 * s, hipY - 1.0, -0.62);
+    const p = ground.clone().lerp(push, launch * (1 - air * 0.5));
+    p.lerp(pounce, air);
     o.foot[i].copy(p);
-    o.plant[i] = 1 - air;
-    o.footPitch[i] = 0.7 * launch * air - 0.3 * ext;
-    o.knee[i].set(0.3 * s, 0, 1);
-    // arms: swing back on crouch, throw forward/up on launch, spread for landing
-    o.addSide('upperArm', i, 0.7 * crouch - 1.6 * launch - 1.2 * tuck - 0.5 * ext, 0, (0.15 * launch + 0.7 * ext) * s);
-    o.addSide('forearm', i, -0.3 * launch - 0.7 * tuck - 0.3 * ext);
-    o.curl[i] = 0.2 + 0.3 * crouch;
-    o.curl2[i] = 0.4;
+    o.plant[i] = 1 - smooth(0.25, 0.35, t);
+    o.footPitch[i] = 0.7 * launch + (lead ? -0.35 : 0.6) * air;
+    o.toes[i] = (lead ? 0.2 : -0.3) * air;
+    o.knee[i].set(0.15 * s, lead ? 0.2 : -0.3, 1);
+    // arms: swing back on the crouch (FK), then reach forward/down for the landing (IK), claws spread
+    o.addSide('upperArm', i, 0.7 * crouch - 1.2 * launch * (1 - air));
+    o.addSide('forearm', i, -0.3 * launch * (1 - air));
+    o.armIK[i] = air;
+    o.hand[i].set(0.4 * s, hipY + 0.3 + 0.05 * br * (lead ? 1 : -1), 1.22 + (lead ? 0.1 : 0));
+    o.elbow[i].set(0.45 * s, -0.4, -0.8);
+    o.handAim[i] = air;
+    o.handDir[i].set(0.1 * s, -0.55, 1).normalize();
+    o.palmDir[i].set(-0.2 * s, -1, 0.1).normalize();
+    o.curl[i] = 0.2 + 0.3 * crouch + 0.25 * air;
+    o.curl2[i] = 0.35 + 0.3 * air;
     o.thumb[i] = 0.2;
   }
   o.look = 0.85;
-  o.lookPitch = 0.05 + 0.15 * ext;
-  o.jaw = 0.2 + 0.5 * launch + 0.6 * ext;
+  o.lookPitch = 0.05 + 0.18 * air;
+  o.jaw = 0.2 + 0.5 * launch + 0.55 * air;
 }
 
 function grab(o: PoseSample, t: number, _c: AnimCtx): void {
@@ -723,9 +740,9 @@ function crawl(o: PoseSample, _t: number, c: AnimCtx): void {
   const br = Math.sin(TAU * 0.3 * c.time);
   const duty = CRAWL_DUTY;
   const len = Math.min(1.5, (v * duty) / Math.max(0.3, c.freq));
-  o.hips.y += -0.55 + 0.012 * br;
+  o.hips.y += -0.46 + 0.012 * br;
   o.hips.z += -0.25;
-  o.add('hips', 0.82);
+  o.add('hips', 0.76);
   o.add('spine1', 0.3 + 0.015 * br);
   o.add('spine2', 0.2 + 0.02 * br);
   o.add('spine3', 0.04);
@@ -743,10 +760,12 @@ function crawl(o: PoseSample, _t: number, c: AnimCtx): void {
     // hind feet
     const pf = frac(P + i * 0.5);
     footCycle(pf, duty, len, 0.16 * amp, fc);
-    o.foot[i].set(0.44 * s, 0.2 + fc[1], -0.02 + fc[0]);
+    // hind feet under the hips (not splayed): the knees point forward/down under the belly, so the hind legs
+    // read as legs in the silhouette instead of looping out sideways
+    o.foot[i].set(0.33 * s, 0.2 + fc[1], -0.12 + fc[0]);
     o.footPitch[i] = fc[2] * 0.8;
     o.toes[i] = -fc[2] * 0.6;
-    o.knee[i].set(0.6 * s, 0, 1);
+    o.knee[i].set(0.2 * s, -0.3, 1);
     o.plant[i] = amp < 0.15 ? 1 : gaitPlant(pf, duty);
     // fore limbs: knuckle-walk
     const ph = frac(P - 0.25 - i * 0.5);
@@ -767,9 +786,10 @@ function crawl(o: PoseSample, _t: number, c: AnimCtx): void {
     // shoulder blade rides up over the loaded arm, drops and rolls forward as it reaches
     o.addSide('clav', i, 0, -0.1 * s * reach * amp, (0.1 * load - 0.04 * reach) * s * amp);
   }
-  o.look = 0.75;
+  // the head stays on the line of travel and only scans a little (±~10°)
+  o.look = 0.85;
   o.lookPitch = -0.02;
-  o.lookYaw = 0.14 * Math.sin(0.35 * c.time) + 0.04 * Math.sin(TAU * (P - 0.25)) * amp;
+  o.lookYaw = 0.12 * Math.sin(0.35 * c.time) + 0.04 * Math.sin(TAU * (P - 0.25)) * amp;
   o.jaw = 0.1 + 0.05 * (0.5 + 0.5 * br);
 }
 

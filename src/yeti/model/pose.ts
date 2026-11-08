@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import { L, R, type PoseSample } from './animation';
-import { B, BONE_COUNT, PARENT_INDEX, armFrame, bindPositions, MOUTH_POS, HEAD_BONE_POS, JAW_BONE_POS } from './rig';
+import { B, BONE_COUNT, PARENT_INDEX, armFrame, bindPositions, MOUTH_POS, HEAD_BONE_POS, JAW_BONE_POS, HEAD_LIFT, HEAD_SCALE } from './rig';
 
 const _m = new THREE.Matrix4();
 const _x = new THREE.Vector3();
@@ -43,6 +43,11 @@ export class PoseSolver {
   readonly mq: THREE.Quaternion[] = [];
   readonly mp: THREE.Vector3[] = [];
   readonly hipsOffset = new THREE.Vector3();
+  /**
+   * Uniform scale of each bone's frame (cumulative): the head (and the jaw inside it) is sculpted in bind space and
+   * enlarged about the head pivot by the rig, so points rigidly attached to those bones scale with it.
+   */
+  readonly boneScale: number[];
   /** total (thigh + shin) length of each leg */
   readonly legLen: number[];
   private legs: Chain[];
@@ -62,6 +67,14 @@ export class PoseSolver {
       const pi = PARENT_INDEX[i];
       return pi < 0 ? p.clone() : p.clone().sub(this.bind[pi]);
     });
+    // the head sits higher on a visible neck than the sculpt's bind pivot
+    this.bindLocal[B.head].add(HEAD_LIFT);
+    this.boneScale = Array.from({ length: BONE_COUNT }, () => 1);
+    for (let i = 0; i < BONE_COUNT; i++) {
+      const own = i === B.head ? HEAD_SCALE : 1;
+      const p = PARENT_INDEX[i];
+      this.boneScale[i] = (p >= 0 ? this.boneScale[p] : 1) * own;
+    }
     for (let i = 0; i < BONE_COUNT; i++) {
       this.local.push(new THREE.Quaternion());
       this.mq.push(new THREE.Quaternion());
@@ -106,14 +119,14 @@ export class PoseSolver {
         this.mp[i].copy(off);
       } else {
         this.mq[i].multiplyQuaternions(this.mq[p], this.local[i]);
-        this.mp[i].copy(off).applyQuaternion(this.mq[p]).add(this.mp[p]);
+        this.mp[i].copy(off).multiplyScalar(this.boneScale[p]).applyQuaternion(this.mq[p]).add(this.mp[p]);
       }
     }
   }
 
   /** model-space position of a bind-space point rigidly attached to bone i */
   pointOn(i: number, bindPoint: THREE.Vector3, out: THREE.Vector3): THREE.Vector3 {
-    return out.copy(bindPoint).sub(this.bind[i]).applyQuaternion(this.mq[i]).add(this.mp[i]);
+    return out.copy(bindPoint).sub(this.bind[i]).multiplyScalar(this.boneScale[i]).applyQuaternion(this.mq[i]).add(this.mp[i]);
   }
 
   mouth(out: THREE.Vector3): THREE.Vector3 {

@@ -6,12 +6,14 @@
  * from the same anchor and the same layout functions below, so the terrain cut and the rock mass are
  * designed together and never drift apart.
  *
- * The cave is a single rock formation standing in the valley-side cliff: a vertical face with an
- * overhanging brow, a chamber that runs ~24 m into the hill and bends downhill (so its back is never in
- * line of sight from the piste), and a rock ledge in front of the mouth. Inside the formation's footprint
- * the heightfield is pulled down so it always stays *inside* the rock (the terrain still forms a cliff for
- * physics, just behind the visible face); along the chamber it drops to just under the cave's own floor
- * mesh. Outside the footprint the heightfield is the classic cliff.
+ * The cave sits in a band of rock cropping out at the foot of the valley-side hillside: a stratified
+ * face (full height around the mouth, tapering out under the snow 45–55 m to either side), with the snow
+ * slope continuing up and back from its top, stepped by rock benches. The heightfield *is* that hillside;
+ * its own cliff step stays hidden a few metres behind the rock face, so the rock never stands on the
+ * slope as an object and there is no edge where rock and heightfield meet except the snow line. The
+ * chamber runs ~24 m into the hill and bends downhill (so its back is never in line of sight from the
+ * piste); along it the heightfield drops to just under the cave's own floor mesh, and a ledge is lifted
+ * in front of the mouth.
  *
  * Every modification is an additive offset on top of the natural terrain `h` (caveTerrainHeight =
  * h + caveTerrainOffset), so the cave builder can recover `h` from `Mountain.heightAt` exactly.
@@ -20,9 +22,10 @@
  *  - `u`  = distance INTO the hill from the mouth reference point, along -outward (Cartesian);
  *  - `v`  = z - anchor.z (lateral, +Z = downhill; NOT mirrored by `side`);
  *  - `uc` = distance into the hill measured from the cliff line (follows the centreline: d·side − (D+2)).
- * Heights are relative to the natural terrain `h`; `bankOffset` is the snow bank rising to the cliff.
+ * Heights are relative to the natural terrain `h`; `bankOffset` is the snow bank rising to the cliff;
+ *  - `t`  = uc − faceBase(v): distance behind the face line.
  */
-import { clamp, gnoise, ridged, smoothstep } from '../core/rng';
+import { clamp, gnoise, smoothstep } from '../core/rng';
 
 export interface CaveAnchor {
   /** Course progress (world Z) of the cave mouth centre. */
@@ -60,8 +63,24 @@ export const BANK_H = 4.5;
 /** Partial levelling of the natural slope under the cave floor (fraction of a typical 8–10° fall line). */
 const LEVEL_U = 0.13;
 const LEVEL_V = -0.17;
-/** Formation footprint: full rock core for |v - V_C| < CORE0, receding into the cliff by CORE1. */
-export const FORM = { vc: 1, core0: 19, core1: 46, uBack: 30 } as const;
+/**
+ * The exposed rock band (an outcrop of the hillside, not an object on it): full height for
+ * |v - vc| < core, tapering (noise-modulated) until the rock has disappeared under the snow slope at
+ * `up` metres uphill / `down` metres downhill.
+ */
+export const FORM = { vc: 1, core: 9, up: 44, down: 56 } as const;
+/** Lateral extent (v) of everything the formation can touch, with margin for the noise. */
+export const FORM_V0 = -58;
+export const FORM_V1 = 70;
+/** Exposed height of the face above the bank in the core. */
+export const BAND_H = 16.5;
+/** The hillside above and behind the band rises HILL_R over the scale length HILL_L (initial slope ≈ R/L). */
+const HILL_R = 18;
+const HILL_L = 28;
+/** The heightfield's (hidden) cliff step sits this far behind the rock face line. */
+export const STEP_IN = 3.2;
+/** Thickness of the bedding planes (rock and the stepped benches above the face). */
+export const BED = 2.3;
 /** The floor mesh is cut at this u (just outside the mouth line); the ledge beyond is heightfield. */
 export const FLOOR_RIM_U = -1.7;
 
@@ -69,37 +88,73 @@ export function bankOffset(uc: number): number {
   return BANK_H * smoothstep(-22, -3, uc);
 }
 
-/** 0 in the formation core, 1 where the rock has merged into the classic terrain cliff. */
-export function formBand(v: number): number {
-  return smoothstep(FORM.core0 - 5, FORM.core1 - 3, Math.abs(v - FORM.vc));
-}
-
-/** Horizontal run of the terrain cliff: the classic steep cliff far away, a steep snow slope beside the cave. */
-export function cliffRun(v: number): number {
-  return 8 + 30 * (1 - smoothstep(52, 66, Math.abs(v - FORM.vc)));
-}
-
-/** uc of a smoothstep cliff profile (from uc = -4, horizontal run `run`) at height y above the bank. */
-export function cliffSurfaceUc(y: number, Hc: number, run = 8): number {
-  const k = clamp(y / Math.max(1, Hc), 0, 1);
-  const t = 0.5 - Math.sin(Math.asin(1 - 2 * k) / 3);
-  return -4 + run * t;
-}
-
-/** Cliff height above the bank (lower around the cave, full classic height away from it). */
-export function cliffHeight(x: number, z: number, v: number, seed: number): number {
+/** Noise-displaced lateral distance from the band centre (so its ends are not symmetric or smooth). */
+function bandDist(v: number, seed: number): number {
   const av = Math.abs(v - FORM.vc);
-  return 28 - 11 * (1 - smoothstep(22, 50, av)) + 6 * ridged(x / 14, z / 14, seed + 9, 3);
+  return av + (6 * gnoise(v * 0.04 + 0.5, 4.4, seed + 101) + 2.5 * gnoise(v * 0.12, 2.2, seed + 102)) * smoothstep(FORM.core - 2, FORM.core + 8, av);
 }
 
-/** Base line (uc) of the formation's front face: protrudes in the core, recedes into the cliff at the sides. */
+/** Lateral profile of the band, 1 in the core … 0 where it has gone under the snow: a plateau, a drop to a
+ *  long lower band, a second drop to a low ledge of rock, then nothing. */
+export function bandTaper(v: number, seed: number): number {
+  const ad = bandDist(v, seed);
+  const reach = v < FORM.vc ? FORM.up : FORM.down;
+  return Math.max(0, 1 - 0.42 * smoothstep(FORM.core, FORM.core + 9, ad) - 0.3 * smoothstep(FORM.core + 15, FORM.core + 21, ad) - 0.28 * smoothstep(reach - 13, reach, ad));
+}
+
+/** 0 in the core of the band, 1 where it has gone under the snow. */
+export function formBand(v: number, seed: number): number {
+  return 1 - bandTaper(v, seed);
+}
+
+/** Exposed height of the rock face above the bank (0 beyond the ends of the band). */
+export function bandHeight(v: number, seed: number): number {
+  const tp = bandTaper(v, seed);
+  if (tp <= 0) return 0;
+  const vary = 2.0 * gnoise(v * 0.07, 7.7, seed + 103) + 1.0 * gnoise(v * 0.19, 1.3, seed + 104);
+  return Math.max(0, BAND_H * tp + vary * (0.4 + 0.6 * smoothstep(4, 12, Math.abs(v - FORM.vc))) * smoothstep(0, 0.25, tp));
+}
+
+/** Base line (uc) of the face: buttresses and bays, curving back into the hillside toward the ends. */
 export function faceBase(v: number, seed: number): number {
   const av = Math.abs(v - FORM.vc);
-  // buttresses and bays along the cliff, calmer right around the mouth
   const wav = 1.7 * gnoise(v * 0.075, 3.1, seed + 77) + 0.6 * gnoise(v * 0.21, 8.3, seed + 78);
   const calm = 1 - 0.65 * (1 - smoothstep(5, 13, Math.abs(v)));
-  void av;
-  return -1.8 + wav * calm;
+  const bay = 5 * Math.pow(smoothstep(8, 60, av), 1.5);
+  return -1.8 + wav * calm + bay;
+}
+
+/** max(t, 0), C¹-rounded over [-3, 3] (no crease where the hillside leaves the bank). */
+function softPos(t: number): number {
+  return t >= 3 ? t : t <= -3 ? 0 : ((t + 3) * (t + 3)) / 12;
+}
+/** Rise of the snow hillside above the top of the band, `t` metres behind the face line. */
+export function hillRise(t: number, v: number, seed: number): number {
+  const sp = softPos(t);
+  // wind-shaped undulation and shallow gullies on the slope (none at the very edge of the band)
+  const und = (1.6 * gnoise(v * 0.045, t * 0.05, seed + 111) + 0.6 * gnoise(v * 0.12, t * 0.1, seed + 112)) * smoothstep(2, 14, t);
+  return HILL_R * (1 - Math.exp(-sp / HILL_L)) + und;
+}
+/** Smooth lateral envelope of the band height (what the hillside high above it "remembers"). */
+export function bandEnvelope(v: number): number {
+  const dv = v - FORM.vc;
+  const reach = dv < 0 ? FORM.up : FORM.down;
+  return BAND_H * (1 - smoothstep(FORM.core - 4, reach + 8, Math.abs(dv)));
+}
+/** Height of the band's top surface under the hillside: the band's own (stepped, noisy) height at the
+ *  face, relaxing to the smooth envelope higher up the slope (no ridges running up the hill). */
+export function hillBase(t: number, v: number, H: number): number {
+  return H + (bandEnvelope(v) - H) * smoothstep(5, 24, t);
+}
+/** Heightfield surface (above the bank) of the hillside with the band: the cliff step hides inside the rock. */
+export function hillSurface(t: number, v: number, H: number, seed: number): number {
+  return hillBase(t, v, H) * smoothstep(STEP_IN, STEP_IN + 3, t) + hillRise(t, v, seed);
+}
+/** Steepness of the heightfield's drop into the chamber pit (hidden inside the chamber walls and roof). */
+export const PIT_K = 14;
+/** The pit's rim: beyond this (cd = distance to the chamber path − half-width) the heightfield is the hillside again. */
+export function pitRim(hill: number): number {
+  return 1.1 + hill / PIT_K;
 }
 
 // --- chamber path -----------------------------------------------------------------------------------
@@ -237,8 +292,13 @@ export function liftMask(u: number, v: number, cd: number): number {
 }
 
 /** Signed coverage of the cave floor mesh (< 0 inside). cd = distance to path − half-width. */
-export function floorCover(u: number, cd: number): number {
-  return Math.max(cd - 1.1, FLOOR_RIM_U - u);
+export function floorCover(u: number, v: number, cd: number): number {
+  return Math.max(cd - 1.1, floorRimDist(u, v));
+}
+/** Signed distance (u) past the floor mesh's outer rim at the mouth: an irregular line, not a smooth arc
+ *  (the ledge snow reaches into the mouth further in places). */
+export function floorRimDist(u: number, v: number): number {
+  return FLOOR_RIM_U - u + 0.45 * gnoise(v * 0.55 + 0.2, u * 0.55, 919);
 }
 /** Terrain sink under the floor mesh (terrain hides just below it). */
 export function floorSink(e: number): number {
@@ -274,35 +334,20 @@ export function caveTerrainOffset(a: CaveAnchor, x: number, z: number, d: number
   const L = caveLocal(a, x, z, d, tmpL);
   const uc = L.uc, u = L.u, v = L.v;
   if (uc <= -24) return 0;
-  const zm = 1 - smoothstep(55, 120, cz);
+  const zm = 1 - smoothstep(60, 120, cz);
   const bank = bankOffset(uc) * zm;
-  const Hc = cliffHeight(x, z, v, seed) * zm;
-  const cliff = Hc * smoothstep(-4, -4 + cliffRun(L.v), uc);
-  const w = formBand(v);
-  const core = (1 - smoothstep(0.5, 0.95, w)) * (1 - smoothstep(FORM.uBack - 7, FORM.uBack, uc));
-  if (core <= 0 || u < -12) return bank + cliff;
-  // inside the formation: a terrain cliff that stays behind the visible rock face …
-  // the rock face is the classic cliff profile with a near-vertical lower wall (see rockField);
-  // the terrain stays 2.6 m behind both
-  const fIn = faceBase(v, seed) + 2.6;
-  const inner = Hc * Math.min(smoothstep(fIn, fIn + 4, uc), smoothstep(-4 + 2.6, 4 + 2.6, uc));
-  // … dropping to the chamber floor along the cave, and lifted to the ledge in front of the mouth
-  // quick reject far from the chamber (most of the formation footprint)
-  let cd = 99;
-  let chS = 0;
-  if (u > -16 && u < 27 && v > -11 && v < 26) {
-    const ch = chamberQuery(u, v, tmpH);
-    cd = ch.dist - chamberHalfWidth(ch.s);
-    chS = ch.s;
-  }
-  const lift = floorLiftRaw(u, v, uc, chS);
-  const sink = floorSink(floorCover(u, cd));
+  // the hillside with the rock band at its foot (the band's cliff step stays hidden inside the rock)
+  const hill = hillSurface(uc - faceBase(v, seed), v, v > FORM_V0 && v < FORM_V1 ? bandHeight(v, seed) : 0, seed) * zm;
+  if (u < -12 || !(u > -16 && u < 27 && v > -11 && v < 26)) return bank + hill;
+  // the chamber: the terrain drops to just under the cave's own floor mesh; the ledge in front of the
+  // mouth is lifted to the floor level
+  const ch = chamberQuery(u, v, tmpH);
+  const cd = ch.dist - chamberHalfWidth(ch.s);
+  const lift = floorLiftRaw(u, v, uc, ch.s);
+  const sink = floorSink(floorCover(u, v, cd));
   const liftGround = lift * liftMask(u, v, cd) - sink;
-  const chamberRamp = lift - sink + 3.0 * Math.max(0, cd - 1.1);
-  let ground = Math.max(liftGround, Math.min(inner, chamberRamp));
-  // on the flanks the rock lies on the (gentle) terrain slope: keep the terrain under both
-  ground += (Math.min(cliff, ground) - ground) * smoothstep(0, 0.15, w);
-  return bank + cliff + (ground - cliff) * core;
+  const chamberRamp = lift - sink + PIT_K * Math.max(0, cd - 1.1);
+  return bank + Math.max(liftGround, Math.min(hill, chamberRamp));
 }
 
 /**

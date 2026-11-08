@@ -1,10 +1,12 @@
 /**
  * The cave formation as a signed distance field (negative = rock), sampled on a regular grid.
  *
- * One continuous body: a stratified front face (bedding-plane ledges, vertical joints, erosion noise) with
- * an overhanging brow, a rounded top that sinks into the plateau behind, a rock shelf under the mouth
- * ledge, a few half-buried rock-fall blocks fused into the cliff base, minus the chamber (a noisy
- * superellipse tube along the shared chamber path, with talus fillets where the walls meet the floor).
+ * A band of stratified rock cropping out at the foot of the hillside: a near-vertical face (bedding-plane
+ * ledges, vertical joints, erosion noise, an overhanging brow over the mouth) whose height tapers out
+ * under the snow to either side, and whose top steps back up the slope in a few benches before it is
+ * buried by the hillside (the heightfield). Minus the chamber: a noisy, asymmetric, leaning superellipse
+ * tube along the shared chamber path, with talus fillets where the walls meet the floor and a slumped
+ * block on one side of the mouth.
  *
  * Evaluation is split into per-column terms (everything that depends only on x/z, computed once) and the
  * per-sample terms; a coarse pass decides where the exact field is needed (a narrow band around the
@@ -13,20 +15,23 @@
 import { gnoise, smoothstep } from '../../core/rng';
 import {
   type CaveAnchor,
-  FORM,
+  BED,
+  FORM_V0,
+  FORM_V1,
+  bandHeight,
   bankOffset,
   chamberCeiling,
   chamberHalfWidth,
   chamberQuery,
-  cliffHeight,
   faceBase,
-  formBand,
-  cliffSurfaceUc,
-  cliffRun,
   floorLiftRaw,
+  hillBase,
+  hillRise,
+  pitRim,
+  STEP_IN,
   type ChamberHit,
 } from '../caveTerrain';
-import { noise3, smax, smin } from './noise';
+import { noise3, smax } from './noise';
 import { NEVER, type Tick } from './budget';
 
 export interface FieldParams {
@@ -39,15 +44,6 @@ export interface FieldParams {
   /** visible terrain height; everything more than 0.8 m below it is treated as solid (never visible) */
   ground: (x: number, z: number) => number;
 }
-
-/** Half-buried rock-fall blocks at the cliff base: (u, v, y above bank, radii u/y/v). */
-const BLOCKS: ReadonlyArray<readonly [number, number, number, number, number, number]> = [
-  [-3.2, -10.5, -0.9, 2.3, 1.7, 2.7],
-  [-5.2, -14.0, -0.9, 1.5, 1.1, 1.8],
-  [-2.6, 11.0, -0.7, 2.1, 1.6, 2.3],
-  [-4.6, 14.5, -0.9, 1.8, 1.3, 2.1],
-  [-6.4, 18.5, -0.5, 1.5, 1.1, 1.6],
-];
 
 export class RockField {
   readonly a: CaveAnchor;
@@ -72,10 +68,11 @@ export class RockField {
   readonly cV: Float32Array;
   readonly cUc: Float32Array;
   readonly cB: Float32Array; // absolute base (h + bank)
-  readonly cTop: Float32Array; // top surface above B
-  readonly cFace: Float32Array; // face base + joints
+  readonly cTop: Float32Array; // rock top above B (benches stepping up the hillside)
+  readonly cFace: Float32Array; // face base line (uc) + joints
+  readonly cH: Float32Array; // exposed face height above B
+  readonly cLean: Float32Array; // face lean (uc per metre of height)
   readonly cPh: Float32Array; // strata phase
-  readonly cBand: Float32Array; // strata band key (lateral coordinate)
   readonly cFloor: Float32Array; // floor height above B (chamber)
   readonly cS: Float32Array;
   readonly cL: Float32Array;
@@ -83,11 +80,8 @@ export class RockField {
   readonly cHw: Float32Array;
   readonly cCeil: Float32Array;
   readonly cBrow: Float32Array;
-  readonly cSlab: Float32Array; // slab lateral term
+  readonly cLid: Float32Array; // 1 on the roof over the chamber (smooth top: it lies just above the snow)
   readonly cLo: Float32Array;
-  readonly cHc: Float32Array;
-  readonly cW: Float32Array; // 0 core … 1 merged into the terrain cliff
-  readonly cRun: Float32Array;
   readonly cHi: Float32Array;
 
   private p: FieldParams;
@@ -98,7 +92,7 @@ export class RockField {
     this.seed = p.seed;
     const cell = (this.cell = p.cell);
     this.mx = a.centerX + a.side * (a.d + 2);
-    const uMin = -12, uMax = 31, vMin = -42, vMax = 44;
+    const uMin = -11, uMax = 32, vMin = FORM_V0, vMax = FORM_V1;
     const xa = this.mx + a.side * uMin, xb = this.mx + a.side * uMax;
     this.x0 = Math.min(xa, xb);
     this.z0 = a.z + vMin;
@@ -106,9 +100,9 @@ export class RockField {
     this.nz = Math.ceil((vMax - vMin) / cell) + 1;
     const nc = this.nx * this.nz;
     const F = () => new Float32Array(nc);
-    this.cU = F(); this.cV = F(); this.cUc = F(); this.cB = F(); this.cTop = F(); this.cFace = F(); this.cPh = F(); this.cBand = F();
-    this.cFloor = F(); this.cS = F(); this.cL = F(); this.cDist = F(); this.cHw = F(); this.cCeil = F(); this.cBrow = F(); this.cSlab = F();
-    this.cLo = F(); this.cHi = F(); this.cHc = F(); this.cW = F(); this.cRun = F();
+    this.cU = F(); this.cV = F(); this.cUc = F(); this.cB = F(); this.cTop = F(); this.cFace = F(); this.cH = F(); this.cLean = F(); this.cPh = F();
+    this.cFloor = F(); this.cS = F(); this.cL = F(); this.cDist = F(); this.cHw = F(); this.cCeil = F(); this.cBrow = F(); this.cLid = F();
+    this.cLo = F(); this.cHi = F();
   }
 
   private *columns(tk: Tick): Generator<void, void, void> {
@@ -125,57 +119,89 @@ export class RockField {
       }
       const z = this.z0 + iz * cell;
       const cx = p.centerX(z);
+      const v = z - a.z;
+      // per-row (lateral) terms
+      const H = bandHeight(v, sd);
+      const fb = faceBase(v, sd);
+      const lean = 0.07 + 0.09 * gnoise(v * 0.045, 5.3, sd + 46) + 0.05 * gnoise(v * 0.16, 2.9, sd + 47);
+      const env = smoothstep(0.4, 3.5, H); // the band exists here
+      const ph = 0.45 * gnoise(v * 0.05, 0.7, sd + 62) + 0.15 * gnoise(v * 0.17, 3.7, sd + 63);
       for (let ix = 0; ix < this.nx; ix++) {
         const x = this.x0 + ix * cell;
         const ci = ix + iz * this.nx;
-        const u = (x - this.mx) * a.side, v = z - a.z;
+        const u = (x - this.mx) * a.side;
         const uc = (x - cx) * a.side - (a.d + 2);
         const B = p.hRaw(x, z) + bankOffset(uc);
-        const av = Math.abs(v - FORM.vc);
-        const Hc = cliffHeight(x, z, v, sd);
-        const wb = formBand(v);
-        const crag = 3.2 * Math.max(0, gnoise(v * 0.045 + 0.3, u * 0.03, sd + 33)) ** 1.5 + 1.6 * Math.max(0, gnoise(v * 0.11, u * 0.08, sd + 34));
-        const top = Hc + (0.9 + crag * (1 - smoothstep(6, 26, uc)) + 1.0 * Math.max(0, gnoise(u * 0.07, v * 0.07, sd + 31)) + 0.5 * gnoise(u * 0.2, v * 0.2, sd + 32)) * (1 - wb) - 5.5 * smoothstep(FORM.uBack - 9, FORM.uBack - 1, uc) - 9 * smoothstep(FORM.core0 - 2, FORM.core1 + 4, av);
         // vertical joints: two sets of narrow recessed grooves
         const j1 = 1 - Math.abs(gnoise(v * 0.16 + uc * 0.05, 1.7, sd + 41)) * 3.2;
         const j2 = 1 - Math.abs(gnoise(v * 0.29 - uc * 0.04, 6.3, sd + 43)) * 4.0;
         const joints = (0.9 * Math.max(0, j1) ** 2 + 0.5 * Math.max(0, j2) ** 2) * (0.4 + 0.6 * smoothstep(-0.3, 0.5, gnoise(v * 0.05, 9.1, sd + 45)));
-        chamberQuery(u, v, hit);
-        const s = hit.s;
-        const asym = 1 - smoothstep(2, 6, s);
-        let hw = chamberHalfWidth(s) * (1 + 0.14 * Math.sign(hit.l) * asym);
-        hw *= 1 + 0.07 * gnoise(s * 0.35, hit.l > 0 ? 3 : 9, sd + 51);
-        const ln = Math.max(-1.2, Math.min(1.2, hit.l / hw));
-        const ceil =
-          chamberCeiling(s) +
-          1.3 * ln * (1 - smoothstep(2, 7, s)) +
-          0.8 * gnoise(ln * 1.6 + 0.3, s * 0.25, sd + 55) * (1 - smoothstep(3, 8, s)) +
-          1.4 * Math.exp(-(((hit.l + 1.6) / 0.6) ** 2)) * (1 - smoothstep(0.5, 4.5, s)) +
-          0.35 * gnoise(s * 0.4, ln * 1.3, sd + 53);
-        this.cHc[ci] = Hc;
-        this.cW[ci] = formBand(v);
-        this.cRun[ci] = cliffRun(v);
-        this.cU[ci] = u; this.cV[ci] = v; this.cUc[ci] = uc; this.cB[ci] = B; this.cTop[ci] = top;
-        this.cFace[ci] = faceBase(v, sd) + joints;
-        this.cPh[ci] = 0.09 * v + 0.04 * uc + 0.3 * gnoise(v * 0.05, uc * 0.05, sd + 61);
-        this.cBand[ci] = v * 0.07;
-        this.cFloor[ci] = floorLiftRaw(u, v, uc, s);
-        this.cS[ci] = s; this.cL[ci] = hit.l; this.cDist[ci] = hit.dist; this.cHw[ci] = hw; this.cCeil[ci] = ceil;
-        this.cBrow[ci] = (1 - smoothstep(5.5, 9.5, Math.abs(v - 0.4))) * (0.75 + 0.35 * gnoise(v * 0.35, 2.2, sd + 71));
-        this.cSlab[ci] = (Math.abs(v - 0.6) - 4.4 - 0.8 * gnoise(u * 0.4, v * 0.3, sd + 73)) * 0.8;
-        {
-          // on the flanks the rock top follows the (gentler) terrain slope, proud at first, then under it
-          const run = cliffRun(v);
-          const Ht = Hc * smoothstep(-4, -4 + run, uc);
-          const tb = smoothstep(0, 0.5, wb);
-          const sinkTop = 0.5 - 2.8 * smoothstep(0.5, 1, wb);
-          this.cTop[ci] = top + (Math.min(top, Ht + sinkTop) - top) * tb;
+        // --- the rock top: benches stepping up the hillside behind the face. The hillside (heightfield)
+        // rises g above the band top; the rock follows it as a staircase of beds whose risers stand a
+        // little proud of the snow and whose treads are buried, fading out higher up the slope.
+        const t = uc - fb;
+        const g = hillRise(t, v, sd);
+        const pn = ph + 0.25 * gnoise(uc * 0.08, v * 0.08, sd + 64);
+        const q = g / BED + pn;
+        const stair = BED * (Math.floor(q) + smoothstep(0.72, 1.0, q - Math.floor(q)) - pn);
+        const fadeUp = smoothstep(3, 12, t);
+        // risers come and go along the slope (not continuous ribbons)
+        const keep = smoothstep(-0.15, 0.25, gnoise(v * 0.07, q * 0.6, sd + 35));
+        const crag = 1.3 * Math.max(0, gnoise(v * 0.09 + 0.3, t * 0.1, sd + 33)) * (1 - smoothstep(8, 18, t));
+        const amp = (0.9 + 0.35 * gnoise(v * 0.11, t * 0.11, sd + 34)) * (1 - fadeUp) * (0.35 + 0.65 * keep) - 1.2 * fadeUp + crag;
+        const Hb = hillBase(t, v, H);
+        let top = Hb + stair + env * amp - (1 - env) * 1.4;
+        // the roof over the chamber: the heightfield drops into a pit around the chamber (hidden in its
+        // walls), so the rock above it must reach just above the hillside and cover the pit
+        const hillY = Hb * smoothstep(STEP_IN, STEP_IN + 3, t) + g;
+        let lidK = 0;
+        if (u > -16 && u < 27 && v > -11 && v < 26 && t > 0.5) {
+          chamberQuery(u, v, hit);
+          const cd = hit.dist - chamberHalfWidth(hit.s);
+          const rim = pitRim(hillY);
+          const lid = 1 - smoothstep(rim + 1.6, rim + 3.6, cd + 0.8 * gnoise(u * 0.15, v * 0.15, sd + 36));
+          if (lid > 0) {
+            const lt = hillY + 0.75 + 0.35 * gnoise(u * 0.2, v * 0.2, sd + 37) - 3.0 * (1 - lid);
+            if (lt > top) {
+              top = lt;
+              lidK = lid;
+            }
+          }
         }
+        this.cTop[ci] = top;
+        this.cLid[ci] = lidK;
+        this.cH[ci] = H;
+        this.cLean[ci] = Math.max(-0.04, lean);
+        // --- the chamber (only near it)
+        let ceil = 0, hw = 1, s = 99, l = 99, dist = 99;
+        if (u > -16 && u < 27 && v > -11 && v < 26) {
+          chamberQuery(u, v, hit);
+          s = hit.s;
+          l = hit.l;
+          dist = hit.dist;
+          const asym = 1 - smoothstep(2, 6, s);
+          hw = chamberHalfWidth(s) * (1 + 0.14 * Math.sign(l) * asym);
+          hw *= 1 + 0.07 * gnoise(s * 0.35, l > 0 ? 3 : 9, sd + 51);
+          const ln = Math.max(-1.2, Math.min(1.2, l / hw));
+          ceil =
+            chamberCeiling(s) +
+            1.3 * ln * (1 - smoothstep(2, 7, s)) +
+            0.8 * gnoise(ln * 1.6 + 0.3, s * 0.25, sd + 55) * (1 - smoothstep(3, 8, s)) +
+            1.4 * Math.exp(-(((l + 1.6) / 0.6) ** 2)) * (1 - smoothstep(0.5, 4.5, s)) +
+            0.35 * gnoise(s * 0.4, ln * 1.3, sd + 53);
+        }
+        this.cU[ci] = u; this.cV[ci] = v; this.cUc[ci] = uc; this.cB[ci] = B;
+        this.cFace[ci] = fb + joints;
+        this.cPh[ci] = 0.09 * v + 0.04 * uc + 0.3 * gnoise(v * 0.05, uc * 0.05, sd + 61);
+        this.cFloor[ci] = floorLiftRaw(u, v, uc, s > 50 ? 0 : s);
+        this.cS[ci] = s; this.cL[ci] = l; this.cDist[ci] = dist; this.cHw[ci] = hw; this.cCeil[ci] = ceil;
+        this.cBrow[ci] = (1 - smoothstep(5.5, 9.5, Math.abs(v - 0.4))) * (0.75 + 0.35 * gnoise(v * 0.35, 2.2, sd + 71));
         const lo = Math.max(B - 2.5, p.ground(x, z) - 0.8);
-        const hi = B + Math.max(this.cTop[ci]!, 8) + 3.0;
-        this.cLo[ci] = lo; this.cHi[ci] = hi;
+        // no rock above the bench tops (nor anywhere the band has gone)
+        const hi = B + Math.max(this.cTop[ci]! + 2.5, H > 0 ? 3 : -1, dist < 12 ? 10 : -1);
+        this.cLo[ci] = lo; this.cHi[ci] = Math.max(lo, hi);
         yMin = Math.min(yMin, lo);
-        yMax = Math.max(yMax, hi);
+        yMax = Math.max(yMax, this.cHi[ci]!);
       }
     }
     this.y0 = Math.floor(yMin / cell) * cell - cell;
@@ -187,20 +213,21 @@ export class RockField {
       const v = this.z0 + iz * cell - a.z;
       for (let b = 0; b < RockField.NB; b++) this.bandTab[iz * RockField.NB + b] = 0.55 * noise3(b - 8, v * 0.07, 0.5, sd + 81);
     }
-    }
+  }
 
   /** Exact field at column ci, world (x, y, z). */
   evalAt(ci: number, x: number, y: number, z: number): number {
     this.evals++;
     const sd = this.seed;
-    const u = this.cU[ci]!, v = this.cV[ci]!, uc = this.cUc[ci]!;
+    const v = this.cV[ci]!, uc = this.cUc[ci]!;
     const Yr = y - this.cB[ci]!;
     const floorRel = this.cFloor[ci]!;
+    const H = this.cH[ci]!;
     // --- front face with strata
     const wi = Math.max(0, Math.min(510, (Yr + 16) * 8));
     const wf = wi - Math.floor(wi);
     const wob = this.wob[Math.floor(wi)]! * (1 - wf) + this.wob[Math.floor(wi) + 1]! * wf;
-    const L = (Yr + wob) / 2.3 + this.cPh[ci]!;
+    const L = (Yr + wob) / BED + this.cPh[ci]!;
     const band = Math.floor(L);
     const t = L - band;
     // band offsets blend across the parting so the field stays continuous; the parting itself is a groove
@@ -209,64 +236,53 @@ export class RockField {
     const bi = Math.max(1, Math.min(RockField.NB - 1, band + 8));
     const bandOff = this.bandTab[row + bi - 1]! * (1 - sb) + this.bandTab[row + bi]! * sb;
     const qb = band - 1 + sb;
-    const gd = 0.25 + 0.3 * Math.abs(this.bandTab[row + bi]!) * 0.0 + 0.15 * (1 + Math.sin(qb * 2.7 + v * 0.15));
+    const gd = 0.25 + 0.15 * (1 + Math.sin(qb * 2.7 + v * 0.15));
     const rec = gd * (1 - smoothstep(0, 0.13, t)) + gd * smoothstep(0.93, 1, t);
     const mt = floorRel + 5.4;
     const brow = -2.8 * this.cBrow[ci]! * smoothstep(mt - 0.6, mt + 1.4, Yr) * (1 - smoothstep(mt + 3.2, mt + 6.5, Yr));
     const n1 = noise3(x * 0.27, y * 0.27, z * 0.27, sd + 91);
     const n2 = noise3(x * 0.55 + 3.1, y * 0.55, z * 0.55, sd + 92);
     const ero = 0.6 * n1 + 0.75 * (0.3 - Math.abs(n2)); // rounded masses with sharp creases
-    // the classic cliff profile, cut back by a near-vertical lower wall (the mouth sits in it)
-    const S = cliffSurfaceUc(Yr, this.cHc[ci]!);
-    const base = smax(S, this.cFace[ci]! + 0.08 * Yr, 1.5);
-    let uFace = base + bandOff + rec + brow + ero;
-    const w = this.cW[ci]!;
-    if (w > 0) {
-      // toward the sides the face lies down onto the classic terrain cliff, then slips behind it
-      // proud of the terrain at first, then sinking under it along an irregular line
-      const ww = w + 0.15 * n1;
-      const sink = -0.8 * (1 - smoothstep(0.1, 0.6, ww)) + 2.4 * smoothstep(0.6, 1, ww);
-      const fl = cliffSurfaceUc(Yr, this.cHc[ci]!, this.cRun[ci]!) + sink + 0.3 * ero * (1 - w);
-      uFace += (fl - uFace) * smoothstep(0.15, 0.55, w);
-    }
+    // a near-vertical face, leaning back a little (varying along the band), its top edge weathered back
+    const round = 1.3 * smoothstep(H - 2.5, H + 1.2, Yr) ** 2;
+    const uFace = this.cFace[ci]! + this.cLean[ci]! * Math.max(0, Yr) + round + bandOff + rec + brow + ero;
     const fFace = (uFace - uc) * 0.75;
-    const fTop = (Yr - this.cTop[ci]! - 0.8 * ero) * 0.9;
-    let r = smax(fFace, fTop, 1.6);
-    // --- rock-fall blocks fused into the cliff base
-    for (let i = 0; i < BLOCKS.length; i++) {
-      const b = BLOCKS[i]!;
-      const pu = u - b[0], py = Yr - b[2], pv = v - b[1];
-      if (pu * pu + py * py + pv * pv > 4 * (b[3] * b[3] + b[4] * b[4] + b[5] * b[5])) continue;
-      // half-buried, irregular rock-fall block
-      const du = pu / b[3], dy = py / b[4], dv = pv / b[5];
-      const fb = (Math.sqrt(du * du + dy * dy + dv * dv) - 1) * Math.min(b[3], b[4], b[5]) + 0.5 * ero + 0.3 * n2;
-      r = smin(r, fb, 1.0);
-    }
+    const fTop = (Yr - this.cTop[ci]! - 0.8 * ero * (1 - 0.85 * this.cLid[ci]!)) * 0.85;
+    let r = smax(fFace, fTop, 1.4);
     // --- the chamber
-    const hw = this.cHw[ci]!;
+    const hw0 = this.cHw[ci]!;
     const dist = this.cDist[ci]!;
-    if (dist < hw + 3.5) {
+    if (dist < hw0 + 3.5) {
       const Yf = Yr - floorRel;
-      const l = Math.abs(this.cL[ci]!);
       const s = this.cS[ci]!;
       const C = this.cCeil[ci]!;
+      const lsig = this.cL[ci]!;
       const yb = 1.0;
       const cb = 0.85 * smoothstep(-2.6, -0.6, s) - 0.05;
+      const mw = 1 - smoothstep(2, 9, s); // mouth weight
+      // the bore leans (~8°) toward -l near the mouth, and a slumped block narrows the -l side low down
+      const lw = lsig + 0.15 * mw * Math.max(0, Yf - yb);
+      const slump = 0.9 * (1 - smoothstep(1.2, 2.6, Yf)) * smoothstep(-2.5, -0.5, -lsig) * (1 - smoothstep(1, 5, s)) * smoothstep(-3, -0.5, s);
+      const hw = hw0 - slump;
+      const dl = Math.abs(lw);
       let dch: number;
       if (Yf < yb) {
         const k = Math.max(0, Math.min(1, 1 - Yf / yb));
         const talus = (0.45 + 0.5 * noise3(x * 0.5, 0.3, z * 0.5, sd + 97) * 0.5 + 0.25) * k * k * smoothstep(-1, 1.5, s);
-        dch = Math.max(dist - (hw - talus), -cb - Yf);
+        dch = Math.max(dl - (hw - talus), -cb - Yf);
       } else {
-        const ea = dist / hw, eb = (Yf - yb) / (C - yb);
-        const ex = 2.4 + 0.5 * (1 - smoothstep(1, 7, s));
+        // (the dead end tapers to nothing: keep the vertical semi-axis positive or the carve explodes)
+        const cy = Math.max(0.35, C - yb);
+        const ea = dl / Math.max(0.3, hw), eb = (Yf - yb) / cy;
+        const ex = 2.4 - 0.35 * mw; // rounder (less box-like) near the mouth
         const rr = Math.pow(Math.pow(ea, ex) + Math.pow(Math.abs(eb), ex), 1 / ex);
-        dch = (rr - 1) * Math.min(hw, C - yb);
+        dch = (rr - 1) * Math.max(0.3, Math.min(hw, cy));
         // lobes and notches around the opening (breakdown along joints and beds)
-        const mw = 1 - smoothstep(2, 9, s);
-        if (mw > 0) dch += 1.0 * mw * noise3(Math.atan2(Yf - yb, this.cL[ci]!) * 1.4, s * 0.25, 2.5, sd + 57);
+        if (mw > 0) {
+          dch += 1.0 * mw * noise3(Math.atan2(Yf - yb, lsig) * 1.4, s * 0.25, 2.5, sd + 57);
+          dch += 0.45 * mw * noise3(x * 0.9, y * 0.9, z * 0.9, sd + 58);
+        }
       }
-      void l;
       dch += 0.34 * noise3(x * 0.45, y * 0.45, z * 0.45, sd + 98);
       r = smax(r, -dch, 0.7);
     }

@@ -19,8 +19,10 @@ import {
   createHardMaterial,
   createLockTexture,
   createShellMaterial,
+  createShadeUniform,
   createSkinMaterial,
   type FurUniforms,
+  type ShadeUniform,
 } from './model/materials';
 import {
   GAIT_MODES,
@@ -34,7 +36,7 @@ import {
 } from './model/animation';
 import { Grounding, PROBE_COUNT, type GroundSampler } from './model/ground';
 import { PoseSolver } from './model/pose';
-import { B, BONE_COUNT, BONE_NAMES, HEAD_CENTER, MOUTH_POS, PARENT_INDEX, armFrame } from './model/rig';
+import { B, BONE_COUNT, BONE_NAMES, HEAD_CENTER, HEAD_SCALE, MOUTH_POS, PARENT_INDEX, armFrame } from './model/rig';
 
 /** Debug overlay (created lazily by setDebug(true)). */
 interface DebugOverlay {
@@ -61,6 +63,7 @@ export class YetiModel {
   private eyes: THREE.Mesh;
   private furU: FurUniforms;
   private eyeGlow: THREE.IUniform<number>;
+  private shade: ShadeUniform = createShadeUniform();
   private geometries: THREE.BufferGeometry[] = [];
   private materials: THREE.Material[] = [];
   private textures: THREE.Texture[] = [];
@@ -112,6 +115,8 @@ export class YetiModel {
       if (p >= 0) this.bones[p].add(b);
     }
     this.root.add(this.bones[0]);
+    // the head (and the jaw, eyes, teeth parented under it) is enlarged about its pivot: see rig.HEAD_SCALE
+    this.bones[B.head].scale.setScalar(HEAD_SCALE);
     const inverses = this.solver.bind.map((p) => new THREE.Matrix4().makeTranslation(-p.x, -p.y, -p.z));
     this.skeleton = new THREE.Skeleton(this.bones, inverses);
     const ident = new THREE.Matrix4();
@@ -129,7 +134,7 @@ export class YetiModel {
 
     // ---- body surface
     const bodyGeo = toBufferGeometry(geo.body);
-    const skinMat = createSkinMaterial();
+    const skinMat = createSkinMaterial(this.shade);
     this.body = mkSkinned(bodyGeo, skinMat);
     this.body.name = 'YetiBody';
     this.body.castShadow = true;
@@ -137,7 +142,7 @@ export class YetiModel {
 
     // ---- shell fur: one instanced draw call for all shells
     const shellGeo = new THREE.InstancedBufferGeometry();
-    for (const name of ['position', 'normal', 'skinIndex', 'skinWeight', 'furData']) {
+    for (const name of ['position', 'normal', 'skinIndex', 'skinWeight', 'furData', 'furComb']) {
       const a = bodyGeo.getAttribute(name);
       if (a) shellGeo.setAttribute(name, a);
     }
@@ -147,7 +152,7 @@ export class YetiModel {
     shellGeo.setAttribute('shell', new THREE.InstancedBufferAttribute(shellIdx, 1));
     shellGeo.instanceCount = cfg.shells;
     this.furU = createFurUniforms(cfg.shells);
-    const shellMat = createShellMaterial(this.furU);
+    const shellMat = createShellMaterial(this.furU, this.shade);
     this.shells = mkSkinned(shellGeo, shellMat);
     this.shells.name = 'YetiShellFur';
     this.shells.castShadow = false;
@@ -157,16 +162,17 @@ export class YetiModel {
     // ---- shaggy fur cards
     const cardGeo = toBufferGeometry(geo.cards);
     const lockTex = createLockTexture();
-    const cardMat = createCardMaterial(lockTex);
+    const cardMat = createCardMaterial(lockTex, this.shade, this.furU);
     this.cards = mkSkinned(cardGeo, cardMat);
     this.cards.name = 'YetiFurCards';
-    this.cards.castShadow = true;
+    // the locks would shadow each other into hard dark streaks; the body casts the creature's shadow
+    this.cards.castShadow = false;
     this.cards.receiveShadow = true;
     this.cards.renderOrder = 2;
 
     // ---- teeth & claws
     const hardGeo = toBufferGeometry(geo.hard);
-    const hardMat = createHardMaterial();
+    const hardMat = createHardMaterial(this.shade);
     this.hard = mkSkinned(hardGeo, hardMat);
     this.hard.name = 'YetiTeethClaws';
     this.hard.castShadow = true;
@@ -178,7 +184,7 @@ export class YetiModel {
     eyeGeo.setAttribute('normal', new THREE.BufferAttribute(geo.eyes.normal, 3));
     eyeGeo.setAttribute('color', new THREE.BufferAttribute(geo.eyes.color, 3));
     eyeGeo.setIndex(new THREE.BufferAttribute(geo.eyes.index, 1));
-    const eyeMat = createEyeMaterial();
+    const eyeMat = createEyeMaterial(this.shade);
     this.eyeGlow = eyeMat.glow;
     this.eyes = new THREE.Mesh(eyeGeo, eyeMat.material);
     this.eyes.name = 'YetiEyes';
@@ -390,31 +396,17 @@ export class YetiModel {
     return this.toWorld(this.solver.pointOn(bone, this.palmBind[i], new THREE.Vector3()), target);
   }
 
-  private shadeBase: Map<THREE.Material, { color: THREE.Color | null; env: number }> | null = null;
   /**
-   * Darken the Yeti's lighting response (1 = normal, 0 = black) — for standing deep inside a cave,
-   * where the heightfield sky light would otherwise light the white fur like a stage. The eyes'
-   * glow is unaffected (it is emissive).
+   * Darken the Yeti's lighting response (1 = normal, 0 = black) — for standing deep inside a cave, where the
+   * sky/ambient light would otherwise light the white fur like a stage. One shared uniform scales everything the
+   * Yeti reflects in every material (skin, shell fur incl. its rim term, lock cards, teeth/claws, eye whites and
+   * glints; diffuse, specular, clearcoat and environment alike). Emissive eye glow (setEyeGlow) is not scaled.
+   * The response is perceptual (light × k²): white fur in direct light needs a much smaller factor than a mid-grey
+   * surface to read as "in the dark" — setShade(0.15) is ≈ 2 % of the light, near-black even in full sun.
    */
   setShade(k: number): void {
-    k = THREE.MathUtils.clamp(k, 0, 1);
-    if (!this.shadeBase) {
-      this.shadeBase = new Map();
-      this.root.traverse((o) => {
-        const mats = (o as THREE.Mesh).material;
-        if (!mats) return;
-        for (const m of Array.isArray(mats) ? mats : [mats]) {
-          const sm = m as THREE.MeshStandardMaterial;
-          if (this.shadeBase!.has(m) || !('envMapIntensity' in sm)) continue;
-          this.shadeBase!.set(m, { color: sm.color ? sm.color.clone() : null, env: sm.envMapIntensity ?? 1 });
-        }
-      });
-    }
-    for (const [m, b] of this.shadeBase) {
-      const sm = m as THREE.MeshStandardMaterial;
-      if (b.color) sm.color.copy(b.color).multiplyScalar(k);
-      sm.envMapIntensity = b.env * k;
-    }
+    const c = THREE.MathUtils.clamp(k, 0, 1);
+    this.shade.value = c * c;
   }
 
   setEyeGlow(v: number): void {

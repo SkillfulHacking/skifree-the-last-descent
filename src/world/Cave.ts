@@ -12,7 +12,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { Rng } from '../core/rng';
+import { Rng, smoothstep } from '../core/rng';
 import type { QualityPreset } from '../core/types';
 import type { Mountain } from './course';
 import {
@@ -24,8 +24,10 @@ import {
   chamberPoint,
   chamberQuery,
   floorCover,
+  floorRimDist,
   floorDip,
-  formBand,
+  FORM_V0,
+  FORM_V1,
   floorLiftRaw,
   liftMask,
 } from './caveTerrain';
@@ -139,8 +141,8 @@ export class Cave {
     const offsetAt = (x: number, z: number) => caveTerrainOffset(anchor, x, z, x - cx(z), seed);
 
     // --- terrain grids (1 m, like the pinned terrain chunk): visible ground and natural ground
-    const gx0 = Math.floor(Math.min(mx + side * -18, mx + side * 40)), gz0 = Math.floor(anchor.z - 52);
-    const gnx = 60, gnz = 106;
+    const gx0 = Math.floor(Math.min(mx + side * -18, mx + side * 40)), gz0 = Math.floor(anchor.z + FORM_V0 - 4);
+    const gnx = 60, gnz = FORM_V1 - FORM_V0 + 9;
     const gTer = new Float32Array(gnx * gnz), gRaw = new Float32Array(gnx * gnz);
     for (let j = 0; j < gnz; j++) {
       if (tk.over()) {
@@ -203,7 +205,7 @@ export class Cave {
 
     phase('floor');
     // --- bake sky visibility + AO
-    const vis = new VisibilityGrid(field, ground, q.visCell, q.rays, (z) => formBand(z - anchor.z) > 0.6, false);
+    const vis = new VisibilityGrid(field, ground, q.visCell, q.rays, undefined, false);
     yield* vis.compute(tk);
     yield* bakeAttr(tk, rockGeo, field, ground, vis, 0, 0.9);
     yield* bakeAttr(tk, floorGeo, field, ground, vis, 1, 0.7, floorRim);
@@ -240,7 +242,7 @@ export class Cave {
 
     // --- claw gouges beside the mouth (shader decal in the rock's own material)
     const claw = this.findClawFrame(field);
-    const rockMat = createCaveRockMaterial(claw, q.detail);
+    const rockMat = createCaveRockMaterial({ claw, detail: q.detail, powder: m.surfaceWeights(this.mouth.x, this.mouth.z).powder });
     const rock = new THREE.Mesh(geo, rockMat);
     rock.castShadow = true;
     rock.receiveShadow = true;
@@ -293,6 +295,7 @@ export class Cave {
     const n = this.fnx * this.fnz;
     this.fY = new Float32Array(n);
     const E = new Float32Array(n);
+    const R = new Float32Array(n);
     const hit: ChamberHit = { s: 0, l: 0, dist: 0 };
     for (let j = 0; j < this.fnz; j++) {
       if (tk.over()) {
@@ -304,8 +307,9 @@ export class Cave {
         const L = this.localOf(x, z);
         chamberQuery(L.u, L.v, hit);
         const cd = hit.dist - chamberHalfWidth(hit.s);
-        const e = floorCover(L.u, cd);
+        const e = floorCover(L.u, L.v, cd);
         E[i + j * this.fnx] = e;
+        R[i + j * this.fnx] = floorRimDist(L.u, L.v);
         if (e > 1.2) continue;
         const d = x - m.centerX(z);
         const raw = m.heightAt(x, z) - caveTerrainOffset(a, x, z, d, m.seed);
@@ -322,8 +326,8 @@ export class Cave {
       if (vmap[k]! < 0) {
         vmap[k] = pos.length / 3;
         pos.push(this.fx0 + i * FLOOR_CELL, this.fY[k]!, this.fz0 + j * FLOOR_CELL);
-        const e = E[k]!;
-        rim.push(e < -1.2 ? 0 : Math.min(1, Math.max(0, (e + 1.2) / 1.0)) ** 2);
+        // rim weight: over the last ~2 m the floor turns into the ledge snow it meets
+        rim.push(smoothstep(-2.3, -0.25, R[k]!));
       }
       return vmap[k]!;
     };
@@ -353,6 +357,21 @@ export class Cave {
         ix.setX(t + 2, b);
       }
       g.computeVertexNormals();
+    }
+    {
+      // at the rim the floor takes the heightfield's normal (no shading crease where they meet)
+      const pa = g.getAttribute('position') as THREE.BufferAttribute;
+      const na = g.getAttribute('normal') as THREE.BufferAttribute;
+      const rw = g.userData.rim as Float32Array;
+      const tn = { x: 0, y: 1, z: 0 };
+      for (let i = 0; i < na.count; i++) {
+        const r = rw[i]!;
+        if (r <= 0) continue;
+        m.normalAt(pa.getX(i), pa.getZ(i), tn);
+        const nx = na.getX(i) + (tn.x - na.getX(i)) * r, ny = na.getY(i) + (tn.y - na.getY(i)) * r, nz = na.getZ(i) + (tn.z - na.getZ(i)) * r;
+        const l = Math.hypot(nx, ny, nz) || 1;
+        na.setXYZ(i, nx / l, ny / l, nz / l);
+      }
     }
     return g;
   }
@@ -440,42 +459,58 @@ export class Cave {
     const side = this.side;
     const parts: THREE.BufferGeometry[] = [];
     const tips: number[] = [];
-    for (let v = -6.5; v <= 7.5; v += rng.range(0.22, 0.55)) {
+    /** the most outward rock underside under the brow at lateral offset v (null if none) */
+    const underside = (v: number): THREE.Vector3 | null => {
       const z = this.a.z + v;
-      // the most outward underside within the brow band
-      let found: THREE.Vector3 | null = null;
-      const yfm = this.floorHeightAt(this.mouth.x, z);
-      for (let u = -5.5; u <= 0.5 && !found; u += 0.2) {
+      const yf = Math.max(this.floorHeightAt(this.mouth.x, z), this.mouth.y);
+      for (let u = -5.5; u <= 0.5; u += 0.15) {
         const x = this.mx + side * u;
-        const yf = Math.max(yfm, this.mouth.y);
-        for (let y = yf + 3.0; y < yf + 9; y += 0.1) {
+        for (let y = yf + 3.0; y < yf + 9; y += 0.08) {
           if (field.sample(x, y, z) < 0) {
             // must be an underside: rock continues above
-            if (field.sample(x, y + 0.6, z) < 0) found = new THREE.Vector3(x + side * 0.2, y + 0.05, z);
+            if (field.sample(x, y + 0.6, z) < 0) return new THREE.Vector3(x + side * 0.15, y + 0.04, z);
             break;
           }
         }
       }
-      if (!found || rng.float() < 0.25) continue;
-      const yf = this.floorHeightAt(found.x, z);
-      const nearPath = Math.abs(v - 0.1) < 3.0;
-      let len = rng.range(0.25, 1.0) * (rng.float() < 0.2 ? 1.9 : 1);
-      if (nearPath) len = Math.min(len, found.y - yf - 4.5);
-      if (len < 0.18) continue;
-      const r = 0.035 + len * rng.range(0.04, 0.07);
-      const g = new THREE.ConeGeometry(r, len, 6, 3, true);
-      // wobble the cone a little so they are not perfect
+      return null;
+    };
+    const add = (v: number, len: number, rTop: number, broken: boolean) => {
+      const p = underside(v);
+      if (!p) return;
+      const yf = this.floorHeightAt(p.x, p.z);
+      // keep the Yeti's head clear along the walk-out line
+      if (Math.abs(v - 0.1) < 3.0) len = Math.min(len, p.y - yf - 4.5);
+      if (len < 0.1) return;
+      // a tapering cone with a slight kink and ripples; broken ones end in a blunt stump
+      const seg = Math.max(3, Math.round(len * 6));
+      const g = new THREE.CylinderGeometry(rTop, broken ? rTop * 0.35 : 0.004, len, 6, seg, true);
       const pa = g.getAttribute('position') as THREE.BufferAttribute;
+      const kx = rng.range(-0.06, 0.06), kz = rng.range(-0.06, 0.06), ph = rng.range(0, 6.28);
       for (let i = 0; i < pa.count; i++) {
-        const t = (pa.getY(i) + len / 2) / len;
-        const k = 1 + 0.25 * Math.sin(t * 9 + v * 5) * t;
-        pa.setXYZ(i, pa.getX(i) * k, pa.getY(i), pa.getZ(i) * k);
+        const t = 0.5 - pa.getY(i) / len; // 0 at the root … 1 at the tip
+        const k = 1 + 0.18 * Math.sin(t * 17 + ph) * (1 - t);
+        pa.setXYZ(i, pa.getX(i) * k + kx * t * t * len, pa.getY(i), pa.getZ(i) * k + kz * t * t * len);
       }
-      g.rotateX(Math.PI);
-      g.translate(found.x, found.y - len / 2, found.z);
+      g.translate(p.x, p.y - len / 2, p.z);
       parts.push(g);
-      tips.push(found.x, found.y - len, found.z);
+      tips.push(p.x, p.y - len, p.z);
+    };
+    // drip points under the brow (where melt water runs off): clusters with gaps between them
+    const drips = 5 + rng.int(0, 2);
+    for (let d = 0; d < drips; d++) {
+      const vc = -6 + (13.5 * (d + rng.range(0.15, 0.85))) / drips;
+      const n = rng.int(2, 7);
+      const lead = rng.range(0.6, 1.7); // the longest icicle of the cluster
+      for (let i = 0; i < n; i++) {
+        const v = vc + rng.range(-0.55, 0.55) * (0.4 + i * 0.12);
+        const len = i === 0 ? lead : lead * rng.range(0.12, 0.7);
+        const r = 0.025 + len * rng.range(0.035, 0.065);
+        add(v, len, r, rng.float() < 0.18);
+      }
     }
+    // a few stray small ones
+    for (let i = 0; i < 6; i++) add(rng.range(-6.5, 7.5), rng.range(0.1, 0.35), 0.02 + rng.range(0, 0.02), rng.float() < 0.3);
     if (!parts.length) return null;
     const merged = mergeGeometries(parts, false)!;
     for (const p of parts) p.dispose();
@@ -589,6 +624,7 @@ function* bakeAttr(tk: Tick, g: THREE.BufferGeometry, f: RockField, ground: Grou
   const p = g.getAttribute('position') as THREE.BufferAttribute;
   const n = g.getAttribute('normal') as THREE.BufferAttribute;
   const out = new Float32Array(p.count * 4);
+  const hit: ChamberHit = { s: 0, l: 0, dist: 0 };
   for (let i = 0; i < p.count; i++) {
     if (tk()) {
       yield;
@@ -599,7 +635,14 @@ function* bakeAttr(tk: Tick, g: THREE.BufferGeometry, f: RockField, ground: Grou
     out[i * 4] = vis.at(x + nx * off, y + ny * off, z + nz * off);
     out[i * 4 + 1] = localAO(f, ground, x, y, z, nx, ny, nz);
     out[i * 4 + 2] = kind + (rim ? rim[i]! : 0);
-    out[i * 4 + 3] = kind ? 0 : formBand(z - f.a.z);
+    // bounce from the mouth: strongest just inside, falling off with depth along the chamber
+    const u = (x - f.mx) * f.a.side, v = z - f.a.z;
+    let b = 0;
+    if (u > -4 && u < 26 && v > -10 && v < 24) {
+      chamberQuery(u, v, hit);
+      if (hit.dist < chamberHalfWidth(hit.s) + 1.5) b = Math.exp(-Math.max(0, hit.s + 0.5) / 5.0);
+    }
+    out[i * 4 + 3] = b;
   }
   g.setAttribute('aCave', new THREE.BufferAttribute(out, 4));
 }

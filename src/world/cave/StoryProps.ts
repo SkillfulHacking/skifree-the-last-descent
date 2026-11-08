@@ -17,26 +17,67 @@ export class Footprints {
   private n = { x: 0, y: 1, z: 0 };
 
   constructor(private m: Mountain, capacity = 400) {
-    const c = document.createElement('canvas');
-    c.width = c.height = 128;
-    const ctx = c.getContext('2d')!;
-    // a big five-toed print: soft blue-grey shadowed impression
-    const grad = (x: number, y: number, r: number) => {
-      const gr = ctx.createRadialGradient(x, y, 0, x, y, r);
-      gr.addColorStop(0, 'rgba(70,90,120,0.85)');
-      gr.addColorStop(0.7, 'rgba(90,110,140,0.55)');
-      gr.addColorStop(1, 'rgba(120,140,170,0)');
-      ctx.fillStyle = gr;
-      ctx.beginPath();
-      ctx.ellipse(x, y, r, r * 1.25, 0, 0, Math.PI * 2);
-      ctx.fill();
+    // a big five-toed print pressed into the snow: a soft height field (heel, ball, toes), turned into a
+    // normal map (the walls of the depression catch and lose the light) and a faint cold tint in the
+    // deepest parts. Alpha fades with depth, so the decal has no edge or outline.
+    const N = 128;
+    const hgt = new Float32Array(N * N);
+    const blob = (cx: number, cy: number, rx: number, ry: number, d: number) => {
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const dx = (x - cx) / rx, dy = (y - cy) / ry;
+          const r2 = dx * dx + dy * dy;
+          if (r2 < 4) hgt[x + y * N] = Math.max(hgt[x + y * N]!, d * Math.exp(-r2 * 1.6));
+        }
+      }
     };
-    grad(64, 78, 30);
-    grad(64, 46, 26);
-    for (let i = 0; i < 5; i++) grad(34 + i * 15, 18 + Math.abs(i - 2) * 4, 9);
-    const tex = new THREE.CanvasTexture(c);
+    blob(64, 84, 22, 26, 0.9); // heel
+    blob(64, 54, 25, 20, 1.0); // ball
+    for (let i = 0; i < 5; i++) blob(36 + i * 14, 24 + Math.abs(i - 2) * 4, 7, 9, 0.75); // toes
+    // flatten the bottom a little (packed snow), keep soft walls
+    for (let i = 0; i < hgt.length; i++) hgt[i] = Math.min(1, hgt[i]! * 1.25);
+    const cCol = document.createElement('canvas');
+    const cNrm = document.createElement('canvas');
+    cCol.width = cCol.height = cNrm.width = cNrm.height = N;
+    const col = cCol.getContext('2d')!.createImageData(N, N);
+    const nrm = cNrm.getContext('2d')!.createImageData(N, N);
+    const H = (x: number, y: number) => hgt[Math.min(N - 1, Math.max(0, x)) + Math.min(N - 1, Math.max(0, y)) * N]!;
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const k = (x + y * N) * 4;
+        const d = H(x, y);
+        // depression: surface height = -d
+        const gx = -(H(x + 1, y) - H(x - 1, y)) * 0.5, gy = -(H(x, y + 1) - H(x, y - 1)) * 0.5;
+        const s = 9;
+        let nx = -gx * s, ny = gy * s, nz = 1;
+        const l = Math.hypot(nx, ny, nz);
+        nx /= l; ny /= l; nz /= l;
+        nrm.data[k] = (nx * 0.5 + 0.5) * 255;
+        nrm.data[k + 1] = (ny * 0.5 + 0.5) * 255;
+        nrm.data[k + 2] = (nz * 0.5 + 0.5) * 255;
+        nrm.data[k + 3] = 255;
+        col.data[k] = 0.84 * 255;
+        col.data[k + 1] = 0.88 * 255;
+        col.data[k + 2] = 0.95 * 255;
+        col.data[k + 3] = Math.min(1, d * 1.4) ** 1.5 * 0.9 * 255;
+      }
+    }
+    cCol.getContext('2d')!.putImageData(col, 0, 0);
+    cNrm.getContext('2d')!.putImageData(nrm, 0, 0);
+    const tex = new THREE.CanvasTexture(cCol);
     tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+    const ntex = new THREE.CanvasTexture(cNrm);
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex,
+      normalMap: ntex,
+      normalScale: new THREE.Vector2(1, 1),
+      transparent: true,
+      depthWrite: false,
+      roughness: 0.92,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    });
     const geo = new THREE.PlaneGeometry(0.9, 1.3).rotateX(-Math.PI / 2);
     this.mesh = new THREE.InstancedMesh(geo, mat, capacity);
     this.mesh.count = capacity;
@@ -69,6 +110,7 @@ export class Footprints {
     this.mesh.geometry.dispose();
     const mat = this.mesh.material as THREE.MeshStandardMaterial;
     mat.map?.dispose();
+    mat.normalMap?.dispose();
     mat.dispose();
   }
 }
