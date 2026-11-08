@@ -65,3 +65,43 @@ These are stated plainly. AAA quality was the target, not a claim. The review re
 - **Victory:** the skier keeps holding the poles while raising the trophy.
 - **Playtesting:** no human playtesting has been done. All feel tuning used scripted bots, numerical
   experiments and reviewer analysis.
+
+
+## Pass 2 status (2026-11-07)
+
+These are tracked with IDs in `docs/reviews/pass2/DEFECTS.md`; reviews are in
+`docs/reviews/pass2/round*/`. All reviews are **internal** (other model instances), not external
+human reviewers.
+
+**Verified by measurement or tests:**
+- **Menu:** fits without scrolling at the 4 target sizes. Some menu e2e tests were changed after
+  their last green run; see the tracker.
+- **Course lengths:** headless runs complete 3, 10, 20 and 50 km courses, and wins and losses are
+  both possible.
+- **Daily:** determinism and UTC rollover are covered by tests.
+- **Endless memory:** a 120 km browser session showed bounded GPU resources and JS heap
+  (`docs/reviews/pass2/endless_memory.json`).
+- **Floating origin:** correct at 50 km and beyond.
+- **Grounding:** the Yeti's soles do not penetrate the floor in any captured frame of the cave
+  cinematic.
+
+**Still open or unverified:**
+- **No GPU frame rates.** Scene cost went up in pass 2: near conifers are about 650–840 triangles,
+  and a High gameplay frame is about 4–5.6 M triangles including shadow passes. It must be measured
+  on real hardware; reduce `Vegetation.nearDist` or tree tiers if needed.
+- **Cave:** after two rounds it reads as a rock band in the hillside, but close up the rock creases
+  look quilted. There is still a visible floor lip at the mouth (A10), and the footprint decals read
+  as icons (A6).
+- **Yeti:**
+  - side fringe cards look like flat ribbons close up;
+  - the head fur is coarser than the body fur after the head was scaled up;
+  - the collected gallop phase is compact.
+- **Trees:** close up (under 5 m) the tiers look polygonal and somewhat regular.
+- **Terrain:** distant rock is soft rather than crisp. Some egg-crate relief remains in the
+  heightfield noise on hillsides.
+- **Course codes:** gamepad-only players cannot type a course code (E6). Every other control works
+  with a gamepad.
+- **Endless:** plan arrays grow slowly with distance (B6). Lookups are about 1.5× slower at
+  1,000 km; memory is not affected.
+- **Precision:** particles and tracks use absolute float32 positions (B12). The error is under 4 mm
+  at 50 km and about 3 cm beyond 250 km of Endless.
