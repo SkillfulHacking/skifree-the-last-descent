@@ -105,6 +105,7 @@ export class MenuSystem {
   }
 
   close() {
+    this.drafts.clear();
     this.stack = [];
     this.root.classList.add('hidden');
   }
@@ -208,18 +209,30 @@ export class MenuSystem {
         const input = row.querySelector('input')!;
         input.value = it.get();
         input.addEventListener('focus', () => (this.listening = true));
+        // Enter applies. Leaving the field keeps the typed text as a draft WITHOUT re-rendering
+        // the menu (a re-render would swallow the click that caused the blur, e.g. on Start);
+        // drafts are applied before any button runs (commitDrafts).
         input.addEventListener('blur', () => {
           this.listening = false;
-          if (input.value.trim() && input.value !== it.get()) {
-            it.set(input.value.trim());
-            this.refresh();
-          } else input.value = it.get();
+          const v = input.value.trim();
+          if (v && v !== it.get()) this.drafts.set(it, v);
+          else this.drafts.delete(it);
         });
         input.addEventListener('keydown', (e) => {
           if (e.key === 'Enter' || e.key === 'Escape') {
             e.preventDefault();
-            if (e.key === 'Escape') input.value = it.get();
-            input.blur();
+            if (e.key === 'Escape') {
+              input.value = it.get();
+              this.drafts.delete(it);
+              input.blur();
+            } else {
+              const v = input.value.trim();
+              this.drafts.delete(it);
+              input.blur();
+              this.drafts.delete(it);
+              if (v && v !== it.get()) it.set(v);
+              this.refresh();
+            }
           }
         });
         break;
@@ -288,11 +301,29 @@ export class MenuSystem {
     this.refresh();
   }
 
+  private drafts = new Map<MenuItem, string>();
+
+  /** Apply text typed into fields but not confirmed with Enter. Returns true if any applied. */
+  commitDrafts(): boolean {
+    if (!this.drafts.size) return false;
+    const pending = [...this.drafts];
+    this.drafts.clear();
+    for (const [it, v] of pending) if (it.kind === 'text') it.set(v);
+    return true;
+  }
+
   private activate() {
     const it = this.current?.items[this.index];
     if (!it) return;
     this.onSound?.('click');
-    if (it.kind === 'button') it.action();
+    if (it.kind === 'button') {
+      // apply typed-but-unconfirmed text first; the action then sees the up-to-date state
+      if (this.commitDrafts()) {
+        const same = this.current?.items.find((x) => x.kind === 'button' && x.label === it.label);
+        if (same && same.kind === 'button') return same.action();
+      }
+      it.action();
+    }
     else if (it.kind === 'toggle') this.adjust(1);
     else if (it.kind === 'select') this.adjust(1);
     else if (it.kind === 'text') {

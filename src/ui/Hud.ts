@@ -31,7 +31,7 @@ export interface HudFrame {
 /** 640 m · 8.4 km · 48 km */
 export function fmtDistance(m: number): string {
   const v = Math.max(0, m);
-  if (v < 1000) return `${Math.round(v)} m`;
+  if (Math.round(v) < 1000) return `${Math.round(v)} m`;
   if (v < 20000) return `${(v / 1000).toFixed(1)} km`;
   return `${Math.round(v / 1000)} km`;
 }
@@ -181,6 +181,11 @@ export class Hud {
     this.cap.textContent = text;
     this.cap.classList.add('on');
     this.capTimer = seconds;
+  }
+
+  clearCaption() {
+    this.capTimer = 0;
+    this.cap.classList.remove('on');
   }
 
   showFps(on: boolean) {

@@ -17,6 +17,7 @@ type MW = {
 };
 
 async function boot(page: Page, settings: Record<string, unknown> = {}) {
+  // one init script per page: seeds settings on the first load only (reloads keep test changes)
   await page.addInitScript((s) => {
     if (!sessionStorage.getItem('booted')) {
       sessionStorage.setItem('booted', '1');
@@ -70,14 +71,18 @@ for (const [w, h] of [
   });
 }
 
-test('browser zoom 125% and UI scale 150% keep the menu usable (scroll only if needed)', async ({ page }) => {
+test('browser zoom 125% and UI scale 150% keep the menu usable (scroll only if needed)', async ({ page: first }) => {
+  let page = first;
   await page.setViewportSize({ width: 1536, height: 864 }); // 1920x1080 at 125%
   await boot(page);
   let l = await layout(page);
   expect(l).toMatchObject({ panelScroll: 0, overflowX: 0, titleClipped: false, rowsOutside: 0 });
-  await page.evaluate(() => sessionStorage.removeItem('booted'));
-  await page.setViewportSize({ width: 1366, height: 768 });
-  await boot(page, { uiScale: 1.5 });
+  // a fresh page (its own single init script) so the 150 % UI scale really applies (E4)
+  const page2 = await page.context().newPage();
+  await page2.setViewportSize({ width: 1366, height: 768 });
+  await boot(page2, { uiScale: 1.5 });
+  expect(await page2.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui-scale').trim())).toBe('1.5');
+  page = page2;
   l = await layout(page);
   expect(l.overflowX).toBe(0);
   expect(l.titleClipped).toBe(false);
@@ -131,11 +136,28 @@ test('a course code typed into the menu selects that course', async ({ page }) =
   await boot(page);
   const input = page.locator('.menu-row', { hasText: 'Enter a course code' }).locator('input');
   await input.focus();
-  await input.fill('seed-777-end');
-  await input.press('Enter');
+  // real key events: letters such as S/D/W/A and Space are game/menu keys elsewhere
+  await page.keyboard.type('seed-777-end', { delay: 20 });
+  expect(await page.evaluate(() => (window as unknown as MW).__skifree.state().menu)).toBe('main');
+  await page.keyboard.press('Enter');
   const c = await page.evaluate(() => (window as unknown as MW).__skifree.currentCourse());
   expect(c.id).toBe('SEED-777-END');
   expect(c.mode).toBe('custom');
-  // typing never triggers game/menu shortcuts (S, D, Space…)
   await expect(page.locator('.menu-root')).toBeVisible();
+  // an invalid code keeps the text and explains why, inline (E1)
+  const input2 = page.locator('.menu-row', { hasText: 'Enter a course code' }).locator('input');
+  await input2.focus();
+  await page.keyboard.type('NOPE-123', { delay: 20 });
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.course-card .err')).toContainText('NOPE-123');
+  await expect(page.locator('.menu-row', { hasText: 'Enter a course code' }).locator('input')).toHaveValue('NOPE-123');
+  // typing a seed then clicking Start straight away starts that course (E2: the click isn't lost)
+  await page.evaluate(() => (window as unknown as MW).__skifree.setCourse('custom', 'sprint'));
+  const seed = page.locator('.menu-row', { hasText: 'Seed' }).locator('input');
+  await seed.focus();
+  await seed.fill('');
+  await page.keyboard.type('AVALANCHE', { delay: 20 });
+  await page.locator('.menu-row.primary').click();
+  await page.waitForFunction(() => (window as unknown as MW).__skifree.state().mode === 'playing', null, { timeout: 600_000, polling: 1000 });
+  expect(await page.evaluate(() => (window as unknown as { __skifree: { state(): { course: { label: string } } } }).__skifree.state().course.label)).toContain('AVALANCHE');
 });

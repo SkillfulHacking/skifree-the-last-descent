@@ -42,3 +42,44 @@ Severity: **C** = critical/blocking · **M** = major · **m** = minor.
 | B10 | m | Codes | Future-day codes are accepted; numeric seeds wrap. | fixed-unverified (future days rejected; numbers above 2³²−1 are hashed). A word seed still shows as its number after a code round-trip (by design, documented) |
 | B11 | m | Config | The serialisable config has no difficulty field and the segment plan can't be exported. | fixed-unverified (Relaxed/Normal/Hard Yeti difficulty in config, menu, course id and records; `courseSpec()` exports the derived plan as JSON) |
 | B12 | m | Precision | Particles, tracks and instances store absolute float32 positions. | wontfix (under 4 mm at 50 km; about 3 cm beyond 250 km of Endless; documented) |
+
+### Round 1: Reviewer A, visual (internal; commit 41ceb7a; see `round1/A_visual.md`). Rejected: 5 of 8 areas fail
+
+| IDs | Area | Severity | Status |
+|---|---|---|---|
+| A1–A8, A10, A13 | Cave geology and integration: box or loaf on the slope, door-like jambs, smears, shard facets, black void, floor disc seam, preview cameras | C/M | open (round-2 cave engineer assigned) |
+| A6 | Footprint decals render as line art | m | open (cave engineer) |
+| A9, A12 | The Yeti looks stage-lit in the dark; a bright orb near the floor | M | partial: `setShade` (89d7ef6); the creature engineer is checking every light term; the orb is being investigated by the cave engineer |
+| A11 | Wall brightness jumps between beats | M | open (to be re-checked once the cave and shading are fixed) |
+| A14–A19, A21 | Yeti fur reads as confetti or ice shards; small head, no neck; glove-like hands and feet; gallop and crawl pose; splayed leap | M/m | open (round-2 creature engineer assigned) |
+| A20 | `rootAboveFloor` reads 0 by construction; the count of 438 visible frames is unclear | m | fixed-unverified: the capture tool now also measures hands and the per-frame root step (see C3) |
+| A22–A24, A29 | Tree tops are four-pointed stars; flat radial whorls; trees on vertical rock; uniform pebble rocks | M/m | open (round-2 terrain/trees engineer assigned) |
+| A25 | Contour-line artefacts on mid-distance slopes | C | partial: distance fade (9584cbd); fwidth anti-aliasing assigned |
+| A26–A28, A30, A31 | Speckle, cardboard wall slabs, straight strata, egg-crate noise, flat distant ranges | M/m | open (terrain engineer) |
+| A32 | Styles clash | M | open (terrain engineer: smooth-shaded trees and start gate) |
+| A33 | Menu view crops the START banner and hides the skier | m | open (terrain engineer: StartArea) |
+
+### Round 1: Reviewer C/E, cinematic and UI (internal; commit 41ceb7a; see `round1/CE_cinematic_ui.md`). Rejected: both 7/10, pass mark 8
+
+| ID | Sev | Defect | Status |
+|---|---|---|---|
+| C1 | C | The leap ignores an ~11 m drop, so the Yeti may still be airborne at hand-off and get reset to the ledge (a teleport) | fixed-unverified: ballistic flight time solved from the drop; an in-flight hand-off keeps position and velocity |
+| C2 | M | 0.6 m jump at t=6.2 | fixed-unverified: the crawl eases out exactly to the grip point |
+| C3 | M | Report misses 15.8–17 s and the hand-off; no hands, head or step checks | fixed-unverified: the capture runs to 18 s and records hands, head and max root step per frame |
+| C4 | m | The Yeti is fully lit in the 3.8 s "shadow" beat | partial (`setShade`); creature engineer |
+| C5 | m | A stale caption at t=0.1 | fixed-unverified: captions cleared at the start of the cinematic |
+| C6 | m | Feet cropped at 9.5 s | fixed-unverified: emerge shot reframed |
+| C7 | m | Skier not in frame for the over-the-shoulder leap | fixed-unverified: the camera sits behind the skier on the line to the cave |
+| C8 | m | At 15.8 s the Yeti looks as if it's above the cave roof | fixed-unverified (via C1 and C7) |
+| C9 | m | A white blob between the hands | open (see A12) |
+| E1 | M | An invalid code is reported through the hidden HUD and the text is wiped | fixed-unverified: inline error in the course card; the text is kept |
+| E2 | M | Clicking Start after typing loses the click (blur triggers a re-render) | fixed-unverified: typed text becomes a draft; buttons commit drafts first; e2e test added |
+| E3 | M | Padding is a % of width, so little headroom at 1366×768 with the Yeti row | fixed-unverified: vh padding; tests and screenshots must be re-run |
+| E4 | M | The 150 % UI-scale test may never apply its setting | fixed-unverified: a fresh page with one init script, and `--ui-scale` asserted |
+| E5 | M | The code test is not re-run and `fill()` sends no keys | fixed-unverified: `keyboard.type` with real key events; to be re-run |
+| E6 | m | No code entry for gamepad-only users | wontfix for now (codes are optional; every other control is reachable by gamepad) |
+| E7 | m | Hard-coded placeholder date | fixed-unverified: today's date |
+| E8 | m | The Start hint shows only the length | fixed-unverified: mountain · length · difficulty |
+| E9 | m | Retire has no confirmation | fixed-unverified: two-step confirmation |
+| E10 | m | Text is small at 2560×1440 | fixed-unverified: larger caps and a large-screen rule |
+| E11 | m | `fmtDistance(999.6)` shows "1000 m" | fixed-unverified |

@@ -6,7 +6,7 @@ import { caveMouthXZ, type CaveAnchor } from '../world/caveTerrain';
  * Where the Yeti stands at the end of the cave cinematic (on the ledge in the cave mouth),
  * and the leap that carries it down onto the slope when the chase begins.
  */
-export function yetiSpawnAfterCinematic(m: Mountain, anchor: CaveAnchor = m.caves[0]!, ledge?: THREE.Vector3): { pos: THREE.Vector3; heading: number; leap: THREE.Vector3 } {
+export function yetiSpawnAfterCinematic(m: Mountain, anchor: CaveAnchor = m.caves[0]!, ledge?: THREE.Vector3): { pos: THREE.Vector3; heading: number; leap: THREE.Vector3; flight: number } {
   const c = caveMouthXZ(anchor);
   // the cave's own ledge point when known (the cinematic ends there), else just outside the mouth
   const x = ledge ? ledge.x : c.x - 3 * anchor.side;
@@ -17,7 +17,12 @@ export function yetiSpawnAfterCinematic(m: Mountain, anchor: CaveAnchor = m.cave
   const tz = anchor.z + 14;
   const heading = Math.atan2(tx - x, tz - z);
   const dist = Math.hypot(tx - x, tz - z);
-  const flight = 1.0;
-  const leap = new THREE.Vector3(((tx - x) / dist) * (dist / flight), 6.5, ((tz - z) / dist) * (dist / flight));
-  return { pos, heading, leap };
+  // a real ballistic arc: hop up at vUp, then fall to the landing point's height (the ledge can be
+  // ~10 m above the piste) — the flight time follows from the drop, so he always lands on the target
+  const g = 9.81;
+  const vUp = 5.5;
+  const drop = pos.y - m.heightAt(tx, tz);
+  const flight = (vUp + Math.sqrt(vUp * vUp + 2 * g * Math.max(-1, drop))) / g;
+  const leap = new THREE.Vector3(((tx - x) / dist) * (dist / flight), vUp, ((tz - z) / dist) * (dist / flight));
+  return { pos, heading, leap, flight };
 }

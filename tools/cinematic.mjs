@@ -20,7 +20,7 @@ await p.evaluate(() => window.__skifree.startRun(true));
 await p.evaluate(() => { window.__skifree.seenCave(false); window.__skifree.hold(true); window.__skifree.toCave(); });
 // step until the cinematic starts
 await p.evaluate(() => { for (let i = 0; i < 400 && window.__skifree.state().session.phase !== 'caveCinematic'; i++) window.__skifree.frames(1); });
-const beats = [0.1, 3.8, 5.4, 6.6, 7.9, 9.5, 11.0, 14.6, 15.8];
+const beats = [0.1, 3.8, 5.4, 6.6, 7.9, 9.5, 11.0, 14.6, 15.8, 16.6];
 const report = [];
 for (const T of beats) {
   const rows = await p.evaluate((T) => {
@@ -41,12 +41,41 @@ for (const T of beats) {
   console.log(`t=${T}`, JSON.stringify(g));
   await p.screenshot({ path: `${outDir}/cine_t${String(T).replace('.', '_')}.png`, timeout: 600000 });
 }
-const vis = report.filter((r) => r && r.visible && r.mode !== 'leap');
+// continue through the end of the cinematic and 1.5 s into the chase (hand-off continuity)
+const tail = await p.evaluate(() => {
+  const out = [];
+  let chase = 0;
+  for (let i = 0; i < 600 && chase < 45; i++) {
+    window.__skifree.frames(1);
+    const g = window.__skifree.yetiGround();
+    g.phase = window.__skifree.state().session.phase;
+    out.push(g);
+    if (g.phase === 'chase') chase++;
+  }
+  return out;
+});
+report.push(...tail);
+await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+await p.screenshot({ path: `${outDir}/cine_handoff_chase.png`, timeout: 600000 });
+// per-frame root displacement across the whole sequence (a teleport shows up as a spike)
+let maxStep = 0;
+let maxStepAt = null;
+for (let i = 1; i < report.length; i++) {
+  const a = report[i - 1]?.pos;
+  const b = report[i]?.pos;
+  if (!a || !b) continue;
+  const d = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+  if (d > maxStep) { maxStep = d; maxStepAt = { i, t: report[i].t, phase: report[i].phase, mode: report[i].mode }; }
+}
+const grounded = report.filter((r) => r && r.visible && r.mode !== 'leap' && r.mode !== 'hidden');
+const vis = grounded;
 const minL = Math.min(...vis.map((r) => r.left));
 const minR = Math.min(...vis.map((r) => r.right));
 const worst = vis.reduce((a, r) => (Math.min(r.left, r.right) < Math.min(a.left, a.right) ? r : a), vis[0]);
 const minRoof = Math.min(...vis.map((r) => r.roofClearance));
-const summary = { frames: report.length, visibleFrames: vis.length, minSoleClearanceLeft: minL, minSoleClearanceRight: minR, worstFrame: worst, minRoofClearanceAtRoot: minRoof, maxRootAboveFloor: Math.max(...vis.map((r) => r.rootAboveFloor)), minRootAboveFloor: Math.min(...vis.map((r) => r.rootAboveFloor)), errors };
+const handsMin = Math.min(...vis.map((r) => Math.min(r.handL, r.handR)));
+const headMin = Math.min(...vis.map((r) => r.headBelowRoof));
+const summary = { frames: report.length, groundedFramesChecked: vis.length, phasesCovered: [...new Set(report.map((r) => r && r.phase))], maxRootStepPerFrame: maxStep, maxRootStepAt: maxStepAt, minHandAboveFloor: handsMin, minHeadBelowRoof: headMin, minSoleClearanceLeft: minL, minSoleClearanceRight: minR, worstFrame: worst, minRoofClearanceAtRoot: minRoof, maxRootAboveFloor: Math.max(...vis.map((r) => r.rootAboveFloor)), minRootAboveFloor: Math.min(...vis.map((r) => r.rootAboveFloor)), errors };
 console.log('SUMMARY', JSON.stringify(summary));
 writeFileSync(`${outDir}/grounding_report.json`, JSON.stringify({ summary, frames: report }, null, 1));
 await b.close();

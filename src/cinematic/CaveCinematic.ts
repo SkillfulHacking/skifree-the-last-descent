@@ -69,7 +69,7 @@ export class CaveCinematic {
     };
     tl.shot({ start: 6.6, end: 7.9, from: handShot(2.8, 34), to: handShot(2.4, 32), handheld: 0.012 });
     // Beat 6–7: he emerges and rises to full height (low angle)
-    tl.shot({ start: 7.9, end: 11.0, from: () => pose(at(M, 9.0, 1.4, 3.2), M.clone().addScaledVector(O, 0.6).add(new THREE.Vector3(0, 1.8, 0)), 50), to: () => pose(at(M, 8.2, 1.2, 2.8), M.clone().addScaledVector(O, 1.6).add(new THREE.Vector3(0, 2.6, 0)), 48), handheld: 0.02 });
+    tl.shot({ start: 7.9, end: 11.0, from: () => pose(at(M, 9.0, 1.4, 3.2), M.clone().addScaledVector(O, 0.6).add(new THREE.Vector3(0, 1.8, 0)), 50), to: () => pose(at(M, 8.6, 1.5, 2.8), M.clone().addScaledVector(O, 1.6).add(new THREE.Vector3(0, 1.9, 0)), 50), handheld: 0.02 });
     // Beat 8: the roar — wide, then (beat 9) a close-up on the face
     tl.shot({ start: 11.0, end: 12.3, from: () => pose(at(M, 7.5, 0.6, 3.2), M.clone().add(new THREE.Vector3(-1.5, 3.0, 0)), 46), to: () => pose(at(M, 7, 0.5, 3), M.clone().add(new THREE.Vector3(-1.5, 3.2, 0)), 44) });
     tl.shot({
@@ -87,9 +87,11 @@ export class CaveCinematic {
     // Beat 10: cut to the skier, who looks back over their shoulder
     tl.shot({ start: 13.7, end: 14.6, from: () => reactionCam, to: () => pose(reactionCam.pos.clone().add(new THREE.Vector3(0, 0.1, 0.4)), reactionCam.look, 44) });
     // Beat 10b: he leaps from the ledge toward the piste — seen past the skier's shoulder
-    const leapCam = P.clone().addScaledVector(downhill, -2.6).addScaledVector(toCave, -1.6).add(new THREE.Vector3(0, 1.5, 0));
-    const yetiLook = () => st.yeti.root.position.clone().add(new THREE.Vector3(0, 1.6, 0));
-    tl.shot({ start: 14.6, end: 15.8, from: () => pose(leapCam, yetiLook(), 30), to: () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.3, 0)), yetiLook(), 38) });
+    // over the skier's shoulder: camera behind the skier on the line to the cave, framing both
+    const leapCam = P.clone().addScaledVector(toCave, -3.4).addScaledVector(downhill, 0.8).add(new THREE.Vector3(0, 1.9, 0));
+    const skierHead = P.clone().add(new THREE.Vector3(0, 1.5, 0));
+    const yetiLook = () => st.yeti.root.position.clone().add(new THREE.Vector3(0, 1.6, 0)).lerp(skierHead, 0.18);
+    tl.shot({ start: 14.6, end: 15.8, from: () => pose(leapCam, yetiLook(), 44), to: () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.3, 0)), yetiLook(), 50) });
     // Beat 11: swing back into third person
     tl.shot({ start: 15.8, end: 17.0, from: () => pose(leapCam, yetiLook(), 38), via: () => pose(P.clone().addScaledVector(downhill, -5).add(new THREE.Vector3(0, 3, 0)), P.clone().add(new THREE.Vector3(0, 1.2, 4)), 58), to: followPose, easing: ease.inOutCubic });
 
@@ -97,6 +99,7 @@ export class CaveCinematic {
     tl.at(0, () => {
       st.hud.letterbox(true);
       st.hud.gameplayWidgets(false);
+      st.hud.clearCaption();
       st.audio.setMusicMode('tension');
       st.audio.playYetiGrowl(M, false);
       st.yetiManual = true;
@@ -203,9 +206,9 @@ export class CaveCinematic {
     } else if (t < 6.2) {
       // a low prowl up the tunnel from the deep chamber (deep in the dark until the eyes beat)
       const k = Math.min(1, Math.max(0, (t - 1.0) / 5.2));
-      const sNow = CRAWL_FROM + (GRIP_AT + 0.6 - CRAWL_FROM) * k;
+      const sNow = CRAWL_FROM + (GRIP_AT - CRAWL_FROM) * ease.out(k);
       this.placeAt(sNow);
-      st.yetiAnim.speed = t < 1.0 ? 0 : Math.abs(GRIP_AT + 0.6 - CRAWL_FROM) / 5.2;
+      st.yetiAnim.speed = t < 1.0 ? 0 : (Math.abs(GRIP_AT - CRAWL_FROM) / 5.2) * Math.max(0.15, 1 - k) * 2; // ease-out speed
     } else st.yetiAnim.speed = 0;
     // the light drops while we stare into the darkness (sky/ambient light would otherwise
     // wash the inside of the cave; the sun is already blocked by the tunnel's shadow)
@@ -265,6 +268,14 @@ export class CaveCinematic {
       const p = st.yeti.root.position;
       st.yetiAI.place(p.x, p.z, this.leap.heading);
       st.yetiAI.startChase(null);
+    } else if (this.leap) {
+      // still in the air when the cinematic ends: hand the flight over as it is (no reset, no
+      // second leap — C1)
+      const L = this.leap;
+      const p = st.yeti.root.position;
+      st.yetiAI.pos.copy(p);
+      st.yetiAI.heading = L.heading;
+      st.yetiAI.startChase(new THREE.Vector3(L.vel.x, L.vel.y - 9.81 * L.t, L.vel.z));
     } else {
       const sp = yetiSpawnAfterCinematic(st.world.mountain, st.world.focusEncounter?.anchor, st.world.cave.ledge);
       st.yetiAI.place(sp.pos.x, sp.pos.z, sp.heading, sp.pos.y - st.world.mountain.heightAt(sp.pos.x, sp.pos.z));

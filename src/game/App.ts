@@ -228,6 +228,9 @@ export class App {
     this.menu.open(this.mainScreen());
   }
 
+  private codeDraft = '';
+  private codeError: string | null = null;
+
   private mainScreen(): Screen {
     const st = this.settings;
     const c = this.currentCourse();
@@ -238,7 +241,13 @@ export class App {
       this.menu.replace(this.mainScreen());
     };
     const items: MenuItem[] = [
-      { kind: 'button', label: 'Start', hint: LENGTH_INFO[c.length].label, primary: true, action: () => void this.startRun(false) },
+      {
+        kind: 'button',
+        label: 'Start',
+        hint: `${c.mode === 'daily' ? 'Daily' : c.mode === 'custom' ? 'Custom' : 'Classic'} · ${LENGTH_INFO[c.length].label}${c.difficulty !== 'normal' ? ` · ${DIFFICULTY[c.difficulty].label}` : ''}`,
+        primary: true,
+        action: () => void this.startRun(false),
+      },
       {
         kind: 'select',
         label: 'Mountain',
@@ -304,20 +313,26 @@ export class App {
     }
     const best = r.runs ? `Best ${r.bestScore.toLocaleString('en-US')} pts${r.bestTime !== null ? ` · ${fmtTime(r.bestTime)}` : ''} · ${fmtDistance(r.bestDistance)} · ${r.runs} run${r.runs === 1 ? '' : 's'}` : 'No runs on this course yet';
     items.push(
-      { kind: 'info', html: `<div class="course-card"><span>Course code <span class="code">${courseId(c)}</span></span><span>seed ${c.seed}</span><span class="rec">${best} <i>(this device only)</i></span></div>` },
+      { kind: 'info', html: `<div class="course-card"><span>Course code <span class="code">${courseId(c)}</span></span><span>seed ${c.seed}</span><span class="rec">${best} <i>(this device only)</i></span>${this.codeError ? `<span class="rec err">${this.codeError}</span>` : ''}</div>` },
       {
         kind: 'text',
         label: 'Enter a course code',
         note: 'play a code a friend shared',
-        placeholder: 'DAILY-2026-11-07-STD',
+        placeholder: `DAILY-${today}-STD`,
         maxLength: 32,
-        get: () => '',
+        get: () => this.codeDraft,
         set: (v) => {
           const parsed = parseCourseId(v);
           if (!parsed) {
-            this.hud.caption(`Unknown course code: ${v.slice(0, 32)}`, 3);
+            // keep what was typed and say why, right next to the field (E1)
+            this.codeDraft = v.slice(0, 32);
+            const esc = this.codeDraft.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
+            this.codeError = `“${esc}” is not a course code (or that day hasn't happened yet). Codes look like DAILY-${today}-STD, CLASSIC-END or SEED-1234-SPR-H.`;
+            changed();
             return;
           }
+          this.codeDraft = '';
+          this.codeError = null;
           st.course = parsed.mode;
           st.courseLength = parsed.length;
           st.difficulty = parsed.difficulty;
@@ -384,6 +399,13 @@ export class App {
     const s = this.session;
     const retire: MenuItem[] = s.endless
       ? [{ kind: 'button', label: 'Retire & bank', hint: `${s.banked.toLocaleString('en-US')} pts`, action: () => {
+          // two-step: the first press asks for confirmation (E9)
+          const it = this.menu.current?.items.find((x) => x.kind === 'button' && x.label.startsWith('Retire'));
+          if (it && it.kind === 'button' && it.label === 'Retire & bank') {
+            it.label = 'Retire — press again to confirm';
+            this.menu.refresh();
+            return;
+          }
           this.menu.close();
           this.mode = 'playing';
           s.paused = false;
@@ -837,7 +859,16 @@ export class App {
         }
         const r = y.root.position;
         const roof = inCave ? w.cave.clearanceAt(r.x, r.z) : Infinity;
-        return { visible: y.root.visible, mode: this.session?.yetiAnim.mode ?? null, t: this.session?.debugState().cinematicTime ?? -1, rootAboveFloor: r.y - floor(r.x, r.z), left: out['left']!, right: out['right']!, roofClearance: roof, pos: r.toArray().map((v) => +v.toFixed(2)) };
+        // hands: lowest knuckle/palm point vs the floor under it; head: distance below the roof
+        const hp = new THREE.Vector3();
+        y.getHandWorldPosition('left', hp);
+        const handL = hp.y - floor(hp.x, hp.z);
+        y.getHandWorldPosition('right', hp);
+        const handR = hp.y - floor(hp.x, hp.z);
+        y.getHeadWorldPosition(hp);
+        const headRoof = inCave ? floor(hp.x, hp.z) + w.cave.clearanceAt(hp.x, hp.z) - hp.y : Infinity;
+        const s = this.session;
+        return { visible: y.root.visible, phase: s?.run.phase ?? null, mode: s?.yetiAnim.mode ?? null, t: s?.debugState().cinematicTime ?? -1, rootAboveFloor: r.y - floor(r.x, r.z), left: out['left']!, right: out['right']!, handL, handR, headBelowRoof: headRoof, roofClearance: roof, pos: r.toArray().map((v) => +v.toFixed(3)) };
       },
       world: () => this.world,
       renderer: this.renderer,
