@@ -21,3 +21,8 @@ Capture script: tools/cavecap.tmp.mjs (preview, __setCam batch).
     chamber falling off with depth (exp(-s/7.5)).
   - jambs: higher-frequency notches + a buttress jutting into the +l jamb at 3 m.
   - exit-path clearance after changes: >= 4.93 m (s<=2), >= 5.72 m deeper.
+- [x] after restart (on fce26bb): tsc clean, vitest 107/107. Build timings (node, CPU time via
+  process.cpuUsage, wall clock is meaningless under the shared 2-CPU load): high 244 steps, 900 ms CPU
+  total, max step 38 ms CPU; low 136 steps, 605 ms, max 31 ms. 42.6k tris (high), 2 draw calls.
+- [ ] final evidence: r2_{front,threequarter,wide,approach,inside,closeup} at 1920x1080 and
+  r2_c1..c12 at 960x540 (preview, PREVIEWS=1 build on :5333) — running /tmp/runfinal.sh

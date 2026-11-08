@@ -23,3 +23,6 @@
 - HEAD_SCALE 1.3 → 1.42.
 - Gallop: hips pitch .8, lower hips, hands land 1.6 m ahead with a low (×0.75) recovery, feet 0.42 m back. Extended
   phase (t=1.25) reads clearly; collected phase (t=1.07) is still compact but limbs separate.
+- 22:xx session 3: verification renders at 960x540 in /tmp/y2/v (main 723,017; overlay 818,021)
+- crawl (3/4, front, back, top) checked: head on travel line, hind legs under the body -> A19 OK as-is. dark shade .15: body near-black + glowing eyes -> A9/C4 OK.
+- A16: HEAD_SCALE 1.42->1.55, HEAD_LIFT (0,.1,.04)->(0,.14,.05): visible neck in side view, roar head ~85px vs ~230 shoulders @960. (/tmp/y2/v/mont4.png)
