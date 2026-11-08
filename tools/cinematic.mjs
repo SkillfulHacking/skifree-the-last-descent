@@ -21,6 +21,9 @@ await p.evaluate(() => { window.__skifree.seenCave(false); window.__skifree.hold
 // step until the cinematic starts
 await p.evaluate(() => { for (let i = 0; i < 400 && window.__skifree.state().session.phase !== 'caveCinematic'; i++) window.__skifree.frames(1); });
 const beats = [0.1, 3.8, 5.4, 6.6, 7.9, 9.5, 11.0, 14.6, 15.8, 16.6];
+// SHOTS=none (grounding only) or SHOTS=14.6,15.8 (screenshot only these beats); default: all
+const shotsEnv = process.env.SHOTS;
+const wantShot = (T) => !shotsEnv || (shotsEnv !== 'none' && shotsEnv.split(',').map(Number).includes(T));
 const report = [];
 for (const T of beats) {
   const rows = await p.evaluate((T) => {
@@ -39,7 +42,7 @@ for (const T of beats) {
   await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
   const g = await p.evaluate(() => window.__skifree.yetiGround());
   console.log(`t=${T}`, JSON.stringify(g));
-  await p.screenshot({ path: `${outDir}/cine_t${String(T).replace('.', '_')}.png`, timeout: 600000 });
+  if (wantShot(T)) await p.screenshot({ path: `${outDir}/cine_t${String(T).replace('.', '_')}.png`, timeout: 600000 });
 }
 // continue through the end of the cinematic and 1.5 s into the chase (hand-off continuity)
 const tail = await p.evaluate(() => {
@@ -56,7 +59,7 @@ const tail = await p.evaluate(() => {
 });
 report.push(...tail);
 await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
-await p.screenshot({ path: `${outDir}/cine_handoff_chase.png`, timeout: 600000 });
+if (shotsEnv !== 'none') await p.screenshot({ path: `${outDir}/cine_handoff_chase.png`, timeout: 600000 });
 // per-frame root displacement across the whole sequence (a teleport shows up as a spike)
 let maxStep = 0;
 let maxStepAt = null;
