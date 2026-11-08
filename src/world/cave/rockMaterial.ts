@@ -104,24 +104,73 @@ float cv_rough = 0.86;
 float cv_vis = 1.0;
 float cv_rim = 0.0;
 float cv_dist = 0.0;
-// claw gouges: 4 slanted tapered strokes in the face's local frame; returns depth 0..1
+vec3 cv_wnG = vec3(0.0, 1.0, 0.0);
+// claw gouges: 4 slanted tapered strokes in the face's local frame; returns depth 0..1. A thin slab
+// around the face plane, only on surfaces that face the same way (a single set, never repeated on rock
+// that folds through the slab behind or below it).
 float cv_clawDepth(vec3 wp){
   vec3 q = wp - uClawO;
   float n = dot(q, uClawN);
-  if (abs(n) > 0.9) return 0.0;
+  if (abs(n) > 0.45) return 0.0;
+  float facing = smoothstep(0.35, 0.7, dot(cv_wnG, uClawN));
+  if (facing <= 0.0) return 0.0;
   float t = dot(q, uClawT), u = dot(q, uClawU);
   float d = 0.0;
   for (int i = 0; i < 4; i++) {
     float fi = float(i);
-    float len = 0.62 + 0.08 * fi - 0.06 * fi * fi * 0.3;
-    float c = (fi - 1.5) * 0.17;
-    float along = u / len;                       // -1..1 along the stroke
-    float x = t - c + along * 0.32 + 0.03 * sin(along * 3.0 + fi);
-    float w = 0.045 * (1.0 - along * along);
-    float s = (1.0 - smoothstep(w * 0.3, w, abs(x))) * step(abs(along), 1.0);
-    d = max(d, s * (0.6 + 0.4 * (1.0 - abs(along))));
+    float len = 0.5 + 0.13 * fi - 0.05 * fi * fi;
+    float c = (fi - 1.5) * 0.16 + 0.02 * sin(fi * 2.3);
+    float along = (u - 0.04 * fi) / len;         // -1..1 along the stroke
+    float x = t - c + along * 0.3 + 0.025 * sin(along * 3.0 + fi * 1.7);
+    float w = (0.028 + 0.008 * fi) * (1.0 - along * along);
+    float s = (1.0 - smoothstep(w * 0.25, w, abs(x))) * step(abs(along), 1.0);
+    d = max(d, s * (0.55 + 0.45 * (1.0 - abs(along))));
   }
-  return d;
+  return d * facing * (1.0 - smoothstep(0.3, 0.45, abs(n)));
+}
+// bedding coordinate (tilted, gently warped strata)
+float cv_tw(vec3 p){ return p.y + 0.09 * p.z + 0.04 * p.x + 2.4 * (cv_n3(vec3(p.y * 0.21, p.x * 0.02, p.z * 0.02)) - 0.5); }
+// soft V groove of half-width w (m) around distance d
+float cv_groove(float d, float w){ return 1.0 - smoothstep(0.0, w, d); }
+// Sparse, oriented fractures (A34): open bedding partings plus two vertical joint sets with staggered,
+// jittered spacing per bed. Lines end where their bed ends or where a stretched mask closes them; width
+// varies along each line. No closed cells: every line is the zero of a single oriented coordinate.
+float cv_fracture(vec3 p, float tw){
+  float bed = floor(tw / 2.3);
+  float bf = tw / 2.3 - bed;
+  float wob = cv_n3(p * 0.9) - 0.5;
+  // bedding partings, at the bed boundary and an occasional sub-bed split
+  float dB = min(bf, 1.0 - bf) * 2.3 + 0.06 * wob + 0.22 * (cv_n3(vec3(p.x * 0.35, p.y * 0.2, p.z * 0.35) + 6.0) - 0.5);
+  float sub = abs(fract(tw / 0.77 + 0.3 * fract(bed * 0.618)) - 0.5) * 0.77;
+  float mB = smoothstep(0.5, 0.75, cv_n3(vec3(p.x * 0.09, bed * 3.7, p.z * 0.09))) * (0.55 + 0.45 * cv_n3(vec3(p.x * 0.5, bed, p.z * 0.5)));
+  float mS = smoothstep(0.62, 0.8, cv_n3(vec3(p.x * 0.11, tw * 0.9, p.z * 0.11) + 3.0));
+  float wv = 0.4 + 1.2 * cv_n3(vec3(p.x * 0.35, tw, p.z * 0.35) + 17.0);
+  float f = cv_groove(abs(dB), 0.05 * wv) * mB;
+  f = max(f, 0.6 * cv_groove(abs(sub + 0.04 * wob), 0.025 * wv) * mS);
+  // joint set 1 (strike ~37 deg), set 2 (~110 deg, sparser): vertical planes, offset per bed (joints
+  // terminate at the bedding and restart staggered in the next bed)
+  vec2 d1 = vec2(0.8, 0.6), d2 = vec2(-0.34, 0.94);
+  float j1 = dot(p.xz, d1) + 0.5 * wob + 0.08 * p.y;
+  float x1 = j1 / 3.3 + fract(sin(bed * 7.13) * 91.7);
+  float c1 = floor(x1);
+  float o1 = 0.36 * (fract(sin(c1 * 12.7 + bed * 3.1) * 4375.5) - 0.5);
+  float e1 = step(0.4, fract(sin(c1 * 5.3 + bed * 17.9) * 2741.3));
+  float dist1 = abs(x1 - c1 - 0.5 - o1) * 3.3;
+  float m1 = smoothstep(0.38, 0.62, cv_n3(vec3(dot(p.xz, vec2(-d1.y, d1.x)) * 0.16, p.y * 0.35, c1 * 4.1)));
+  float ex1 = smoothstep(0.08, 0.18, bf) * smoothstep(0.08, 0.18, 1.0 - bf); // die out toward bed edges
+  ex1 = mix(ex1, 1.0, step(0.75, fract(sin(c1 * 3.9 + bed) * 513.1))); // some cut through the parting
+  float face1 = 1.0 - smoothstep(0.7, 0.92, abs(dot(cv_wnG.xz, d1)));
+  f = max(f, cv_groove(dist1, 0.045 * wv) * e1 * m1 * ex1 * face1);
+  float j2 = dot(p.xz, d2) + 0.7 * wob;
+  float x2 = j2 / 5.7 + fract(sin(bed * 3.71) * 37.3);
+  float c2 = floor(x2);
+  float o2 = 0.3 * (fract(sin(c2 * 9.1 + bed * 1.7) * 3115.1) - 0.5);
+  float e2 = step(0.62, fract(sin(c2 * 2.9 + bed * 11.3) * 1977.7));
+  float dist2 = abs(x2 - c2 - 0.5 - o2) * 5.7;
+  float m2 = smoothstep(0.45, 0.66, cv_n3(vec3(dot(p.xz, vec2(-d2.y, d2.x)) * 0.12, p.y * 0.3, c2 * 2.3 + 8.0)));
+  float face2 = 1.0 - smoothstep(0.7, 0.92, abs(dot(cv_wnG.xz, d2)));
+  f = max(f, 0.8 * cv_groove(dist2, 0.035 * wv) * e2 * m2 * ex1 * face2);
+  return f;
 }
 `,
       )
@@ -131,6 +180,7 @@ float cv_clawDepth(vec3 wp){
 {
   vec3 ap = vAPos;
   vec3 wn = normalize(vCWN);
+  cv_wnG = wn;
   float kind = min(vCave.z, 1.0);
   cv_rim = clamp(vCave.z - 1.0, 0.0, 1.0);
   cv_vis = vCave.x;
@@ -138,7 +188,7 @@ float cv_clawDepth(vec3 wp){
   cv_dist = length(cameraPosition - vCWPos);
   float steep = 1.0 - clamp(wn.y, 0.0, 1.0);
   // --- rock: tilted beds, each with its own tone (terrain rock palette)
-  float tw = ap.y + 0.09 * ap.z + 0.04 * ap.x + 2.4 * (cv_n3(vec3(ap.y * 0.21, ap.x * 0.02, ap.z * 0.02)) - 0.5);
+  float tw = cv_tw(ap);
   float bedId = floor(tw / 2.3);
   float bedF = fract(tw / 2.3);
   float tone = fract(sin(bedId * 12.9898 + 4.1) * 43758.5453);
@@ -154,11 +204,10 @@ float cv_clawDepth(vec3 wp){
   // fine grain (close range only)
   float cv_near = 1.0 - smoothstep(8.0, 40.0, length(cameraPosition - vCWPos));
   rock *= 1.0 + 0.16 * (cv_n3(ap * 9.0) - 0.5) * cv_near;
-  // hairline fractures: the same ridged noise that creases the shading normals (bedding-parallel set and
-  // a vertical joint set), so the dark lines sit in the creases and never trace polygon edges
-  float frB = pow(1.0 - abs(2.0 * cv_n3(vec3(ap.x * 0.3, ap.y * 0.9, ap.z * 0.3)) - 1.0), 22.0);
-  float frJ = pow(1.0 - abs(2.0 * cv_n3(vec3(ap.x * 0.9, ap.y * 0.16, ap.z * 0.9) + 9.0) - 1.0), 26.0);
-  rock *= 1.0 - (0.45 * frB + 0.4 * frJ) * (0.4 + 0.6 * cv_near);
+  // sparse oriented fractures (bedding partings + two joint sets), the same field that creases the
+  // shading normals; they fade with distance (no texture-like lattice from afar), depth/darkness varies
+  float frac = cv_fracture(ap, tw) * (1.0 - smoothstep(35.0, 90.0, cv_dist)) * (1.0 - kind);
+  rock *= 1.0 - frac * (0.32 + 0.25 * cv_n3(ap * 0.33 + 4.0));
   // partings between beds: dark, irregular, open only in places (they follow the strata)
   float seam = (1.0 - smoothstep(0.0, 0.05 + 0.05 * cv_n3(ap * 0.4), bedF)) * smoothstep(0.35, 0.6, cv_n3(ap * 0.15 + 2.0));
   rock *= 1.0 - 0.4 * seam;
@@ -173,8 +222,11 @@ float cv_clawDepth(vec3 wp){
   floorCol = mix(floorCol, rock * 1.1, pebble);
   vec3 col = mix(rock, floorCol, kind);
   // --- claw gouges (fresh, slightly paler scraped rock with dark grooves)
+  // --- claw gouges: freshly scraped rock is paler (crushed grain), with a thin shadowed core
   cv_claw = cv_clawDepth(ap) * (1.0 - kind);
-  col = mix(col, col * 0.5, cv_claw);
+  vec3 scraped = mix(col, vec3(0.52, 0.5, 0.47), 0.55);
+  col = mix(col, scraped, smoothstep(0.05, 0.5, cv_claw));
+  col *= 1.0 - 0.35 * smoothstep(0.75, 1.0, cv_claw);
   // --- snow: the terrain's snow albedo (snowMaterial.ts), off-piste
   float n1 = sf_fbm(ap.xz * 0.045);
   float n2 = sf_noise(ap.xz * 0.6);
@@ -204,6 +256,7 @@ float cv_clawDepth(vec3 wp){
   }
   #endif
   cv_rough = mix(0.86, mix(0.82, 0.93, uPowder), cv_snow);
+  cv_rough = max(cv_rough, 0.95 * cv_claw);
   // baked AO darkens the albedo of the rock a little too (crevices read even in direct light)
   col *= mix(1.0, ao, 0.25 * (1.0 - cv_rim));
   diffuseColor.rgb = col;
@@ -226,8 +279,9 @@ if (uDetail > 0.0) {
     // rock: rounded knobs and fine grain; snow: soft wind ripples (as weak as the terrain's)
     float amp = mix(1.0, 0.12, cv_snow);
     // knobs and grain, plus sharp creases: bedding-parallel fractures and vertical joints (shading only)
-    #define CV_FR(q) pow(1.0 - abs(2.0 * cv_n3(q) - 1.0), 8.0)
-    #define CV_H(p) (abs(cv_n3((p) * 0.8) - 0.5) * 0.9 + cv_n3((p) * 3.3) * 0.18 + cv_n3((p) * 7.1) * 0.06 - 0.13 * CV_FR(vec3((p).x * 0.3, (p).y * 0.9, (p).z * 0.3)) - 0.09 * CV_FR(vec3((p).x * 0.9, (p).y * 0.16, (p).z * 0.9) + 9.0) - 1.4 * cv_clawDepth(p))
+    // smooth knobs stretched along the beds (no abs()/ridged creases: those closed into quilted cells),
+    // fine grain, the sparse fracture grooves and the claw gouges
+    #define CV_H(p) (cv_n3(vec3((p).x * 0.55, cv_tw(p) * 1.3, (p).z * 0.55)) * 0.5 + cv_n3((p) * 3.3) * 0.12 + cv_n3((p) * 7.1) * 0.05 - 0.11 * cv_fracture(p, cv_tw(p)) - 0.6 * cv_clawDepth(p))
     float h0 = CV_H(wp);
     vec3 g = vec3(CV_H(wp + vec3(e, 0.0, 0.0)) - h0, CV_H(wp + vec3(0.0, e, 0.0)) - h0, CV_H(wp + vec3(0.0, 0.0, e)) - h0) / e;
     vec3 wn = normalize(vCWN);
@@ -270,7 +324,7 @@ totalEmissiveRadiance += diffuseColor.rgb * vec3(0.62, 0.72, 0.95) * uGlow * vCa
       )
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vCWPos);');
   };
-  mat.customProgramCacheKey = () => 'skifree-cave-rock-v3';
+  mat.customProgramCacheKey = () => 'skifree-cave-rock-v4';
   return mat;
 }
 

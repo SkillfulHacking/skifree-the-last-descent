@@ -59,7 +59,7 @@ export function qualityConfig(q: QualityPreset): QualityConfig {
     case 'medium':
       return { bodyH: 0.0445, headH: 0.015, limbH: 0.022, shells: 6, cards: 8000, fringe: 260 };
     case 'high':
-      return { bodyH: 0.038, headH: 0.0125, limbH: 0.019, shells: 9, cards: 19000, fringe: 420 };
+      return { bodyH: 0.038, headH: 0.0125, limbH: 0.019, shells: 9, cards: 22500, fringe: 420 };
     case 'ultra':
       return { bodyH: 0.0272, headH: 0.01, limbH: 0.013, shells: 14, cards: 44000, fringe: 700 };
   }
@@ -153,8 +153,11 @@ const CARD_TABLE = Float32Array.from(BONE_NAMES.map((_, i) => CARDS_BY_BONE[base
 const COL = {
   // skin under the pelt: light and warm, so gaps between strands read as fur roots, not as dark holes
   under: [0.56, 0.54, 0.5],
-  skin: [0.15, 0.142, 0.15],
-  lip: [0.05, 0.05, 0.06],
+  // bare face: dark grey-brown leather (not black rubber); lips and nose a warmer, flushed dark
+  skin: [0.165, 0.142, 0.13],
+  lip: [0.13, 0.075, 0.07],
+  nose: [0.12, 0.075, 0.068],
+  throat: [0.09, 0.025, 0.035],
   gum: [0.36, 0.1, 0.12],
   palate: [0.2, 0.05, 0.065],
   tongue: [0.42, 0.14, 0.17],
@@ -223,7 +226,9 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
     // (mirror-symmetric noise: an irregular but balanced hairline)
     const r = Math.sqrt(fx * fx + fy * fy) + (vnoise(Math.abs(p.x) * 40, p.y * 40, p.z * 40) - 0.5) * 0.16;
     // the pelt thins out gradually over ~6–12 cm toward the face (no hard mask edge)
-    const rr = r + (0.23 - Math.min(0.23, p.z)) * 3.5 + smoothstep(3.0, 3.06, p.y) * 0.8;
+    // forehead: the hairline climbs gradually over the brow ridge (a broad noisy ramp, not a step at y = 3.0)
+    const browN = (vnoise(Math.abs(p.x) * 55 + 3, p.y * 55, p.z * 55) - 0.5) * 0.05;
+    const rr = r + (0.23 - Math.min(0.23, p.z)) * 3.5 + smoothstep(2.975, 3.13, p.y + browN) * 0.75;
     cov = smoothstep(0.52, 1.22, rr);
     // eyes, nostrils and lips stay clear
     cov *= smoothstep(0.035, 0.06, nearEye(p));
@@ -231,8 +236,8 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
     cov *= smoothstep(1.0, 1.6, noseD);
     if (p.y < 2.835 && p.z > 0.32) cov *= 1 - smoothstep(0.32, 0.35, p.z);
     // skin shows where the coat ends (the shell coat edge sits at cov ≈ 0.66): dark leather right up to the
-    // edge, hidden under it — no half-tone grey band between the fur and the face
-    bare = 1 - smoothstep(0.52, 0.72, cov);
+    // edge, hidden under it; the leather lightens gradually under the thinning short hair (no hard rim)
+    bare = 1 - smoothstep(0.5, 0.85, cov);
     // fur framing the face starts short and lengthens away from it, with a band of long fringe hairs
     // (brow, cheeks) at the thinning edge that falls over onto the skin
     fur *= 0.45 + 0.55 * smoothstep(0.95, 1.6, rr);
@@ -250,15 +255,29 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
     col = COL.skin;
     // lips & nose: darker leather
     const nose = Math.hypot(p.x / 0.1, (p.y - 2.895) / 0.06, (p.z - 0.4) / 0.07);
-    if (nose < 1 || (p.y < 2.83 && p.z > 0.33)) col = COL.lip;
+    if (nose < 1) col = mixCol(COL.nose, COL.skin, smoothstep(0.6, 1.0, nose));
+    if (p.y < 2.83 && p.z > 0.33) col = mixCol(COL.skin, COL.lip, smoothstep(2.83, 2.8, p.y) * smoothstep(0.33, 0.37, p.z));
     if (p.y < MY + 0.012 && n.y < -0.25 && p.z < 0.41 && Math.abs(p.x) < 0.2) {
       if (Math.abs(p.x) > 0.115 && p.z > 0.25) col = COL.lip;
       else col = p.z > 0.33 ? COL.gum : COL.palate;
       bare = 1;
     }
+    // walls of the carved mouth cavity (back of the throat, inner cheeks): bare, dark — no pelt inside the mouth
+    const inward = n.y < -0.25 || (n.z > 0.35 && p.z < 0.3) || (Math.abs(n.x) > 0.45 && n.x * p.x < 0);
+    if (p.y < MY + 0.015 && p.z > 0.06 && p.z < 0.42 && Math.abs(p.x) < 0.205 && inward) {
+      if (!(n.y < -0.25 && p.z > 0.25)) col = COL.throat;
+      bare = 1;
+      cov = 0;
+      fur = 0;
+      cards = 0;
+      fringe = 0;
+    }
     if (p.y < 2.88 && p.z < 0.25) fur *= 1.45; // ruff around the face / mane
     if (Math.abs(p.x) > 0.14 && p.z > 0.0) fur *= 1.3;
     cards *= smoothstep(0.7, 1.0, cov) * 3.2;
+    // jowls / upper lip / mouth corners: no long locks (they droop across the opening when the jaw drops)
+    const mz = Math.hypot(p.x / 0.25, (p.y - (MY + 0.02)) / 0.09, (p.z - 0.36) / 0.2);
+    cards *= smoothstep(1.0, 1.6, mz);
     // the crown and brow carry locks too, but they are combed back/up (flowAt), so none hangs over the face
   } else if (part === 'jaw') {
     col = COL.skin;
@@ -272,6 +291,12 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
       col = Math.abs(p.x) < 0.085 && p.y < MY - 0.005 ? COL.tongue : COL.gum;
       cov = 0;
     }
+    // inner walls of the lower jaw (sides and back of the mouth floor): bare
+    const inwardJ = (Math.abs(n.x) > 0.45 && n.x * p.x < 0) || (n.z > 0.35 && p.z < 0.25);
+    if (p.y > MY - 0.035 && Math.abs(p.x) < 0.118 && p.z > 0.06 && p.z < 0.395 && inwardJ) {
+      col = p.z < 0.2 ? COL.throat : COL.gum;
+      cov = 0;
+    }
     // cheeks partially bare where the mouth stretches
     if (Math.abs(p.x) > 0.09 && p.y > 2.77 && p.z > 0.21) cov = Math.min(cov, 0.45);
     bare = 1 - smoothstep(0.52, 0.72, cov);
@@ -282,6 +307,8 @@ function attrFor(part: string, p: THREE.Vector3, n: THREE.Vector3, bw: Float32Ar
     fringe = beard;
     comb = [0, -0.75 * beard, 0.25 * beard];
     cards *= smoothstep(0.75, 1.0, cov) * 2.0;
+    // no long locks rooted at the lip line or on the inner mouth: they would hang across the open mouth
+    cards *= smoothstep(MY - 0.02, MY - 0.07, p.y) + smoothstep(0.24, 0.16, p.z) * 0.5;
   } else if (part.startsWith('hand')) {
     const s = part.endsWith('L') ? 1 : -1;
     const f = handFrame(s);
@@ -486,36 +513,55 @@ function horn(
 
 function buildHard(): GeoArrays {
   const g = new GeoBuilder();
-  const ivory = [0.66, 0.6, 0.47];
+  const ivory = [0.62, 0.55, 0.41];
   const ivoryTip = [0.93, 0.9, 0.8];
   const clawBase = [0.06, 0.055, 0.05];
   const clawTip = [0.2, 0.18, 0.15];
+  // teeth: irregular, worn and slightly yellowed (no uniform "piano keys"): every tooth gets its own length, girth,
+  // lean and stain from a fixed seed; the canines are long, heavy fangs; one lower incisor is missing
+  const trnd = mulberry32(4242);
+  const stain = (k: number): [number[], number[]] => {
+    const y = 0.75 + 0.25 * k; // 1 = clean ivory, lower = more yellow-brown at the gum
+    return [
+      [ivory[0] * (0.82 + 0.18 * y), ivory[1] * (0.74 + 0.26 * y), ivory[2] * (0.55 + 0.45 * y)],
+      [ivoryTip[0] * (0.94 + 0.06 * y), ivoryTip[1] * (0.9 + 0.1 * y), ivoryTip[2] * (0.78 + 0.22 * y)],
+    ];
+  };
+  const jitter = (v: THREE.Vector3, k: number): THREE.Vector3 =>
+    v.add(new THREE.Vector3((trnd() - 0.5) * k, 0, (trnd() - 0.5) * k * 0.5)).normalize();
   // upper teeth (head bone), pointing down
   const N = 12;
   for (let i = 0; i < N; i++) {
     const a = -1.2 + (2.4 * i) / (N - 1);
     const fang = Math.abs(Math.abs(a) - 0.62) < 0.12;
     const molar = Math.abs(a) > 0.8;
-    const x = 0.104 * Math.sin(a);
+    const x = 0.104 * Math.sin(a) + (trnd() - 0.5) * 0.004;
     const z = 0.27 + 0.125 * Math.cos(a);
-    const base = new THREE.Vector3(x, MY + 0.02, z);
-    const len = fang ? 0.085 : molar ? 0.028 : 0.032;
-    const r = fang ? 0.017 : molar ? 0.014 : 0.0105;
+    const base = new THREE.Vector3(x, MY + 0.02 + (trnd() - 0.5) * 0.006, z);
+    const v = 0.7 + 0.6 * trnd();
+    const len = (fang ? 0.1 + 0.012 * trnd() : molar ? 0.026 * (0.8 + 0.4 * trnd()) : 0.032 * v) * (i === 4 ? 1.25 : 1);
+    const r = fang ? 0.019 : molar ? 0.014 * (0.9 + 0.2 * trnd()) : 0.0105 * (0.8 + 0.4 * trnd());
     const out = new THREE.Vector3(x, 0, z - 0.23).normalize();
-    horn(g, base, new THREE.Vector3(0, -1, 0).addScaledVector(out, fang ? 0.12 : 0.05), out.clone().multiplyScalar(-1), len, r, fang ? 0.85 : 0.6, ivory, ivoryTip, B.head);
+    const [cb, ct] = stain(fang ? 0.55 + 0.2 * trnd() : trnd());
+    const dir = jitter(new THREE.Vector3(0, -1, 0).addScaledVector(out, fang ? 0.12 : 0.05), fang ? 0.05 : 0.22);
+    horn(g, base, dir, out.clone().multiplyScalar(-1), len, r, fang ? 0.85 : 0.5 + 0.25 * trnd(), cb, ct, B.head);
   }
   // lower teeth (jaw bone), pointing up
   for (let i = 0; i < N; i++) {
     const a = -1.15 + (2.3 * i) / (N - 1);
     const fang = Math.abs(Math.abs(a) - 0.52) < 0.12;
     const molar = Math.abs(a) > 0.8;
-    const x = 0.096 * Math.sin(a);
+    if (i === 6) continue; // a missing incisor
+    const x = 0.096 * Math.sin(a) + (trnd() - 0.5) * 0.004;
     const z = 0.264 + 0.115 * Math.cos(a);
-    const base = new THREE.Vector3(x, MY - 0.022, z);
-    const len = fang ? 0.07 : molar ? 0.026 : 0.03;
-    const r = fang ? 0.015 : molar ? 0.013 : 0.0095;
+    const base = new THREE.Vector3(x, MY - 0.022 + (trnd() - 0.5) * 0.006, z);
+    const v = 0.65 + 0.7 * trnd();
+    const len = fang ? 0.078 + 0.01 * trnd() : molar ? 0.026 * (0.8 + 0.4 * trnd()) : 0.03 * v;
+    const r = fang ? 0.016 : molar ? 0.013 * (0.9 + 0.2 * trnd()) : 0.0095 * (0.8 + 0.4 * trnd());
     const out = new THREE.Vector3(x, 0, z - 0.23).normalize();
-    horn(g, base, new THREE.Vector3(0, 1, 0).addScaledVector(out, fang ? 0.15 : 0.04), out.clone().multiplyScalar(-1), len, r, 0.7, ivory, ivoryTip, B.jaw);
+    const [cb, ct] = stain(fang ? 0.5 + 0.2 * trnd() : trnd());
+    const dir = jitter(new THREE.Vector3(0, 1, 0).addScaledVector(out, fang ? 0.15 : 0.04), fang ? 0.05 : 0.25);
+    horn(g, base, dir, out.clone().multiplyScalar(-1), len, r, fang ? 0.75 : 0.5 + 0.3 * trnd(), cb, ct, B.jaw);
   }
   // finger & thumb claws
   for (const side of SIDES) {

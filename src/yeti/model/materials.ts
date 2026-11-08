@@ -53,7 +53,7 @@ float yWrinkle(vec3 p) {
   // irregularity: every family of folds is broken up by low-frequency noise
   float m1 = smoothstep(0.25, 0.75, yNoise(p * 55.0 + 3.1));
   float m2 = smoothstep(0.3, 0.8, yNoise(p * 38.0 + 7.7));
-  float jit = (yNoise(p * 140.0) - 0.5) * 2.0;
+  float jit = (yNoise(p * 70.0) - 0.5) * 2.0;
   // eyes: radial crow's feet on the outer side, two soft folds under the eye
   vec2 e = vec2(ax - 0.085, p.y - 2.948);
   float d = length(e * vec2(1.0, 1.25));
@@ -73,10 +73,11 @@ float yWrinkle(vec3 p) {
   h += exp(-pow((sd - 0.012) / 0.009, 2.0)) * front * 0.18;
   // upper lip: faint, irregular vertical wrinkles
   float lip = smoothstep(2.8, 2.81, p.y) * (1.0 - smoothstep(2.835, 2.85, p.y)) * smoothstep(0.35, 0.375, p.z);
-  h -= lip * pow(0.5 + 0.5 * sin(p.x * 330.0 + jit * 2.0), 8.0) * 0.18 * m1;
-  // pores + leathery grain
-  h -= pow(yNoise(p * 1100.0), 6.0) * 0.45;
-  h += (yNoise(p * 260.0) - 0.5) * 0.14 + (yNoise(p * 90.0) - 0.5) * 0.12;
+  h -= lip * pow(0.5 + 0.5 * sin(p.x * 330.0 + jit * 2.0), 8.0) * 0.09 * m1;
+  // pores + leathery grain: sparse, soft pores and a low-frequency leathery undulation (the old 1100/260 grain
+  // aliased into salt-and-pepper static at screen scale)
+  h -= pow(yNoise(p * 420.0), 8.0) * 0.08;
+  h += (yNoise(p * 150.0) - 0.5) * 0.04 + (yNoise(p * 60.0) - 0.5) * 0.035;
   return h;
 }
 `;
@@ -242,10 +243,11 @@ ${FUR_PALETTE_GLSL}`,
   float edgeN = yNoise(P * 28.0) * 0.5 + yNoise(P * 90.0) * 0.3 + yNoise(P * 240.0) * 0.2;
   float covN = vFurCov + (edgeN - 0.5) * 0.3;
   // closed coat inside the edge; a band of dense, short strands combed over the edge (fuzzy, not dotted)
-  float coat = smoothstep(0.64, 0.72, covN);
+  float coat = smoothstep(0.64, 0.8, covN);
   float zone = smoothstep(0.5, 0.58, covN);
   if (zone < 0.01) discard;
-  float hmax = mix(0.55, 1.0, fract(st.w * 17.31)) * mix(0.55, 1.0, coat);
+  // short-hair gradient onto the skin: strands shorten over a broad band toward the edge (no helmet rim)
+  float hmax = mix(0.55, 1.0, fract(st.w * 17.31)) * mix(0.3, 1.0, smoothstep(0.5, 0.92, covN));
   float tH = vFurH / hmax;
   float radius = 0.95 * (1.0 - pow(min(tH, 1.0), 1.6));
   float a = (1.0 - smoothstep(radius * 0.45, radius, d)) * step(tH, 1.0);
@@ -271,7 +273,7 @@ ${FUR_PALETTE_GLSL}`,
       );
     injectShade(shader, shade);
   };
-  m.customProgramCacheKey = () => 'yeti-shell-fur-v4';
+  m.customProgramCacheKey = () => 'yeti-shell-fur-v5';
   return m;
 }
 
@@ -313,9 +315,11 @@ ${WRINKLE_GLSL}`,
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
-  float sn = yNoise(vSkinP * 90.0) * 0.6 + yNoise(vSkinP * 260.0) * 0.4;
+  float sn = yNoise(vSkinP * 45.0) * 0.7 + yNoise(vSkinP * 110.0) * 0.3;
   float blot = yNoise(vSkinP * 14.0);
-  diffuseColor.rgb *= mix(1.0, 0.86 + 0.2 * sn, vBare) * (0.95 + 0.1 * blot);
+  // mottling: low-contrast, low-frequency (weathered leather, not static); blotches drift toward a warmer brown
+  diffuseColor.rgb *= mix(1.0, 0.94 + 0.08 * sn, vBare) * (0.95 + 0.1 * blot);
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(1.12, 0.98, 0.9), vBare * smoothstep(0.4, 0.75, blot));
   // wrinkles & pores (bind space) on bare skin: height + gradient by central differences
   float yWr = 0.0;
   vec3 yWrG = vec3(0.0);
@@ -325,14 +329,14 @@ ${WRINKLE_GLSL}`,
     yWrG = vec3(yWrinkle(vSkinP + vec3(he, 0.0, 0.0)), yWrinkle(vSkinP + vec3(0.0, he, 0.0)), yWrinkle(vSkinP + vec3(0.0, 0.0, he))) - yWr;
     yWrG /= he;
     // creases and pores collect darkness, ridges catch a little light
-    diffuseColor.rgb *= mix(1.0, clamp(1.0 + 0.7 * yWr, 0.55, 1.1), vBare);
+    diffuseColor.rgb *= mix(1.0, clamp(1.0 + 0.55 * yWr, 0.65, 1.06), vBare);
   }`,
       )
       .replace(
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>
   // greasy leather: shinier on the ridges, matte in the creases
-  roughnessFactor = mix(0.95, 0.6 + 0.2 * sn - 0.2 * clamp(yWr, -0.4, 0.4), vBare);`,
+  roughnessFactor = mix(0.95, 0.66 + 0.12 * sn - 0.15 * clamp(yWr, -0.4, 0.4), vBare);`,
       )
       .replace(
         '#include <normal_fragment_maps>',
@@ -343,10 +347,21 @@ ${WRINKLE_GLSL}`,
     gv -= normal * dot(gv, normal);
     normal = normalize(normal - gv * 0.0024 * vBare);
   }`,
+      )
+      .replace(
+        '#include <opaque_fragment>',
+        `{
+    // subsurface-ish warmth: light entering the skin comes back reddened, strongest on the thin warm tissue
+    // (lips, nose: higher red/blue ratio in the vertex colour) and softly everywhere on the bare face
+    float flush = clamp((vColor.r - vColor.b - 0.035) * 40.0, 0.0, 1.0);
+    vec3 lit = reflectedLight.directDiffuse + reflectedLight.indirectDiffuse;
+    outgoingLight += lit * vec3(0.55, 0.16, 0.08) * vBare * (0.07 + 0.35 * flush);
+  }
+  #include <opaque_fragment>`,
       );
     injectShade(shader, shade);
   };
-  m.customProgramCacheKey = () => 'yeti-skin-v3';
+  m.customProgramCacheKey = () => 'yeti-skin-v4';
   return m;
 }
 

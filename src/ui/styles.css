@@ -157,7 +157,7 @@ kbd {
 .rear-view::after { content: 'BEHIND YOU'; position: absolute; left: 8px; top: 4px; font: 800 10px var(--font); letter-spacing: 0.25em; color: #ffd0d0; text-shadow: 0 1px 4px #000; }
 .hud-caption { position: absolute; left: 50%; bottom: calc(11vh + 64px); transform: translateX(-50%); padding: 6px 14px; border-radius: 8px; background: rgba(0,0,0,0.55); font-size: 15px; letter-spacing: 0.04em; opacity: 0; transition: opacity 0.25s !important; white-space: nowrap; }
 .hud-caption.on { opacity: 1; }
-.hud-center.run { top: 18%; font-size: clamp(44px, 7vw, 96px) !important; }
+.hud-center.run { top: 36%; font-size: clamp(44px, 7vw, 96px) !important; }
 
 /* ---------- main menu (pass 2): hero title outside the panel; fits without scrolling ---------- */
 .menu-root.main { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0;
@@ -184,7 +184,7 @@ kbd {
 .menu-row .ctl input { width: 190px; font: 700 15px var(--font); color: #fff; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.3); border-radius: 8px; padding: 5px 10px; outline: none; text-transform: uppercase; }
 .menu-row .ctl input:focus { border-color: var(--accent); background: rgba(255,255,255,0.14); }
 .menu-root.main .menu-row.kind-select .val { min-width: 150px; }
-.menu-row .ctl input::placeholder { color: rgba(255,255,255,0.38); font-size: 13px; letter-spacing: 0.02em; }
+.menu-row .ctl input::placeholder { color: rgba(255,255,255,0.58); font-size: 13px; letter-spacing: 0.02em; }
 .course-card .err { color: #ffb4a8; font-style: normal; }
 
 /* larger screens: scale the main menu body text with the viewport too (E10) */

@@ -512,7 +512,9 @@ export class GameSession implements Stage {
     const e = this.run.encounter!;
     this.world.focusEncounter = e;
     this.world.caveFor(e);
-    this.yetiAI.speedMul = e.speedMul * DIFFICULTY[this.world.course.difficulty].yetiSpeed;
+    // documented ceiling: never more than +33 % over the classic Yeti, whatever the escalation
+    // and difficulty (B13); a skilled skier must always be able to escape
+    this.yetiAI.speedMul = Math.min(1.33, e.speedMul * DIFFICULTY[this.world.course.difficulty].yetiSpeed);
     this.cave = new CaveCinematic(this);
     this.cave.onRunPrompt = () => {};
     this.input.steer = 0;

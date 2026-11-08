@@ -229,6 +229,7 @@ export class App {
   }
 
   private codeDraft = '';
+  private menuDay = '';
   private codeError: string | null = null;
 
   private mainScreen(): Screen {
@@ -329,7 +330,7 @@ export class App {
             const esc = this.codeDraft.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
             this.codeError = `“${esc}” is not a course code (or that day hasn't happened yet). Codes look like DAILY-${today}-STD, CLASSIC-END or SEED-1234-SPR-H.`;
             changed();
-            return;
+            return false;
           }
           this.codeDraft = '';
           this.codeError = null;
@@ -355,6 +356,9 @@ export class App {
   }
 
   async startRun(retry: boolean, sameCourse = retry) {
+    // a stale, unconfirmed code (and its error) doesn't survive into the next menu visit (E13)
+    this.codeDraft = '';
+    this.codeError = null;
     void this.audio.unlock().then(() => this.applyVolumes());
     // a retry replays exactly the same course, even if the Daily day rolled over meanwhile (B8)
     const course = sameCourse && this.world ? this.world.course : this.currentCourse();
@@ -631,6 +635,12 @@ export class App {
     if (!w) return;
     if (this.mode === 'menu' || this.mode === 'loading') {
       this.menuTime += dt;
+      // the Daily card/date must not go stale across 00:00 UTC while the menu is open (B8)
+      const day = utcDate();
+      if (day !== this.menuDay) {
+        if (this.menuDay && this.mode === 'menu' && this.menu.current?.id === 'main') this.menu.replace(this.mainScreen());
+        this.menuDay = day;
+      }
       this.menu.update(this.input.menu(dt));
       // living mountain: slow crane around the summit
       const cx = w.mountain.routeX(0);

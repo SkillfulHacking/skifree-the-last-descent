@@ -17,25 +17,51 @@ export class Footprints {
   private n = { x: 0, y: 1, z: 0 };
 
   constructor(private m: Mountain, capacity = 400) {
-    // a big five-toed print pressed into the snow: a soft height field (heel, ball, toes), turned into a
-    // normal map (the walls of the depression catch and lose the light) and a faint cold tint in the
-    // deepest parts. Alpha fades with depth, so the decal has no edge or outline.
+    // a big print pressed into the snow, built as a height field: one irregular depression (heel and ball
+    // merged, the toes only lumps along its front edge, never separate dots) with a low ridge of pushed-out
+    // snow around it and crumbled, noisy edges. The normal map carries the read (walls catch and lose the
+    // light); colour is only a faint cold shade in the deepest part and a brighter crust on the ridge, so
+    // there is no graphic outline or icon shape.
     const N = 128;
     const hgt = new Float32Array(N * N);
-    const blob = (cx: number, cy: number, rx: number, ry: number, d: number) => {
-      for (let y = 0; y < N; y++) {
-        for (let x = 0; x < N; x++) {
-          const dx = (x - cx) / rx, dy = (y - cy) / ry;
-          const r2 = dx * dx + dy * dy;
-          if (r2 < 4) hgt[x + y * N] = Math.max(hgt[x + y * N]!, d * Math.exp(-r2 * 1.6));
-        }
-      }
+    const vn = (x: number, y: number, sd: number) => {
+      const h = (i: number, j: number) => {
+        let k = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(sd, 1442695041);
+        k = Math.imul(k ^ (k >>> 13), 1274126177);
+        return ((k ^ (k >>> 16)) >>> 0) / 4294967296;
+      };
+      const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+      const u = fx * fx * (3 - 2 * fx), w = fy * fy * (3 - 2 * fy);
+      return h(i, j) + (h(i + 1, j) - h(i, j)) * u + (h(i, j + 1) - h(i, j) + (h(i + 1, j + 1) - h(i + 1, j) - h(i, j + 1) + h(i, j)) * u) * w;
     };
-    blob(64, 84, 22, 26, 0.9); // heel
-    blob(64, 54, 25, 20, 1.0); // ball
-    for (let i = 0; i < 5; i++) blob(36 + i * 14, 24 + Math.abs(i - 2) * 4, 7, 9, 0.75); // toes
-    // flatten the bottom a little (packed snow), keep soft walls
-    for (let i = 0; i < hgt.length; i++) hgt[i] = Math.min(1, hgt[i]! * 1.25);
+    // signed "inside" field: >0 inside the print
+    const shape = (x: number, y: number) => {
+      const e = (cx: number, cy: number, rx: number, ry: number) => 1 - Math.hypot((x - cx) / rx, (y - cy) / ry);
+      let f = Math.max(e(64, 86, 21, 24), e(62, 56, 26, 22), e(66, 70, 22, 26));
+      // toes: overlapping lumps on the front edge (merged, uneven sizes)
+      const toes: Array<[number, number, number]> = [[38, 34, 10], [50, 27, 10.5], [63, 24, 11], [76, 27, 10], [87, 35, 9]];
+      for (const [tx, ty, r] of toes) f = Math.max(f, (1 - Math.hypot((x - tx) / r, (y - ty) / (r * 1.25))) * 0.75);
+      return f + 0.16 * (vn(x * 0.11, y * 0.11, 3) - 0.5) + 0.07 * (vn(x * 0.33, y * 0.33, 4) - 0.5);
+    };
+    const S = new Float32Array(N * N);
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) S[x + y * N] = shape(x, y);
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const f = S[x + y * N]!;
+        // depth: steep crumbly wall, packed (flat-ish, uneven) bottom
+        const depth = Math.min(1, Math.max(0, f * 4.5)) * (0.8 + 0.2 * vn(x * 0.2, y * 0.2, 5));
+        // pushed-out ridge just outside the wall
+        const ridge = Math.max(0, 1 - Math.abs(f + 0.08) / 0.09) * (0.25 + 0.2 * vn(x * 0.15, y * 0.15, 6));
+        hgt[x + y * N] = depth - ridge;
+      }
+    }
+    // fade everything to zero at the quad border (no edge)
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const bx = Math.min(x, N - 1 - x) / 10, by = Math.min(y, N - 1 - y) / 10;
+        hgt[x + y * N]! *= Math.min(1, bx, by);
+      }
+    }
     const cCol = document.createElement('canvas');
     const cNrm = document.createElement('canvas');
     cCol.width = cCol.height = cNrm.width = cNrm.height = N;
@@ -46,9 +72,9 @@ export class Footprints {
       for (let x = 0; x < N; x++) {
         const k = (x + y * N) * 4;
         const d = H(x, y);
-        // depression: surface height = -d
-        const gx = -(H(x + 1, y) - H(x - 1, y)) * 0.5, gy = -(H(x, y + 1) - H(x, y - 1)) * 0.5;
-        const s = 9;
+        // depression: surface height = -d (smoothed gradient over 2 px)
+        const gx = -(H(x + 2, y) - H(x - 2, y)) * 0.25, gy = -(H(x, y + 2) - H(x, y - 2)) * 0.25;
+        const s = 7;
         let nx = -gx * s, ny = gy * s, nz = 1;
         const l = Math.hypot(nx, ny, nz);
         nx /= l; ny /= l; nz /= l;
@@ -56,10 +82,13 @@ export class Footprints {
         nrm.data[k + 1] = (ny * 0.5 + 0.5) * 255;
         nrm.data[k + 2] = (nz * 0.5 + 0.5) * 255;
         nrm.data[k + 3] = 255;
-        col.data[k] = 0.84 * 255;
-        col.data[k + 1] = 0.88 * 255;
-        col.data[k + 2] = 0.95 * 255;
-        col.data[k + 3] = Math.min(1, d * 1.4) ** 1.5 * 0.9 * 255;
+        const deep = Math.max(0, d), crust = Math.max(0, -d) * 3;
+        const c = deep > crust ? [0.8, 0.85, 0.93] : [0.97, 0.98, 1.0];
+        col.data[k] = c[0]! * 255;
+        col.data[k + 1] = c[1]! * 255;
+        col.data[k + 2] = c[2]! * 255;
+        // alpha only carries the normal map's lighting; the tint itself stays faint
+        col.data[k + 3] = Math.min(0.85, Math.max(deep * 1.4, crust * 0.7, Math.hypot(gx, gy) * 5)) * 255;
       }
     }
     cCol.getContext('2d')!.putImageData(col, 0, 0);

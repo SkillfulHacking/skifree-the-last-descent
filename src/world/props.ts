@@ -358,16 +358,18 @@ export function pineGeometry(variant: number, detailed: boolean): THREE.BufferGe
 }
 
 /**
- * A rock, unit size (~1 m radius). Variants differ in character, not just noise seed:
- * 0 rounded boulder, 1 blocky (cleaved by a few planes), 2 flat slab, 3 tall split block,
- * 4 low weathered dome, 5 angular wedge. Welded vertices → smooth (stylised-soft) shading.
+ * A rock, unit size (~1 m radius). Variants differ in character, not just noise seed, and all are
+ * chunky and angular (no flat discs): 0 cleaved boulder, 1 blocky, 2 thick tilted slab, 3 tall split
+ * block, 4 jagged tor, 5 angular wedge. Cleavage planes cut flat facets with crisp silhouette breaks;
+ * welded vertices keep the stylised-soft shading inside each facet. The base flares into the ground
+ * (instances are partially buried).
  * `opts.snow` = 0 bakes bare rock (the rock shader then adds snow by world normal).
  */
 export function rockGeometry(variant: number, detailed: boolean, opts: { flatten?: number; snow?: number; detail?: number } = {}): THREE.BufferGeometry {
   const kind = ((variant % 6) + 6) % 6;
-  const flatten = opts.flatten ?? [0.62, 0.7, 0.4, 0.95, 0.45, 0.75][kind]!;
+  const flatten = opts.flatten ?? [0.8, 0.88, 0.62, 1.2, 0.98, 0.9][kind]!;
   const snowAmt = opts.snow ?? 1;
-  const ico = new THREE.IcosahedronGeometry(1, opts.detail ?? (detailed ? 2 : 1));
+  const ico = new THREE.IcosahedronGeometry(1, opts.detail ?? (detailed ? 3 : 1));
   ico.deleteAttribute('uv');
   ico.deleteAttribute('normal');
   // weld vertices so displacement stays watertight and normals are smooth
@@ -375,25 +377,35 @@ export function rockGeometry(variant: number, detailed: boolean, opts: { flatten
   const pos = g.getAttribute('position') as THREE.BufferAttribute;
   const v = new THREE.Vector3();
   const rng = new Rng(4711 + variant * 31);
-  // cleavage planes (fractured faces) for the blocky kinds
+  // cleavage planes (fractured faces): every kind is cut, the blocky kinds hardest
   const planes: Array<{ n: THREE.Vector3; d: number }> = [];
-  const nPlanes = [0, 4, 2, 5, 0, 3][kind]!;
+  const nPlanes = [3, 5, 4, 5, 7, 4][kind]!;
   for (let i = 0; i < nPlanes; i++) {
-    const n = new THREE.Vector3(rng.range(-1, 1), rng.range(-0.4, 0.9), rng.range(-1, 1)).normalize();
-    planes.push({ n, d: rng.range(0.55, 0.8) });
+    // spread the plane normals around the rock (golden-angle azimuths), mostly sideways/up
+    const az = i * 2.39996 + rng.range(-0.4, 0.4);
+    const el = rng.range(-0.25, 0.85);
+    const n = new THREE.Vector3(Math.cos(az), el, Math.sin(az)).normalize();
+    planes.push({ n, d: rng.range(0.5, 0.74) });
   }
-  const stretch = new THREE.Vector3([1, 1.1, 1.35, 0.8, 1.2, 1.3][kind]!, 1, [1, 0.9, 1.1, 0.85, 1.15, 0.8][kind]!);
+  if (kind === 2) planes.push({ n: new THREE.Vector3(0.25, 1, 0.1).normalize(), d: 0.55 }); // slab top, tilted
+  if (kind === 5) planes.push({ n: new THREE.Vector3(-0.8, 0.6, 0).normalize(), d: 0.35 }); // wedge ramp
+  const stretch = new THREE.Vector3([1.05, 1.1, 1.3, 0.8, 0.95, 1.25][kind]!, 1, [0.95, 0.9, 1.0, 0.85, 1.0, 0.8][kind]!);
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i);
-    const n = gnoise(v.x * 1.3 + variant * 3, v.z * 1.3 + v.y, 41 + variant) * 0.3 + gnoise(v.x * 3.5, v.y * 3.5 + v.z, 42 + variant) * 0.1 + gnoise(v.x * 8, v.y * 8 + v.z * 2, 43) * 0.035;
+    const n = gnoise(v.x * 1.3 + variant * 3, v.z * 1.3 + v.y, 41 + variant) * 0.2 + gnoise(v.x * 3.5, v.y * 3.5 + v.z, 42 + variant) * 0.07 + gnoise(v.x * 8, v.y * 8 + v.z * 2, 43) * 0.025;
     v.multiplyScalar(1 + n);
     for (const pl of planes) {
       const dd = v.dot(pl.n) - pl.d;
-      if (dd > 0) v.addScaledVector(pl.n, -dd * 0.92);
+      if (dd > 0) v.addScaledVector(pl.n, -dd * 0.97);
     }
     v.multiply(stretch);
     v.y *= flatten;
-    if (v.y < -0.1) v.y = -0.1 + (v.y + 0.1) * 0.3;
+    // the buried base flares a little (sits in the snow instead of balancing on a point)
+    if (v.y < -0.15) {
+      const k = 1 + Math.min(0.25, (-0.15 - v.y) * 0.6);
+      v.x *= k;
+      v.z *= k;
+    }
     pos.setXYZ(i, v.x, v.y, v.z);
   }
   return colorize(g, (p, n) => {

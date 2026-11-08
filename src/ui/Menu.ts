@@ -9,7 +9,7 @@ export type MenuItem =
   | { kind: 'toggle'; label: string; get: () => boolean; set: (v: boolean) => void }
   | { kind: 'select'; label: string; options: Array<{ value: string; label: string }>; get: () => string; set: (v: string) => void; note?: string }
   | { kind: 'bind'; label: string; get: () => string; listen: (done: () => void) => void }
-  | { kind: 'text'; label: string; get: () => string; set: (v: string) => void; placeholder?: string; maxLength?: number; note?: string }
+  | { kind: 'text'; label: string; get: () => string; set: (v: string) => boolean | void; placeholder?: string; maxLength?: number; note?: string }
   | { kind: 'info'; html: string }
   | { kind: 'custom'; render: (el: HTMLElement) => void; update?: (el: HTMLElement) => void };
 
@@ -303,13 +303,17 @@ export class MenuSystem {
 
   private drafts = new Map<MenuItem, string>();
 
-  /** Apply text typed into fields but not confirmed with Enter. Returns true if any applied. */
-  commitDrafts(): boolean {
-    if (!this.drafts.size) return false;
+  /**
+   * Apply text typed into fields but not confirmed with Enter. Returns 'none' (nothing pending),
+   * 'applied', or 'rejected' when a field refused its value (the caller must not proceed, E12).
+   */
+  commitDrafts(): 'none' | 'applied' | 'rejected' {
+    if (!this.drafts.size) return 'none';
     const pending = [...this.drafts];
     this.drafts.clear();
-    for (const [it, v] of pending) if (it.kind === 'text') it.set(v);
-    return true;
+    let rejected = false;
+    for (const [it, v] of pending) if (it.kind === 'text' && it.set(v) === false) rejected = true;
+    return rejected ? 'rejected' : 'applied';
   }
 
   private activate() {
@@ -318,7 +322,9 @@ export class MenuSystem {
     this.onSound?.('click');
     if (it.kind === 'button') {
       // apply typed-but-unconfirmed text first; the action then sees the up-to-date state
-      if (this.commitDrafts()) {
+      const r = this.commitDrafts();
+      if (r === 'rejected') return; // the field shows why; don't start anything with stale state
+      if (r === 'applied') {
         const same = this.current?.items.find((x) => x.kind === 'button' && x.label === it.label);
         if (same && same.kind === 'button') return same.action();
       }

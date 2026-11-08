@@ -93,7 +93,8 @@ export class Vegetation {
     this.treeNear = [0, 1, 2].map((v) => pineGeometry(v, true));
     this.treeFar = [0, 1, 2].map((v) => pineGeometry(v, false));
     this.rockNear = Array.from({ length: ROCK_VARIANTS }, (_, v) => rockGeometry(v, true, { snow: 0 }));
-    this.rockFar = [rockGeometry(0, false, { snow: 0 })];
+    // mid/far LOD: three angular characters (one shared boulder made every distant rock identical)
+    this.rockFar = [1, 3, 5].map((v) => rockGeometry(v, false, { snow: 0, detail: 1 }));
     this.logGeo = logGeometry();
     this.stumpGeo = stumpGeometry();
     this.geos.push(...this.treeNear, ...this.treeFar, ...this.rockNear, ...this.rockFar, this.logGeo, this.stumpGeo);
@@ -159,23 +160,28 @@ export class Vegetation {
           const h2 = hash01(o.x, o.z, 2);
           const h3 = hash01(o.x, o.z, 3);
           const sc = o.scale;
+          // chunky, not discs: height 0.85–1.6× the footprint scale, buried by 20–45 % of it (the
+          // geometry runs below its origin, so the rock grows out of the snow), varied tilt.
+          // Away from the piste (distance from the centre line) rocks get taller and more tilted:
+          // weathered blocks on the margins, lower rounded ones where the piste is groomed.
+          const off = Math.min(1, Math.abs(o.x - mountain.centerX(o.z)) / Math.max(20, mountain.halfWidth(o.z)));
           base.sx = sc * (0.85 + 0.35 * h1);
           base.sz = sc * (0.85 + 0.35 * h2);
-          base.sy = sc * (0.78 + 0.4 * h3) * 0.95;
-          base.y = o.y - sc * (0.08 + 0.22 * hash01(o.x, o.z, 4));
-          base.rx = (hash01(o.x, o.z, 5) - 0.5) * 0.45;
-          base.rz = (hash01(o.x, o.z, 6) - 0.5) * 0.45;
+          base.sy = sc * (0.85 + 0.45 * h3 + 0.3 * off * hash01(o.x, o.z, 8));
+          base.y = o.y - sc * (0.2 + 0.25 * hash01(o.x, o.z, 4));
+          base.rx = (hash01(o.x, o.z, 5) - 0.5) * (0.4 + 0.3 * off);
+          base.rz = (hash01(o.x, o.z, 6) - 0.5) * (0.4 + 0.3 * off);
           b.rocks[(o.variant + Math.floor(h3 * 3) * 2) % ROCK_VARIANTS]!.push(base);
           // a few small, half-buried satellite stones (render only; power-law sizes) so rocks
           // read as clusters/talus instead of an even sprinkle
-          const nSat = Math.floor(hash01(o.x, o.z, 7) * (o.kind === 'boulder' ? 5 : 3));
+          const nSat = Math.floor(hash01(o.x, o.z, 7) * (o.kind === 'boulder' ? 3 : 1.6));
           for (let k = 0; k < nSat; k++) {
             const a = hash01(o.x, o.z, 10 + k) * Math.PI * 2;
             const d = sc * (1.0 + 1.4 * hash01(o.x, o.z, 20 + k));
             const sz = Math.min(0.32 * sc, 0.1 * sc * Math.pow(1 / Math.max(0.08, hash01(o.x, o.z, 30 + k)), 0.55));
             const x = o.x + Math.cos(a) * d;
             const z = o.z + Math.sin(a) * d;
-            get(x).pebbles.push({ x, y: mountain.heightAt(x, z) - sz * 0.35, z, rot: a * 3, sx: sz, sy: sz * 0.8, sz: sz * 1.1, rx: 0.3 * (hash01(o.x, o.z, 50 + k) - 0.5), rz: 0.3 * (hash01(o.x, o.z, 60 + k) - 0.5) });
+            get(x).pebbles.push({ x, y: mountain.heightAt(x, z) - sz * 0.3, z, rot: a * 3, sx: sz, sy: sz * (0.8 + 0.5 * hash01(o.x, o.z, 40 + k)), sz: sz * 1.1, rx: 0.3 * (hash01(o.x, o.z, 50 + k) - 0.5), rz: 0.3 * (hash01(o.x, o.z, 60 + k) - 0.5) });
           }
           break;
         }
@@ -223,7 +229,7 @@ export class Vegetation {
         const side = rng.chance(0.5) ? 1 : -1;
         const cx = mountain.centerX(z);
         const x = cx + side * (mountain.halfWidth(z) + 60 + rng.float() * 700);
-        const n = 3 + rng.int(0, 5);
+        const n = 2 + rng.int(0, 3);
         const seedA = rng.float();
         if (Math.abs(x) < 560 || z < -300) continue;
         const y = mountain.heightAt(x, z);
@@ -242,9 +248,9 @@ export class Vegetation {
           const d = rng.float() * 14;
           const rx = x + Math.cos(a) * d;
           const rz = z + Math.sin(a) * d * 0.6;
-          const sz = Math.min(3.2, 0.45 * Math.pow(1 / Math.max(0.06, rng.float()), 0.7));
+          const sz = Math.min(4.0, 0.7 * Math.pow(1 / Math.max(0.06, rng.float()), 0.7));
           const vv = Math.floor(((seedA * 7 + k * 0.37) % 1) * ROCK_VARIANTS);
-          get(rx).rocks[vv]!.push({ x: rx, y: mountain.heightAt(rx, rz) - sz * 0.3, z: rz, rot: rng.float() * 6.28, sx: sz * rng.range(0.85, 1.25), sy: sz * rng.range(0.6, 1.0), sz: sz, rx: rng.range(-0.3, 0.3), rz: rng.range(-0.3, 0.3) });
+          get(rx).rocks[vv]!.push({ x: rx, y: mountain.heightAt(rx, rz) - sz * 0.35, z: rz, rot: rng.float() * 6.28, sx: sz * rng.range(0.85, 1.25), sy: sz * rng.range(0.85, 1.5), sz: sz, rx: rng.range(-0.4, 0.4), rz: rng.range(-0.4, 0.4) });
         }
       }
     }
@@ -293,8 +299,11 @@ export class Vegetation {
       });
       // small satellite stones: cheap far-LOD geometry, near ring only
       if (b.pebbles.length) cell.near.push(make(this.rockFar[0]!, this.rockMat, b.pebbles, false));
-      const rocks = b.rocks.flat();
-      if (rocks.length) cell.mid.push(make(this.rockFar[0]!, this.rockMat, rocks, false));
+      const midSets: Inst[][] = [[], [], []];
+      b.rocks.forEach((list, v) => midSets[v % 3]!.push(...list));
+      midSets.forEach((list, k) => {
+        if (list.length) cell.mid.push(make(this.rockFar[k]!, this.rockMat, list, false));
+      });
       if (b.logs.length) cell.near.push(make(this.logGeo, this.woodMat, b.logs, true));
       if (b.stumps.length) cell.near.push(make(this.stumpGeo, this.woodMat, b.stumps, true));
       for (const m of new Set([...cell.near, ...cell.far, ...cell.mid])) {

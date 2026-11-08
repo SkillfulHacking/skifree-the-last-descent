@@ -15,7 +15,7 @@ export class CaveCinematic {
   private dim = 0;
   private dimShade = 1;
   private sunBase: number;
-  private leap: { t: number; from: THREE.Vector3; vel: THREE.Vector3; heading: number; landed: boolean } | null = null;
+  private leap: { t: number; from: THREE.Vector3; vel: THREE.Vector3; heading: number; landed: boolean; runV: number } | null = null;
   onRunPrompt: (() => void) | null = null;
 
   /** exit-path samples: depth s (m inside the mouth; negative = out on the ledge) → floor point */
@@ -66,7 +66,8 @@ export class CaveCinematic {
       st.yeti.getHandWorldPosition('right', hand);
       st.yeti.getHeadWorldPosition(handHead);
       const look = hand.clone().lerp(handHead, 0.35);
-      return pose(hand.clone().addScaledVector(O, dist).add(new THREE.Vector3(0, 0.55, 0.9)), look, fov);
+      // camera a little higher and looking slightly lower: the planted hand sits above the letterbox (C12)
+      return pose(hand.clone().addScaledVector(O, dist).add(new THREE.Vector3(0, 0.95, 0.9)), look.add(new THREE.Vector3(0, -0.15, 0)), fov);
     };
     tl.shot({ start: 6.6, end: 7.9, from: handShot(2.8, 34), to: handShot(2.4, 32), handheld: 0.012 });
     // Beat 6–7: he emerges and rises to full height (low angle)
@@ -158,13 +159,13 @@ export class CaveCinematic {
     });
     tl.at(14.6, () => {
       const sp = yetiSpawnAfterCinematic(st.world.mountain, st.world.focusEncounter?.anchor, st.world.cave.ledge);
-      this.leap = { t: 0, from: sp.pos.clone(), vel: sp.leap.clone(), heading: sp.heading, landed: false };
+      this.leap = { t: 0, from: sp.pos.clone(), vel: sp.leap.clone(), heading: sp.heading, landed: false, runV: 0 };
       st.yeti.root.position.copy(sp.pos);
       st.yeti.root.rotation.set(0, sp.heading, 0);
       st.setYetiMode('leap');
       st.audio.playYetiGrowl(sp.pos, false);
     });
-    tl.at(15.8, () => {
+    tl.at(16.95, () => {
       st.poseOverride = { lookBack: 0 };
       st.hud.letterbox(false);
     });
@@ -190,13 +191,24 @@ export class CaveCinematic {
         if (L.t > 0.2 && p.y <= h) {
           p.y = h;
           L.landed = true;
+          L.runV = Math.hypot(L.vel.x, L.vel.z);
           st.setYetiMode('run');
           st.shake(0.5);
           st.audio.playYetiFootstep(p, 1);
           st.world.particles.emit({ x: p.x, y: h + 0.2, z: p.z, vx: 0, vy: 2, vz: 0, spread: 2.5, size: 0.7, life: 1.4, count: 60, gravity: 0.5, drag: 1.6, grow: 1.4, alpha: 0.85 });
         }
       }
-      st.yetiAnim.speed = L.landed ? 0 : 6;
+      if (L.landed) {
+        // keep running after the landing (no freeze between touchdown and the hand-off, C10):
+        // decelerate from the flight's ground speed to a chase run along the leap direction
+        const p = st.yeti.root.position;
+        const target = 13;
+        L.runV += (target - L.runV) * (1 - Math.exp(-2.5 * dt));
+        p.x += Math.sin(L.heading) * L.runV * dt;
+        p.z += Math.cos(L.heading) * L.runV * dt;
+        p.y = st.world.mountain.heightAt(p.x, p.z);
+        st.yetiAnim.speed = L.runV;
+      } else st.yetiAnim.speed = 6;
     } else if (t >= 7.9 && t < 10.0) {
       // heavy steps out of the darkness onto the ledge (root speed = real path speed)
       const k = (t - 7.9) / 2.1;
@@ -282,8 +294,13 @@ export class CaveCinematic {
     if (this.leap?.landed) {
       // the leap was filmed: the chase starts where he landed
       const p = st.yeti.root.position;
-      st.yetiAI.place(p.x, p.z, this.leap.heading);
+      const L = this.leap;
+      st.yetiAI.place(p.x, p.z, L.heading);
       st.yetiAI.startChase(null);
+      // carry the running speed over: no stop at the hand-off
+      st.yetiAI.speed = L.runV;
+      st.yetiAI.vel.set(Math.sin(L.heading) * L.runV, 0, Math.cos(L.heading) * L.runV);
+      st.yetiAI.delay = 0;
     } else if (this.leap) {
       // still in the air when the cinematic ends: hand the flight over as it is (no reset, no
       // second leap — C1)

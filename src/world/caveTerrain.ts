@@ -302,11 +302,12 @@ export function floorRimDist(u: number, v: number): number {
 }
 /** Terrain sink under the floor mesh (terrain hides just below it). */
 export function floorSink(e: number): number {
-  return 0.3 * (1 - smoothstep(-0.8, 0, e));
+  // a long, shallow tuck (~9°): a short steep ramp here faced into the mouth and read as a dark lip (A10)
+  return 0.3 * (1 - smoothstep(-1.6, 0, e));
 }
 /** Floor mesh dip at its rim (it tucks under the heightfield). */
 export function floorDip(e: number): number {
-  return 0.14 * smoothstep(-0.45, 0.45, e);
+  return 0.14 * smoothstep(-0.6, 0.6, e);
 }
 
 export interface CaveLocal {
@@ -344,10 +345,19 @@ export function caveTerrainOffset(a: CaveAnchor, x: number, z: number, d: number
   const ch = chamberQuery(u, v, tmpH);
   const cd = ch.dist - chamberHalfWidth(ch.s);
   const lift = floorLiftRaw(u, v, uc, ch.s);
-  const sink = floorSink(floorCover(u, v, cd));
+  const cover = floorCover(u, v, cd);
+  const sink = floorSink(cover);
   const liftGround = lift * liftMask(u, v, cd) - sink;
   const chamberRamp = lift - sink + PIT_K * Math.max(0, cd - 1.1);
-  return bank + Math.max(liftGround, Math.min(hill, chamberRamp));
+  // smooth max where the ledge meets the bank/hill: a hard max left a crease that the 1 m terrain grid
+  // drew as triangle facets in the snow beside the mouth (A37). Off only where the floor mesh covers the
+  // terrain (there the terrain must stay just under the floor).
+  return bank + smaxT(liftGround, Math.min(hill, chamberRamp), 0.05 + 0.75 * smoothstep(0.2, 1.4, cover));
+}
+
+function smaxT(a: number, b: number, k: number): number {
+  const h = Math.max(k - Math.abs(a - b), 0) / k;
+  return Math.max(a, b) + h * h * k * 0.25;
 }
 
 /**
