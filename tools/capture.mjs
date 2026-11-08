@@ -6,7 +6,8 @@ const [base, outDir, scriptPath] = process.argv.slice(2);
 mkdirSync(outDir, { recursive: true });
 const steps = JSON.parse(readFileSync(scriptPath, 'utf8'));
 const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
-const p = await b.newPage({ viewport: { width: 960, height: 540 } });
+const [VW, VH] = (process.env.VIEWPORT ?? '960x540').split('x').map(Number);
+const p = await b.newPage({ viewport: { width: VW, height: VH } });
 const errors = [];
 p.on('pageerror', (e) => { errors.push(String(e)); console.log('[pageerror]', String(e).slice(0, 300)); });
 p.on('console', (m) => { if (m.type() === 'error') { errors.push(m.text()); console.log('[console.error]', m.text().slice(0, 300)); } });
@@ -21,7 +22,7 @@ for (const s of steps) {
   else if (s.do === 'wait') await p.waitForTimeout(s.ms);
   else if (s.do === 'waitFor') await p.waitForFunction(s.fn, null, { timeout: s.timeout ?? 120000, polling: 500 });
   else if (s.do === 'eval') console.log('eval', s.label ?? '', String(JSON.stringify(await p.evaluate(s.fn))).slice(0, 600));
-  else if (s.do === 'shot') { await p.screenshot({ path: `${outDir}/${s.name}.png`, timeout: 300000 }); }
+  else if (s.do === 'shot') { await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await p.screenshot({ path: `${outDir}/${s.name}.png`, timeout: 600000 }); }
   console.log(`step ${s.do} ${s.name ?? s.label ?? ''} ${Date.now() - t0}ms`, JSON.stringify(await p.evaluate(() => window.__skifree.state().session)).slice(0, 260));
 }
 console.log('ERRORS', errors.length);

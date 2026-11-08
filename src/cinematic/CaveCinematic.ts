@@ -57,11 +57,15 @@ export class CaveCinematic {
     tl.shot({ start: 2.4, end: 3.8, from: () => pose(at(M, 24, 3.5, 9), cave.lipTop, 40), to: () => pose(at(M, 21, 3.2, 7), cave.lipTop.clone().add(new THREE.Vector3(0, -1, 0)), 40), handheld: 0.03 });
     // Beats 3–4: a huge shadow moves in the darkness; two eyes appear
     tl.shot({ start: 3.8, end: 6.6, from: () => pose(at(M, 12, 2.4, 1.5), yetiInside.clone().lerp(yetiRoot(), 0.6).add(new THREE.Vector3(0, 1.6, 0)), 38), to: () => pose(at(M, 6.5, 2.3, 0.6), yetiRoot().clone().add(new THREE.Vector3(0, 1.5, 0)), 30), easing: ease.linear, handheld: 0.02 });
-    // Beat 5: a giant furry hand grips the cave entrance
+    // Beat 5: a giant furry hand reaches out of the dark and plants on the threshold
+    // (low, close, from just outside the mouth; the head looms behind it in the darkness)
     const hand = new THREE.Vector3();
+    const handHead = new THREE.Vector3();
     const handShot = (dist: number, fov: number) => () => {
       st.yeti.getHandWorldPosition('right', hand);
-      return pose(hand.clone().addScaledVector(O, dist).add(new THREE.Vector3(0, -0.5, -0.9)), hand.clone().add(new THREE.Vector3(0, -0.2, 0)), fov);
+      st.yeti.getHeadWorldPosition(handHead);
+      const look = hand.clone().lerp(handHead, 0.35);
+      return pose(hand.clone().addScaledVector(O, dist).add(new THREE.Vector3(0, 0.55, 0.9)), look, fov);
     };
     tl.shot({ start: 6.6, end: 7.9, from: handShot(2.8, 34), to: handShot(2.4, 32), handheld: 0.012 });
     // Beat 6–7: he emerges and rises to full height (low angle)
@@ -120,8 +124,9 @@ export class CaveCinematic {
     tl.at(5.4, () => (this.eyeTarget = st.settings.reduceFlashes ? 0.55 : 1));
     tl.at(6.2, () => {
       // the grip pose settles while we are still on the eyes, so the insert finds the hand
+      // stops at the threshold on all fours, one hand planted on the lip of the floor
       this.placeAt(GRIP_AT);
-      st.setYetiMode('grip');
+      st.setYetiMode('crawl');
     });
     tl.at(6.6, () => {
       st.audio.playImpact('rock-light', 0.6);
@@ -274,5 +279,5 @@ export class CaveCinematic {
 
 /** exit-path depths (see Cave.exitPath): crawl start, grip point, ledge */
 const CRAWL_FROM = 12.5;
-const GRIP_AT = 1.0;
+const GRIP_AT = 0.6;
 const LEDGE_AT = -2.2;
