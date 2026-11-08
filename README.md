@@ -8,6 +8,8 @@ It is an original reimagining of the premise of the 1991 Windows game *SkiFree*.
 game are used. Every model, texture, animation, sound effect and music cue is generated procedurally
 at runtime by code in this repository, so the game has no binary asset files.
 
+**Play online:** https://skillfulhacking.github.io/skifree-the-last-descent/ (deployed from `main` by GitHub Actions; see `.github/workflows/deploy.yml`).
+
 ## Quick start
 
 Requirements: **Node.js 20+** and a desktop browser with **WebGL2** (current Chrome, Edge, Firefox or Safari).
