@@ -8,7 +8,7 @@
 import { clamp, fbm, gnoise, ridged, smoothstep } from '../core/rng';
 import type { SurfaceType } from '../core/types';
 import { caveTerrainHeight, CAVE_INFLUENCE_Z, type CaveAnchor } from './caveTerrain';
-import { CLASSIC, ClassicProfile, GeneratedProfile, type CliffBand, type CourseProfile, type Kicker } from './profile';
+import { CLASSIC, foreshadowFor, ClassicProfile, GeneratedProfile, type CliffBand, type CourseProfile, type Kicker } from './profile';
 
 export type { Kicker, CliffBand, CourseProfile, Encounter, Sighting, SegmentType, AltRoute } from './profile';
 import type { AltRoute } from './profile';
@@ -22,7 +22,7 @@ export const COURSE = {
   finishZ: CLASSIC.finishZ,
   caveZ: CLASSIC.caveZ,
   caveTriggerZ: CLASSIC.caveZ + 22,
-  foreshadowZ: CLASSIC.caveZ - 530,
+  foreshadowZ: foreshadowFor(CLASSIC.caveZ),
   tutorialEndZ: CLASSIC.tutorialEndZ,
 } as const;
 

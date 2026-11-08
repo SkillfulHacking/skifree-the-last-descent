@@ -203,7 +203,8 @@ describe('pursuit fairness (full headless runs)', () => {
     expect(simulateRun(style('skilled'), SEED_DEFAULT, 400, null, [20]).outcome).toBe('victory');
     const two = simulateRun(style('skilled'), SEED_DEFAULT, 400, null, [30, 60]);
     expect(two.outcome).toBe('victory');
-    expect(two.finalGap).toBeLessThan(simulateRun(style('skilled')).finalGap);
+    // the cost is real: the crashes lose time (the long chase lets the gap itself recover)
+    expect(two.time).toBeGreaterThan(simulateRun(style('skilled')).time + 4);
     expect(simulateRun(style('intermediate'), 42, 400, null, [40]).outcome).toBe('victory');
   });
 

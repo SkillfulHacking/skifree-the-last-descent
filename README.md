@@ -1,7 +1,7 @@
 # SkiFree — The Last Descent
 
 A third-person 3D skiing survival game for the browser, built with **Three.js + TypeScript + Vite**.
-You ski down a mountain at speed. Partway down, a Yeti bursts out of a cliffside cave, and you have
+You ski down a mountain at speed. Early in the run, a Yeti bursts out of a cliffside cave, and you have
 to outrun it to the ski resort at the bottom.
 
 It is an original reimagining of the premise of the 1991 Windows game *SkiFree*. No assets from that
@@ -75,8 +75,11 @@ The game moves to each phase when you reach a point on the course, not after a s
 
 Courses are assembled from segment types (beginner, open alpine, forest, ridgeline, basin, chute,
 moguls, powder, high-speed, cliffside), each with its own slope, width and hazards. The whole course
-comes deterministically from its code. Long courses add earlier skirmishes from other caves; those
-end at a refuge where the Yeti loses your trail, and the main chase stays at the end. Wide segments
+comes deterministically from its code. The Yeti's cave is always inside the **first 10 %** of the
+course (Sprint: by 300 m; Standard: by 1 km), so on Sprint and Standard you are chased almost all the
+way to the resort. On Endurance and Expedition that early chase ends at a refuge where the Yeti
+loses your trail; later skirmishes follow, and the main chase stays at the end. Endless puts its
+first cave as early as Standard does. Wide segments
 sometimes have an **alternate line**: a shorter, icy, slightly sunken chute marked with
 orange and blue poles. It is faster but has less grip.
 
