@@ -272,8 +272,8 @@ function between<T extends { z: number }>(arr: readonly T[], z0: number, z1: num
 // Classic: the original 3 km mountain
 // =============================================================================================
 const CLASSIC_SLOPE: ReadonlyArray<readonly [number, number]> = [
-  [-400, 2], [-60, 3], [0, 6], [60, 10], [240, 11], [300, 18], [640, 17], [700, 22], [980, 21], [1060, 14], [1250, 13], [1300, 8],
-  [1365, 9], [1405, 18], [1470, 19], [1900, 20], [1990, 26], [2280, 25], [2330, 17], [2680, 16], [2740, 14], [2930, 12], [2990, 6],
+  [-400, 2], [-60, 3], [0, 6], [60, 10], [160, 12], [210, 8], [275, 9], [315, 18], [380, 19], [640, 17], [700, 22], [980, 21], [1060, 14],
+  [1250, 13], [1300, 15], [1365, 17], [1405, 18], [1470, 19], [1900, 20], [1990, 26], [2280, 25], [2330, 17], [2680, 16], [2740, 14], [2930, 12], [2990, 6],
   [3060, 1.2], [3400, 0.6], [6000, 0.4],
 ];
 const CLASSIC_WIDTH: ReadonlyArray<readonly [number, number]> = [
@@ -281,7 +281,23 @@ const CLASSIC_WIDTH: ReadonlyArray<readonly [number, number]> = [
   [2700, 52], [2950, 70], [3100, 110], [6000, 140],
 ];
 
-export const CLASSIC = { finishZ: 3000, caveZ: 1350, tutorialEndZ: 330 } as const;
+/**
+ * Yeti cave placement rule: the (first) cave always sits inside the first 10 % of a finite course,
+ * with its trigger line before the 10 % mark too (Sprint 3 km: by 300 m; Standard 10 km: by 1 km).
+ */
+export const CAVE_FRACTION = 0.1;
+export function firstCaveZ(length: number): number {
+  return Math.round(length * CAVE_FRACTION) - 40;
+}
+/** Early caves leave less run-in: the tutorial, and the foreshadowing, shrink to fit before them. */
+export function tutorialEndFor(caveZ: number): number {
+  return caveZ < 600 ? caveZ - 110 : 330;
+}
+export function foreshadowFor(caveZ: number): number {
+  return caveZ < 600 ? caveZ - 80 : caveZ - 530;
+}
+
+export const CLASSIC = { finishZ: 3000, caveZ: firstCaveZ(3000), tutorialEndZ: tutorialEndFor(firstCaveZ(3000)) } as const;
 
 export class ClassicProfile implements CourseProfile {
   readonly kind = 'classic' as const;
@@ -298,7 +314,8 @@ export class ClassicProfile implements CourseProfile {
   constructor(readonly seed: number) {
     this.slope.anchorZero(0);
     const rng = new Rng(seed ^ 0x51f15e);
-    this.kick.push({ z: 285, d: this.routeX(285) - this.centerX(285), width: 9, height: 1.1, run: 12 });
+    const tk = this.tutorialEndZ - 45; // the tutorial kicker, just before the tutorial ends
+    this.kick.push({ z: tk, d: this.routeX(tk) - this.centerX(tk), width: 9, height: 1.1, run: 12 });
     for (const [a, b, count] of [
       [420, 960, 4],
       [1080, 1240, 1],
@@ -332,7 +349,7 @@ export class ClassicProfile implements CourseProfile {
         index: 0,
         caveZ,
         triggerZ: caveZ + 22,
-        foreshadowZ: caveZ - 530,
+        foreshadowZ: foreshadowFor(caveZ),
         anchor: { z: caveZ, centerX: this.centerX(caveZ), side: 1, d: CAVE_D },
         chaseEndZ: this.finishZ,
         checkpointZ: null,
@@ -472,13 +489,13 @@ export function chaseLength(length: number): number {
 /** chase length of a mid-course skirmish on long finite courses (cave → refuge) */
 export const SKIRMISH_CHASE = 2200;
 
-export const ENDLESS = { firstCave: 5200, cycle: 9000, chase: 3400 } as const;
+export const ENDLESS = { firstCave: 960, cycle: 9000, chase: 3400 } as const;
 
 export class GeneratedProfile implements CourseProfile {
   readonly kind = 'generated' as const;
   readonly finishZ: number;
   readonly endless: boolean;
-  readonly tutorialEndZ = 330;
+  readonly tutorialEndZ: number;
   private slope = new SlopeTrack();
   private width = new KeyTrack();
   private amp = new KeyTrack(); // centreline amplitude
@@ -515,29 +532,39 @@ export class GeneratedProfile implements CourseProfile {
     const r = new Rng(seed ^ 0x7c0ffee);
     this.rngPlan = new Rng(seed ^ 0x51ed);
     this.phase = [r.range(0, 6.28), r.range(0, 6.28), r.range(0, 6.28), r.range(0, 6.28)];
-    // the summit: identical shape for every course (start gate, tutorial run-in)
+    const first = this.endless ? ENDLESS.firstCave : firstCaveZ(length);
+    this.tutorialEndZ = tutorialEndFor(first);
+    // the summit: identical start for every course (start gate, tutorial run-in). With an early
+    // cave (Sprint) the summit hands straight over to the cave shelf.
+    const summitEnd = Math.min(330, first - 320);
     this.keys(-400, { slope: 2, width: 70, amp: 0, route: 0, tree: 0, forest: 0.3, rock: 1, setback: 1, steep: 0.8 });
     this.keys(-60, { slope: 3, width: 66, amp: 0, route: 0 });
     this.keys(0, { slope: 6, width: 62, amp: 0, route: 0 });
-    this.keys(60, { slope: 10, width: 60, amp: 10, route: 0 });
-    this.keys(240, { slope: 11, width: 56, amp: 30, route: 0.5, tree: 0.4 });
-    this.segs.push({ i: 0, type: 'summit', z0: -400, z1: 330 });
-    this.kick.push({ z: 285, d: 0, width: 9, height: 1.1, run: 12 });
-    this.zDone = 330;
-    // the finish
+    if (summitEnd >= 240) {
+      this.keys(60, { slope: 10, width: 60, amp: 10, route: 0 });
+      this.keys(240, { slope: 11, width: 56, amp: 30, route: 0.5, tree: 0.4 });
+    }
+    this.zDone = Math.max(0, summitEnd);
+    this.segs.push({ i: 0, type: 'summit', z0: -400, z1: this.zDone });
+    this.kick.push({ z: this.tutorialEndZ - 45, d: 0, width: 9, height: 1.1, run: 12 });
     if (!this.endless) {
       const L = length;
-      const caveZ = Math.max(1350, L - chaseLength(L));
-      // long courses: earlier skirmishes from other caves, each ending at a refuge where the Yeti
-      // loses the trail; the main confrontation stays at the end (B4)
-      const skirm = L >= 45000 ? [0.24, 0.5, 0.72] : L >= 18000 ? [0.4] : [];
-      skirm.forEach((f, i) => {
-        const c = Math.round((L * f) / 10) * 10;
-        const cp = c + SKIRMISH_CHASE;
-        this.addEncounter(i, c, cp, cp, 0.94 + 0.02 * i);
-        this.cps.push(cp);
-      });
-      this.addEncounter(skirm.length, caveZ, L, null, 1);
+      // the Yeti's cave is always in the first 10 % of the course. Sprint and Standard: one
+      // encounter, chased from there to the finish. Long courses: the early cave's chase ends at
+      // a refuge; later skirmishes follow, and the main confrontation stays at the end (B4).
+      if (L < 18000) {
+        this.addEncounter(0, first, L, null, 1);
+      } else {
+        const skirm = L >= 45000 ? [0.5, 0.72] : [0.45];
+        const cps = [first, ...skirm.map((f) => Math.round((L * f) / 10) * 10)];
+        cps.forEach((c, i) => {
+          const cp = c + SKIRMISH_CHASE;
+          this.addEncounter(i, c, cp, cp, 0.94 + 0.02 * i);
+          this.cps.push(cp);
+        });
+        this.addEncounter(cps.length, Math.max(1350, L - chaseLength(L)), L, null, 1);
+      }
+      const caveZ = this.enc.at(-1)!.caveZ;
       // sightings: the Yeti shows itself on a ridge between the encounters
       const busy = (z: number) => this.enc.some((e) => z > e.foreshadowZ - 900 && z < e.chaseEndZ + 600);
       for (let z = 2600; z < caveZ - 1500; z += this.rngPlan.range(3600, 5200)) if (!busy(z)) this.sight.push({ z, side: this.rngPlan.chance(0.5) ? 1 : -1 });
@@ -553,7 +580,7 @@ export class GeneratedProfile implements CourseProfile {
       index,
       caveZ,
       triggerZ: caveZ + 22,
-      foreshadowZ: caveZ - 530,
+      foreshadowZ: foreshadowFor(caveZ),
       anchor: { z: caveZ, centerX: 0, side: 1, d: CAVE_D }, // centerX resolved once the keys exist
       chaseEndZ: chaseEnd,
       checkpointZ,
@@ -697,8 +724,11 @@ export class GeneratedProfile implements CourseProfile {
   private buildSpecial(kind: 'encounter' | 'checkpoint' | 'finish', ref: number, z0: number, z1: number, rng: Rng, idx: number) {
     if (kind === 'encounter') {
       const c = ref;
-      const common = { width: 50, amp: 55, route: 0.8, forest: 0.9, tree: 1, rock: 1.2, setback: 1, steep: 1 };
-      this.keys(c - 300, { slope: 13, ...common });
+      // an early cave (Sprint) starts inside the summit run-in: keep the start straighter and
+      // skip shelf keys that would land before the segment start
+      const common = { width: 50, amp: Math.min(55, Math.max(20, (c - 50) * 0.15)), route: 0.8, forest: 0.9, tree: 1, rock: 1.2, setback: 1, steep: 1 };
+      if (c - 300 > z0 + 5) this.keys(c - 300, { slope: 13, ...common });
+      else this.keys(c - 120, { slope: 11, ...common });
       this.keys(c - 50, { slope: 8, ...common });
       this.keys(c + 15, { slope: 9, ...common });
       this.keys(c + 55, { slope: 18, ...common });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Mountain } from '../../src/world/course';
-import { ENDLESS, chaseLength } from '../../src/world/profile';
+import { ENDLESS, chaseLength, firstCaveZ } from '../../src/world/profile';
 import { ObstacleField, laneClearance } from '../../src/physics/obstacles';
 import { simulateGenerated } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
@@ -86,8 +86,8 @@ describe('course config & daily mountain', () => {
     expect(json.id).toBe(spec.id);
     expect(json.finishZ).toBe(20000);
     expect(json.segments.length).toBeGreaterThan(10);
-    expect(json.encounters.length).toBe(2);
-    expect(json.refuges.length).toBe(1);
+    expect(json.encounters.length).toBe(3);
+    expect(json.refuges.length).toBe(2);
     expect(json.route.length).toBeGreaterThan(150);
     expect(JSON.stringify(courseSpec(makeCourse('custom', 'endurance', { customText: 'YETI' })))).toBe(JSON.stringify(spec));
   });
@@ -150,29 +150,46 @@ describe('course config & daily mountain', () => {
 });
 
 describe('configurable course lengths', () => {
+  it('Classic Sprint: the Yeti cave and its trigger are inside the first 300 m', () => {
+    const m = buildMountain(makeCourse('classic', 'sprint'));
+    const [e] = m.profile.encounters(-Infinity, Infinity);
+    expect(e!.caveZ).toBe(firstCaveZ(3000));
+    expect(e!.triggerZ).toBeLessThanOrEqual(300);
+    expect(e!.chaseEndZ).toBe(3000);
+    expect(m.profile.tutorialEndZ).toBeLessThan(e!.foreshadowZ);
+    expect(e!.foreshadowZ).toBeLessThan(e!.triggerZ);
+  });
+
+  it('Endless: the first cave comes as early as on Standard', () => {
+    expect(Mountain.generated(5, Infinity).profile.encounters(0, 5000)[0]!.caveZ).toBe(firstCaveZ(10000));
+  });
+
   it('Classic Sprint is the original hand-tuned course; other lengths are generated', () => {
     expect(buildMountain(makeCourse('classic', 'sprint')).profile.kind).toBe('classic');
     expect(buildMountain(makeCourse('classic', 'standard')).profile.kind).toBe('generated');
   });
 
   for (const l of ['sprint', 'standard', 'endurance', 'expedition'] as const) {
-    it(`${l}: finish at ${LENGTH_INFO[l].metres} m, a valid descending route with a clear lane, the cave late`, () => {
+    it(`${l}: finish at ${LENGTH_INFO[l].metres} m, a valid descending route with a clear lane, the cave in the first 10 %`, () => {
       const L = LENGTH_INFO[l].metres;
       const m = Mountain.generated(4242, L);
       expect(m.finishZ).toBe(L);
       const enc = m.profile.encounters(-Infinity, Infinity);
       const main = enc.at(-1)!;
-      // long courses add earlier skirmishes that end at refuges; the main one ends at the finish
-      expect(enc.length).toBe(L >= 45000 ? 4 : L >= 18000 ? 2 : 1);
-      expect(main.caveZ).toBe(Math.max(1350, L - chaseLength(L)));
+      // the Yeti's cave (and its trigger line) is always inside the first 10 % of the course
+      expect(enc[0]!.caveZ).toBe(firstCaveZ(L));
+      expect(enc[0]!.triggerZ).toBeLessThanOrEqual(L * 0.1);
+      expect(enc[0]!.caveZ).toBeGreaterThan(m.profile.tutorialEndZ);
+      // Sprint/Standard: that one encounter is chased to the finish. Long courses: the early
+      // chase ends at a refuge, later skirmishes follow, the main confrontation is at the end.
+      expect(enc.length).toBe(L >= 45000 ? 4 : L >= 18000 ? 3 : 1);
       expect(main.chaseEndZ).toBe(L);
       expect(main.checkpointZ).toBeNull();
+      if (L >= 18000) expect(main.caveZ).toBe(Math.max(1350, L - chaseLength(L)));
       for (const e of enc.slice(0, -1)) {
         expect(e.checkpointZ).toBe(e.chaseEndZ);
         expect(e.chaseEndZ).toBeLessThan(main.foreshadowZ);
       }
-      // main confrontation in the final part of the course
-      if (L >= 10000) expect(main.caveZ / L).toBeGreaterThan(0.6);
       // the route descends everywhere (small bumps allowed)
       let prev = m.heightAt(m.routeX(0), 0);
       let worst = 0;
@@ -231,7 +248,8 @@ describe('alternate lines', () => {
         const zm = (a.z0 + a.z1) / 2;
         const xm = m.profile.altRouteX(zm)!;
         expect(m.surfaceAt(xm, zm)).toBe('ice');
-        expect(m.heightAt(xm, zm)).toBeLessThan(m.heightAt(xm + 9, zm) + 0.2);
+        // sunken relative to the snow either side (robust to a piste that tilts across)
+        expect(m.heightAt(xm, zm)).toBeLessThan((m.heightAt(xm + 9, zm) + m.heightAt(xm - 9, zm)) / 2 + 0.2);
         // no solid obstacle in the alternate lane
         f.ensure(a.z0, a.z1);
         for (const o of f.inRange(a.z0, a.z1)) {
@@ -294,7 +312,7 @@ describe('endless', () => {
     });
     expect(enc.at(-1)!.speedMul).toBeLessThanOrEqual(1.3);
     expect(enc.at(-1)!.speedMul).toBeGreaterThan(1.25);
-    expect(m.profile.checkpoints(0, 200_000).length).toBe(enc.length);
+    expect(m.profile.checkpoints(0, 200_000).length).toBe(enc.filter((e) => e.chaseEndZ <= 200_000).length);
     // terrain stays finite and descending far down the mountain
     const h1 = m.heightAt(m.routeX(150_000), 150_000);
     const h2 = m.heightAt(m.routeX(150_500), 150_500);

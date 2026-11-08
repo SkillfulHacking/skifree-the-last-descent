@@ -735,7 +735,7 @@ export class GameSession implements Stage {
     const step = TUTORIAL[this.tutIndex];
     if (!step) return;
     // the pop lesson is shown on approach to the tutorial kicker
-    if (step.key === 'pop' && s.pos.z < 240) return;
+    if (step.key === 'pop' && s.pos.z < this.world.mountain.profile.tutorialEndZ - 90) return;
     // drift needs speed: wait until fast enough
     if (step.key === 'drift' && s.speed < DRIFT_MIN_SPEED) {
       this.hud.setPrompt(`drift-wait:${this.hud.device}`, `Tuck to build speed — then hold ${this.hud.g('drift')} + steer to <b>DRIFT</b>`);

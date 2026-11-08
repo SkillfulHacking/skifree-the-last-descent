@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.1 — Early Yeti cave (2026-11-08)
+- **The Yeti's cave is always in the first 10 % of the course,** with its trigger line before the
+  10 % mark: Sprint (Classic and generated) at 260 m, Standard at 960 m, Endurance at 1.96 km,
+  Expedition at 4.96 km, Endless at 960 m. The rule lives in `firstCaveZ()` in
+  `src/world/profile.ts`.
+- Sprint and Standard: that encounter is chased to the finish. Endurance and Expedition: the early
+  chase ends at a refuge, then the later skirmishes and the final confrontation follow as before.
+- With the cave this close to the start, the tutorial, its kicker and the foreshadowing now fit in
+  front of it (the Sprint tutorial ends at 150 m, the kicker sits at 105 m).
+- The hand-tuned Classic Sprint slope was re-keyed: the cave shelf moved from 1.3 km to 260 m.
+- Tests: new unit tests lock the rule for every length; headless runs on 3, 10 and 20 km (3 seeds,
+  3 skier styles) still give skilled and intermediate wins and careless losses.
+
 ## 0.2.0 — Production improvement pass 2 (2026-11-07, branch `pass2`)
 
 ### User-reported defects
