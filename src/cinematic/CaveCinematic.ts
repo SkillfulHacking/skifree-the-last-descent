@@ -15,7 +15,7 @@ export class CaveCinematic {
   private dim = 0;
   private dimShade = 1;
   private sunBase: number;
-  private leap: { t: number; from: THREE.Vector3; vel: THREE.Vector3; heading: number; landed: boolean; runV: number } | null = null;
+  private leap: { t: number; from: THREE.Vector3; vel: THREE.Vector3; heading: number; landed: boolean; runV: number; justLanded?: boolean } | null = null;
   onRunPrompt: (() => void) | null = null;
 
   /** exit-path samples: depth s (m inside the mouth; negative = out on the ledge) → floor point */
@@ -192,13 +192,14 @@ export class CaveCinematic {
           p.y = h;
           L.landed = true;
           L.runV = Math.hypot(L.vel.x, L.vel.z);
+          L.justLanded = true; // the touchdown frame already moved him along the flight path
           st.setYetiMode('run');
           st.shake(0.5);
           st.audio.playYetiFootstep(p, 1);
           st.world.particles.emit({ x: p.x, y: h + 0.2, z: p.z, vx: 0, vy: 2, vz: 0, spread: 2.5, size: 0.7, life: 1.4, count: 60, gravity: 0.5, drag: 1.6, grow: 1.4, alpha: 0.85 });
         }
       }
-      if (L.landed) {
+      if (L.landed && !L.justLanded) {
         // keep running after the landing (no freeze between touchdown and the hand-off, C10):
         // decelerate from the flight's ground speed to a chase run along the leap direction
         const p = st.yeti.root.position;
@@ -209,6 +210,7 @@ export class CaveCinematic {
         p.y = st.world.mountain.heightAt(p.x, p.z);
         st.yetiAnim.speed = L.runV;
       } else st.yetiAnim.speed = 6;
+      L.justLanded = false;
     } else if (t >= 7.9 && t < 10.0) {
       // heavy steps out of the darkness onto the ledge (root speed = real path speed)
       const k = (t - 7.9) / 2.1;
