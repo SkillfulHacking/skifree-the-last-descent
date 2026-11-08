@@ -137,7 +137,11 @@ export class Mountain {
       const es = e * P.sideSteep(z, side);
       // walls ease in from the piste (gentle banks, then steepening valley sides)
       const wall = 330 * (1 - Math.exp(-(es * es) / (2 * 230 * 230))) + 0.0025 * es * es * Math.exp(-es / 120) + 0.04 * es;
-      const rough = ridged(x / 160, z / 160, s + 7, 4) * 70 * smoothstep(30, 220, e) * (0.6 + 0.4 * P.rockBias(z));
+      // wall relief: ridged noise gives spurs and gullies, but on its own its sharp creases read as
+      // "egg-crate" spikes (A30) — blend in smooth fbm and soften the finest octave
+      const rr = ridged(x / 160, z / 160, s + 7, 3);
+      const rf = 0.5 + 0.5 * fbm(x / 210, z / 210, s + 17, 3);
+      const rough = (0.55 * rr + 0.45 * rf) * 64 * smoothstep(30, 220, e) * (0.6 + 0.4 * P.rockBias(z));
       h += wall + rough;
       // distant ranges
       h += 900 * smoothstep(350, 2600, e) * (0.35 + ridged(x / 900, z / 900, s + 11, 5));
