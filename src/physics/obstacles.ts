@@ -178,6 +178,13 @@ export class ObstacleField {
 /** Deterministic obstacle generation for one band. */
 export function generateBand(m: Mountain, seed: number, band: number): Obstacle[] {
   const P = m.profile;
+  // location mix (alpine: all 1 / no weights, i.e. the original placement, draw for draw)
+  const B = m.biome;
+  const kTrees = B.trees.density;
+  const kRocks = B.obstacles.rocks;
+  const kLogs = B.obstacles.logs;
+  const kStumps = B.obstacles.stumps;
+  const speciesW = B.trees.speciesWeights;
   const rng = new Rng((seed ^ 0x0b57ac1e ^ Math.imul(band + 7919, 0x85ebca6b)) >>> 0);
   const list: Obstacle[] = [];
   const zA = band * BAND;
@@ -239,6 +246,7 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
         treeDensity *= 1 - chute * smoothstep(w + 15, w + 50, ad);
       }
       if (lane < LANE_HALF + 6) treeDensity *= 0.35;
+      treeDensity *= kTrees;
 
       // no forests on cliffs: trees thin out on steep ground and are gone above ~45° (only
       // sampled for candidates that would otherwise grow, so it costs little)
@@ -253,30 +261,44 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
         const age = hash2(Math.floor(x * 3), Math.floor(z * 3), seed + 77);
         const scale = (age < 0.18 ? rng.range(0.45, 0.7) : age > 0.9 ? rng.range(1.35, 1.7) : rng.range(0.75, 1.3)) * (onPiste ? 0.9 : 1);
         const height = 9 * scale + rng.range(-1, 2);
-        add({ kind: 'tree', x, z, r: 0.32 * scale, softR: 1.9 * scale, height, rot: rng.range(0, Math.PI * 2), scale, variant: rng.int(0, 2), halfLen: 0 });
+        add({ kind: 'tree', x, z, r: 0.32 * scale, softR: 1.9 * scale, height, rot: rng.range(0, Math.PI * 2), scale, variant: speciesW ? pickSpecies(rng.float(), speciesW) : rng.int(0, 2), halfLen: 0 });
         continue;
       }
       const rb = P.rockBias(z);
-      const rockDensity = (onPiste ? 0.012 + 0.02 * smoothstep(w * 0.5, w * 0.9, ad) : 0.05 + 0.08 * smoothstep(w + 20, w + 120, ad)) * clamp(rb, 0.3, 3);
+      const rockDensity = (onPiste ? 0.012 + 0.02 * smoothstep(w * 0.5, w * 0.9, ad) : 0.05 + 0.08 * smoothstep(w + 20, w + 120, ad)) * clamp(rb, 0.3, 3) * kRocks;
       if (roll2 < rockDensity) {
         const big = rng.chance(onPiste ? 0.25 : 0.55);
         const scale = big ? rng.range(1.4, 2.6) : rng.range(0.35, 0.8);
         add({ kind: big ? 'boulder' : 'rock', x, z, r: big ? 0.9 * scale : 0.75 * scale, softR: 0, height: big ? 1.1 * scale : 0.55 * scale, rot: rng.range(0, Math.PI * 2), scale, variant: rng.int(0, 3), halfLen: 0 });
         continue;
       }
-      if (onPiste && z > 300 && rng.chance(0.0035)) {
+      if (onPiste && z > 300 && rng.chance(0.0035 * kLogs)) {
         // fallen log across the slope (never reaching into the lane)
         const rot = Math.PI / 2 + rng.range(-0.5, 0.5);
         const halfLen = rng.range(2.2, 3.5);
         const ex = Math.abs(Math.cos(rot)) * halfLen;
         if (lane - ex < LANE_HALF + 0.5) continue;
         add({ kind: 'log', x, z, r: 0.28, softR: 0, height: 0.55, rot, scale: 1, variant: 0, halfLen });
-      } else if (rng.chance(0.004) && !onPiste) {
+      } else if (rng.chance(0.004 * kStumps) && !onPiste) {
         add({ kind: 'stump', x, z, r: 0.35, softR: 0, height: 0.5, rot: 0, scale: 1, variant: 0, halfLen: 0 });
       }
     }
   }
   return list;
+}
+
+/**
+ * Tree species slot (0..2) from one uniform draw u in [0,1) and relative weights (consumes the
+ * same single draw as the unweighted `rng.int(0, 2)`, so the rest of the stream is unaffected).
+ */
+export function pickSpecies(u: number, w: readonly [number, number, number]): number {
+  const a = Math.max(0, w[0]);
+  const b = Math.max(0, w[1]);
+  const c = Math.max(0, w[2]);
+  const sum = a + b + c;
+  if (!(sum > 0)) return Math.floor(u * 3);
+  const t = u * sum;
+  return t < a ? 0 : t < a + b ? 1 : 2;
 }
 
 /** Build a field and load the whole of a (short) course — convenience for tests and Sprint. */

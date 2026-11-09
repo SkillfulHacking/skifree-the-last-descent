@@ -38,6 +38,9 @@ export class Ambience {
   private time = 0;
   private sinceParam = 1;
   private rnd = Math.random;
+  /** location (biome) wind character: gain and filter-frequency multipliers (1 = alpine) */
+  windGain = 1;
+  windPitch = 1;
 
   constructor(private readonly mix: Mix) {
     const ctx = mix.ctx;
@@ -174,10 +177,10 @@ export class Ambience {
 
   private applyParams(s: AudioFrameState, now: number): void {
     const w = windTargets(s.speed, s.eerie, gustValue(this.time));
-    target(this.windLowG.gain, w.lowGain, now, 0.25);
-    target(this.windLowF.frequency, w.lowFreq, now, 0.25);
-    target(this.windHiG.gain, w.whistleGain, now, 0.3);
-    target(this.windHiF.frequency, w.whistleFreq, now, 0.3);
+    target(this.windLowG.gain, w.lowGain * this.windGain, now, 0.25);
+    target(this.windLowF.frequency, w.lowFreq * this.windPitch, now, 0.25);
+    target(this.windHiG.gain, w.whistleGain * this.windGain, now, 0.3);
+    target(this.windHiF.frequency, w.whistleFreq * this.windPitch, now, 0.3);
     target(this.windHiF.Q, w.whistleQ, now, 0.3);
     target(this.windPan.pan, w.pan, now, 0.6);
 

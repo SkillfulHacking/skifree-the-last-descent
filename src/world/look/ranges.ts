@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { Rng, gnoise, ridged } from '../../core/rng';
 import { GLSL_NOISE } from '../snowMaterial';
 import { ATMOSPHERE_GLSL, addAtmosphereUniforms } from './atmosphere';
+import { getBiome, glslVec3, type BiomeRangesLook } from '../biome';
 
 interface Layer {
   radius: number;
@@ -102,7 +103,7 @@ function ringGeometry(L: Layer): THREE.BufferGeometry {
   return g;
 }
 
-function ridgeMaterial(L: Layer, sunDir: THREE.Vector3, sunColor: THREE.Color, skyColor: THREE.Color): THREE.ShaderMaterial {
+function ridgeMaterial(L: Layer, sunDir: THREE.Vector3, sunColor: THREE.Color, skyColor: THREE.Color, look: BiomeRangesLook): THREE.ShaderMaterial {
   const uniforms: Record<string, THREE.IUniform> = {
     uSun: { value: sunDir },
     uSunCol: { value: sunColor },
@@ -163,10 +164,10 @@ void main() {
   rock = max(rock, smoothstep(0.6, 0.8, rib) * smoothstep(0.08, 0.3, h) * 0.85);
   // lower slopes: forested / rocky (dark), fading in under the snowline
   float low = 1.0 - smoothstep(0.02, 0.2, h + 0.1 * (rib - 0.5));
-  vec3 snow = vec3(0.92, 0.94, 0.98);
-  vec3 stone = mix(vec3(0.15, 0.15, 0.17), vec3(0.32, 0.3, 0.29), rib) * (0.8 + 0.4 * big);
+  vec3 snow = ${glslVec3(look.snow)};
+  vec3 stone = mix(${glslVec3(look.stoneDark)}, ${glslVec3(look.stoneLight)}, rib) * (0.8 + 0.4 * big);
   vec3 alb = mix(snow, stone, rock);
-  alb = mix(alb, vec3(0.1, 0.13, 0.13), low * 0.8);
+  alb = mix(alb, ${glslVec3(look.lowland)}, low * 0.8);
   float ndl = max(dot(n, uSun), 0.0);
   float detail = 0.88 + 0.24 * sf_fbm(vec2(q.x * 0.03, q.y * 0.012) + uSeed);
   // stronger key/fill contrast so faces turned from the sun read as relief, not a flat card
@@ -242,11 +243,11 @@ export class DistantRanges {
   /** smoothed base height (follows the valley floor near the skier) */
   private baseY = NaN;
 
-  constructor(sunDir: THREE.Vector3, sunColor: THREE.Color, skyColor: THREE.Color) {
+  constructor(sunDir: THREE.Vector3, sunColor: THREE.Color, skyColor: THREE.Color, look: BiomeRangesLook = getBiome().ranges) {
     this.group.name = 'DistantRanges';
     for (const L of LAYERS) {
       const g = ringGeometry(L);
-      const m = ridgeMaterial(L, sunDir, sunColor, skyColor);
+      const m = ridgeMaterial(L, sunDir, sunColor, skyColor, look);
       const mesh = new THREE.Mesh(g, m);
       mesh.frustumCulled = false;
       mesh.renderOrder = -5;

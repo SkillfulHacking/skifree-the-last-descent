@@ -471,6 +471,31 @@ const TYPES: Record<Exclude<SegmentType, 'summit' | 'encounter' | 'checkpoint' |
 };
 const TYPE_LIST = Object.keys(TYPES) as Array<keyof typeof TYPES>;
 
+/**
+ * Location (biome) knobs for generated courses: scales on the regular segments' slope, width and
+ * centre-line swing, and an optional weighted segment-type mix. Set pieces (summit, encounter
+ * shelf, refuges, finish) are never scaled. Defaults reproduce the original courses exactly.
+ */
+export interface ProfileKnobs {
+  slopeScale: number;
+  widthScale: number;
+  swingScale: number;
+  segmentWeights?: Partial<Record<SegmentType, number>>;
+}
+export const DEFAULT_KNOBS: ProfileKnobs = { slopeScale: 1, widthScale: 1, swingScale: 1 };
+
+function pickWeighted<T extends string>(rng: Rng, list: readonly T[], w: Partial<Record<string, number>>): T {
+  let sum = 0;
+  for (const t of list) sum += Math.max(0, w[t] ?? 0);
+  if (!(sum > 0)) return rng.pick(list);
+  let u = rng.float() * sum;
+  for (const t of list) {
+    u -= Math.max(0, w[t] ?? 0);
+    if (u < 0) return t;
+  }
+  return list[list.length - 1]!;
+}
+
 interface Segment {
   i: number;
   type: SegmentType;
@@ -526,6 +551,7 @@ export class GeneratedProfile implements CourseProfile {
   constructor(
     readonly seed: number,
     readonly length: number,
+    private readonly knobs: ProfileKnobs = DEFAULT_KNOBS,
   ) {
     this.endless = !Number.isFinite(length);
     this.finishZ = this.endless ? Infinity : length;
@@ -656,8 +682,10 @@ export class GeneratedProfile implements CourseProfile {
     }
     // a regular segment, possibly shortened to meet the next special zone
     let type: keyof typeof TYPES;
+    const K = this.knobs;
+    let tries = 0;
     do {
-      type = rng.pick(TYPE_LIST);
+      type = K.segmentWeights && tries++ < 32 ? pickWeighted(rng, TYPE_LIST, K.segmentWeights) : rng.pick(TYPE_LIST);
     } while (type === this.lastType || (type === 'chute' && this.lastType === 'moguls') || (z0 < 1200 && (type === 'chute' || type === 'cliffside')));
     const spec = TYPES[type];
     let len = rng.range(spec.len[0], spec.len[1]);
@@ -666,10 +694,10 @@ export class GeneratedProfile implements CourseProfile {
       if (room < len + 250) len = room; // fill exactly up to the special zone
     }
     const z1 = z0 + len;
-    const sA = rng.range(spec.slope[0], spec.slope[1]);
-    const sB = rng.range(spec.slope[0], spec.slope[1]);
-    const w = rng.range(spec.width[0], spec.width[1]);
-    const a = rng.range(spec.amp[0], spec.amp[1]);
+    const sA = rng.range(spec.slope[0], spec.slope[1]) * K.slopeScale;
+    const sB = rng.range(spec.slope[0], spec.slope[1]) * K.slopeScale;
+    const w = rng.range(spec.width[0], spec.width[1]) * K.widthScale;
+    const a = rng.range(spec.amp[0], spec.amp[1]) * K.swingScale;
     const steepSide = rng.chance(0.5) ? 1 : -1;
     const st = rng.range(spec.steep[0], spec.steep[1]);
     const common = {

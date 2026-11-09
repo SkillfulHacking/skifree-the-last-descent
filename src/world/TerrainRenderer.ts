@@ -73,7 +73,7 @@ export class TerrainRenderer {
     private mountain: Mountain,
     quality: QualityPreset,
   ) {
-    const m = createSnowMaterial(quality);
+    const m = createSnowMaterial(quality, mountain.biome);
     this.material = m.material;
     this.uniforms = m.uniforms;
     this.ranges = lodRanges(quality);

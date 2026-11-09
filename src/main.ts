@@ -1,4 +1,5 @@
 import './ui/styles.css';
+import './world/biomes'; // registers additional locations before settings load
 import { App } from './game/App';
 
 function webgl2Available(): boolean {
