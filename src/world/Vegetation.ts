@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import type { QualityPreset } from '../core/types';
 import { Rng, fbm, smoothstep } from '../core/rng';
-import { BAND, type Obstacle, type ObstacleField } from '../physics/obstacles';
+import { BAND, pickSpecies, type Obstacle, type ObstacleField } from '../physics/obstacles';
 import type { Mountain } from './course';
 import { createFoliageMaterial, createRockMaterial, logGeometry, pineGeometry, rockGeometry, stumpGeometry } from './props';
 
@@ -84,17 +84,19 @@ export class Vegetation {
     this.shadowDist = { low: 60, medium: 90, high: 120, ultra: 160 }[quality];
     // the original static build scattered 6k/10k/15k decorative trees over ~4.5 km
     this.decorPerBand = Math.round(({ low: 6000, medium: 10000, high: 15000, ultra: 15000 }[quality] * BAND) / 4500);
-    this.foliage = createFoliageMaterial(this.uTime, quality !== 'low');
-    this.foliageFar = createFoliageMaterial(this.uTime, false);
-    this.rockMat = createRockMaterial();
+    // the location's palette and species (alpine: the original look)
+    const biome = mountain.biome;
+    this.foliage = createFoliageMaterial(this.uTime, quality !== 'low', biome);
+    this.foliageFar = createFoliageMaterial(this.uTime, false, biome);
+    this.rockMat = createRockMaterial(biome);
     this.woodMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
     this.mats.push(this.foliage, this.foliageFar, this.rockMat, this.woodMat);
 
-    this.treeNear = [0, 1, 2].map((v) => pineGeometry(v, true));
-    this.treeFar = [0, 1, 2].map((v) => pineGeometry(v, false));
-    this.rockNear = Array.from({ length: ROCK_VARIANTS }, (_, v) => rockGeometry(v, true, { snow: 0 }));
+    this.treeNear = [0, 1, 2].map((v) => pineGeometry(v, true, biome));
+    this.treeFar = [0, 1, 2].map((v) => pineGeometry(v, false, biome));
+    this.rockNear = Array.from({ length: ROCK_VARIANTS }, (_, v) => rockGeometry(v, true, { snow: 0, color: biome.rocks.base }));
     // mid/far LOD: three angular characters (one shared boulder made every distant rock identical)
-    this.rockFar = [1, 3, 5].map((v) => rockGeometry(v, false, { snow: 0, detail: 1 }));
+    this.rockFar = [1, 3, 5].map((v) => rockGeometry(v, false, { snow: 0, detail: 1, color: biome.rocks.base }));
     this.logGeo = logGeometry();
     this.stumpGeo = stumpGeometry();
     this.geos.push(...this.treeNear, ...this.treeFar, ...this.rockNear, ...this.rockFar, this.logGeo, this.stumpGeo);
@@ -195,6 +197,8 @@ export class Vegetation {
     }
     // decorative forests on the outer valley walls (render only, no collision)
     const zA = band * BAND;
+    const decorK = mountain.biome.trees.decorDensity;
+    const speciesW = mountain.biome.trees.speciesWeights;
     if (zA + BAND > -300) {
       const rng = new Rng((seed ^ 0xf0e57 ^ Math.imul(band + 101, 0x27d4eb2d)) >>> 0);
       for (let i = 0; i < this.decorPerBand; i++) {
@@ -208,13 +212,13 @@ export class Vegetation {
         const s = rng.range(0.8, 1.5);
         const sy = rng.range(0.9, 1.2);
         const rot = rng.range(0, 6.28);
-        const v = rng.int(0, 2);
+        const v = speciesW ? pickSpecies(rng.float(), speciesW) : rng.int(0, 2);
         if (Math.abs(x) < 560) continue; // corridor trees come from the obstacle field
         if (z < -300) continue;
         const y = mountain.heightAt(x, z);
         // tree line by altitude relative to the local valley floor
         const rel = y - mountain.heightAt(cx, z);
-        const dens = smoothstep(260, 120, rel) * (0.5 + 0.5 * smoothstep(-0.3, 0.3, fbm(x / 140, z / 140, seed + 3, 2))) * (0.35 + 0.65 * mountain.profile.treeLine(z));
+        const dens = smoothstep(260, 120, rel) * (0.5 + 0.5 * smoothstep(-0.3, 0.3, fbm(x / 140, z / 140, seed + 3, 2))) * (0.35 + 0.65 * mountain.profile.treeLine(z)) * decorK;
         if (r1 > dens) continue;
         // no forest on cliffs: thin with the local slope (gone above ~45°)
         const g = Math.hypot(mountain.heightAt(x + 4, z) - y, mountain.heightAt(x, z + 4) - y) / 4;

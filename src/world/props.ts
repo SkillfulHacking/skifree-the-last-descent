@@ -1,12 +1,15 @@
 /**
  * Procedural prop geometry: snow-laden pines (detailed + far LOD), rocks, logs, stumps.
  * All geometry is merged per variant with baked vertex colours; instanced by Vegetation.
+ * Tree species, bark, foliage and rock palettes come from the biome (src/world/biome.ts);
+ * logs, stumps and the broken-tree story prop are not biome-specific (yet).
  */
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { Rng, gnoise } from '../core/rng';
 import { ATMOSPHERE_GLSL, addAtmosphereUniforms } from './look/atmosphere';
 import { GLSL_NOISE_BL } from './snowMaterial';
+import { ALPINE, biomeCacheSuffix, getBiome, glslVec3, type Biome, type RGB, type TreeSpecies } from './biome';
 
 function colorize(g: THREE.BufferGeometry, fn: (p: THREE.Vector3, n: THREE.Vector3) => THREE.Color): THREE.BufferGeometry {
   // indexed input keeps smooth shared normals; non-indexed stays faceted
@@ -95,18 +98,16 @@ interface TreeShape {
   lean: number;
 }
 
-const SHAPES: TreeShape[] = [
-  // Norway-spruce type: narrow spire, strongly drooping skirts
-  { height: 10.4, crownBase: 0.1, baseR: 2.2, whorls: 10, maxBranches: 6, droop0: 0.62, droop1: 0.12, gap: 0.06, needle: new THREE.Color(0.035, 0.1, 0.065), lean: 0.05 },
-  // fir type: fuller, flatter tiers, bluer needles
-  { height: 9.6, crownBase: 0.13, baseR: 2.5, whorls: 9, maxBranches: 6, droop0: 0.34, droop1: 0.06, gap: 0.04, needle: new THREE.Color(0.03, 0.095, 0.08), lean: 0.03 },
-  // old, tall, wind-thinned spruce: long bare trunk, ragged gaps, crooked top
-  { height: 12.0, crownBase: 0.24, baseR: 2.25, whorls: 9, maxBranches: 5, droop0: 0.55, droop1: 0.1, gap: 0.2, needle: new THREE.Color(0.04, 0.095, 0.06), lean: 0.12 },
-];
+function toShape(sp: TreeSpecies): TreeShape {
+  return { ...sp, needle: new THREE.Color(...sp.needle) };
+}
 
-const BARK = new THREE.Color(0.17, 0.12, 0.09);
+/** default species (alpine: Norway spruce, fir, old wind-thinned spruce) */
+const SHAPES: TreeShape[] = ALPINE.trees.species.map(toShape);
 
-function addTrunk(tb: TreeBuilder, h: number, r0: number, sides: number, rings: number[], rng: Rng, lean: (y: number) => THREE.Vector3) {
+const BARK = new THREE.Color(...ALPINE.trees.bark);
+
+function addTrunk(tb: TreeBuilder, h: number, r0: number, sides: number, rings: number[], rng: Rng, lean: (y: number) => THREE.Vector3, bark: THREE.Color = BARK) {
   // rings: list of heights (fraction of h); radius tapers, flare at the root
   const ids: number[][] = [];
   const p = new THREE.Vector3();
@@ -121,7 +122,7 @@ function addTrunk(tb: TreeBuilder, h: number, r0: number, sides: number, rings: 
       const rr = r * (1 + 0.08 * Math.sin(a * 3 + f * 9));
       p.set(Math.cos(a) * rr + off.x, y, Math.sin(a) * rr + off.z);
       const v = 0.7 + 0.3 * gnoise(a * 2, y * 2.5, 31);
-      c.copy(BARK).multiplyScalar(v * (y < 0.4 ? 0.8 : 1));
+      c.copy(bark).multiplyScalar(v * (y < 0.4 ? 0.8 : 1));
       row.push(tb.vert(p, c, 0));
     }
     ids.push(row);
@@ -258,8 +259,10 @@ function softenNormals(g: THREE.BufferGeometry, soft: number[], H: number, baseR
  * same soft normals). Colours carry needle/bark albedo; `aSnow` carries snow propensity
  * (composited per instance and per pixel in the foliage shader).
  */
-export function pineGeometry(variant: number, detailed: boolean): THREE.BufferGeometry {
-  const sh = SHAPES[((variant % SHAPES.length) + SHAPES.length) % SHAPES.length]!;
+export function pineGeometry(variant: number, detailed: boolean, biome?: Biome): THREE.BufferGeometry {
+  const shapes = biome ? biome.trees.species.map(toShape) : SHAPES;
+  const bark = biome ? new THREE.Color(...biome.trees.bark) : BARK;
+  const sh = shapes[((variant % shapes.length) + shapes.length) % shapes.length]!;
   const rng = new Rng(9001 + variant * 77 + (detailed ? 0 : 5));
   const tb = new TreeBuilder();
   const soft: number[] = [];
@@ -274,7 +277,7 @@ export function pineGeometry(variant: number, detailed: boolean): THREE.BufferGe
     while (soft.length < tb.pos.length / 3) soft.push(0);
   };
   if (detailed) {
-    addTrunk(tb, H * 0.9, 0.27, 7, [0, 0.06, 0.3, 1], rng, lean);
+    addTrunk(tb, H * 0.9, 0.27, 7, [0, 0.06, 0.3, 1], rng, lean, bark);
     pad();
     const nT = sh.whorls;
     let rot = rng.range(0, Math.PI * 2);
@@ -319,7 +322,7 @@ export function pineGeometry(variant: number, detailed: boolean): THREE.BufferGe
     }
   } else {
     // far LOD: 3-sided trunk stub + 3 lobed drooping cones (tips droop, notches lift)
-    addTrunk(tb, crown0 + 1.2, 0.3, 3, [0, 1], rng, lean);
+    addTrunk(tb, crown0 + 1.2, 0.3, 3, [0, 1], rng, lean, bark);
     pad();
     const tiers = 3;
     const nb = 5 + (variant % 2);
@@ -365,7 +368,8 @@ export function pineGeometry(variant: number, detailed: boolean): THREE.BufferGe
  * (instances are partially buried).
  * `opts.snow` = 0 bakes bare rock (the rock shader then adds snow by world normal).
  */
-export function rockGeometry(variant: number, detailed: boolean, opts: { flatten?: number; snow?: number; detail?: number } = {}): THREE.BufferGeometry {
+export function rockGeometry(variant: number, detailed: boolean, opts: { flatten?: number; snow?: number; detail?: number; color?: RGB } = {}): THREE.BufferGeometry {
+  const rc = opts.color ?? ALPINE.rocks.base;
   const kind = ((variant % 6) + 6) % 6;
   const flatten = opts.flatten ?? [0.8, 0.88, 0.62, 1.2, 0.98, 0.9][kind]!;
   const snowAmt = opts.snow ?? 1;
@@ -412,7 +416,7 @@ export function rockGeometry(variant: number, detailed: boolean, opts: { flatten
     const s = 0.5 + 0.5 * gnoise(p.x * 3, p.y * 6 + p.z * 3, 7 + variant) * (0.7 + 0.3 * gnoise(p.x * 11, p.z * 11, 3));
     // darker, damp underside / base
     const base = 0.75 + 0.25 * THREE.MathUtils.smoothstep(p.y, -0.1, 0.25);
-    const rock = new THREE.Color(0.27 * s * base, 0.26 * s * base, 0.25 * s * base);
+    const rock = new THREE.Color(rc[0] * s * base, rc[1] * s * base, rc[2] * s * base);
     if (snowAmt <= 0) return rock;
     const snow = THREE.MathUtils.smoothstep(n.y + 0.2 * gnoise(p.x * 5, p.z * 5, 9), 0.45 + (1 - snowAmt) * 0.4, 0.75 + (1 - snowAmt) * 0.2) * snowAmt;
     return rock.lerp(SNOW, snow);
@@ -424,7 +428,8 @@ export function rockGeometry(variant: number, detailed: boolean, opts: { flatten
  * (cool grey / warm grey-brown / dark), with lichen/weathering detail and a snow cap computed from
  * the *world* normal (so tilted instances still hold snow on top), with a noisy band-limited edge.
  */
-export function createRockMaterial(): THREE.MeshStandardMaterial {
+export function createRockMaterial(biome: Biome = getBiome()): THREE.MeshStandardMaterial {
+  const R = biome.rocks;
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.86, metalness: 0 });
   mat.onBeforeCompile = (shader) => {
     addAtmosphereUniforms(shader.uniforms);
@@ -447,7 +452,7 @@ export function createRockMaterial(): THREE.MeshStandardMaterial {
     vRN = normalize(mat3(modelMatrix) * sn);
     float h1 = fract(sin(dot(mod(ip.xz, 4096.0), vec2(12.9898, 78.233))) * 43758.5453);
     float h2 = fract(h1 * 23.17 + 0.31);
-    vec3 cool = vec3(0.95, 0.97, 1.02), warm = vec3(1.18, 1.06, 0.92), dark = vec3(0.62, 0.62, 0.66);
+    vec3 cool = ${glslVec3(R.tintCool)}, warm = ${glslVec3(R.tintWarm)}, dark = ${glslVec3(R.tintDark)};
     vRTint = (h1 < 0.45 ? mix(cool, warm, h1 / 0.45) : mix(warm, dark, (h1 - 0.45) / 0.55)) * (0.85 + 0.3 * h2);
     vRSnow = fract(h1 * 7.13 + 0.5);
     vRP = transformed + vec3(h1 * 31.0, 0.0, h2 * 17.0);
@@ -478,12 +483,12 @@ ${GLSL_NOISE_BL}`,
   vec3 wn = normalize(vRN);
   float lim = mix(0.32, 0.62, vRSnow);
   float s = smoothstep(lim - 0.08, lim + 0.08, wn.y + 0.35 * (w1 - 0.5));
-  diffuseColor.rgb = mix(rc, vec3(0.88, 0.9, 0.94) * (0.93 + 0.07 * w1), s);
+  diffuseColor.rgb = mix(rc, ${glslVec3(R.snow)} * (0.93 + 0.07 * w1), s);
 }`,
       )
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vRW);');
   };
-  mat.customProgramCacheKey = () => 'rock-v1';
+  mat.customProgramCacheKey = () => `rock-v1${biomeCacheSuffix(biome)}`;
   return mat;
 }
 
@@ -573,7 +578,8 @@ function bakeSnow(g: THREE.BufferGeometry, threshold: number): THREE.BufferGeome
  * clump noise darkens the gaps between needle clusters (band-limited: it fades to its mean when
  * sub-pixel, so distant trees never shimmer). Optional gentle wind sway, height-weighted.
  */
-export function createFoliageMaterial(uTime: { value: number }, sway: boolean): THREE.MeshStandardMaterial {
+export function createFoliageMaterial(uTime: { value: number }, sway: boolean, biome: Biome = getBiome()): THREE.MeshStandardMaterial {
+  const F = biome.trees;
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 });
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uTime;
@@ -601,7 +607,7 @@ ${GLSL_NOISE_BL}`,
   float clump = 0.65 * cl + 0.35 * cl2;
   diffuseColor.rgb *= 0.74 + 0.52 * clump;
   float sn = smoothstep(vSnowThr, vSnowThr + 0.16, vSnowP + 0.32 * (clump - 0.5));
-  vec3 snowC = vec3(0.86, 0.89, 0.94) * (0.88 + 0.12 * vSnowP) * (0.94 + 0.1 * cl2);
+  vec3 snowC = ${glslVec3(F.snow)} * (0.88 + 0.12 * vSnowP) * (0.94 + 0.1 * cl2);
   diffuseColor.rgb = mix(diffuseColor.rgb, snowC, sn);
 }`,
       )
@@ -632,7 +638,7 @@ ${GLSL_NOISE_BL}`,
     float h2 = fract(h1 * 17.31 + 0.137);
     float h3 = fract(h1 * 31.7 + 0.71);
     // needle tint: blue-green fir .. olive spruce, darker/lighter individuals
-    vec3 tint = mix(vec3(0.82, 1.0, 1.08), vec3(1.18, 1.06, 0.82), h1) * (0.75 + 0.5 * h2);
+    vec3 tint = mix(${glslVec3(F.tintA)}, ${glslVec3(F.tintB)}, h1) * (0.75 + 0.5 * h2);
     vColor.rgb *= tint;
     vSnowThr = mix(0.12, 0.62, h3);
     vSnowP = aSnow;
@@ -656,6 +662,6 @@ ${GLSL_NOISE_BL}`,
   }`,
       );
   };
-  mat.customProgramCacheKey = () => (sway ? 'foliage-v3-sway' : 'foliage-v3');
+  mat.customProgramCacheKey = () => (sway ? 'foliage-v3-sway' : 'foliage-v3') + biomeCacheSuffix(biome);
   return mat;
 }

@@ -14,6 +14,7 @@
  */
 import * as THREE from 'three';
 import { ATMOSPHERE_GLSL, addAtmosphereUniforms } from './look/atmosphere';
+import { biomeCacheSuffix, getBiome, glslVec3 as v3, type Biome } from './biome';
 
 export const GLSL_NOISE = /* glsl */ `
 float sf_hash(vec2 p){ p = fract(p*vec2(123.34,456.21)); p += dot(p,p+45.32); return fract(p.x*p.y); }
@@ -62,7 +63,9 @@ export interface TerrainUniforms {
   uGlint: { value: number };
 }
 
-export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra'): { material: THREE.MeshStandardMaterial; uniforms: TerrainUniforms } {
+/** The terrain material; its palette (snow, piste, ice, rock strata, tints) comes from the biome. */
+export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra', biome: Biome = getBiome()): { material: THREE.MeshStandardMaterial; uniforms: TerrainUniforms } {
+  const T = biome.terrainLook;
   const uniforms: TerrainUniforms = {
     uTime: { value: 0 },
     uCloudShadow: { value: 1 },
@@ -205,24 +208,24 @@ float sf_sideN(vec2 sc, float off){
   sf_ice = vSurf.x; sf_powder = vSurf.y; float groomed = vSurf.z;
 
   // snow albedo: very slightly blue-white, subtle large-scale tint variation (never pure white)
-  vec3 snow = vec3(0.9, 0.92, 0.95);
+  vec3 snow = ${v3(T.snow)};
   snow *= 0.94 + 0.08 * n1;
-  snow = mix(snow, vec3(0.84, 0.87, 0.92), sf_wind * 0.55 * (1.0 - groomed));        // wind slab
+  snow = mix(snow, ${v3(T.windSlab)}, sf_wind * 0.55 * (1.0 - groomed));        // wind slab
   snow *= 1.0 + 0.035 * (L2 - 0.5);
-  snow = mix(snow, vec3(0.80, 0.84, 0.90), groomed * (0.35 + 0.25 * n2));       // packed piste: slightly greyer-blue
-  snow = mix(snow, vec3(0.91, 0.925, 0.95), sf_powder * 0.6);                     // powder: brighter, softer
+  snow = mix(snow, ${v3(T.packed)}, groomed * (0.35 + 0.25 * n2));       // packed piste: slightly greyer-blue
+  snow = mix(snow, ${v3(T.powder)}, sf_powder * 0.6);                     // powder: brighter, softer
   // groomed corduroy along the fall line (anti-aliased triangle wave, gone when unresolvable)
   float cx = wp.x * 3.2 + n1 * 2.0;
   float cw = fwidth(cx);
   float cord = smoothstep(0.32 - cw, 0.5, abs(fract(cx) - 0.5)) * (1.0 - smoothstep(0.15, 0.4, cw));
   snow *= 1.0 - 0.06 * cord * groomed * sf_near * uDetail;
-  vec3 ice = vec3(0.62, 0.70, 0.78) * (0.92 + 0.12 * n2);
+  vec3 ice = ${v3(T.ice)} * (0.92 + 0.12 * n2);
   snow = mix(snow, ice, sf_ice * 0.85);
 
   // rock colour: per-band tone (cool grey / warm grey-brown / dark) ...
-  vec3 rockA = vec3(0.25, 0.245, 0.245);
-  vec3 rockB = vec3(0.34, 0.30, 0.26);
-  vec3 rockC = vec3(0.15, 0.15, 0.165);
+  vec3 rockA = ${v3(T.rockA)};
+  vec3 rockB = ${v3(T.rockB)};
+  vec3 rockC = ${v3(T.rockC)};
   vec3 rock = tone < 0.45 ? mix(rockA, rockB, tone / 0.45) : mix(rockB, rockC, (tone - 0.45) / 0.55);
   // ... large-scale weathering tone and fall-line staining (both survive distance)
   rock *= 0.66 + 0.68 * M;
@@ -252,7 +255,7 @@ float sf_sideN(vec2 sc, float off){
   col *= 1.0 - uCloudShadow * 0.22 * smoothstep(0.52, 0.7, cloud);
   // cold, slightly blue-shifted albedo on faces turned away from the sun (reads as crisp winter light)
   float away = 1.0 - clamp(dot(gn, uSunDir), 0.0, 1.0);
-  col *= mix(vec3(1.0), vec3(0.9, 0.95, 1.05), 0.25 * away * (1.0 - sf_rock));
+  col *= mix(vec3(1.0), ${v3(T.shadeTint)}, 0.25 * away * (1.0 - sf_rock));
   diffuseColor.rgb = col;
 
   // relief: one height field (macro + mid + band-limited micro), applied as a screen-derivative bump
@@ -278,7 +281,7 @@ float sf_sideN(vec2 sc, float off){
         '#include <lights_fragment_end>',
         `#include <lights_fragment_end>
 // skylight is blue: shadowed snow reads cold while the sunlit side stays warm
-reflectedLight.indirectDiffuse *= mix(vec3(0.88, 0.97, 1.2), vec3(1.0), sf_rock * 0.5);`,
+reflectedLight.indirectDiffuse *= mix(${v3(T.skylightTint)}, vec3(1.0), sf_rock * 0.5);`,
       )
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vWPos);')
       .replace(
@@ -312,6 +315,6 @@ normal = normalize((viewMatrix * vec4(sf_wn, 0.0)).xyz);
 `,
       );
   };
-  material.customProgramCacheKey = () => 'skifree-snow-v6';
+  material.customProgramCacheKey = () => `skifree-snow-v6${biomeCacheSuffix(biome)}`;
   return { material, uniforms };
 }

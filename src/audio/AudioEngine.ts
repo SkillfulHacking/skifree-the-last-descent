@@ -25,6 +25,7 @@ export class AudioEngine {
   private paused = false;
   private disposed = false;
   private unlocking: Promise<void> | null = null;
+  private wind = { gain: 1, pitch: 1 };
 
   constructor() {}
 
@@ -53,6 +54,8 @@ export class AudioEngine {
         this.core.setVolumes(this.volumes);
         if (this.paused) this.core.setPaused(true);
         if (this.mode !== 'none') this.core.setMusicMode(this.mode);
+        this.core.ambience.windGain = this.wind.gain;
+        this.core.ambience.windPitch = this.wind.pitch;
         this.startScheduler();
       }
       if (this.ctx.state !== 'running') await this.ctx.resume();
@@ -89,6 +92,16 @@ export class AudioEngine {
   setMusicMode(mode: MusicMode): void {
     this.mode = mode;
     this.safe(() => this.core?.setMusicMode(mode));
+  }
+
+  /** Location ambience (biome audio): wind gain / pitch multipliers. Remembered if called before unlock. */
+  setAmbience(a: { windGain: number; windPitch: number }): void {
+    this.wind = { gain: a.windGain, pitch: a.windPitch };
+    this.safe(() => {
+      if (!this.core) return;
+      this.core.ambience.windGain = a.windGain;
+      this.core.ambience.windPitch = a.windPitch;
+    });
   }
 
   /** Per-frame continuous state (wind, skis, yeti breathing, chase intensity, crowd, listener). */
