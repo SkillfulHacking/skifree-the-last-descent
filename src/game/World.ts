@@ -25,7 +25,8 @@ import { SkiTracks } from '../fx/SkiTracks';
 import { StartArea } from '../world/StartArea';
 import { Checkpoint } from '../world/Checkpoint';
 import { AltMarkers } from '../world/Markers';
-import { buildMountain, courseId, type CourseConfig } from './CourseConfig';
+import { buildMountain, courseId, worldSeed, type CourseConfig } from './CourseConfig';
+import type { Biome } from '../world/biome';
 
 export interface CaveSlot {
   enc: Encounter;
@@ -53,6 +54,8 @@ export class World {
   readonly start: StartArea;
   readonly quality: QualityPreset;
   readonly seed: number;
+  /** the location (look + terrain knobs) this world was built for */
+  readonly biome: Biome;
   /** render-space origin (see header) */
   readonly origin = new THREE.Vector3();
   private caves = new Map<number, CaveSlot>();
@@ -68,12 +71,13 @@ export class World {
     this.quality = quality;
     this.course = course;
     this.id = courseId(course);
-    this.seed = course.seed;
+    this.seed = worldSeed(course);
     this.mountain = buildMountain(course);
+    this.biome = this.mountain.biome;
     this.obstacles = new ObstacleField(this.mountain, this.seed);
     this.terrain = new TerrainRenderer(this.mountain, quality);
     this.scene.add(this.terrain.group);
-    this.env = new Environment(this.scene, renderer, quality);
+    this.env = new Environment(this.scene, renderer, quality, this.biome);
     this.terrain.uniforms.uSunDir.value.copy(this.env.sunDir);
     this.vegetation = new Vegetation(this.mountain, this.obstacles, quality, this.seed);
     this.scene.add(this.vegetation.group);

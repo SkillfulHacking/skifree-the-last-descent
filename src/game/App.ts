@@ -16,6 +16,7 @@ import { applyRun, loadRecordBook, loadSettings, recordsFor, saveRecordBook, sav
 import type { QualityPreset } from '../core/types';
 import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
 import { fmtDistance } from '../ui/Hud';
+import { getBiome, listBiomes } from '../world/biome';
 import type { AutopilotStyle } from '../debug/autopilot';
 
 type Mode = 'loading' | 'menu' | 'playing' | 'paused' | 'results';
@@ -157,7 +158,7 @@ export class App {
     const s = this.settings;
     const today = utcDate();
     const date = s.dailyDate && s.dailyDate < today ? s.dailyDate : today;
-    return makeCourse(s.course, s.courseLength, { date, customText: s.customSeed, difficulty: s.difficulty });
+    return makeCourse(s.course, s.courseLength, { date, customText: s.customSeed, difficulty: s.difficulty, biome: s.biome });
   }
 
   private async buildWorld(q: QualityPreset, course: CourseConfig) {
@@ -186,6 +187,9 @@ export class App {
     this.yetiRim = rim;
     this.yeti.setVisible(false);
     this.world = world;
+    // location: exposure and wind character follow the biome (alpine: 0.78 / unchanged)
+    this.renderer.toneMappingExposure = world.biome.lighting.exposure;
+    this.audio.setAmbience(world.biome.audio);
     world.particles.setPixelRatio(this.renderer.getPixelRatio(), innerHeight);
     // warm up shaders to avoid first-frame hitches
     this.placeMenuSkier();
@@ -245,7 +249,7 @@ export class App {
       {
         kind: 'button',
         label: 'Start',
-        hint: `${c.mode === 'daily' ? 'Daily' : c.mode === 'custom' ? 'Custom' : 'Classic'} · ${LENGTH_INFO[c.length].label}${c.difficulty !== 'normal' ? ` · ${DIFFICULTY[c.difficulty].label}` : ''}`,
+        hint: `${c.mode === 'daily' ? 'Daily' : c.mode === 'custom' ? 'Custom' : 'Classic'} · ${LENGTH_INFO[c.length].label}${c.difficulty !== 'normal' ? ` · ${DIFFICULTY[c.difficulty].label}` : ''}${listBiomes().length > 1 ? ` · ${getBiome(c.biome).name}` : ''}`,
         primary: true,
         action: () => void this.startRun(false),
       },
@@ -263,6 +267,23 @@ export class App {
           changed();
         },
       },
+      // Location (biome): only shown once there is more than one to choose from, so the
+      // single-biome menu keeps its no-scroll layout
+      ...(listBiomes().length > 1
+        ? [
+            {
+              kind: 'select' as const,
+              label: 'Location',
+              note: getBiome(st.biome).description,
+              options: listBiomes().map((b) => ({ value: b.id, label: b.name })),
+              get: () => c.biome,
+              set: (v: string) => {
+                st.biome = v;
+                changed();
+              },
+            },
+          ]
+        : []),
       {
         kind: 'select',
         label: 'Length',
@@ -337,6 +358,7 @@ export class App {
           st.course = parsed.mode;
           st.courseLength = parsed.length;
           st.difficulty = parsed.difficulty;
+          st.biome = parsed.biome;
           if (parsed.mode === 'daily') st.dailyDate = parsed.date === today ? null : parsed.date;
           if (parsed.mode === 'custom' && parsed.customText) st.customSeed = parsed.customText;
           changed();

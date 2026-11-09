@@ -2,6 +2,7 @@
 import type { QualityPreset } from './types';
 import { DEFAULT_BINDINGS, type Action } from '../input/Input';
 import type { CourseMode, Difficulty, LengthMode } from '../game/CourseConfig';
+import { DEFAULT_BIOME, hasBiome, type BiomeId } from '../world/biome';
 
 export interface Settings {
   quality: QualityPreset;
@@ -32,6 +33,8 @@ export interface Settings {
   dailyDate: string | null;
   /** Yeti pursuit difficulty */
   difficulty: Difficulty;
+  /** location (registered biome id) */
+  biome: BiomeId;
   bindings: Record<Action, string[]>;
 }
 
@@ -69,6 +72,7 @@ export const DEFAULT_SETTINGS: Settings = {
   customSeed: 'POWDER',
   dailyDate: null,
   difficulty: 'normal',
+  biome: DEFAULT_BIOME,
   bindings: structuredClone(DEFAULT_BINDINGS),
 };
 
@@ -137,6 +141,7 @@ export function sanitize(s: Settings): Settings {
   if (s.course !== 'classic' && s.course !== 'daily' && s.course !== 'custom') s.course = 'classic';
   if (!['sprint', 'standard', 'endurance', 'expedition', 'endless'].includes(s.courseLength)) s.courseLength = d.courseLength;
   if (s.difficulty !== 'relaxed' && s.difficulty !== 'normal' && s.difficulty !== 'hard') s.difficulty = 'normal';
+  if (!hasBiome(s.biome)) s.biome = DEFAULT_BIOME;
   if (typeof s.customSeed !== 'string' || !s.customSeed.trim() || s.customSeed.length > 40) s.customSeed = d.customSeed;
   if (s.dailyDate !== null && !(typeof s.dailyDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.dailyDate) && new Date(`${s.dailyDate}T00:00:00Z`).toISOString().startsWith(s.dailyDate))) s.dailyDate = null;
   for (const k of Object.keys(d.bindings) as Array<keyof Settings['bindings']>) {

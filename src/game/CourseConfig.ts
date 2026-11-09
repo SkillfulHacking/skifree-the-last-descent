@@ -8,8 +8,14 @@
  * Daily: one mountain per UTC calendar day. The day rolls over at 00:00 UTC for every player
  * (explicitly not local midnight), so a shared daily code means the same course everywhere.
  * Records are local to this browser only — there is no online leaderboard.
+ *
+ * Location (biome, src/world/biome.ts): the default biome adds nothing to the course code, so codes
+ * and record keys from before biomes existed are unchanged. Any other biome appends "@<CODE>"
+ * (e.g. DAILY-2026-11-07-STD-H@DUNE) and mixes its id into the world seed, so the same code gives
+ * a different mountain in every location.
  */
 import { Mountain, SEED_DEFAULT } from '../world/course';
+import { DEFAULT_BIOME, biomeByCode, getBiome, hasBiome, type BiomeId } from '../world/biome';
 
 export type CourseMode = 'classic' | 'daily' | 'custom';
 export type LengthMode = 'sprint' | 'standard' | 'endurance' | 'expedition' | 'endless';
@@ -40,6 +46,8 @@ export interface CourseConfig {
   /** Custom only: what the player typed */
   customText: string | null;
   difficulty: Difficulty;
+  /** location (registered biome id); DEFAULT_BIOME ('alpine') for every pre-biome course */
+  biome: BiomeId;
 }
 
 /** UTC calendar date (YYYY-MM-DD) for a timestamp. */
@@ -93,17 +101,29 @@ export function customSeed(text: string): number {
   return hashString(`skifree-tld/custom/${t.toUpperCase()}`);
 }
 
-export function makeCourse(mode: CourseMode, length: LengthMode, opts: { date?: string; customText?: string; now?: number; difficulty?: Difficulty } = {}): CourseConfig {
+export function makeCourse(mode: CourseMode, length: LengthMode, opts: { date?: string; customText?: string; now?: number; difficulty?: Difficulty; biome?: BiomeId } = {}): CourseConfig {
   const difficulty = opts.difficulty ?? 'normal';
+  // unknown / unregistered locations fall back to the default
+  const biome = hasBiome(opts.biome) ? opts.biome : DEFAULT_BIOME;
   if (mode === 'daily') {
     const date = opts.date && isValidDate(opts.date) ? opts.date : utcDate(opts.now ?? Date.now());
-    return { mode, length, seed: dailySeed(date), date, customText: null, difficulty };
+    return { mode, length, seed: dailySeed(date), date, customText: null, difficulty, biome };
   }
   if (mode === 'custom') {
     const text = (opts.customText ?? '').trim() || 'POWDER';
-    return { mode, length, seed: customSeed(text), date: null, customText: text, difficulty };
+    return { mode, length, seed: customSeed(text), date: null, customText: text, difficulty, biome };
   }
-  return { mode: 'classic', length, seed: SEED_DEFAULT, date: null, customText: null, difficulty };
+  return { mode: 'classic', length, seed: SEED_DEFAULT, date: null, customText: null, difficulty, biome };
+}
+
+/**
+ * Seed the world is generated from. `c.seed` is the course's own seed (shown in the code for
+ * custom courses); for a non-default biome the biome id is mixed in, so every location has its
+ * own mountain for the same code. The default biome uses `c.seed` unchanged.
+ */
+export function worldSeed(c: CourseConfig): number {
+  const b = c.biome ?? DEFAULT_BIOME;
+  return b === DEFAULT_BIOME ? c.seed : hashString(`skifree-tld/biome/${b}/${c.seed}`);
 }
 
 /**
@@ -112,14 +132,25 @@ export function makeCourse(mode: CourseMode, length: LengthMode, opts: { date?: 
  */
 export function courseId(c: CourseConfig): string {
   const len = LENGTH_INFO[c.length].short + (DIFFICULTY[c.difficulty ?? 'normal'].code ? `-${DIFFICULTY[c.difficulty].code}` : '');
-  if (c.mode === 'daily') return `DAILY-${c.date}-${len}`;
-  if (c.mode === 'custom') return `SEED-${c.seed}-${len}`;
-  return `CLASSIC-${len}`;
+  const loc = c.biome && c.biome !== DEFAULT_BIOME ? `@${getBiome(c.biome).code}` : '';
+  if (c.mode === 'daily') return `DAILY-${c.date}-${len}${loc}`;
+  if (c.mode === 'custom') return `SEED-${c.seed}-${len}${loc}`;
+  return `CLASSIC-${len}${loc}`;
 }
 
 /** Parse a share code back into a config (null if not recognised). */
 export function parseCourseId(id: string): CourseConfig | null {
-  const s = id.trim().toUpperCase();
+  const raw = id.trim().toUpperCase();
+  // optional location suffix "@CODE" (must name a registered biome)
+  const at = raw.indexOf('@');
+  const s = at < 0 ? raw : raw.slice(0, at);
+  const biome = at < 0 ? DEFAULT_BIOME : biomeByCode(raw.slice(at + 1))?.id;
+  if (!biome) return null;
+  const base = parseBaseCourseId(s);
+  return base && biome !== DEFAULT_BIOME ? { ...base, biome } : base;
+}
+
+function parseBaseCourseId(s: string): CourseConfig | null {
   const len = (code: string) => LENGTH_MODES.find((l) => LENGTH_INFO[l].short === code) ?? null;
   const diff = (code: string | undefined): Difficulty | null => (!code ? 'normal' : code === 'R' ? 'relaxed' : code === 'H' ? 'hard' : null);
   let m = /^CLASSIC-([A-Z]{3})(?:-([RH]))?$/.exec(s);
@@ -147,7 +178,8 @@ export function parseCourseId(id: string): CourseConfig | null {
 export function courseLabel(c: CourseConfig): string {
   const name = c.mode === 'daily' ? `Daily Mountain · ${c.date} (UTC)` : c.mode === 'custom' ? `Custom seed “${c.customText}”` : 'The Last Descent';
   const d = c.difficulty && c.difficulty !== 'normal' ? ` · ${DIFFICULTY[c.difficulty].label}` : '';
-  return `${name} · ${LENGTH_INFO[c.length].label}${d}`;
+  const loc = c.biome && c.biome !== DEFAULT_BIOME ? ` · ${getBiome(c.biome).name}` : '';
+  return `${name}${loc} · ${LENGTH_INFO[c.length].label}${d}`;
 }
 
 /**
@@ -184,9 +216,11 @@ export function sameCourse(a: CourseConfig, b: CourseConfig): boolean {
 
 /**
  * Build the mountain for a config. Classic Sprint is the original hand-tuned 3 km course
- * (ClassicProfile, unchanged); every other combination is a generated course.
+ * (ClassicProfile, unchanged); every other combination is a generated course. The biome skins
+ * the mountain and (for generated courses) scales its terrain; see worldSeed for the seed.
  */
 export function buildMountain(c: CourseConfig): Mountain {
-  if (c.mode === 'classic' && c.length === 'sprint') return new Mountain(SEED_DEFAULT);
-  return Mountain.generated(c.seed, LENGTH_INFO[c.length].metres);
+  const biome = getBiome(c.biome);
+  if (c.mode === 'classic' && c.length === 'sprint') return Mountain.classic(worldSeed(c), biome);
+  return Mountain.generated(worldSeed(c), LENGTH_INFO[c.length].metres, biome);
 }
