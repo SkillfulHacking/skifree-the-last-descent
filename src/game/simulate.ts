@@ -131,7 +131,7 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
         if (d < SNOWBALL.hitRadius + 1.5) {
           const toCentre = m.centerX(b.to.z) - b.to.x;
           const dir = Math.abs(px - b.to.x) > 0.6 ? Math.sign(px - b.to.x) : Math.sign(toCentre) || 1;
-          inp.steer = -dir * 0.55;
+          inp.steer = Math.max(-1, Math.min(1, inp.steer - dir * 0.5));
           break;
         }
       }
@@ -174,7 +174,7 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
         balls.update(PHYS_DT, yeti.pos, s, yeti.phase === 'chase' && !yeti.airborne, ballEv);
         for (const e of ballEv) {
           if (e.type !== 'hit' || e.hit === 'miss') continue;
-          phys.knock(e.hit === 'direct' ? SNOWBALL.directKeep : SNOWBALL.nearKeep, e.hit === 'direct' ? 1 : 0.4);
+          phys.knock(e.hit === 'direct' ? SNOWBALL.directKeep : SNOWBALL.nearKeep, e.hit === 'direct' ? SNOWBALL.directWobble : SNOWBALL.nearWobble);
           if (log) log.push(`${t.toFixed(1)}s snowball ${e.hit} (${e.distance.toFixed(1)} m)`);
         }
       }

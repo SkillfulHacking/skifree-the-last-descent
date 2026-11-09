@@ -324,8 +324,9 @@ export class YetiModel {
       }
       out = this.sB;
     }
+    // the snowball throw is layered over the sampled pose (the solve below works on `out`)
+    if (anim.throwT !== undefined) applyThrow(out, anim.throwT);
     this.sOut.copy(out);
-    if (anim.throwT !== undefined) applyThrow(this.sOut, anim.throwT);
     this.lastSpeed = v;
     // terrain adaptation around the IK solve
     const sv = this.solver;

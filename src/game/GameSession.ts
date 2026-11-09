@@ -568,7 +568,7 @@ export class GameSession implements Stage {
       }
       if (e.hit === 'miss') continue;
       const direct = e.hit === 'direct';
-      this.phys.knock(direct ? SNOWBALL.directKeep : SNOWBALL.nearKeep, direct ? 1 : 0.4);
+      this.phys.knock(direct ? SNOWBALL.directKeep : SNOWBALL.nearKeep, direct ? SNOWBALL.directWobble : SNOWBALL.nearWobble);
       this.shake(direct ? 0.9 : 0.35);
       if (direct) {
         this.audio.playExertion('yelp');
@@ -968,6 +968,8 @@ export class GameSession implements Stage {
       yetiDistance: this.yetiAI.distance,
       yetiPhase: this.yetiAI.phase,
       yetiMode: this.yetiAnim.mode,
+      yetiPos: [this.yetiAI.pos.x, this.yetiAI.pos.y, this.yetiAI.pos.z],
+      yetiThrowT: this.yetiAnim.throwT ?? null,
       chaseTime: this.run.chaseTime,
       cinematicTime: this.cave?.tl.time ?? this.victory?.tl.time ?? this.defeat?.tl.time ?? -1,
       crashes: s.crashes,

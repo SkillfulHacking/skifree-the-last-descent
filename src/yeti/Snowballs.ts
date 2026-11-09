@@ -52,15 +52,18 @@ export const SNOWBALL = {
   maxGap: 150,
   /** seconds of chase before the first throw */
   firstDelay: 3.5,
-  cooldown: [4.5, 7.5] as [number, number],
+  cooldown: [5.5, 9] as [number, number],
   flight: [1.6, 2.3] as [number, number],
   /** radius of the marked zone (m): inside it is a direct hit */
   hitRadius: 2.2,
   /** near miss radius */
   nearRadius: 4.0,
   /** speed kept after a direct hit / near miss */
-  directKeep: 0.45,
+  directKeep: 0.55,
   nearKeep: 0.97,
+  /** wobble from a direct hit / a near miss */
+  directWobble: 1,
+  nearWobble: 0.15,
   /** launch height above the Yeti's feet (headless; the game launches from the hand) */
   launchY: 3.0,
   /** wind-up before the release (s) */

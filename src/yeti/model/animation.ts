@@ -883,8 +883,8 @@ export function applyThrow(o: PoseSample, t: number): void {
   if (w <= 0) return;
   const r = THROW.release;
   // hand path in root space (+z forward towards the skier, right side is -x)
-  const back = { x: -0.78, y: 2.75, z: -0.75 };
-  const top = { x: -0.62, y: 3.05, z: 0.35 };
+  const back = { x: -0.95, y: 3.2, z: -0.6 };
+  const top = { x: -0.7, y: 3.45, z: 0.5 };
   const fwd = { x: -0.42, y: 1.55, z: 1.45 };
   let hx: number, hy: number, hz: number;
   if (t < r) {
@@ -914,7 +914,9 @@ export function applyThrow(o: PoseSample, t: number): void {
   // body: coil (twist right, lean back) then uncoil through the release
   const coil = t < r ? smooth(0, r, t) : 1 - smooth(r, r + 0.25, t);
   const whip = t < r ? 0 : Math.sin(Math.min(1, (t - r) / 0.35) * Math.PI);
-  o.add('spine2', (-0.12 * coil + 0.22 * whip) * w, (-0.32 * coil + 0.28 * whip) * w, 0);
+  // rear up out of the gallop to throw, then pitch into it
+  o.add('spine1', (-0.22 * coil + 0.1 * whip) * w, 0, 0);
+  o.add('spine2', (-0.18 * coil + 0.22 * whip) * w, (-0.32 * coil + 0.28 * whip) * w, 0);
   o.add('spine3', (-0.08 * coil + 0.14 * whip) * w, (-0.2 * coil + 0.18 * whip) * w, 0);
   o.jaw = Math.max(o.jaw, 0.35 * whip * w);
 }
