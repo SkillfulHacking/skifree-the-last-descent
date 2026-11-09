@@ -1,12 +1,14 @@
 /**
  * Sky, sun, image-based lighting, fog and ambient falling snow.
- * Art direction: clear winter day — warm low sun, cold blue skylight in the shadows, soft haze.
+ * Art direction (alpine biome): clear winter day — warm low sun, cold blue skylight in the
+ * shadows, soft haze. Every colour/intensity comes from the biome (src/world/biome.ts).
  */
 import * as THREE from 'three';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import type { QualityPreset } from '../core/types';
 import { atmosphere } from './look/atmosphere';
 import { DistantRanges } from './look/ranges';
+import { getBiome, type Biome } from './biome';
 
 export class Environment {
   readonly sun: THREE.DirectionalLight;
@@ -20,22 +22,28 @@ export class Environment {
   private envRT: THREE.WebGLRenderTarget | null = null;
   private baseFogDensity: number;
   readonly ranges: DistantRanges;
+  private hemiBase: number;
+  private envBase: number;
 
   constructor(
     private scene: THREE.Scene,
     renderer: THREE.WebGLRenderer,
     quality: QualityPreset,
+    readonly biome: Biome = getBiome(),
   ) {
+    const B = biome;
+    const L = B.lighting;
+    const A = B.atmosphere;
     this.sky = new Sky();
     this.sky.scale.setScalar(45000);
     const u = this.sky.material.uniforms;
-    u['turbidity']!.value = 2.6;
-    u['rayleigh']!.value = 1.5;
-    u['mieCoefficient']!.value = 0.004;
-    u['mieDirectionalG']!.value = 0.82;
-    // low winter sun, from behind-left of the descending skier so faces read well
-    const elevation = 24;
-    const azimuth = 205;
+    u['turbidity']!.value = B.sky.turbidity;
+    u['rayleigh']!.value = B.sky.rayleigh;
+    u['mieCoefficient']!.value = B.sky.mieCoefficient;
+    u['mieDirectionalG']!.value = B.sky.mieDirectionalG;
+    // alpine: low winter sun, from behind-left of the descending skier so faces read well
+    const elevation = B.sky.sunElevation;
+    const azimuth = B.sky.sunAzimuth;
     const phi = THREE.MathUtils.degToRad(90 - elevation);
     const theta = THREE.MathUtils.degToRad(azimuth);
     this.sunDir.setFromSphericalCoords(1, phi, theta);
@@ -52,19 +60,20 @@ export class Environment {
     cu['sunPosition']!.value.copy(this.sunDir);
     envScene.add(skyClone);
     // white snowy ground bounce in the environment
-    const ground = new THREE.Mesh(new THREE.CircleGeometry(900, 16).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x8c96a6 }));
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(900, 16).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: L.envGround }));
     ground.position.y = -20;
     envScene.add(ground);
     this.envRT = pmrem.fromScene(envScene, 0.02);
     scene.environment = this.envRT.texture;
-    scene.environmentIntensity = 0.3;
+    this.envBase = L.envIntensity;
+    scene.environmentIntensity = this.envBase;
     pmrem.dispose();
     skyClone.material.dispose();
     skyClone.geometry.dispose();
     ground.geometry.dispose();
     (ground.material as THREE.Material).dispose();
 
-    this.sun = new THREE.DirectionalLight(new THREE.Color(1.0, 0.86, 0.7), 4.2);
+    this.sun = new THREE.DirectionalLight(new THREE.Color(...L.sunColor), L.sunIntensity);
     this.sun.castShadow = true;
     const mapSize = { low: 1024, medium: 2048, high: 2048, ultra: 4096 }[quality];
     this.shadowSize = { low: 70, medium: 90, high: 110, ultra: 130 }[quality];
@@ -81,20 +90,28 @@ export class Environment {
     this.sun.shadow.radius = 3;
     scene.add(this.sun, this.sun.target);
 
-    this.hemi = new THREE.HemisphereLight(new THREE.Color(0.42, 0.56, 0.95), new THREE.Color(0.6, 0.64, 0.72), 0.25);
+    this.hemiBase = L.hemiIntensity;
+    this.hemi = new THREE.HemisphereLight(new THREE.Color(...L.hemiSky), new THREE.Color(...L.hemiGround), this.hemiBase);
     scene.add(this.hemi);
 
-    this.baseFogDensity = 0.00036;
-    this.fog = new THREE.FogExp2(new THREE.Color(0.72, 0.8, 0.9), this.baseFogDensity);
+    this.baseFogDensity = A.fogDensity;
+    this.fog = new THREE.FogExp2(new THREE.Color(...A.fogColor), this.baseFogDensity);
     scene.fog = this.fog;
     atmosphere.uAtmSunDir.value.copy(this.sunDir);
+    // the shared aerial-perspective model (module singletons) follows the biome too
+    atmosphere.uFogColor.value.copy(this.fog.color);
+    atmosphere.uFogExp.value = this.fog.density;
+    atmosphere.uSunHaze.value.setRGB(...A.sunHaze);
+    atmosphere.uFogLin.value = A.linear;
+    atmosphere.uFogFalloff.value = A.falloff;
 
     // distant skyline beyond the playable terrain + horizon haze (follows the viewer)
-    this.ranges = new DistantRanges(this.sunDir, new THREE.Color(1.0, 0.86, 0.7), new THREE.Color(0.5, 0.6, 0.8));
+    this.ranges = new DistantRanges(this.sunDir, new THREE.Color(...L.sunColor), new THREE.Color(...B.ranges.skyColor), B.ranges);
     scene.add(this.ranges.group);
 
     // ambient drifting snow (a box of flakes around the camera)
-    const count = { low: 600, medium: 1400, high: 2400, ultra: 3600 }[quality];
+    const W = B.weather;
+    const count = Math.round({ low: 600, medium: 1400, high: 2400, ultra: 3600 }[quality] * W.flakeDensity);
     const pos = new Float32Array(count * 3);
     this.snowVel = new Float32Array(count);
     for (let i = 0; i < count; i++) {
@@ -105,7 +122,7 @@ export class Environment {
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const flake = new THREE.PointsMaterial({ size: 0.09, color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false, map: makeFlakeTexture(), sizeAttenuation: true });
+    const flake = new THREE.PointsMaterial({ size: W.flakeSize, color: W.flakeColor, transparent: true, opacity: W.flakeOpacity, depthWrite: false, map: makeFlakeTexture(), sizeAttenuation: true });
     this.snow = new THREE.Points(g, flake);
     this.snow.frustumCulled = false;
     scene.add(this.snow);
@@ -154,8 +171,8 @@ export class Environment {
 
   /** Scale sky/ambient light (1 = normal). Used by the cave reveal. */
   setAmbientScale(k: number) {
-    this.hemi.intensity = 0.25 * k;
-    this.scene.environmentIntensity = 0.3 * k;
+    this.hemi.intensity = this.hemiBase * k;
+    this.scene.environmentIntensity = this.envBase * k;
   }
 
   /** Show/hide the ambient falling snow (hidden in the dark cave shots, where it reads as stars). */

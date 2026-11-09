@@ -59,8 +59,20 @@ export class SnowballView {
 
   private cam = new THREE.Vector3();
 
-  update(barrage: SnowballBarrage | null, time: number, camera: THREE.Vector3) {
+  private heldBall: THREE.Mesh | null = null;
+
+  update(barrage: SnowballBarrage | null, time: number, camera: THREE.Vector3, held: THREE.Vector3 | null = null) {
     this.cam.copy(camera);
+    // the ball in the Yeti's fist during the wind-up
+    if (held && !this.heldBall) {
+      this.heldBall = new THREE.Mesh(this.ballGeo, this.ballMat);
+      this.heldBall.castShadow = true;
+      this.group.add(this.heldBall);
+    }
+    if (this.heldBall) {
+      this.heldBall.visible = !!held;
+      if (held) this.heldBall.position.copy(held);
+    }
     for (const s of this.slots) s.used = false;
     if (barrage) for (const b of barrage.balls) this.draw(this.slot(), b, time);
     for (const s of this.slots) {

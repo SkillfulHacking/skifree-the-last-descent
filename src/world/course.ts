@@ -9,6 +9,7 @@ import { clamp, fbm, gnoise, ridged, smoothstep } from '../core/rng';
 import type { SurfaceType } from '../core/types';
 import { caveTerrainHeight, CAVE_INFLUENCE_Z, type CaveAnchor } from './caveTerrain';
 import { CLASSIC, foreshadowFor, ClassicProfile, GeneratedProfile, type CliffBand, type CourseProfile, type Kicker } from './profile';
+import { getBiome, type Biome } from './biome';
 
 export type { Kicker, CliffBand, CourseProfile, Encounter, Sighting, SegmentType, AltRoute } from './profile';
 import type { AltRoute } from './profile';
@@ -29,12 +30,38 @@ export const COURSE = {
 export class Mountain {
   readonly seed: number;
   readonly profile: CourseProfile;
+  /** the location this mountain is skied in (look + terrain knobs); see biome.ts */
+  readonly biome: Biome;
+  // terrain amplitudes from the biome (alpine: the original literals, so heights are bit-identical)
+  private readonly kWall: number;
+  private readonly kRelief: number;
+  private readonly kRanges: number;
+  private readonly kUndulation: number;
+  private readonly kDetail: number;
+  private readonly kMoguls: number;
+  private readonly kDrifts: number;
+  private readonly kDriftsPowder: number;
+  private readonly kRollers: number;
   private kTmp: Kicker[] = [];
   private cTmp: CliffBand[] = [];
   private caveCache: { z0: number; z1: number; list: CaveAnchor[] } = { z0: 1, z1: 0, list: [] };
 
-  /** `new Mountain()` / `new Mountain(seed)` → the classic course; pass a profile for any other. */
-  constructor(seedOrProfile: number | CourseProfile = SEED_DEFAULT, seed?: number) {
+  /**
+   * `new Mountain()` / `new Mountain(seed)` → the classic course; pass a profile for any other.
+   * `biome` defaults to the default biome (alpine).
+   */
+  constructor(seedOrProfile: number | CourseProfile = SEED_DEFAULT, seed?: number, biome: Biome = getBiome()) {
+    this.biome = biome;
+    const t = biome.terrain;
+    this.kWall = t.wallHeight;
+    this.kRelief = t.wallRelief;
+    this.kRanges = t.rangeHeight;
+    this.kUndulation = t.undulation;
+    this.kDetail = t.detail;
+    this.kMoguls = t.moguls;
+    this.kDrifts = t.drifts;
+    this.kDriftsPowder = t.driftsPowder;
+    this.kRollers = t.rollers;
     if (typeof seedOrProfile === 'number') {
       this.seed = seedOrProfile;
       this.profile = new ClassicProfile(seedOrProfile);
@@ -44,8 +71,13 @@ export class Mountain {
     }
   }
 
-  static generated(seed: number, length: number): Mountain {
-    return new Mountain(new GeneratedProfile(seed, length), seed);
+  static generated(seed: number, length: number, biome: Biome = getBiome()): Mountain {
+    return new Mountain(new GeneratedProfile(seed, length, biome.terrain), seed, biome);
+  }
+
+  /** The classic hand-tuned 3 km course (its tracks ignore the biome's scale knobs). */
+  static classic(seed: number = SEED_DEFAULT, biome: Biome = getBiome()): Mountain {
+    return new Mountain(seed, undefined, biome);
   }
 
   // --- profile delegates ----------------------------------------------------------------------
@@ -136,35 +168,35 @@ export class Mountain {
     if (e > 0) {
       const es = e * P.sideSteep(z, side);
       // walls ease in from the piste (gentle banks, then steepening valley sides)
-      const wall = 330 * (1 - Math.exp(-(es * es) / (2 * 230 * 230))) + 0.0025 * es * es * Math.exp(-es / 120) + 0.04 * es;
+      const wall = this.kWall * (1 - Math.exp(-(es * es) / (2 * 230 * 230))) + 0.0025 * es * es * Math.exp(-es / 120) + 0.04 * es;
       // wall relief: ridged noise gives spurs and gullies, but on its own its sharp creases read as
       // "egg-crate" spikes (A30) — blend in smooth fbm and soften the finest octave
       const rr = ridged(x / 160, z / 160, s + 7, 3);
       const rf = 0.5 + 0.5 * fbm(x / 210, z / 210, s + 17, 3);
-      const rough = (0.55 * rr + 0.45 * rf) * 64 * smoothstep(30, 220, e) * (0.6 + 0.4 * P.rockBias(z));
+      const rough = (0.55 * rr + 0.45 * rf) * this.kRelief * smoothstep(30, 220, e) * (0.6 + 0.4 * P.rockBias(z));
       h += wall + rough;
       // distant ranges
-      h += 900 * smoothstep(350, 2600, e) * (0.35 + ridged(x / 900, z / 900, s + 11, 5));
+      h += this.kRanges * smoothstep(350, 2600, e) * (0.35 + ridged(x / 900, z / 900, s + 11, 5));
     }
 
     // rolling large-scale undulation
-    h += fbm(x / 210, z / 210, s + 1, 3) * 7;
+    h += fbm(x / 210, z / 210, s + 1, 3) * this.kUndulation;
     // mid-scale terrain variation
-    h += fbm(x / 46, z / 46, s + 2, 3) * 1.4;
+    h += fbm(x / 46, z / 46, s + 2, 3) * this.kDetail;
 
     // moguls: in specific zones and along piste edges
     const mogulZone = P.mogulZone(z);
     const edge = smoothstep(w * 0.55, w * 0.9, ad) * (1 - smoothstep(w * 1.1, w * 1.6, ad));
-    const mogulAmp = 0.42 * clamp(mogulZone * (1 - smoothstep(w * 0.25, w * 0.35, Math.abs(x - P.routeX(z)))) + edge * 0.6, 0, 1);
+    const mogulAmp = this.kMoguls * clamp(mogulZone * (1 - smoothstep(w * 0.25, w * 0.35, Math.abs(x - P.routeX(z)))) + edge * 0.6, 0, 1);
     if (mogulAmp > 0.001) h += mogulAmp * gnoise(x / 4.2, z / 5.1, s + 3);
 
     // wind-shaped drifts (anisotropic), mostly off the groomed line
     const driftMask = smoothstep(w * 0.4, w * 1.2, ad);
-    if (driftMask > 0.001) h += driftMask * (0.9 + 0.6 * P.powderBias(z)) * gnoise(x / 26, z / 7.5, s + 4);
+    if (driftMask > 0.001) h += driftMask * (this.kDrifts + this.kDriftsPowder * P.powderBias(z)) * gnoise(x / 26, z / 7.5, s + 4);
 
     // rollers across the piste
     const roller = P.rollerZone(z);
-    if (roller > 0.001) h += 0.6 * Math.sin(z / 37) * roller;
+    if (roller > 0.001) h += this.kRollers * Math.sin(z / 37) * roller;
 
     // kickers
     for (const k of P.kickersNear(z - 4, z + 16, this.kTmp)) {

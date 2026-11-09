@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.0 — Long-course pacing, snowball fixes, biome support (2026-11-08)
+- **~10 % free skiing on every length.** Endurance/Expedition are now a chain of chases
+  (`longCoursePlan()` in `src/world/profile.ts`): first cave at 560 m, a refuge at the end of each
+  ~6 km leg, ~600 m of reprieve before the next cave. Endurance: 3 chases / 2 refuges; Expedition:
+  8 chases / 7 refuges. Endless: a refuge every 6 km (5.4 km chase + 0.6 km reprieve).
+  Headless (normal difficulty, 3 seeds): skilled and intermediate win 20 km and 50 km, careless is
+  caught on the first leg.
+- **Snowballs (Hard):** the ball is dangerous for the last 0.45 s of its fall plus a 0.15 s splash,
+  so crossing the marked circle as it lands is a hit. Each throw starts with a 0.42 s wind-up: the
+  Yeti rears up out of its gallop and throws overarm with its right hand (layered over the gait,
+  `applyThrow()`); the ball is held in the fist and leaves from the hand. Rate eased to every
+  5.5–9 s; a direct hit keeps 55 % of your speed; near misses wobble less.
+- **Fixed:** the menu's crane camera dipped up to 3 m into the hillside (the ground vanished); it
+  and the run intro now stay above the snow. The snapped pine's fallen top vanished when seen from
+  below or behind; it is now closed and two-sided.
+- **Biomes:** groundwork for more locations (`src/world/biome.ts`, `docs/BIOMES.md`). Alpine is the
+  only biome and is bit-for-bit unchanged; course codes for Alpine are unchanged.
+
 ## 0.3.0 — Hard-mode snowballs, one-time tutorial (2026-11-08)
 - **Hard: the Yeti throws snowballs** during the chase (`src/yeti/Snowballs.ts`, shared by the game
   and the headless balance runs; rendering in `src/yeti/SnowballView.ts`).

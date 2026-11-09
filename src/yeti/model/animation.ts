@@ -867,3 +867,56 @@ export function crossfadeTime(from: YetiMode, to: YetiMode): number {
   if (from === 'lurk' || to === 'lurk') return 0.6;
   return 0.3;
 }
+
+/** Timing of the overarm snowball throw (seconds from its start). The ball leaves the hand at RELEASE. */
+export const THROW = { windup: 0.42, release: 0.42, end: 1.0 } as const;
+
+const _gh = new THREE.Vector3();
+/**
+ * Snowball throw layered over whatever the body is doing (the chase gallop): the right arm leaves
+ * the ground, scoops the ball up behind the shoulder, whips over the top and follows through; the
+ * chest twists into it and the head stays on the target. `t` is seconds since the throw began.
+ */
+export function applyThrow(o: PoseSample, t: number): void {
+  if (!(t >= 0) || t > THROW.end) return;
+  const w = smooth(0, 0.14, t) * (1 - smooth(0.72, THROW.end, t));
+  if (w <= 0) return;
+  const r = THROW.release;
+  // hand path in root space (+z forward towards the skier, right side is -x)
+  const back = { x: -0.95, y: 3.2, z: -0.6 };
+  const top = { x: -0.7, y: 3.45, z: 0.5 };
+  const fwd = { x: -0.42, y: 1.55, z: 1.45 };
+  let hx: number, hy: number, hz: number;
+  if (t < r) {
+    const u = smooth(0, r, t);
+    hx = back.x;
+    hy = 1.2 + (back.y - 1.2) * u;
+    hz = 0.6 + (back.z - 0.6) * u;
+  } else if (t < r + 0.1) {
+    const u = (t - r) / 0.1;
+    hx = back.x + (top.x - back.x) * u;
+    hy = back.y + (top.y - back.y) * u;
+    hz = back.z + (top.z - back.z) * u;
+  } else {
+    const u = smooth(r + 0.1, r + 0.32, t);
+    hx = top.x + (fwd.x - top.x) * u;
+    hy = top.y + (fwd.y - top.y) * u;
+    hz = top.z + (fwd.z - top.z) * u;
+  }
+  _gh.copy(o.hand[R]);
+  const ik = o.armIK[R];
+  if (ik < 1e-3) _gh.set(hx, hy, hz);
+  o.hand[R].set(hx, hy, hz).lerp(_gh, 1 - w);
+  o.armIK[R] = ik + (1 - ik) * w;
+  o.handGround[R] *= 1 - w;
+  o.curl[R] += (0.85 - o.curl[R]) * w;
+  o.curl2[R] += (0.85 - o.curl2[R]) * w;
+  // body: coil (twist right, lean back) then uncoil through the release
+  const coil = t < r ? smooth(0, r, t) : 1 - smooth(r, r + 0.25, t);
+  const whip = t < r ? 0 : Math.sin(Math.min(1, (t - r) / 0.35) * Math.PI);
+  // rear up out of the gallop to throw, then pitch into it
+  o.add('spine1', (-0.22 * coil + 0.1 * whip) * w, 0, 0);
+  o.add('spine2', (-0.18 * coil + 0.22 * whip) * w, (-0.32 * coil + 0.28 * whip) * w, 0);
+  o.add('spine3', (-0.08 * coil + 0.14 * whip) * w, (-0.2 * coil + 0.18 * whip) * w, 0);
+  o.jaw = Math.max(o.jaw, 0.35 * whip * w);
+}

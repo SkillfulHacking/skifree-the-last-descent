@@ -10,6 +10,13 @@ at runtime by code in this repository, so the game has no binary asset files.
 
 **Play online:** https://skillfulhacking.github.io/skifree-the-last-descent/ (deployed from `main` by GitHub Actions; see `.github/workflows/deploy.yml`).
 
+## Locations (biomes)
+
+The mountain's look, vegetation, obstacle mix and terrain character come from a **biome**. Alpine is
+the only one so far; `docs/BIOMES.md` explains how to add more. A non-default location is shown in
+the menu (a Location row appears once there is more than one) and in course codes as a suffix,
+e.g. `DAILY-2026-11-08-STD-N@DUSK`; Alpine codes are unchanged.
+
 ## Quick start
 
 Requirements: **Node.js 20+** and a desktop browser with **WebGL2** (current Chrome, Edge, Firefox or Safari).
@@ -65,8 +72,10 @@ there is no CDN, no API key and no telemetry.
 - **Yeti:** Relaxed / Normal / Hard pursuit difficulty. On **Hard** the Yeti also hurls snowballs during the
   chase. Each one is aimed at (or just ahead of) where you are heading, and its landing zone is marked on
   the snow the moment it is thrown: a red ring with a light column that fills and pulses faster as it
-  comes down. Change line to get out of it. A direct hit staggers you and costs about half your speed;
-  a near miss costs a little.
+  comes down. Change line to get out of it: the ball is dangerous for the last half-second of its
+  fall and the splash, so cutting through the circle as it lands counts as a hit. A direct hit
+  staggers you and costs about half your speed; a near miss costs a little. Watch the rear view: the
+  Yeti rears up and winds up an overarm throw before each ball leaves its hand.
 - **Course codes:** every course has a code, such as `DAILY-2026-11-07-STD` or `SEED-777-END-H`.
   Type a friend's code into the menu to ski the same mountain. Records are kept per code on this
   device only; there is no online leaderboard.
@@ -81,9 +90,10 @@ Courses are assembled from segment types (beginner, open alpine, forest, ridgeli
 moguls, powder, high-speed, cliffside), each with its own slope, width and hazards. The whole course
 comes deterministically from its code. The Yeti's cave is always inside the **first 10 %** of the
 course (Sprint: by 300 m; Standard: by 1 km), so on Sprint and Standard you are chased almost all the
-way to the resort. On Endurance and Expedition that early chase ends at a refuge where the Yeti
-loses your trail; later skirmishes follow, and the main chase stays at the end. Endless puts its
-first cave as early as Standard does. Wide segments
+way to the resort. On every length you ski free for only about **10 %** of the distance; the Yeti is
+on your tail for the rest. Endurance, Expedition and Endless are a chain of chases: each ends at a
+**refuge** where the Yeti loses your trail, with a short reprieve (about 600 m) before the next
+cave. Endurance has 2 refuges, Expedition 7, and Endless one every 6 km. Wide segments
 sometimes have an **alternate line**: a shorter, icy, slightly sunken chute marked with
 orange and blue poles. It is faster but has less grip.
 

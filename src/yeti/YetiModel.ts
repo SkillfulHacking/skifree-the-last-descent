@@ -28,6 +28,7 @@ import {
   GAIT_MODES,
   GALLOP_STRIKES,
   PoseSample,
+  applyThrow,
   crossfadeTime,
   modeFreq,
   sampleMode,
@@ -323,6 +324,8 @@ export class YetiModel {
       }
       out = this.sB;
     }
+    // the snowball throw is layered over the sampled pose (the solve below works on `out`)
+    if (anim.throwT !== undefined) applyThrow(out, anim.throwT);
     this.sOut.copy(out);
     this.lastSpeed = v;
     // terrain adaptation around the IK solve
