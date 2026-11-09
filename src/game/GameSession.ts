@@ -25,6 +25,7 @@ import type { Device, GameplayInput } from '../input/Input';
 import type { Stage } from './Stage';
 import { SnowballBarrage, SNOWBALL, clampToPiste, type SnowballEvent } from '../yeti/Snowballs';
 import { SnowballView } from '../yeti/SnowballView';
+import { THROW } from '../yeti/model/animation';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -169,6 +170,14 @@ export class GameSession implements Stage {
   private timers: ReturnType<typeof setTimeout>[] = [];
   private hockey = false;
 
+  private keepAboveGround(p: THREE.Vector3, clearance: number) {
+    const m = this.world.mountain;
+    // sample a little around the eye too: the near plane must clear a steep side slope as well
+    let g = m.heightAt(p.x, p.z);
+    for (const [dx, dz] of [[1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]] as const) g = Math.max(g, m.heightAt(p.x + dx, p.z + dz) - 0.4);
+    if (p.y < g + clearance) p.y = g + clearance;
+  }
+
   // --- intro ------------------------------------------------------------------------
   private buildIntro() {
     const s = this.phys.s;
@@ -211,6 +220,9 @@ export class GameSession implements Stage {
     if (this.intro) {
       this.intro.advance(dt);
       this.intro.apply(this.camera);
+      // the opening shot is authored relative to the skier; on some mountains its path would
+      // pass through the terrain (and the ground would vanish): keep it above the snow
+      this.keepAboveGround(this.camera.position, 1.6);
       if (gi.skipPressed || gi.pop || this.intro.done) this.endIntro();
     } else if (this.run.phase === 'caveCinematic' && this.cave) {
       const canSkip = this.recordsSeenCave;
@@ -523,31 +535,38 @@ export class GameSession implements Stage {
     }
   }
 
-  /** Hard: snowballs from the Yeti — throws, landing zones, hits (fixed step). */
+  /** Hard: snowballs from the Yeti — wind-up, throws, landing zones, hits (fixed step). */
   private stepSnowballs() {
     const b = this.snowballs;
     if (!b) return;
     const s = this.phys.s;
     const ai = this.yetiAI;
     this.snowEv.length = 0;
-    b.update(PHYS_DT, ai.pos, s, ai.phase === 'chase' && !ai.airborne, this.snowEv);
+    // the ball leaves from the (rendered) Yeti's right hand
+    const hand = this.yeti.getHandWorldPosition('right', this.tmpHand);
+    b.update(PHYS_DT, ai.pos, s, ai.phase === 'chase' && !ai.airborne, this.snowEv, hand);
     const fx = this.world.particles;
     for (const e of this.snowEv) {
-      const p = e.ball.to;
+      if (e.type === 'windup') {
+        this.yetiAnim.throwT = 0;
+        continue;
+      }
       if (e.type === 'throw') {
         const f = e.ball.from;
-        fx.emit({ x: f.x, y: f.y, z: f.z, vx: 0, vy: 1.2, vz: 2, spread: 1.2, size: 0.45, life: 0.7, count: 16, gravity: 0.4, drag: 2, grow: 1.3, alpha: 0.7 });
+        fx.emit({ x: f.x, y: f.y, z: f.z, vx: 0, vy: 0.6, vz: 3, spread: 0.6, size: 0.35, life: 0.5, count: 10, gravity: 0.4, drag: 2, grow: 1.3, alpha: 0.6 });
         this.audio.playYetiGrowl(this.yeti.root.position, false);
         if (b.throws === 1) this.hud.caption('[the Yeti hurls a snowball — watch the red marks]', 2.6);
         continue;
       }
-      // impact: a burst of snow where it lands
-      fx.emit({ x: p.x, y: p.y + 0.3, z: p.z, vx: 0, vy: 3, vz: 0, spread: 2.5, size: 0.7, life: 1.3, count: 60, gravity: 0.7, drag: 1.6, grow: 1.3, alpha: 0.9 });
-      this.audio.playLanding(e.hit === 'miss' ? 0.5 : 0.9, true);
-      if (e.hit === 'miss') {
-        if (e.distance < 9) this.shake(0.12);
+      const p = e.ball.to;
+      if (e.type === 'land') {
+        // impact: a burst of snow where it lands
+        fx.emit({ x: p.x, y: p.y + 0.3, z: p.z, vx: 0, vy: 3, vz: 0, spread: 2.5, size: 0.7, life: 1.3, count: 60, gravity: 0.7, drag: 1.6, grow: 1.3, alpha: 0.9 });
+        this.audio.playLanding(0.7, true);
+        if (Math.hypot(s.pos.x - p.x, s.pos.z - p.z) < 9) this.shake(0.12);
         continue;
       }
+      if (e.hit === 'miss') continue;
       const direct = e.hit === 'direct';
       this.phys.knock(direct ? SNOWBALL.directKeep : SNOWBALL.nearKeep, direct ? 1 : 0.4);
       this.shake(direct ? 0.9 : 0.35);
@@ -600,6 +619,8 @@ export class GameSession implements Stage {
   readonly snowballs: SnowballBarrage | null;
   private snowView: SnowballView | null = null;
   private snowEv: SnowballEvent[] = [];
+  private tmpHand = new THREE.Vector3();
+  private tmpHeld = new THREE.Vector3();
 
   private beginDefeat() {
     this.hud.setPrompt(null);
@@ -717,7 +738,12 @@ export class GameSession implements Stage {
       if (this.run.phase === 'chase') this.setYetiMode(this.yetiAI.mode);
     }
     this.yetiAnim.modeTime += dt;
-    this.snowView?.update(this.run.phase === 'chase' ? this.snowballs : null, this.time, this.camera.position);
+    if (this.yetiAnim.throwT !== undefined) {
+      this.yetiAnim.throwT += dt;
+      if (this.yetiAnim.throwT > THROW.end || this.run.phase !== 'chase') this.yetiAnim.throwT = undefined;
+    }
+    const held = this.run.phase === 'chase' && this.snowballs?.windingUp ? this.yeti.getHandWorldPosition('right', this.tmpHeld) : null;
+    this.snowView?.update(this.run.phase === 'chase' ? this.snowballs : null, this.time, this.camera.position, held);
     if (this.yeti.root.visible) {
       // fur shells are the costliest pixels in the game: only render them when the yeti is close enough to read
       this.yeti.setFurVisible(this.camera.position.distanceTo(this.yeti.root.position) < 140);

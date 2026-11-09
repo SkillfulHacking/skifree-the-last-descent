@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Mountain } from '../../src/world/course';
-import { ENDLESS, chaseLength, firstCaveZ } from '../../src/world/profile';
+import { ENDLESS, firstCaveZ, LONG_FIRST_CAVE, MIN_REPRIEVE } from '../../src/world/profile';
 import { ObstacleField, laneClearance } from '../../src/physics/obstacles';
 import { simulateGenerated } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
@@ -160,6 +160,14 @@ describe('configurable course lengths', () => {
     expect(e!.foreshadowZ).toBeLessThan(e!.triggerZ);
   });
 
+  it('Endless: the chase is on ~90 % of the way too (refuge reprieves are short)', () => {
+    const enc = Mountain.generated(5, Infinity).profile.encounters(0, 60000);
+    let free = enc[0]!.triggerZ;
+    for (let i = 1; i < enc.length; i++) free += enc[i]!.triggerZ - enc[i - 1]!.chaseEndZ;
+    expect(free / enc.at(-1)!.chaseEndZ).toBeLessThan(0.11);
+    for (let i = 1; i < enc.length; i++) expect(enc[i]!.caveZ - enc[i - 1]!.chaseEndZ).toBeGreaterThanOrEqual(MIN_REPRIEVE);
+  });
+
   it('Endless: the first cave comes as early as on Standard', () => {
     expect(Mountain.generated(5, Infinity).profile.encounters(0, 5000)[0]!.caveZ).toBe(firstCaveZ(10000));
   });
@@ -177,19 +185,26 @@ describe('configurable course lengths', () => {
       const enc = m.profile.encounters(-Infinity, Infinity);
       const main = enc.at(-1)!;
       // the Yeti's cave (and its trigger line) is always inside the first 10 % of the course
-      expect(enc[0]!.caveZ).toBe(firstCaveZ(L));
+      expect(enc[0]!.caveZ).toBe(L >= 18000 ? LONG_FIRST_CAVE : firstCaveZ(L));
       expect(enc[0]!.triggerZ).toBeLessThanOrEqual(L * 0.1);
       expect(enc[0]!.caveZ).toBeGreaterThan(m.profile.tutorialEndZ);
-      // Sprint/Standard: that one encounter is chased to the finish. Long courses: the early
-      // chase ends at a refuge, later skirmishes follow, the main confrontation is at the end.
-      expect(enc.length).toBe(L >= 45000 ? 4 : L >= 18000 ? 3 : 1);
+      // the last chase runs to the finish; every earlier one ends at a refuge
       expect(main.chaseEndZ).toBe(L);
       expect(main.checkpointZ).toBeNull();
-      if (L >= 18000) expect(main.caveZ).toBe(Math.max(1350, L - chaseLength(L)));
-      for (const e of enc.slice(0, -1)) {
-        expect(e.checkpointZ).toBe(e.chaseEndZ);
-        expect(e.chaseEndZ).toBeLessThan(main.foreshadowZ);
-      }
+      for (const e of enc.slice(0, -1)) expect(e.checkpointZ).toBe(e.chaseEndZ);
+      // ~10 % free skiing: the run-in to the first trigger + each refuge → next trigger reprieve
+      let free = enc[0]!.triggerZ;
+      for (let i = 1; i < enc.length; i++) free += enc[i]!.triggerZ - enc[i - 1]!.chaseEndZ;
+      expect(free / L).toBeLessThanOrEqual(0.1 + 1e-9);
+      if (L >= 18000) {
+        expect(free / L).toBeGreaterThan(0.085);
+        // refuges for a breather, at least every ~7 km of chase, and the next cave never crowds them
+        expect(enc.length).toBeGreaterThanOrEqual(L >= 45000 ? 7 : 3);
+        for (let i = 1; i < enc.length; i++) {
+          expect(enc[i]!.caveZ - enc[i - 1]!.chaseEndZ).toBeGreaterThanOrEqual(MIN_REPRIEVE);
+          expect(enc[i]!.chaseEndZ - enc[i]!.triggerZ).toBeLessThan(7000);
+        }
+      } else expect(enc.length).toBe(1);
       // the route descends everywhere (small bumps allowed)
       let prev = m.heightAt(m.routeX(0), 0);
       let worst = 0;

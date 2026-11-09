@@ -516,19 +516,40 @@ export function brokenTreeGeometry(): THREE.BufferGeometry {
   // splintered top
   const spl = new THREE.ConeGeometry(0.22, 0.6, 6, 1);
   spl.translate(0.03, 2.45, 0);
-  const top = bakeSnow(pineGeometry(0, false), 0.4);
+  const top = bakeSnow(pineGeometry(0, true), 0.4);
   top.rotateZ(Math.PI / 2 - 0.15);
   top.translate(0.3, 0.3, 0);
   const parts = [
     colorize(trunk, () => new THREE.Color(0.2, 0.14, 0.1)),
     colorize(spl, () => new THREE.Color(0.75, 0.62, 0.45)),
-    top.toNonIndexed(),
+    // the pine's needle skirts are open shells built to be seen from the side and above; lying on
+    // its side, the fallen top is seen from below and from the inside too, so give it back faces
+    withBackFaces(top.toNonIndexed()),
   ];
   for (const g of parts) g.deleteAttribute('normal');
   const m = mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)), false);
   if (!m) throw new Error('merge failed');
   m.computeVertexNormals();
   return m;
+}
+
+/** Append a reversed copy of every triangle (non-indexed geometry), so an open shell is solid from both sides. */
+function withBackFaces(g: THREE.BufferGeometry): THREE.BufferGeometry {
+  for (const name of Object.keys(g.attributes)) {
+    const a = g.getAttribute(name) as THREE.BufferAttribute;
+    const n = a.count;
+    const isz = a.itemSize;
+    const out = new (a.array.constructor as new (len: number) => THREE.TypedArray)(n * 2 * isz);
+    out.set(a.array as ArrayLike<number>);
+    for (let t = 0; t < n; t += 3) {
+      for (let k = 0; k < 3; k++) {
+        const src = t + [0, 2, 1][k]!;
+        for (let c = 0; c < isz; c++) out[(n + t + k) * isz + c] = (a.array as ArrayLike<number>)[src * isz + c]! * (name === 'normal' ? -1 : 1);
+      }
+    }
+    g.setAttribute(name, new THREE.BufferAttribute(out, isz, a.normalized));
+  }
+  return g;
 }
 
 /** Bake the snow-propensity attribute into the vertex colours (for plain, non-foliage materials). */

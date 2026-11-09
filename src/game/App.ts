@@ -657,6 +657,9 @@ export class App {
       const cy = w.mountain.heightAt(cx, 0);
       const a = this.menuTime * 0.04 + 2.4;
       this.camera.position.set(cx + Math.sin(a) * 26, cy + 6 + Math.sin(this.menuTime * 0.1) * 1.5, Math.cos(a) * 26 + 4);
+      // the crane swings over the rising valley sides: never let it sink into the hillside
+      const gy = w.mountain.heightAt(this.camera.position.x, this.camera.position.z);
+      this.camera.position.y = Math.max(this.camera.position.y, gy + 3.5);
       this.camera.lookAt(cx + 4, cy + 1.5, 60);
       this.camera.fov = 55;
       this.camera.updateProjectionMatrix();

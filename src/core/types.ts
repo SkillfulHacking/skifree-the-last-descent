@@ -74,6 +74,8 @@ export interface YetiAnimState {
   turn: number;
   /** Elapsed game time. */
   time: number;
+  /** Seconds since a snowball throw began (wind-up, release, follow-through), or undefined. Layered over the gait. */
+  throwT?: number;
 }
 
 /** Per-frame inputs for continuous audio (src/audio/AudioEngine.ts). */

@@ -489,7 +489,45 @@ export function chaseLength(length: number): number {
 /** chase length of a mid-course skirmish on long finite courses (cave → refuge) */
 export const SKIRMISH_CHASE = 2200;
 
-export const ENDLESS = { firstCave: 960, cycle: 9000, chase: 3400 } as const;
+/** Endless: each leg is a 5.4 km chase to a refuge, then 600 m of reprieve before the next cave (~10 % free). */
+export const ENDLESS = { firstCave: 960, cycle: 6000, chase: 5400 } as const;
+
+/** Share of a course skied without the Yeti on your tail (run-in + reprieves after refuges). */
+export const FREE_FRACTION = 0.1;
+/** Long finite courses: where the first cave sits (a shorter run-in leaves room for reprieves). */
+export const LONG_FIRST_CAVE = 560;
+/** Minimum refuge → next cave distance: the refuge zone and the next cave's shelf must not overlap. */
+export const MIN_REPRIEVE = 560;
+
+export interface LegPlan {
+  caveZ: number;
+  /** where this leg's chase ends: a refuge, or the finish (last leg) */
+  endZ: number;
+  refuge: boolean;
+}
+
+/**
+ * Long courses (≥ 18 km): a chain of chases. The Yeti is on your tail for ~90 % of the distance;
+ * the other ~10 % is the run-in to the first cave plus a short reprieve after each refuge, where
+ * the Yeti has lost your trail until the next cave. As many refuges as that budget allows.
+ */
+export function longCoursePlan(L: number): LegPlan[] {
+  const budget = FREE_FRACTION * L;
+  const firstTrig = LONG_FIRST_CAVE + 22;
+  const refuges = Math.max(1, Math.floor((budget - firstTrig) / (MIN_REPRIEVE + 60)));
+  const gap = Math.max(MIN_REPRIEVE, Math.floor((budget - firstTrig) / refuges) - 22);
+  const chaseTotal = L - LONG_FIRST_CAVE - 22 - refuges * (gap + 22);
+  const leg = chaseTotal / (refuges + 1);
+  const plan: LegPlan[] = [];
+  let cave = LONG_FIRST_CAVE;
+  for (let i = 0; i <= refuges; i++) {
+    const last = i === refuges;
+    const end = last ? L : Math.round((cave + 22 + leg) / 10) * 10;
+    plan.push({ caveZ: cave, endZ: end, refuge: !last });
+    cave = end + gap;
+  }
+  return plan;
+}
 
 export class GeneratedProfile implements CourseProfile {
   readonly kind = 'generated' as const;
@@ -532,7 +570,7 @@ export class GeneratedProfile implements CourseProfile {
     const r = new Rng(seed ^ 0x7c0ffee);
     this.rngPlan = new Rng(seed ^ 0x51ed);
     this.phase = [r.range(0, 6.28), r.range(0, 6.28), r.range(0, 6.28), r.range(0, 6.28)];
-    const first = this.endless ? ENDLESS.firstCave : firstCaveZ(length);
+    const first = this.endless ? ENDLESS.firstCave : length >= 18000 ? LONG_FIRST_CAVE : firstCaveZ(length);
     this.tutorialEndZ = tutorialEndFor(first);
     // the summit: identical start for every course (start gate, tutorial run-in). With an early
     // cave (Sprint) the summit hands straight over to the cave shelf.
@@ -549,20 +587,18 @@ export class GeneratedProfile implements CourseProfile {
     this.kick.push({ z: this.tutorialEndZ - 45, d: 0, width: 9, height: 1.1, run: 12 });
     if (!this.endless) {
       const L = length;
-      // the Yeti's cave is always in the first 10 % of the course. Sprint and Standard: one
-      // encounter, chased from there to the finish. Long courses: the early cave's chase ends at
-      // a refuge; later skirmishes follow, and the main confrontation stays at the end (B4).
+      // the Yeti's cave is always in the first 10 % of the course, and on every length you ski
+      // free for only ~10 % of it. Sprint and Standard: one encounter, chased to the finish. Long
+      // courses: a chain of chases, each ending at a refuge with a short reprieve before the next
+      // cave; the last one runs to the finish.
       if (L < 18000) {
         this.addEncounter(0, first, L, null, 1);
       } else {
-        const skirm = L >= 45000 ? [0.5, 0.72] : [0.45];
-        const cps = [first, ...skirm.map((f) => Math.round((L * f) / 10) * 10)];
-        cps.forEach((c, i) => {
-          const cp = c + SKIRMISH_CHASE;
-          this.addEncounter(i, c, cp, cp, 0.94 + 0.02 * i);
-          this.cps.push(cp);
+        const plan = longCoursePlan(L);
+        plan.forEach((leg, i) => {
+          this.addEncounter(i, leg.caveZ, leg.endZ, leg.refuge ? leg.endZ : null, leg.refuge ? Math.min(1, 0.94 + 0.02 * i) : 1);
+          if (leg.refuge) this.cps.push(leg.endZ);
         });
-        this.addEncounter(cps.length, Math.max(1350, L - chaseLength(L)), L, null, 1);
       }
       const caveZ = this.enc.at(-1)!.caveZ;
       // sightings: the Yeti shows itself on a ridge between the encounters
