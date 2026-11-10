@@ -74,20 +74,24 @@ function basaltMaterial(): THREE.MeshStandardMaterial {
   float seed = vJ.x;
   float y = vJ.y;
   float side = 1.0 - abs(normalize(vBN).y);
-  // cross-joints: irregular spacing per column (0.35–0.9 m), slightly wavy, dark and chipped
-  float sp = 0.35 + 0.55 * bs_h(seed * 3.1);
-  float q = y / sp + bs_h(seed * 7.7) + 0.08 * sin(y * 3.7 + seed);
+  // cross-joints: irregular spacing per column (0.5–1.1 m), slightly wavy; anti-aliased (they
+  // fade out once a joint is about a pixel wide, so distant columns do not sparkle)
+  float sp = 0.5 + 0.6 * bs_h(seed * 3.1);
+  float q = y / sp + bs_h(seed * 7.7) + 0.06 * sin(y * 3.7 + seed);
+  float fq = fwidth(q);
   float d = abs(fract(q) - 0.5);
-  float joint = (1.0 - smoothstep(0.43, 0.49, d)) ;
-  joint = 1.0 - joint;
-  diffuseColor.rgb *= 1.0 - 0.55 * joint * side;
-  // wet, near-black low down (spray), salt-white rime crust and ochre lichen higher up
-  float wet = 1.0 - smoothstep(0.0, 1.6, y);
-  diffuseColor.rgb *= 1.0 - 0.35 * wet;
-  float rime = smoothstep(0.55, 0.95, bs_h(floor(q) + seed) ) * smoothstep(1.0, 2.5, y) * side;
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.66, 0.7), rime * 0.35);
-  float lichen = smoothstep(0.82, 0.97, bs_h(floor(q) * 1.7 + floor(seed * 13.0))) * smoothstep(2.0, 4.0, y);
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.5, 0.38, 0.12), lichen * 0.5);
+  float joint = smoothstep(0.5 - 0.06 - fq, 0.5 - fq * 0.5, d) * (1.0 - smoothstep(0.15, 0.4, fq));
+  diffuseColor.rgb *= 1.0 - 0.6 * joint * side;
+  // per-drum tone (each section between joints a little different), wet near-black low down
+  float drum = bs_h(floor(q) * 1.31 + seed);
+  diffuseColor.rgb *= mix(1.0, 0.82 + 0.36 * drum, 1.0 - smoothstep(0.15, 0.4, fq));
+  float wet = 1.0 - smoothstep(0.0, 1.8, y);
+  diffuseColor.rgb *= 1.0 - 0.4 * wet;
+  // salt rime streaks on a few drums, ochre lichen on a few higher ones
+  float rime = step(0.82, drum) * smoothstep(1.0, 2.5, y) * side;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.46, 0.5), rime * 0.3);
+  float lichen = step(0.9, bs_h(floor(q) * 1.7 + floor(seed * 13.0))) * smoothstep(2.0, 4.0, y);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.36, 0.27, 0.08), lichen * 0.45);
 }`,
       )
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.28, 1.0 - smoothstep(0.0, 1.4, vJ.y));');
@@ -118,9 +122,12 @@ function basaltCaveRock(cave: CaveDressingContext['cave']): void {
     vec2 ha = abs(hc.xy);
     float he = 0.5 - max(dot(ha, hs * 0.5), ha.x);
     float hid = fract(sin(dot(hc.zw, vec2(12.9898, 78.233))) * 43758.5453);
-    vec3 bas = vec3(0.07, 0.075, 0.085) * (0.75 + 0.5 * hid);
-    float cj = abs(fract(ap.y / (0.45 + 0.4 * hid) + hid) - 0.5);
-    bas *= 1.0 - 0.5 * (1.0 - smoothstep(0.0, 0.05, he)) - 0.35 * (1.0 - smoothstep(0.44, 0.5, 0.5 - cj)) * steep;
+    vec3 bas = vec3(0.04, 0.043, 0.05) * (0.8 + 0.4 * hid);
+    float cj = abs(fract(ap.y / (0.55 + 0.5 * hid) + hid) - 0.5);
+    // column joints read as vertical seams on steep faces only (on gentler surfaces a plan-view
+    // hexagon grid would read as tiles)
+    float colFace = smoothstep(0.55, 0.85, steep) * (1.0 - smoothstep(14.0, 45.0, cv_dist));
+    bas *= 1.0 - 0.45 * (1.0 - smoothstep(0.0, 0.045, he)) * colFace - 0.3 * (1.0 - smoothstep(0.44, 0.5, 0.5 - cj)) * colFace;
     float salt = smoothstep(0.6, 0.85, cv_n3(vec3(ap.x * 0.6, ap.y * 1.4, ap.z * 0.6) + 11.0)) * steep;
     bas = mix(bas, vec3(0.5, 0.53, 0.56), salt * 0.3);
     rock = mix(rock, bas, 0.88);
@@ -163,9 +170,9 @@ function iceTexture(): THREE.CanvasTexture {
   c.width = c.height = 256;
   const g = c.getContext('2d')!;
   const grd = g.createRadialGradient(128, 128, 10, 128, 128, 128);
-  grd.addColorStop(0, '#1d4a52');
-  grd.addColorStop(0.7, '#2c6470');
-  grd.addColorStop(1, '#a9c8d0');
+  grd.addColorStop(0, '#0f2a30');
+  grd.addColorStop(0.7, '#1a3f47');
+  grd.addColorStop(1, '#8fb0b8');
   g.fillStyle = grd;
   g.fillRect(0, 0, 256, 256);
   const r = new Rand(77);
@@ -243,17 +250,18 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     const centre = new THREE.Vector3(p.x, (base + topY) / 2, p.z);
     const rad = Math.max(R, (topY - base) / 2);
     if (!ok(centre, rad)) return;
-    const g = new THREE.CylinderGeometry(R * 0.97, R, topY - base, 6, 1);
+    const g = new THREE.CylinderGeometry(R * 0.985, R, topY - base, 6, 1);
     // chamfer the top rim slightly (a bevel ring)
     const P = g.attributes.position as THREE.BufferAttribute;
-    for (let k = 0; k < P.count; k++) if (P.getY(k) > 0) P.setXYZ(k, P.getX(k) * 0.96, P.getY(k), P.getZ(k) * 0.96);
-    g.rotateY(Math.PI / 6 + Math.atan2(tan.x, tan.z) + (seed % 0.2));
+    for (let k = 0; k < P.count; k++) if (P.getY(k) > 0) P.setXYZ(k, P.getX(k) * 0.97, P.getY(k), P.getZ(k) * 0.97);
+    // flat faces toward the neighbours along the row
+    g.rotateY(Math.atan2(tan.x, tan.z));
     g.translate(p.x, (base + topY) / 2, p.z);
     const ng = g.toNonIndexed();
     g.dispose();
     ng.computeVertexNormals();
     const NP = ng.attributes.position as THREE.BufferAttribute;
-    const tone = 0.05 + 0.035 * ((seed * 7.31) % 1);
+    const tone = 0.03 + 0.022 * ((seed * 7.31) % 1);
     for (let k = 0; k < NP.count; k++) {
       colPos.push(NP.getX(k), NP.getY(k), NP.getZ(k));
       colCol.push(tone, tone * 1.04, tone * 1.13);
@@ -262,7 +270,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     ng.dispose();
     // snow cushion seated exactly on the top (a flattened dome of the same hexagon)
     const cap = new THREE.CylinderGeometry(R * 0.9, R * 0.95, 0.22, 6, 1);
-    cap.rotateY(Math.PI / 6 + Math.atan2(tan.x, tan.z) + (seed % 0.2));
+    cap.rotateY(Math.atan2(tan.x, tan.z));
     b.add('snow', cap, mat(p.x, topY + 0.1, p.z), 0xffffff);
     b.add('snow', new THREE.SphereGeometry(R * 0.78, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.22, 1), mat(p.x, topY + 0.19, p.z), 0xffffff);
     perches.push({ p: new THREE.Vector3(p.x, topY + 0.3, p.z) });
@@ -272,28 +280,18 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     const rows = hi ? 5 : 4;
     for (let r = 0; r < rows; r++)
       for (let k = 0; k < 8; k++) {
-        const R = 0.82 + rnd.range(-0.08, 0.1);
-        const along = 6.4 + k * 1.62 + (r % 2) * 0.81 + rnd.range(-0.05, 0.05);
-        const back = -7 + r * 1.42;
+        // tightly packed hexagonal prisms (flat to flat), so the mass reads as one jointed body
+        const R = 0.8;
+        const along = 6.4 + k * Math.sqrt(3) * R + (r % 2) * Math.sqrt(3) * R * 0.5;
+        const back = -7 + r * 1.5 * R;
         const p = place(s * along, back);
         // tallest against the wall, stepping down toward the piste like a giant's staircase
-        const h = Math.max(0.6, (10.5 - k * 1.15 - (rows - 1 - r) * 1.1) * rnd.range(0.7, 1.05));
+        const h = Math.max(0.5, (10.5 - k * 1.05 - (rows - 1 - r) * 1.0) * rnd.range(0.82, 1.04));
         const seed = rnd.next() * 100;
-        if (rnd.next() < 0.1) continue;
+        if (rnd.next() < 0.04) continue;
         addColumn(p, R, h, seed);
       }
   }
-  // fallen column drums half-buried in the snow (rounded by the sea: prisms with softened edges)
-  for (const s of [-1, 1])
-    for (let i = 0; i < 3; i++) {
-      const p = place(s * rnd.range(7, 15), rnd.range(-15, -9));
-      if (!ok(p.clone().setY(p.y + 0.4), 1.4)) continue;
-      const L = rnd.range(1.1, 2.0);
-      const g = new THREE.CylinderGeometry(0.75, 0.78, L, 6, 1).rotateZ(Math.PI / 2);
-      b.add('basaltDrum', g, mat(p.x, p.y + 0.25, p.z, rnd.range(-0.1, 0.1), rnd.range(0, 6), 0), new THREE.Color(0.05, 0.053, 0.06));
-      props.push({ p: p.clone().setY(p.y + 0.4), r: 1.2, kind: 'drum' });
-    }
-
   // ---------------- the frozen tide pool on the cave floor + broken sea-ice plates ----------------
   {
     // a dense skin on the floor in front of the mouth (follows floorHeightAt; flush)
@@ -376,33 +374,31 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
       const yaw = Math.atan2(tan.x, tan.z) + 0.5;
       const L = 4.6;
       const B = 1.5;
-      // strakes: overlapping planks bent round the frames (a half-shell built from 5 strake strips per side)
-      for (const sd of [-1, 1])
-        for (let k = 0; k < 5; k++) {
-          if (sd > 0 && (k === 2 || k === 3)) continue; // staved in: two strakes gone on the upper side
-          const seg = 10;
-          const pos: number[] = [];
-          for (let q = 0; q <= seg; q++) {
-            const t = q / seg - 0.5;
-            const pinch = 1 - Math.pow(Math.abs(t) * 2, 2.2);
-            const ang = (k / 5) * 1.35 + 0.05;
-            const yy = Math.cos(ang) * 0.62 * (0.4 + 0.6 * pinch);
-            const xx = sd * Math.sin(ang) * B * 0.5 * pinch;
-            pos.push(t * L, xx, yy);
-          }
-          const pts = [];
-          for (let q = 0; q <= seg; q++) pts.push(new THREE.Vector3(pos[q * 3]!, pos[q * 3 + 1]!, pos[q * 3 + 2]!));
-          const curve = new THREE.CatmullRomCurve3(pts);
-          const g = new THREE.TubeGeometry(curve, 14, 0.06, 3, false);
-          g.scale(1, 1, 1);
-          const tone = 0.32 + 0.06 * Math.sin(k * 2.1);
-          b.add('drift', g, mat(p.x, p.y + 0.35, p.z, 0, yaw, sd * 0.0 + 1.25), new THREE.Color(tone * 1.1, tone, tone * 0.9));
-        }
+      // an overturned clinker hull: a half-ellipsoid shell with plank bands (tarred, faded blue
+      // paint on the top strakes) and a dark staved-in patch, half-buried on its side
+      const hull = new THREE.SphereGeometry(1, 22, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+      const HP = hull.attributes.position as THREE.BufferAttribute;
+      for (let k = 0; k < HP.count; k++) {
+        const hx = HP.getX(k);
+        const hy = HP.getY(k);
+        const hz2 = HP.getZ(k);
+        const pinch = 1 - 0.35 * Math.pow(Math.abs(hz2), 3);
+        HP.setXYZ(k, hx * (B / 2) * pinch, hy * 0.62, hz2 * (L / 2));
+      }
+      hull.computeVertexNormals();
+      b.add('drift', hull, mat(p.x, p.y - 0.12, p.z, 0.12, yaw, 0.32), (q, nn) => {
+        // plank bands by height on the hull, a dark hole on one side
+        const band = Math.floor((q.y - p.y + 0.6) / 0.13);
+        const t = 0.2 + 0.05 * ((band * 7) % 3);
+        const c = band % 4 === 3 ? new THREE.Color(0.16, 0.24, 0.34) : new THREE.Color(t * 1.15, t, t * 0.85);
+        if (nn.x > 0.5 && Math.abs(q.z - p.z) < 0.7) c.multiplyScalar(0.25);
+        return c;
+      });
       // keel and a broken spar
-      b.add('drift', new THREE.BoxGeometry(L, 0.1, 0.12), mat(p.x, p.y + 0.85, p.z, 0, yaw, 1.25), new THREE.Color(0.26, 0.23, 0.2));
+      b.add('drift', new THREE.BoxGeometry(0.12, 0.12, L * 0.95), mat(p.x, p.y + 0.5, p.z, 0.12, yaw, 0.32), new THREE.Color(0.22, 0.19, 0.16));
       b.add('drift', new THREE.CylinderGeometry(0.06, 0.08, 3.2, 6).rotateZ(Math.PI / 2), mat(p.x + tan.x * 1.5, p.y + 0.12, p.z + tan.z * 1.5, 0, yaw + 0.8, 0.05), new THREE.Color(0.55, 0.52, 0.48));
       // snow drifted into its lee
-      b.add('snow', new THREE.SphereGeometry(1.4, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(1.4, 0.35, 0.9), mat(p.x, p.y - 0.05, p.z, 0, yaw, 0), 0xffffff);
+      b.add('snow', new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.9, 0.22, L * 0.42), mat(p.x + Math.cos(yaw) * 0.9, p.y - 0.04, p.z - Math.sin(yaw) * 0.9, 0, yaw, 0), 0xffffff);
       props.push({ p: p.clone().setY(p.y + 0.6), r: 2.8, kind: 'boat' });
     }
   }
@@ -412,7 +408,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     if (!ok(p.clone().setY(p.y + 0.2), 1.8)) continue;
     const L = rnd.range(2.2, 4.2);
     const g = new THREE.CylinderGeometry(0.12, 0.2, L, 7).rotateZ(Math.PI / 2);
-    b.add('drift', g, mat(p.x, p.y + 0.08, p.z, rnd.range(-0.1, 0.1), rnd.range(0, 6), 0.05), new THREE.Color(0.58, 0.56, 0.52));
+    b.add('drift', g, mat(p.x, p.y + 0.08, p.z, rnd.range(-0.1, 0.1), rnd.range(0, 6), 0.05), new THREE.Color(0.4, 0.37, 0.33));
     props.push({ p: p.clone().setY(p.y + 0.2), r: L / 2, kind: 'driftwood' });
   }
   // lobster pots: wooden slat cages with a net funnel end
@@ -466,7 +462,6 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     cm.name = 'fjord-basalt-columns';
     group.add(cm);
   }
-  M['basaltDrum'] = basalt;
   for (const me of b.build(M, { cast: true, receive: true })) group.add(me);
   // the drums use the basalt shader: give them the joint attribute
   group.traverse((o) => {

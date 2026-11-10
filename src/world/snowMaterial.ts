@@ -115,7 +115,7 @@ const SHORE_GLSL = /* glsl */ `
     if (vNPos.z >= r.x && vNPos.z < r.y) W = r.z;
   }
   float dh = vNPos.y - W;
-  if (dh < 150.0) {
+  if (dh < 200.0) {
     float sn = sf_vnBL(vNPos.xz * 0.35, sf_fp(sf_fY, vec2(0.35)));
     float sn2 = sf_vn(vNPos.xz * 0.06 + 4.0);
     float wash = 1.0 - smoothstep(1.2 + 2.2 * sn2, 3.4 + 3.0 * sn2, dh);
@@ -134,7 +134,7 @@ const SHORE_GLSL = /* glsl */ `
     sf_rock = max(sf_rock, wash);
     // round 2 (art review D3): the lowest 40–120 m of every wall and steep shore is spray-washed
     // bare rock, darker and wetter towards the water: no white snow skirt at sea level
-    float lowWall = (1.0 - smoothstep(35.0 + 30.0 * sn2, 115.0 + 30.0 * sn2, dh)) * smoothstep(0.1, 0.28, slope);
+    float lowWall = (1.0 - smoothstep(60.0 + 40.0 * sn2, 150.0 + 40.0 * sn2, dh)) * smoothstep(0.1, 0.28, slope);
     vec3 wetRock = rock * mix(0.5, 0.9, smoothstep(0.0, 70.0, dh));
     col = mix(col, wetRock, lowWall * (1.0 - wash) * (1.0 - spray * 0.5));
     sf_rock = max(sf_rock, lowWall);

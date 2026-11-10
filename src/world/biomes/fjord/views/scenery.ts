@@ -12,7 +12,7 @@ import type { Coast, Lookout } from '../../../coast';
 import type { Mountain } from '../../../course';
 import { FjordWater } from './water';
 import { SeaMist } from './mist';
-import { PAINT, cairn, ferry, fishingBoat, house, jetty, kitMaterials } from './buildings';
+import { PAINT, cairn, ferry, fishingBoat, house, jetty, kitMaterials, rimOutcrop } from './buildings';
 import { viewpointProps } from './viewpoint';
 
 const CHUNK = 512;
@@ -91,6 +91,15 @@ export class FjordScenery implements SceneryView {
       if (m.profile.checkpoints(z - 160, z + 160).some((q) => Math.abs(q - z) < 120)) continue;
       const x = coast.rimX(z) + 7;
       cairn(b, x, m.heightAt(x, z), z, rnd.range(1.4, 2.0), rnd);
+    }
+    // granite outcrops along the rim (lichen, rime, snow in the lee): coastal dressing that sits
+    // in the gameplay camera's view on the sea side, between the cairns
+    for (let z = z0 + rnd.range(10, 40); z < z1; z += rnd.range(38, 70)) {
+      if (z < 40 || nearLook(z) || (coast.finite && z > coast.finishZ - 160)) continue;
+      if (m.profile.checkpoints(z - 160, z + 160).some((q) => Math.abs(q - z) < 120)) continue;
+      const x = coast.rimX(z) + rnd.range(12, 26);
+      const size = rnd.range(1.1, 2.6);
+      rimOutcrop(b, x, m.heightAt(x, z), z, size, rnd);
     }
     for (const l of looks) if (l.z >= z0 && l.z < z1) this.viewpoint(b, l, rnd);
     for (const h of coast.hamlets(z0, z1 - 1)) this.hamlet(b, h.z, h.seed);
@@ -195,8 +204,10 @@ export class FjordScenery implements SceneryView {
     const z = 30 + Math.sin(time * 0.05) * 12;
     const xr = c.rimX(z);
     const y = m.heightAt(xr + 20, z);
-    out.pos.set(xr + 34 + Math.sin(time * 0.04) * 6, y + 46 + Math.sin(time * 0.1) * 2, z - 70);
-    out.look.set(xr - 700, c.seaLevelAt(z) + 260, z + 900);
+    // round 2 (art review D12): a little further out over the rim and looking further down, so
+    // the top of the wall drops away below the cornice (the height of the cliffs reads)
+    out.pos.set(xr + 16 + Math.sin(time * 0.04) * 5, y + 52 + Math.sin(time * 0.1) * 2, z - 80);
+    out.look.set(xr - 620, c.seaLevelAt(z) + 150, z + 820);
     out.fov = 58;
     return true;
   }

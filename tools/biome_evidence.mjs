@@ -268,15 +268,33 @@ if (G.finite && (want('finish') || want('victory'))) {
     await goTo(G.L - 50, 22);
     await ev(() => { window.__skifree.autopilot('skilled'); window.__skifree.placeYeti(45); });
     await framesUntil(`(s) => s.phase === 'victory' || s.outcome === 'victory'`, 600);
-    await framesUntil(`(s) => s.cinematicTime >= 9.6`, 600);
-    await settle(1500);
-    await shot('11_victory_trophy', 'Victory: trophy hand-off');
-    await framesUntil(`(s) => s.cinematicTime >= 13.4`, 300);
-    await settle(1500);
-    await shot('11b_victory_celebration', 'Victory: the celebration beat');
-    await framesUntil(`(s) => s.cinematicTime >= 19.5`, 400);
-    await settle(1500);
-    await shot('11c_victory_reveal', 'Victory: the closing reveal');
+    // the beats to capture: the shared three (trophy, celebration, closing shot), at the times of
+    // this location's script; Fjord (round 2) has its own beat sheet and a few extra beats
+    const beats =
+      biome === 'fjord'
+        ? [
+            [2.2, '11d_victory_quay', 'Victory: onto the quay (low tracking shot)'],
+            [4.7, '11e_victory_racks', 'Victory: the Yeti arrives at the stockfish rack'],
+            [6.6, '11f_victory_gag', 'Victory: the Yeti gags on a dried cod'],
+            [8.7, '11g_victory_present', 'Victory: the harbourmaster presents the trophy (over the shoulder)'],
+            [10.9, '11_victory_trophy', 'Victory: the trophy caught and held up (reverse angle)'],
+            [12.9, '11b_victory_celebration', 'Victory: apres on the quay (tub, bonfire, sauna, the plunge)'],
+            [14.5, '11h_victory_splash', 'Victory: the cannonball splash'],
+            [18.6, '11i_victory_reveal_mid', 'Victory: the reveal, mid-move'],
+            [22.6, '11c_victory_reveal', 'Victory: the closing reveal (summit), title'],
+          ]
+        : [
+            [9.6, '11_victory_trophy', 'Victory: trophy hand-off'],
+            [13.4, '11b_victory_celebration', 'Victory: the celebration beat'],
+            [19.5, '11c_victory_reveal', 'Victory: the closing reveal'],
+          ];
+    const onlyBeats = process.env.BEATS ? process.env.BEATS.split(',') : null;
+    for (const [t, name, note] of beats) {
+      await framesUntil(`(s) => s.cinematicTime >= ${t}`, 900);
+      if (onlyBeats && !onlyBeats.includes(name)) continue;
+      await settle(1500);
+      await shot(name, note);
+    }
   }
 }
 

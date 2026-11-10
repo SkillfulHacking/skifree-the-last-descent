@@ -18,6 +18,7 @@ export function kitMaterials(): Record<string, THREE.Material> {
     paint: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78 }),
     snow: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, color: 0xf3f7ff }),
     stone: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, flatShading: true }),
+    rock: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }),
     glass: new THREE.MeshStandardMaterial({ color: 0x1a1612, roughness: 0.2, emissive: new THREE.Color(0xffb46a), emissiveIntensity: 0.7 }),
     metal: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.6 }),
     sign: new THREE.MeshStandardMaterial({ map: signTexture(), roughness: 0.7 }),
@@ -374,4 +375,43 @@ export function cairn(b: Batch, x: number, y: number, z: number, h: number, rnd:
   b.add('snow', new THREE.SphereGeometry(r * 1.2, 7, 4, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.5, 1), mat(x, yy, z), 0xffffff);
   b.add('paint', new THREE.BoxGeometry(0.42, 0.1, 0.03), mat(x, yy - h * 0.18, z + r * 1.05), 0xc81e1e);
   b.add('paint', new THREE.BoxGeometry(0.1, 0.36, 0.03), mat(x, yy - h * 0.18 - 0.2, z + r * 1.05), 0xc81e1e);
+}
+
+/**
+ * A wind-scoured granite outcrop on the rim (round 2, art review D4: coastal trackside dressing):
+ * a half-buried whaleback with ochre and grey-green lichen, sea-spray rime on its seaward face and
+ * snow lying in its lee. Base on the ground at y.
+ */
+export function rimOutcrop(b: Batch, x: number, y: number, z: number, size: number, rnd: Rand): void {
+  const g = new THREE.IcosahedronGeometry(1, 2);
+  const P = g.attributes.position as THREE.BufferAttribute;
+  const k1 = rnd.range(0, 10);
+  const k2 = rnd.range(0, 10);
+  for (let i = 0; i < P.count; i++) {
+    const vx = P.getX(i);
+    const vy = P.getY(i);
+    const vz = P.getZ(i);
+    const n = 1 + 0.16 * Math.sin(vx * 3.1 + k1) * Math.cos(vz * 2.7 + k2) + 0.08 * Math.sin(vy * 5.3 + k1);
+    P.setXYZ(i, vx * n * 1.5, vy * n * 0.62, vz * n);
+  }
+  g.computeVertexNormals();
+  const yaw = rnd.range(-0.3, 0.3);
+  b.add(
+    'rock',
+    g,
+    mat(x, y - size * 0.22, z, rnd.range(-0.1, 0.1), yaw, rnd.range(-0.08, 0.08), size),
+    (p, n) => {
+      const t = 0.2 + 0.05 * Math.sin(p.x * 2.1 + p.z * 1.7);
+      const c = new THREE.Color(t, t * 1.02, t * 1.08);
+      // lichen: ochre and grey-green blotches on the upper surfaces
+      const l = Math.sin(p.x * 3.7 + p.z * 2.9) * Math.cos(p.z * 3.3 - p.x * 1.3);
+      if (n.y > 0.2 && l > 0.45) c.lerp(new THREE.Color(0.55, 0.42, 0.14), 0.55);
+      else if (n.y > 0.1 && l < -0.55) c.lerp(new THREE.Color(0.38, 0.44, 0.34), 0.5);
+      // rime on the seaward (−x) face
+      if (n.x < -0.45) c.lerp(new THREE.Color(0.82, 0.86, 0.9), 0.55 * Math.min(1, (-n.x - 0.45) * 3));
+      // snow in the lee (+x), on top
+      if (n.y > 0.75 && n.x > -0.1) c.lerp(new THREE.Color(0.92, 0.94, 0.98), 0.85);
+      return c;
+    },
+  );
 }

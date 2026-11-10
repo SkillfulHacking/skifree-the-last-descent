@@ -26,7 +26,7 @@ function mats() {
     rock: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 }),
     // ground skin: vertex alpha fades the rim into the snow; pulled toward the camera in depth
     // instead of lifted, so it hugs the terrain at every LOD
-    skin: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }),
+    skin: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -6 }),
     stone: new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.9, flatShading: true }),
     drift: new THREE.PointsMaterial({ size: 2.2, map: tex, color: 0xf4f8ff, transparent: true, opacity: 0.0, depthWrite: false, sizeAttenuation: true }),
     tex,
@@ -164,10 +164,10 @@ function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardView {
     pos.push(x, m.heightAt(x, z) + 0.02, z);
     const { n1, n2 } = tone(x, z);
     // core → rim: gneiss / ice glaze → gravel → wind crust → snow
-    const rock = new THREE.Color(0.07 + 0.06 * n2, 0.075 + 0.06 * n2, 0.085 + 0.065 * n2);
-    const ice = new THREE.Color(0.42, 0.55, 0.66);
-    const gravel = new THREE.Color(0.24 + 0.08 * n2, 0.235 + 0.08 * n2, 0.23 + 0.07 * n2);
-    const crust = new THREE.Color(0.74, 0.8, 0.88);
+    const rock = new THREE.Color(0.055 + 0.05 * n2, 0.062 + 0.05 * n2, 0.075 + 0.06 * n2);
+    const ice = new THREE.Color(0.5, 0.66, 0.78);
+    const gravel = new THREE.Color(0.2 + 0.1 * n2, 0.2 + 0.1 * n2, 0.21 + 0.09 * n2);
+    const crust = new THREE.Color(0.8, 0.85, 0.92);
     c.copy(rock).lerp(ice, Math.max(0, n1 - 0.62) * 1.6 * (1 - k));
     c.lerp(gravel, Math.min(1, Math.max(0, (k - 0.45 + 0.2 * (n2 - 0.5)) / 0.25)));
     c.lerp(crust, Math.min(1, Math.max(0, (k - 0.72 + 0.15 * (n1 - 0.5)) / 0.2)));
@@ -208,9 +208,9 @@ function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardView {
     const d = h.r * (0.12 + 0.55 * h01(i, v + 3));
     const x = h.x + Math.cos(a) * d;
     const z = h.z + Math.sin(a) * d;
-    const L = 1.6 + 2.6 * h01(i + 7, v);
-    const W = 0.55 + 0.7 * h01(i + 11, v);
-    const T = 0.22 + 0.16 * h01(i + 13, v);
+    const L = 2.2 + 3.0 * h01(i + 7, v);
+    const W = 0.8 + 0.9 * h01(i + 11, v);
+    const T = 0.3 + 0.16 * h01(i + 13, v);
     const box = new THREE.BoxGeometry(L, T * 2.4, W, 6, 2, 3);
     const P = box.attributes.position as THREE.BufferAttribute;
     for (let k = 0; k < P.count; k++) {
@@ -231,7 +231,7 @@ function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardView {
     // seat: the lowest terrain point under the rib, minus the buried part (~60 %)
     let gy = Infinity;
     for (const sx of [-L / 2, 0, L / 2]) for (const sz of [-W / 2, W / 2]) gy = Math.min(gy, m.heightAt(x + sx * Math.cos(yaw), z - sx * Math.sin(yaw) + sz));
-    box.translate(x, gy - T * 0.2, z);
+    box.translate(x, gy - T * 0.05, z);
     ribs.push(box);
     // a snow tail in the rib's lee (downwind, +x)
     const tail = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2);
@@ -243,7 +243,7 @@ function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardView {
     ribs.push(tail);
   }
   // gravel: small angular stones scattered in the gravel ring
-  const stones = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.16, 0), M.stone, 26);
+  const stones = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.22, 0), M.stone, 26);
   const mm = new THREE.Matrix4();
   for (let i = 0; i < 26; i++) {
     const a = h.rot + i * 2.4 + v;
@@ -262,8 +262,10 @@ function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardView {
     const P = n.attributes.position as THREE.BufferAttribute;
     const cc = new Float32Array(P.count * 3);
     for (let k = 0; k < P.count; k++) {
-      const t = 0.11 + 0.08 * h01(P.getX(k) * 0.7, P.getZ(k) * 0.9);
-      cc.set([t, t * 1.04, t * 1.12], k * 3);
+      // dark gneiss, lighter where the wind has polished the top
+      const top = P.getY(k) > 0 ? 1 : 0;
+      const t = 0.1 + 0.07 * h01(P.getX(k) * 0.7, P.getZ(k) * 0.9) + 0.06 * top;
+      cc.set([t, t * 1.05, t * 1.14], k * 3);
     }
     n.setAttribute('color', new THREE.BufferAttribute(cc, 3));
     return n;
