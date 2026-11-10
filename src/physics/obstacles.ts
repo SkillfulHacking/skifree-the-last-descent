@@ -36,6 +36,8 @@ export interface Obstacle {
 
 /** Half-width of the guaranteed-clear primary lane around routeX. */
 export const LANE_HALF = 6;
+/** coastal locations: extra clearance (m) between a rock's edge and the obstacle-free lane */
+const EDGE_CLEAR = 1.0;
 export const BAND = 256;
 const CELL = 6.5;
 const X_MIN = -560;
@@ -197,7 +199,7 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
   const caves = P.encounters(zA - 60, zB + 60).map((e) => ({ x: e.anchor.centerX + e.anchor.side * e.anchor.d, z: e.anchor.z, side: e.anchor.side, d: e.anchor.d }));
   const hasAlt = P.altRoutes(zA - 10, zB + 10).length > 0;
   const coast = m.coast;
-  const lookouts = coast ? coast.lookouts(zA - 20, zB + 20) : [];
+  const lookouts = coast ? coast.lookouts(zA - 70, zB + 70) : [];
   const nearKicker = (x: number, z: number) => kickers.some((k) => z > k.z - k.run - 18 && z < k.z + 26 && Math.abs(x - (m.centerX(k.z) + k.d)) < k.width * 0.5 + 6);
   let local = 0;
   const add = (o: Omit<Obstacle, 'id' | 'collidable' | 'y'>) => {
@@ -230,6 +232,8 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
       if (caves.some((c) => d * c.side > c.d - 16 && Math.abs(z - c.z) < 40)) continue; // keep cave clearing open
       // coast: nothing on the cornice, the cliff or in the water; viewpoints stay clear
       if (coast && (coast.beyondRim(x, z) > -5 || lookouts.some((l) => Math.hypot(x - l.x, z - l.z) < 13))) continue;
+      // …and the swerve from the line to a chase viewpoint beside it stays clear
+      if (lookouts.some((l) => l.chase && z > l.z - 75 && z < l.z + 85 && x > l.x - 6 && x < m.routeX(z))) continue;
 
       // altitude/biome tree line: open alpine where the profile says so, forests elsewhere
       const treeLine = P.treeLine(z);
@@ -273,6 +277,10 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
       if (roll2 < rockDensity) {
         const big = rng.chance(onPiste ? 0.25 : 0.55);
         const scale = big ? rng.range(1.4, 2.6) : rng.range(0.35, 0.8);
+        const rr = big ? 0.9 * scale : 0.75 * scale;
+        // a coast (round 3, B N4): the rock's edge, not only its centre, keeps clear of the lane, so
+        // the way round a scoured-rock patch on the line never runs into a boulder
+        if (coast && lane - rr < LANE_HALF + 1.5 + EDGE_CLEAR) continue;
         add({ kind: big ? 'boulder' : 'rock', x, z, r: big ? 0.9 * scale : 0.75 * scale, softR: 0, height: big ? 1.1 * scale : 0.55 * scale, rot: rng.range(0, Math.PI * 2), scale, variant: rng.int(0, 3), halfLen: 0 });
         continue;
       }

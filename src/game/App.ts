@@ -510,6 +510,8 @@ export class App {
       onPauseRequest: () => this.pause(),
     }, { skipIntro: retry });
     this.trackSession(this.session);
+    // compile what the session brings (Hard: the snowball glint sprite) now, not at the first throw
+    for (const o of this.session.warmupObjects) this.renderer.compile(o, this.camera, this.world.scene);
     this.session.recordsSeenCave = this.book.seenCaveCinematic;
     this.session.onCaveSeen = () => {
       this.book.seenCaveCinematic = true;

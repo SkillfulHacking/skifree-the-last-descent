@@ -35,9 +35,37 @@ export class CoastalShelter implements RefugeView {
   readonly group = new THREE.Group();
   readonly gate = new THREE.Vector3();
   private mats: THREE.Material[] = [];
-  private tex: THREE.Texture;
+  private tex!: THREE.Texture;
 
-  constructor(m: Mountain, z: number, index: number) {
+  /** build now (loading, tests) */
+  constructor(m: Mountain, z: number, index: number, sliced = false) {
+    if (!sliced) {
+      const job = this.steps(m, z, index);
+      while (!job.next().done);
+    }
+  }
+
+  /**
+   * The build in slices (round 2, D6: 9–31 ms in one frame): World steps it one slice per frame
+   * while the shelter is still ~1.5 km ahead. Yields after the board texture, the gate, the hut,
+   * the wind wall, and before the final merge.
+   */
+  static sliced(m: Mountain, z: number, index: number): Generator<void, CoastalShelter, void> {
+    const sh = new CoastalShelter(m, z, index, true);
+    return (function* () {
+      let done = false;
+      try {
+        yield* sh.steps(m, z, index);
+        done = true;
+        return sh;
+      } finally {
+        // abandoned half-way (streamed out before it finished): release what was made
+        if (!done) sh.dispose();
+      }
+    })();
+  }
+
+  private *steps(m: Mountain, z: number, index: number): Generator<void, void, void> {
     const x = m.routeX(z);
     this.gate.set(x, m.heightAt(x, z), z);
     const rnd = new Rand(777 + index * 13);
@@ -47,6 +75,7 @@ export class CoastalShelter implements RefugeView {
     const lamp = new THREE.MeshStandardMaterial({ color: 0xffc070, emissive: 0xff9a3c, emissiveIntensity: 2.6 });
     const M: Record<string, THREE.Material> = { ...K, board, lamp };
     this.mats.push(...Object.values(M));
+    yield;
     const b = new Batch();
     // gate: two log posts, a crossbeam, the board, a lantern
     const span = 16;
@@ -63,6 +92,7 @@ export class CoastalShelter implements RefugeView {
     b.add('board', new THREE.PlaneGeometry(span - 1, 2.2), mat(x, gy + 4.7, z - 0.06, 0, Math.PI, 0), 0xffffff);
     b.add('board', new THREE.PlaneGeometry(span - 1, 2.2), mat(x, gy + 4.7, z + 0.06), 0xffffff);
     b.add('lamp', new THREE.SphereGeometry(0.3, 10, 8), mat(x - span * 0.5, gy + 6.9, z), 0xffffff);
+    yield;
     // the hut, on the wider side of the piste, with a stone wind wall facing the sea
     const side = m.centerX(z) > x ? 1 : -1;
     const hx = x + side * (span * 0.5 + 13);
@@ -71,6 +101,7 @@ export class CoastalShelter implements RefugeView {
     house(b, hx, hy + 0.4, hz, side * 0.2, { w: 8, d: 5.6, h: 3.2, roofH: 2.2, color: 0x8e2c1d, door: 'side', chimney: true }, rnd);
     // turf showing under the snow at the eaves
     for (const s of [-1, 1]) b.add('paint', new THREE.BoxGeometry(8.6, 0.22, 0.4), mat(hx, hy + 0.4 + 3.2 + 0.05, hz + s * 3.05, 0, side * 0.2, 0), 0x4a4a2a);
+    yield;
     // dry-stone wind wall
     for (let i = 0; i < 9; i++) {
       const wx = hx - side * 7 + rnd.range(-0.4, 0.4);
@@ -86,6 +117,7 @@ export class CoastalShelter implements RefugeView {
     pen.setAttribute('position', new THREE.Float32BufferAttribute([0, 6.9, 0, 0, 6.1, 0, 2.8, 6.5, 0.2, 0, 6.1, 0, 0, 6.9, 0, 2.8, 6.5, 0.2], 3));
     pen.computeVertexNormals();
     b.add('paint', pen, mat(fx, fy, hz - 4, 0, 0.5, 0), 0xc81e1e);
+    yield;
     for (const me of b.build(M, { cast: true, receive: true })) this.group.add(me);
     // no PointLight: shelters stream in and out mid-run, and a change in the scene's light count
     // recompiles every lit material (three.js keys programs by light counts). The lamp glows by
@@ -97,7 +129,7 @@ export class CoastalShelter implements RefugeView {
       if (o instanceof THREE.Mesh) o.geometry.dispose();
     });
     for (const m of this.mats) m.dispose();
-    this.tex.dispose();
+    this.tex?.dispose();
     this.group.removeFromParent();
   }
 }

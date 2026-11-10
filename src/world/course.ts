@@ -19,6 +19,11 @@ export { CAVE_D, CAVE_FLOOR_RAISE } from './caveTerrain';
 export const SEED_DEFAULT = 20261106;
 /** coastal locations: share of the valley-wall rise kept on the sea side (a low bank to the rim) */
 const SEA_BANK = 0.22;
+/** coastal locations: share of the valley cross-section's rise kept on the sea side of the piste */
+const SEA_CROSS = 0.4;
+/** a sea-side cave's hillside (Mountain.seaCaveK): full within this z distance, gone beyond the next */
+export const SEA_CAVE_NEAR = 90;
+export const SEA_CAVE_FAR = 170;
 
 /** Classic-course constants (the original 3 km mountain). New code should ask the profile. */
 export const COURSE = {
@@ -154,6 +159,17 @@ export class Mountain {
     return this.profile.encounters(-Infinity, Number.isFinite(this.profile.finishZ) ? this.profile.finishZ : 30000).map((e) => e.anchor);
   }
 
+  /**
+   * 0..1: how much a Yeti cave cut into the SEA side (anchor.side −1 on a coast) shapes the ground
+   * at z: the valley side there is the ordinary hillside the cave contract expects (1 within 90 m of
+   * the cave, gone by 170 m).
+   */
+  seaCaveK(z: number): number {
+    let k = 0;
+    for (const c of this.cavesNear(z, z)) if (c.side < 0) k = Math.max(k, 1 - smoothstep(SEA_CAVE_NEAR, SEA_CAVE_FAR, Math.abs(z - c.z)));
+    return k;
+  }
+
   /** Terrain height at world (x, z). */
   heightAt(x: number, z: number): number {
     const h = this.landHeight(x, z);
@@ -176,8 +192,12 @@ export class Mountain {
       h += 0.00022 * b * b + 0.18 * b;
     }
 
-    // valley cross-section
-    h += 0.0016 * d * d * (ad < w ? 1 : w / ad);
+    // valley cross-section (a coast: the sea side is flatter, so the rim and the sea beyond it sit
+    // low in the gameplay view instead of behind a rising bank — art request R1 — except around a
+    // sea-side cave, which is cut into an ordinary valley side: R4)
+    const cross = 0.0016 * d * d * (ad < w ? 1 : w / ad);
+    const seaCave = this.coast && d < 0 ? this.seaCaveK(z) : 0;
+    h += this.coast && d < 0 ? cross * (SEA_CROSS + (1 - SEA_CROSS) * seaCave) : cross;
     // each side of the valley has its own character: banks set back further or closer, steeper or gentler
     const side: 1 | -1 = d >= 0 ? 1 : -1;
     const sideW = w * P.sideSetback(z, side);
@@ -193,7 +213,7 @@ export class Mountain {
       const rough = (0.55 * rr + 0.45 * rf) * this.kRelief * smoothstep(30, 220, e) * (0.6 + 0.4 * P.rockBias(z));
       if (side < 0 && this.coast) {
         // a coast: the sea side is only a low bank up to the cliff rim (open views over the fjord)
-        h += (wall + rough) * SEA_BANK;
+        h += (wall + rough) * (SEA_BANK + (1 - SEA_BANK) * seaCave);
       } else {
         h += wall + rough;
         // distant ranges

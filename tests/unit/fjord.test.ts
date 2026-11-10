@@ -164,8 +164,9 @@ describe('Fjord Coast: deterministic, continuous coastal terrain at every length
       expect(c.reachAt(L).ocean).toBe(true);
       expect(c.reachAt(L + 5000).level).toBe(sea);
       const shore = c.shoreZ(x);
-      expect(shore - L).toBeGreaterThan(150);
-      expect(shore - L).toBeLessThan(260);
+      // round 3 (art request R5): the quay front is 120 m past the finish line
+      expect(shore - L).toBeGreaterThan(100);
+      expect(shore - L).toBeLessThan(190);
       for (let z = L - 50; z < shore - 15; z += 10) {
         const h = m.heightAt(x, z) - sea;
         expect(h).toBeGreaterThan(1);
@@ -227,17 +228,19 @@ describe('Fjord Coast: physics (cornice guard, crosswind)', () => {
 
   it('the cornice only acts near the rim: the piste and the inland side ski like Alpine', () => {
     const e = env();
-    const rocks = collectPlacements(m, worldSeed(course('standard')), [getHazardKind('sea-gust'), getHazardKind('scoured-rock')], 1, 0, 10000).filter((h) => h.kind === 'scoured-rock');
+    const hz = collectPlacements(m, worldSeed(course('standard')), [getHazardKind('sea-gust'), getHazardKind('scoured-rock')], 1, 0, 10000);
     for (let z = 300; z < 9000; z += 211) {
-      // (scoured rock patches are hazards, not the surface model: skip points on one)
-      if (rocks.some((h) => Math.hypot(m.routeX(z) - h.x, z - h.z) < h.r + 1)) continue;
+      // (scoured rock patches and squalls are hazards, not the surface model: skip points in one)
+      if (hz.some((h) => Math.hypot(m.routeX(z) - h.x, z - h.z) < h.r + 5)) continue;
+      // (nor where a spine's fast wind-packed lane runs over the line, at its ends)
+      if (m.altLane(m.routeX(z), z) > 0) continue;
       const s = probe(e, m.routeX(z), z, 1, 20).sample.surface;
       expect(s.dragAdd).toBe(0);
       expect(s.friction).toBe(1);
     }
   });
 
-  it('crosswind: deterministic, bounded, zero on the ground; a jump drifts less than 2.5 m', () => {
+  it('crosswind (the breeze, away from squalls): deterministic, bounded, zero on the ground; a jump drifts less than 2.5 m', () => {
     expect(validateWeather(FJORD_WEATHER)).toEqual([]);
     const a = makeWeatherSample();
     const b = makeWeatherSample();
@@ -246,8 +249,11 @@ describe('Fjord Coast: physics (cornice guard, crosswind)', () => {
     expect(a).toEqual(b);
     const e = env();
     let maxAir = 0;
+    const squalls = collectPlacements(m, worldSeed(course('standard')), [getHazardKind('sea-gust')], 1, 0, 10000);
     for (let t = 0; t < 600; t += 3.7) {
       const z = 400 + t * 15;
+      // squalls push on purpose (their own tests); this is the breeze everywhere else
+      if (squalls.some((h) => Math.abs(z - h.z) < h.r + 6)) continue;
       const q = makeEnvQuery();
       q.x = m.routeX(z);
       q.z = z;
@@ -310,7 +316,8 @@ describe('Fjord Coast: hazards', () => {
     const e = new BiomeEnvironment(m, seed);
     const h = collectPlacements(m, seed, [gust, rock], 1, 0, 10000).find((q) => q.kind === 'sea-gust')!;
     e.stream(h.z - 60);
-    const tTel = timeOfPhase(gust, h, 'telegraph');
+    // a telegraph from its start (t = 0 may fall inside one)
+    const tTel = timeOfPhase(gust, h, 'telegraph', timeOfPhase(gust, h, 'dormant'));
     const tAct = timeOfPhase(gust, h, 'active', tTel);
     expect(tAct - tTel).toBeGreaterThanOrEqual(1.29);
     const events: EnvironmentEvent[] = [];
@@ -386,7 +393,8 @@ describe('Fjord Coast: optional viewpoints', () => {
       const seed = worldSeed(course(len));
       for (const l of list.slice(0, 6)) {
         const lane = Math.abs(l.x - m.routeX(l.z));
-        expect(lane).toBeGreaterThan(LANE_HALF + LOOKOUT_RADIUS); // the racing line never passes through one
+        // the racing line never passes through one (a chase viewpoint is a short swerve away)
+        expect(lane).toBeGreaterThan(l.chase ? LOOKOUT_RADIUS + 1.5 : LANE_HALF + LOOKOUT_RADIUS);
         expect(m.heightAt(l.x, l.z) - m.heightAt(m.routeX(l.z), l.z)).toBeLessThan(9);
         expect(c.guard(l.x, l.z)).toBe(0); // outside the cornice
         const band = generateBand(m, seed, Math.floor(l.z / BAND));
@@ -400,6 +408,7 @@ describe('Fjord Coast: optional viewpoints', () => {
     const c = m.coast!;
     const f = new ObstacleField(m, worldSeed(course('standard')));
     let reached = 0;
+    const miss: string[] = [];
     const list = c.lookouts(0, m.finishZ).slice(0, 4);
     for (const l of list) {
       f.ensure(l.z - 400, l.z + 200);
@@ -409,7 +418,12 @@ describe('Fjord Coast: optional viewpoints', () => {
       let best = Infinity;
       for (let i = 0; i < 40 / PHYS_DT; i++) {
         const s = p.s;
-        let desired = Math.atan2(l.x - s.pos.x, Math.max(4, l.z - s.pos.z));
+        // follow the line, easing out toward the platform over the last ~150 m (a beeline from far
+        // up can cut across the cornice where the line bends)
+        const tz = Math.min(l.z, s.pos.z + 10);
+        const u = Math.max(0, Math.min(1, (tz - (l.z - 150)) / 130));
+        const tx = m.routeX(tz) + (l.x - m.routeX(l.z)) * u * u * (3 - 2 * u);
+        let desired = Math.atan2(tx - s.pos.x, Math.max(4, tz - s.pos.z));
         // like a player: look ~10 m ahead and steer round rocks and trees in the way
         for (const o of f.inRange(s.pos.z, s.pos.z + 14)) {
           if (o.kind === 'stump' || !o.collidable) continue;
@@ -423,14 +437,16 @@ describe('Fjord Coast: optional viewpoints', () => {
         }
         let err = desired - s.heading;
         err = Math.atan2(Math.sin(err), Math.cos(err));
-        const inp: SkierInput = { ...NO_INPUT, steer: Math.max(-1, Math.min(1, -err * 3)), brake: s.speed > 16 ? 0.5 : 0, recover: true };
+        // (and skates on with the tuck input where the ground goes flat, like a player)
+        const inp: SkierInput = { ...NO_INPUT, steer: Math.max(-1, Math.min(1, -err * 3)), brake: s.speed > 16 ? 0.5 : 0, tuck: s.speed < 6 ? 1 : 0, recover: true };
         p.step(inp);
         best = Math.min(best, Math.hypot(s.pos.x - l.x, s.pos.z - l.z));
         if (s.pos.z > l.z + 30) break;
       }
       if (best < l.r) reached++;
+      else miss.push(`${l.id} best ${best.toFixed(1)} crashes ${p.s.crashes} z ${p.s.pos.z.toFixed(0)}`);
     }
-    expect(reached).toBe(list.length);
+    expect(reached, miss.join('; ')).toBe(list.length);
   });
 
   it('discoveries become ScenicLocationDiscovered (biome "fjord") on the gameplay bus, once per id', () => {

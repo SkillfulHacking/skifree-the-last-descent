@@ -131,7 +131,8 @@ function pennantGeo(w: number, h: number, a: number, b: number): THREE.BufferGeo
   return g;
 }
 
-export function buildFjordStart(m: Mountain, group: THREE.Group, woodTexture: (seed: number) => THREE.CanvasTexture): Array<{ dispose(): void }> {
+export function buildFjordStart(m: Mountain, group: THREE.Group, woodTexture: (seed: number) => THREE.CanvasTexture, opts: { quality?: string } = {}): Array<{ dispose(): void }> {
+  const low = opts.quality === 'low';
   const out: Array<{ dispose(): void }> = [];
   const rng = new Rng(9137);
   const grain = woodTexture(141);
@@ -239,7 +240,7 @@ export function buildFjordStart(m: Mountain, group: THREE.Group, woodTexture: (s
   // (sea) side only, swinging out toward the rim; the inland side gets a line of trail cairns
   for (const side of [-1]) {
     let prev: THREE.Vector3 | null = null;
-    for (let i = 0; i < 11; i++) {
+    for (let i = 0; i < (low ? 7 : 11); i++) {
       const zz = -4 - i * 3.2 + (i > 6 ? (i - 6) * 1.4 : 0);
       const x = m.routeX(zz) + side * (5 + i * 0.7 + Math.max(0, i - 5) * 1.6);
       const gy = m.heightAt(x, zz);
@@ -406,7 +407,7 @@ export function buildFjordStart(m: Mountain, group: THREE.Group, woodTexture: (s
   }
 
   // trail cairns on the inland side, stepping down beside the run
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < (low ? 1 : 3); i++) {
     const kz = 6 + i * 9;
     const kx = m.routeX(kz) + 9 + i * 1.5;
     let yy = m.heightAt(kx, kz) - 0.1;

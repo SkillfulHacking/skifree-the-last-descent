@@ -10,6 +10,7 @@
  * Every along-course quantity is a piecewise-linear KeyTrack; the base height is the analytic
  * integral of the slope track, so arbitrary distances stay exact and cheap.
  */
+import { RIM_LINE_CLEAR, nearRimDistance, rimOffsetRaw, type CoastParams } from './coast';
 import { Rng, clamp, smoothstep } from '../core/rng';
 import { CAVE_D, type CaveAnchor } from './caveTerrain';
 
@@ -525,6 +526,17 @@ export interface ProfileKnobs {
   spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
   /** slope (degrees) of the run-in at the start gate (default 6): steeper = no stall on a bump */
   startSlope?: number;
+  /**
+   * A sea coast on −X (see coast.ts): alternate lines, off-route kickers and cliff bands keep
+   * RIM_LINE_CLEAR from the cliff rim, and spines bow inland where the rim is too close.
+   */
+  coast?: CoastParams;
+  /**
+   * Which side of the piste the Yeti caves are cut into (default +1, the original). A coast puts
+   * them on the sea side (−1), in front of the cliff (art request R4); see Mountain.landHeight and
+   * Coast.rimX for the ground around them.
+   */
+  caveSide?: 1 | -1;
 }
 export const DEFAULT_KNOBS: ProfileKnobs = { slopeScale: 1, widthScale: 1, swingScale: 1 };
 
@@ -688,7 +700,7 @@ export class GeneratedProfile implements CourseProfile {
       caveZ,
       triggerZ: caveZ + 22,
       foreshadowZ: foreshadowFor(caveZ),
-      anchor: { z: caveZ, centerX: 0, side: 1, d: CAVE_D }, // centerX resolved once the keys exist
+      anchor: { z: caveZ, centerX: 0, side: this.knobs.caveSide ?? 1, d: CAVE_D }, // centerX resolved once the keys exist
       chaseEndZ: chaseEnd,
       checkpointZ,
       speedMul,
@@ -815,7 +827,9 @@ export class GeneratedProfile implements CourseProfile {
       const hw = this.halfWidth(z);
       const base = this.routeX(z) - this.centerX(z);
       const onRoute = k % 2 === 0;
-      const d = onRoute ? base : clamp(base + rng.pick([-1, 1]) * rng.range(14, 22), -hw * 0.75, hw * 0.75);
+      let d = onRoute ? base : clamp(base + rng.pick([-1, 1]) * rng.range(14, 22), -hw * 0.75, hw * 0.75);
+      // a coast: an off-route kicker never sits in the cornice zone (it moves to the land side)
+      if (K.coast && this.centerX(z) + d - 6 < this.seaBound(z)) d = clamp(base + Math.abs(d - base), -hw * 0.75, hw * 0.75);
       this.kick.push({ z, d, width: rng.range(7, 11), height: rng.range(1.2, type === 'highspeed' ? 2.4 : 2.0), run: rng.range(10, 15) });
     }
     // a ridgeline spine (see ProfileKnobs.spine) has its gap jump instead of a cliff drop across it
@@ -825,6 +839,7 @@ export class GeneratedProfile implements CourseProfile {
       const hw = this.halfWidth(z);
       const o = this.routeX(z) - this.centerX(z);
       const band = o > 0 ? { dMin: -(hw - 6), dMax: o - 13 } : { dMin: o + 13, dMax: hw - 6 };
+      if (K.coast) band.dMin = Math.max(band.dMin, this.seaBound(z) - this.centerX(z));
       if (band.dMax - band.dMin > 8) {
         const drop = rng.range(3.5, 6);
         if (!spineSeg) this.cliffs.push({ z, drop, ...band });
@@ -839,7 +854,24 @@ export class GeneratedProfile implements CourseProfile {
       if (roll || sp) {
         const a: AltRoute = { z0: z0 + edge + 10, z1: z1 - edge - 10, type };
         if (sp) {
-          a.bow = sp.side * sp.bow * Math.min(this.halfWidth(z0 + len / 2), w);
+          const amount = sp.bow * Math.min(this.halfWidth(z0 + len / 2), w);
+          let side: number = sp.side;
+          if (K.coast) {
+            // the line bows to whichever side keeps it furthest from the racing line (the route
+            // swings too, and the rim and the piste edge clamp it), preferring the knob's side (the
+            // exposed ridge above the sea) unless the other is clearly better
+            const sep = (b: number) => {
+              a.bow = b;
+              let sum = 0;
+              for (let k = 1; k < 8; k++) {
+                const zz = a.z0 + ((a.z1 - a.z0) * k) / 8;
+                sum += Math.min(30, Math.abs(this.altX(a, zz) - this.routeX(zz)));
+              }
+              return sum / 7;
+            };
+            if (sep(-sp.side * amount) > sep(sp.side * amount) + 3) side = -sp.side;
+          }
+          a.bow = side * amount;
           if (sp.gap) this.addGap(a, rng);
         }
         this.alts.push(a);
@@ -852,9 +884,11 @@ export class GeneratedProfile implements CourseProfile {
   /** a take-off kicker on a spine and the gully past it, where the spine is furthest from the route */
   private addGap(a: AltRoute, rng: Rng) {
     const u = rng.range(0.42, 0.58);
-    const height = rng.range(1.3, 1.6);
-    const len = rng.range(6.5, 7.5);
-    const depth = rng.range(1.7, 2.0);
+    // round 3 (B N3): a gap with a stake — cleared in a tuck at racing speed, but a skier who comes
+    // in slow (or stands up into a squall over it) lands on the far ramp and loses a few m/s
+    const height = rng.range(1.4, 1.7);
+    const len = rng.range(9.5, 11.5);
+    const depth = rng.range(2.0, 2.4);
     // the take-off must be approached at full speed: no cliff drop or other kicker on the spine
     // just before it (or just after the landing)
     const clearAt = (lip: number) => {
@@ -1038,7 +1072,20 @@ export class GeneratedProfile implements CourseProfile {
     if (a.bow) chord += a.bow * Math.sin(Math.PI * clamp(t, 0, 1));
     const c = this.centerX(z);
     const hw = this.halfWidth(z) - 9;
-    return Math.min(c + hw, Math.max(c - hw, chord));
+    return Math.min(c + hw, Math.max(c - hw, chord, this.seaBound(z)));
+  }
+
+  /**
+   * Coastal locations: the lowest x (sea side) a line may use at z — RIM_LINE_CLEAR inside the rim
+   * crest, wherever Coast.rimX puts it (conservative: ignores where set pieces push the rim back).
+   * −Infinity inland.
+   */
+  seaBound(z: number): number {
+    const c = this.knobs.coast;
+    if (!c) return -Infinity;
+    const edge = this.centerX(z) - this.halfWidth(z) - rimOffsetRaw(c, this.seed, z);
+    const near = this.routeX(z) - nearRimDistance(c, this.seed, z);
+    return Math.max(edge, near) + RIM_LINE_CLEAR;
   }
 
   altRouteX(z: number): number | null {

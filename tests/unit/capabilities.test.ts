@@ -435,7 +435,14 @@ describe('hazards: deterministic placement and streaming', () => {
       for (let z = 0; z < 12000; z += 64) {
         env.stream(z);
         env.release(z - 900, z + 1600);
+        // views are built on a frame budget (round 3, D1): a frame's pump builds at least one, and
+        // flush() (loading) builds the rest
+        const pending = layer.pendingCount;
+        layer.pump(0);
+        if (pending) expect(layer.pendingCount).toBe(pending - 1);
+        layer.flush();
         layer.update(1 / 60);
+        expect(layer.pendingCount).toBe(0);
         expect(layer.liveCount).toBe(env.hazards.count);
         expect(layer.group.children.length).toBe(env.hazards.count);
       }

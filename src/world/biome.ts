@@ -197,6 +197,8 @@ export interface BiomeTerrain {
   spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
   /** run-in slope at the start gate (degrees, default 6) */
   startSlope?: number;
+  /** side of the piste the Yeti caves are cut into (default +1; a coast: −1, the sea side) */
+  caveSide?: 1 | -1;
   /** valley wall height (m) */
   wallHeight: number;
   /** ridged/fbm relief on the valley walls (m) */

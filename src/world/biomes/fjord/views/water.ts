@@ -69,8 +69,8 @@ float sf_wave(vec2 p, float t, float nearK) {
 }
 void main() {
   vec3 P = vW + uOrigin; // absolute world position
-  // (no discard: update() clips each quad to its arm's [z0, z1) exactly — round 3, tech review D
-  // minor 4 — so the depth test can run early on the water)
+  // (no discard outside [uZ0, uZ1): the quad is clipped to the arm geometrically in update(), so
+  // early depth rejection keeps working — round 2, D new 4)
   vec3 rel = vW - cameraPosition;
   float d = length(rel);
   vec3 V = -rel / d;
@@ -174,14 +174,24 @@ export class FjordWater {
 export const WATER_AHEAD = 14000;
 export const WATER_BEHIND = 4500;
 
+/** the main camera's far plane (m) and the rear-view inset's (App: rear camera far) */
+export const WATER_FAR_MAIN = 12000;
+export const WATER_FAR_REAR = 2500;
+
 /**
- * The arms that get a water surface: the one under the camera and the ones ahead of it first (the
- * camera looks down the course; the far plane is ~12 km), then the nearest ones behind (menu,
- * victory reveal) while slots remain.
+ * The arms that get a water surface, in priority order (round 2, D7: arms beyond the far plane used
+ * to take slots from arms just behind the skier, so the rear-view inset could miss water 0.7–2.5 km
+ * back on Expedition):
+ *  1. the one under the camera and the ones ahead that start within the main far plane;
+ *  2. the ones behind that end within the rear view's far distance;
+ *  3. then any others ahead (out to WATER_AHEAD) and behind (menu, victory reveal), nearest first.
  */
 export function waterReaches(coast: Coast, camZ: number, slots: number): Reach[] {
   const list = coast.reaches(camZ - WATER_BEHIND, camZ + WATER_AHEAD);
   const ahead = list.filter((r) => r.z1 > camZ).sort((a, b) => a.z0 - b.z0);
   const behind = list.filter((r) => r.z1 <= camZ).sort((a, b) => b.z1 - a.z1);
-  return ahead.concat(behind).slice(0, slots);
+  const seen = ahead.filter((r) => r.z0 < camZ + WATER_FAR_MAIN);
+  const rear = behind.filter((r) => r.z1 > camZ - WATER_FAR_REAR);
+  const rest = ahead.filter((r) => !seen.includes(r)).concat(behind.filter((r) => !rear.includes(r)));
+  return seen.concat(rear, rest).slice(0, slots);
 }

@@ -9,6 +9,7 @@
  *    in the core, low chamfered rock ribs breaking through along the wind grain with snow tails in
  *    their lee, gravel, and a wind-crust rim that fades into the slope — reads as "no snow here"
  *    from 100 m away.
+ *  - gap-marker: banded poles and a pennant line at the lip of a spine's gap gully.
  */
 import * as THREE from 'three';
 import { registerHazardView, type HazardView } from '../../../presentation/hazardViews';
@@ -164,8 +165,37 @@ function h01(a: number, b: number): number {
  * chamfered rock ribs breaking through along the wind grain (+x), half-buried, never more than
  * ~0.35 m proud (skis pass over them: the hazard only adds friction), with snow tails in their lee.
  */
+/**
+ * The ground under a patch sampled once on a small grid (bilinear in between): the skin, ribs, tails
+ * and stones drape over it with ~3× fewer terrain samples than sampling every vertex (round 2, D1:
+ * a rock view used ~1,100 heightAt calls). 1.5 m cells keep the skin within a few cm of the snow,
+ * which the skin's polygon offset absorbs.
+ */
+export function groundGrid(m: Mountain, cx: number, cz: number, R: number, cell = 1.5): (x: number, z: number) => number {
+  const n = Math.ceil((2 * R) / cell) + 1;
+  const x0 = cx - R;
+  const z0 = cz - R;
+  const g = new Float32Array(n * n);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) g[j * n + i] = m.heightAt(x0 + i * cell, z0 + j * cell);
+  return (x: number, z: number) => {
+    const u = Math.min(n - 1.0001, Math.max(0, (x - x0) / cell));
+    const v = Math.min(n - 1.0001, Math.max(0, (z - z0) / cell));
+    const i = Math.floor(u);
+    const j = Math.floor(v);
+    const fu = u - i;
+    const fv = v - j;
+    const a = g[j * n + i]!;
+    const b = g[j * n + i + 1]!;
+    const c = g[(j + 1) * n + i]!;
+    const d = g[(j + 1) * n + i + 1]!;
+    return a + (b - a) * fu + (c - a) * fv + (a - b - c + d) * fu * fv;
+  };
+}
+
 export function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardView {
   const M = mats();
+  // every draped vertex lies within 1.3 r (skin) or r + a rib/tail length of the centre
+  const H = groundGrid(m, h.x, h.z, h.r * 1.4 + 3);
   const obj = new THREE.Group();
   obj.name = 'scoured-rock';
   const rings = 12;
@@ -182,7 +212,7 @@ export function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardV
   };
   const c = new THREE.Color();
   const push = (x: number, z: number, k: number) => {
-    pos.push(x, m.heightAt(x, z) + 0.02, z);
+    pos.push(x, H(x, z) + 0.02, z);
     const { n1, n2 } = tone(x, z);
     // core → rim: gneiss / ice glaze → gravel → wind crust → snow
     // round 3 (A6, visual only): a darker, larger exposed core with lichen-stained patches and only
@@ -256,14 +286,14 @@ export function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardV
     // ~45 % of its height buried
     {
       const BP = box.attributes.position as THREE.BufferAttribute;
-      for (let k = 0; k < BP.count; k++) BP.setY(k, m.heightAt(BP.getX(k), BP.getZ(k)) + BP.getY(k) + T * 0.15);
+      for (let k = 0; k < BP.count; k++) BP.setY(k, H(BP.getX(k), BP.getZ(k)) + BP.getY(k) + T * 0.15);
       box.computeVertexNormals();
     }
     ribs.push(box);
     // a snow tail in the rib's lee (downwind, +x)
     const tail = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2);
     tail.scale(L * 0.6, 0.16, W * 0.45);
-    tail.translate(x + L * 0.75, m.heightAt(x + L * 0.75, z) - 0.04, z);
+    tail.translate(x + L * 0.75, H(x + L * 0.75, z) - 0.04, z);
     const TP = tail.attributes.position as THREE.BufferAttribute;
     const tc = new Float32Array(TP.count * 3).fill(0.9);
     tail.setAttribute('color', new THREE.BufferAttribute(tc, 3));
@@ -278,7 +308,7 @@ export function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardV
     const x = h.x + Math.cos(a) * d;
     const z = h.z + Math.sin(a) * d;
     const s = 0.6 + 1.4 * h01(i + 29, v);
-    mm.compose(new THREE.Vector3(x, m.heightAt(x, z) + 0.02, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(i, i * 2, 0)), new THREE.Vector3(s, s * 0.55, s));
+    mm.compose(new THREE.Vector3(x, H(x, z) + 0.02, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(i, i * 2, 0)), new THREE.Vector3(s, s * 0.55, s));
     stones.setMatrixAt(i, mm);
   }
   stones.castShadow = true;
@@ -316,24 +346,93 @@ export function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardV
   };
 }
 
-/** concatenate non-indexed geometries with position/normal/color */
+/** concatenate non-indexed geometries with position/normal/color (preallocated, no array spreads) */
 function mergeSimple(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  const pos: number[] = [];
-  const nor: number[] = [];
-  const col: number[] = [];
-  for (const raw of list) {
+  const parts = list.map((raw) => {
     const gg = raw.index ? raw.toNonIndexed() : raw;
     if (!gg.getAttribute('normal')) gg.computeVertexNormals();
-    pos.push(...(gg.attributes.position as THREE.BufferAttribute).array);
-    nor.push(...(gg.attributes.normal as THREE.BufferAttribute).array);
-    col.push(...(gg.attributes.color as THREE.BufferAttribute).array);
+    return gg;
+  });
+  let n = 0;
+  for (const gg of parts) n += (gg.attributes.position as THREE.BufferAttribute).count;
+  const pos = new Float32Array(n * 3);
+  const nor = new Float32Array(n * 3);
+  const col = new Float32Array(n * 3);
+  let o = 0;
+  for (const gg of parts) {
+    const c = (gg.attributes.position as THREE.BufferAttribute).count;
+    pos.set((gg.attributes.position as THREE.BufferAttribute).array as ArrayLike<number>, o * 3);
+    nor.set((gg.attributes.normal as THREE.BufferAttribute).array as ArrayLike<number>, o * 3);
+    col.set(((gg.attributes.color as THREE.BufferAttribute).array as ArrayLike<number>), o * 3);
+    o += c;
   }
+  parts.forEach((gg, i) => {
+    if (gg !== list[i]) gg.dispose();
+  });
   const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  out.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return out;
 }
 
+/**
+ * gap-marker: the gully of a spine's gap jump, telegraphed (round 2, E5 / B N3): orange-and-black
+ * poles at both ends of the take-off lip and of the far edge, with a line of red pennants strung
+ * across the lip — "a drop here, carry speed". One merged draw (the windsock's vertex-colour
+ * material).
+ */
+export function gapMarkerView(h: HazardInstance<{ len: number; hw: number }>, m: Mountain): HazardView {
+  const M = mats();
+  const parts: THREE.BufferGeometry[] = [];
+  const colour = (g: THREE.BufferGeometry, c: number) => {
+    const P = g.attributes.position as THREE.BufferAttribute;
+    const col = new Float32Array(P.count * 3);
+    const cc = new THREE.Color(c);
+    for (let i = 0; i < P.count; i++) col.set([cc.r, cc.g, cc.b], i * 3);
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return g;
+  };
+  const { len, hw } = h.params;
+  const half = hw - 1.5;
+  const pole = (x: number, z: number) => {
+    const y = m.heightAt(x, z);
+    // banded pole (orange / black), 2.4 m
+    for (let k = 0; k < 4; k++) {
+      const seg = new THREE.CylinderGeometry(0.06, 0.06, 0.6, 6);
+      seg.translate(x, y + 0.3 + k * 0.6, z);
+      parts.push(colour(seg, k % 2 ? 0x1a1a1a : 0xff6a1a));
+    }
+    return y + 2.35;
+  };
+  const lip = h.z - 1.5;
+  const tops = [pole(h.x - half, lip), pole(h.x + half, lip)];
+  pole(h.x - half, h.z + len);
+  pole(h.x + half, h.z + len);
+  // pennants on a line across the lip (sagging a little)
+  const n = Math.max(6, Math.round((2 * half) / 1.4));
+  for (let i = 0; i < n; i++) {
+    const u = (i + 0.5) / n;
+    const x = h.x - half + 2 * half * u;
+    const y = tops[0]! + (tops[1]! - tops[0]!) * u - 0.35 * Math.sin(Math.PI * u);
+    const tri = new THREE.BufferGeometry();
+    tri.setAttribute('position', new THREE.Float32BufferAttribute([x - 0.35, y, lip, x + 0.35, y, lip, x, y - 0.6, lip + 0.05], 3));
+    tri.computeVertexNormals();
+    parts.push(colour(tri, i % 2 ? 0xf4f1ea : 0xd8261e));
+  }
+  const merged = mergeSimple(parts);
+  for (const g of parts) g.dispose();
+  const mesh = new THREE.Mesh(merged, M.sock);
+  mesh.name = 'gap-marker';
+  return {
+    object: mesh,
+    dispose() {
+      merged.dispose();
+      mesh.removeFromParent();
+    },
+  };
+}
+
 registerHazardView('sea-gust', (h, ctx) => gustView(h, ctx.mountain));
+registerHazardView('gap-marker', (h, ctx) => gapMarkerView(h as HazardInstance<{ len: number; hw: number }>, ctx.mountain));
 registerHazardView('scoured-rock', (h, ctx) => rockView(h as HazardInstance<{ v: number }>, ctx.mountain));

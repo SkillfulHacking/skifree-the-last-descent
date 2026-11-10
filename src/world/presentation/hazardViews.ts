@@ -47,6 +47,9 @@ export function hasHazardView(id: string): boolean {
   return views.has(id);
 }
 
+/** main-thread budget (ms) per frame for building hazard views (World) */
+export const HAZARD_VIEW_BUDGET_MS = 2;
+
 /** hazard views this far (m) behind the skier are hidden and no longer animated */
 export const HAZARD_VIEW_BEHIND = 150;
 
@@ -68,21 +71,58 @@ export class HazardLayer {
     return this.live.size;
   }
 
+  /** instances whose views are still to be built (round 3, D1: built on a per-frame budget) */
+  private pending = new Map<number, HazardInstance>();
+
+  /** views waiting to be built */
+  get pendingCount(): number {
+    return this.pending.size;
+  }
+
   private add(list: readonly HazardInstance[]) {
     for (const h of list) {
       const view = getHazardKind(h.kind).view;
       if (!view || this.live.has(h.id)) continue;
-      const f = views.get(view);
-      if (!f) throw new Error(`hazard "${h.kind}" uses unregistered view "${view}"`);
-      const v = f(h, this.ctx);
-      this.group.add(v.object);
-      this.live.set(h.id, { h, v });
-      this.stats.created++;
+      if (!views.get(view)) throw new Error(`hazard "${h.kind}" uses unregistered view "${view}"`);
+      this.pending.set(h.id, h);
+    }
+  }
+
+  private build(h: HazardInstance) {
+    const v = views.get(getHazardKind(h.kind).view!)!(h, this.ctx);
+    this.group.add(v.object);
+    this.live.set(h.id, { h, v });
+    this.stats.created++;
+  }
+
+  /**
+   * Build pending views for up to `ms` of main-thread time (at least one per call, nearest first).
+   * Views are created ~1 km ahead (World streams hazard bands that far), so a band's views spread
+   * over a few frames instead of costing one frame 10–50 ms (round 2, D1).
+   */
+  pump(ms: number, focusZ = -Infinity): void {
+    if (!this.pending.size) return;
+    const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const t0 = now();
+    const order = [...this.pending.values()].sort((a, b) => Math.abs(a.z - focusZ) - Math.abs(b.z - focusZ));
+    for (const h of order) {
+      this.pending.delete(h.id);
+      this.build(h);
+      if (now() - t0 >= ms) break;
+    }
+  }
+
+  /** Build every pending view now (loading, teleports). */
+  flush(): void {
+    for (const h of [...this.pending.values()]) {
+      this.pending.delete(h.id);
+      this.build(h);
     }
   }
 
   private remove(list: readonly HazardInstance[]) {
     for (const h of list) {
+      this.pending.delete(h.id);
       const e = this.live.get(h.id);
       if (!e) continue;
       this.group.remove(e.v.object);
@@ -139,6 +179,7 @@ export class HazardLayer {
 
   dispose(): void {
     this.update(0);
+    this.pending.clear();
     this.off();
     this.remove([...this.live.values()].map((e) => e.h));
     this.group.removeFromParent();

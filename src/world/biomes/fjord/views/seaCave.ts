@@ -28,6 +28,7 @@ import { Batch, Rand, mat } from '../../../resort/util';
 import { kitMaterials } from './buildings';
 import { PrismSet, clinkerHull, hullKeelY } from './basaltKit';
 import { caveCameraSightlines } from '../../../../cinematic/CaveCinematic';
+import { dressingTicker } from '../../../presentation/cave';
 
 /** distance from p to the segment ab */
 function segDist(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): number {
@@ -288,7 +289,40 @@ function faceSampler(cave: CaveDressingContext['cave'], mouth: THREE.Vector3, ou
   };
 }
 
+/** The dressing, built in one go (tests, and presentations without slicing). */
 export function dressSeaCave(c: CaveDressingContext): CaveDressing {
+  const job = dressSeaCaveSteps(c, Infinity);
+  let r = job.next();
+  while (!r.done) r = job.next();
+  return r.value;
+}
+
+/**
+ * The dressing as a time-sliced job (CavePresentation.dressSteps): yields between pieces of work
+ * once `budgetMs` of main-thread time has passed. If World abandons the job (`return()`), whatever
+ * was built so far is disposed in the `finally`.
+ */
+export function* dressSeaCaveSteps(c: CaveDressingContext, budgetMs = 3): Generator<void, CaveDressing, void> {
+  const tick = dressingTicker(budgetMs);
+  let done = false;
+  const partial: { mats: THREE.Material[]; texs: THREE.Texture[]; group: THREE.Group | null } = { mats: [], texs: [], group: null };
+  try {
+    const d = yield* buildSeaCave(c, tick, partial);
+    done = true;
+    return d;
+  } finally {
+    if (!done) {
+      partial.group?.traverse((o) => {
+        if (o instanceof THREE.Mesh) o.geometry.dispose();
+      });
+      partial.group?.removeFromParent();
+      for (const m of partial.mats) m.dispose();
+      for (const t of partial.texs) t.dispose();
+    }
+  }
+}
+
+function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partial: { mats: THREE.Material[]; texs: THREE.Texture[]; group: THREE.Group | null }): Generator<void, CaveDressing, void> {
   const { cave, mountain: m } = c;
   const hi = c.quality === 'high' || c.quality === 'ultra';
   const group = new THREE.Group();
@@ -324,7 +358,12 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
   // as pale floating shards (round 2, A4): the Fjord hangs its icicles from the lintel instead
   const sharedIce = cave.group.getObjectByName('cave-icicles');
   if (sharedIce) sharedIce.visible = false;
+  partial.group = group;
+  partial.mats.push(...new Set(Object.values(M)), net, seaIce);
+  partial.texs.push(iceTex);
+  if (tick.over()) yield;
   const face = faceSampler(cave, mouth, out, tan);
+  if (tick.over()) yield;
   const up = new THREE.Vector3(0, 1, 0);
 
   // ---------------- basalt columns (round 3: irregular, not a bollard grid) ----------------
@@ -387,6 +426,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
   };
   const big = rnd.next() < 0.5 ? -1 : 1;
   causeway(big > 0 ? 6.0 : -19, big > 0 ? 19 : -6.0, -10.5, -1.0, 7.5, big > 0 ? 6 : -6, 3.1, hi ? 0.92 : 0.7);
+  if (tick.over()) yield;
   causeway(big > 0 ? -13 : 6.5, big > 0 ? -6.5 : 13, -6.5, -1.5, 4.2, big > 0 ? -6.5 : 6.5, 8.4, hi ? 0.78 : 0.6);
   // fallen drums from the collapsed side lying in the snow (column sections on their sides)
   for (let i = 0; i < (hi ? 5 : 3); i++) {
@@ -400,6 +440,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     cols.prism(mtx, { sides: 6, r, h: len, rot: rnd.range(0, 6), tone: 0.014, seed: rnd.next() * 100, ground: -1, rnd });
     props.push({ p: centre, r: len / 2 + r, kind: 'drum' });
   }
+  if (tick.over()) yield;
   // the portal: tall columns flanking the mouth, standing on the face line, rising to the brow
   const brow = cave.lipTop.y - mouth.y;
   for (const s of [-1, 1]) {
@@ -416,6 +457,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
       n++;
     }
   }
+  if (tick.over()) yield;
   // the lintel: column ends standing out of the brow above the opening, fanned like the curved
   // columns over Fingal's Cave (axis = outward, tilted up more toward the sides)
   {
@@ -456,6 +498,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
       }
     }
   }
+  if (tick.over()) yield;
   // ---------------- the frozen tide pool on the cave floor + broken sea-ice plates ----------------
   {
     // a dense skin on the floor in front of the mouth (follows floorHeightAt; flush)
@@ -513,6 +556,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     break;
   }
 
+  if (tick.over()) yield;
   // ---------------- wreckage: the beachcombing hoard ----------------
   // an overturned clinker rowing boat (round 3: modelled strakes, keel, stem and stern posts, a
   // faded painted sheer strake and a staved-in hole), keel up on the snow, a drift banked on one side
@@ -544,6 +588,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
       props.push({ p: p.clone().setY(p.y + 0.6), r: 3.0, kind: 'boat' });
     }
   }
+  if (tick.over()) yield;
   // silver driftwood logs
   for (let i = 0; i < 4; i++) {
     const p = place(rnd.range(-14, 14), rnd.range(-15, -8));
@@ -596,6 +641,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     props.push({ p: p.clone().setY(p.y + 0.05), r: 0.5, kind: 'bones' });
   }
 
+  if (tick.over()) yield;
   // build the columns (one mesh), their snow, and the icicles (one instanced mesh: the cave
   // cinematic drops them in the icicle-shatter beat)
   if (cols.count) {
