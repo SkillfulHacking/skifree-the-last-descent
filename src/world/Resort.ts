@@ -26,6 +26,7 @@ import { LODGE, buildLodge } from './resort/lodge';
 import { aBoard, adirondack, bench, firePit, hotTub, lampPost, lightPole, lounger, paddedPost, pine, podium, shrub, signpost, skiRack, snowFence, snowman, stringLights, truss } from './resort/props';
 import { Banner, Glows, Particles, flameMaterial, waterMaterial } from './resort/fx';
 import { Guest, type GuestBehaviour, type GuestLook } from './resort/Guest';
+import type { FinishEnvironment } from './presentation/finish';
 
 export interface ResortOptions {
   quality: QualityPreset;
@@ -45,7 +46,8 @@ interface GuestSpec {
   beh: GuestBehaviour;
 }
 
-export class Resort {
+/** The "alpine-resort" finish environment (registered in src/world/presentation/alpine.ts). */
+export class Resort implements FinishEnvironment {
   readonly group = new THREE.Group();
   readonly trophy: THREE.Object3D;
   readonly finishZ: number;
@@ -747,6 +749,10 @@ export class Resort {
   }
   getHotTubCenter(target: THREE.Vector3): THREE.Vector3 {
     return target.copy(this.tubCenter);
+  }
+  /** FinishEnvironment: where the celebration happens (the hot tub). */
+  getCelebrationFocus(target: THREE.Vector3): THREE.Vector3 {
+    return this.getHotTubCenter(target);
   }
   getStopPoint(target: THREE.Vector3): THREE.Vector3 {
     return target.copy(this.stopPoint);
