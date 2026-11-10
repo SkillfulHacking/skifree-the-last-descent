@@ -102,9 +102,12 @@ test('keyboard, mouse and gamepad drive the course controls; the choice persists
   await boot(page);
   // Start is focused first
   await expect(page.locator('.menu-row.focus .label')).toHaveText('Start');
-  // keyboard: down to Length, right twice → Expedition
-  await press(page, 'ArrowDown');
-  await press(page, 'ArrowDown');
+  // keyboard: down to Length (found by its label: a Location row sits in between when more than
+  // one location exists), right twice → Expedition
+  for (let i = 0; i < 6; i++) {
+    if (((await page.locator('.menu-row.focus .label').textContent()) ?? '').includes('Length')) break;
+    await press(page, 'ArrowDown');
+  }
   await expect(page.locator('.menu-row.focus .label')).toContainText('Length');
   await press(page, 'ArrowRight');
   await press(page, 'ArrowRight');

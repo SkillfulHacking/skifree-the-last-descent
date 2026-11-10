@@ -846,12 +846,31 @@ export class GeneratedProfile implements CourseProfile {
 
   /** a take-off kicker on a spine and the gully past it, where the spine is furthest from the route */
   private addGap(a: AltRoute, rng: Rng) {
-    const lip = a.z0 + (a.z1 - a.z0) * rng.range(0.42, 0.58);
-    const x = this.altX(a, lip);
-    if (Math.abs(x - this.routeX(lip)) < 18) return; // too close to the main line to be a separate branch
+    const u = rng.range(0.42, 0.58);
     const height = rng.range(1.3, 1.6);
+    const len = rng.range(6.5, 7.5);
+    const depth = rng.range(1.7, 2.0);
+    // the take-off must be approached at full speed: no cliff drop or other kicker on the spine
+    // just before it (or just after the landing)
+    const clearAt = (lip: number) => {
+      const x = this.altX(a, lip);
+      if (Math.abs(x - this.routeX(lip)) < 18) return false; // too close to the main line to be a separate branch
+      for (const c of this.cliffs) if (c.z > lip - 90 && c.z < lip + 40 && x - this.centerX(c.z) > c.dMin - 8 && x - this.centerX(c.z) < c.dMax + 8) return false;
+      for (const k of this.kick) if (k.z > lip - 70 && k.z < lip + 40 && Math.abs(this.centerX(k.z) + k.d - this.altX(a, k.z)) < k.width * 0.5 + 8) return false;
+      return true;
+    };
+    let lip = NaN;
+    for (const v of [u, u - 0.12, u + 0.12, u - 0.24, u + 0.2]) {
+      const z = a.z0 + (a.z1 - a.z0) * v;
+      if (clearAt(z)) {
+        lip = z;
+        break;
+      }
+    }
+    if (!Number.isFinite(lip)) return;
+    const x = this.altX(a, lip);
     this.kick.push({ z: lip, d: x - this.centerX(lip), width: 8, height, run: 14 });
-    this.gaps.push({ z: lip + 3, len: rng.range(8, 10), x: this.altX(a, lip + 7), hw: 10, depth: rng.range(2.2, 2.7), lipZ: lip });
+    this.gaps.push({ z: lip + 1.5, len, x: this.altX(a, lip + 1.5 + len / 2), hw: 10, depth, lipZ: lip });
     this.gaps.sort((p, q) => p.z - q.z);
   }
 

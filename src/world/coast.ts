@@ -415,7 +415,9 @@ export class Coast {
       if (z < g.z || z > g.z + g.len) continue;
       const ax = Math.abs(x - g.x);
       if (ax > g.hw) continue;
-      const along = smoothstep(g.z, g.z + 2.2, z) * (1 - smoothstep(g.z + g.len - 2.2, g.z + g.len, z));
+      // a steep lip side, then a long ramp back up: still downhill on the slope, so a short jump
+      // lands hard on it instead of slamming into a wall
+      const along = smoothstep(g.z, g.z + 1.5, z) * (1 - smoothstep(g.z + 2, g.z + g.len, z));
       const across = 1 - smoothstep(g.hw - 5, g.hw, ax);
       d = Math.max(d, g.depth * along * across);
     }
