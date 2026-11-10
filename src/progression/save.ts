@@ -2,8 +2,14 @@
  * Versioned local progression save (achievements + statistics), stored separately from settings
  * and records under its own localStorage key.
  *
- * Format (see docs/PROGRESSION.md):
- *   { version, achievements: { <id>: { earnedAt } }, stats: { counters, sets }, ...unknownKeys }
+ * Format v2 (see docs/PROGRESSION.md):
+ *   { version: 2,
+ *     achievements: { <id>: { earnedAt } },
+ *     stats: { counters: { <stat>: number }, sets: { <stat>: string[] } },
+ *     cosmetics: { owned: { <itemId>: { at, source } }, equipped: { <category>: <itemId> } },
+ *     ...unknownKeys }
+ * History: v1 = achievements + stats (no cosmetics). v1 → v2 adds `cosmetics`, granting the
+ * rewards of achievements already earned.
  *
  * - Migrations run stepwise (MIGRATIONS[v] turns version v into v + 1) on load.
  * - Unknown achievement ids (removed definitions, or a newer build's) are preserved untouched.
@@ -12,15 +18,17 @@
  *   build never overwrites it (a downgrade must not destroy progress).
  * - Corrupt data is backed up under `<key>.corrupt` and the player starts fresh.
  */
-import { emptyStats, type EarnedMap, type ProgressStats } from './achievements';
+import { ACHIEVEMENTS, emptyStats, type EarnedMap, type ProgressStats } from './achievements';
+import { emptyCosmetics, grantRewards, type CosmeticsState } from './cosmetics';
 
 export const PROGRESS_KEY = 'skifree-tld.progress';
-export const PROGRESS_VERSION = 1;
+export const PROGRESS_VERSION = 2;
 
 export interface ProgressSave {
   version: number;
   achievements: EarnedMap;
   stats: ProgressStats;
+  cosmetics: CosmeticsState;
   /** unknown top-level keys from other builds, preserved */
   [extra: string]: unknown;
 }
@@ -30,11 +38,23 @@ export interface KV {
   setItem(k: string, v: string): void;
 }
 
-export const emptySave = (): ProgressSave => ({ version: PROGRESS_VERSION, achievements: {}, stats: emptyStats() });
+export const emptySave = (): ProgressSave => ({ version: PROGRESS_VERSION, achievements: {}, stats: emptyStats(), cosmetics: emptyCosmetics() });
 
 type Raw = Record<string, unknown>;
 /** MIGRATIONS[v]: version v → v + 1 (pure; input is a parsed object of version v). */
-export const MIGRATIONS: Record<number, (s: Raw) => Raw> = {};
+export const MIGRATIONS: Record<number, (s: Raw) => Raw> = {
+  // v1 → v2: cosmetics added; rewards of achievements earned under v1 are granted
+  1: (s) => {
+    const cosmetics = emptyCosmetics();
+    const earned = isObj(s.achievements) ? ACHIEVEMENTS.filter((a) => isObj((s.achievements as Raw)[a.id])) : [];
+    const at = (id: string) => {
+      const t = ((s.achievements as Raw)[id] as Raw).earnedAt;
+      return typeof t === 'number' && Number.isFinite(t) ? t : 0;
+    };
+    for (const a of earned) grantRewards(cosmetics, [a], at(a.id), 'migration');
+    return { ...s, cosmetics };
+  },
+};
 
 const isObj = (v: unknown): v is Raw => !!v && typeof v === 'object' && !Array.isArray(v);
 const MAX_SET = 1000;
@@ -53,7 +73,16 @@ export function sanitizeSave(raw: Raw): ProgressSave {
     for (const [k, v] of Object.entries(st.counters)) if (typeof v === 'number' && Number.isFinite(v) && v >= 0) stats.counters[k] = v;
   if (isObj(st.sets))
     for (const [k, v] of Object.entries(st.sets)) if (Array.isArray(v)) stats.sets[k] = [...new Set(v.filter((x): x is string => typeof x === 'string'))].slice(0, MAX_SET);
-  const out: ProgressSave = { ...raw, version: typeof raw.version === 'number' ? raw.version : PROGRESS_VERSION, achievements, stats };
+  const cosmetics = emptyCosmetics();
+  const cs = isObj(raw.cosmetics) ? raw.cosmetics : {};
+  if (isObj(cs.owned))
+    for (const [id, v] of Object.entries(cs.owned)) {
+      const at = isObj(v) ? v.at : undefined;
+      const source = isObj(v) && typeof v.source === 'string' ? v.source : 'unknown';
+      if (typeof at === 'number' && Number.isFinite(at) && at >= 0) cosmetics.owned[id] = { at, source };
+    }
+  if (isObj(cs.equipped)) for (const [cat, id] of Object.entries(cs.equipped)) if (typeof id === 'string') cosmetics.equipped[cat] = id;
+  const out: ProgressSave = { ...raw, version: typeof raw.version === 'number' ? raw.version : PROGRESS_VERSION, achievements, stats, cosmetics };
   return out;
 }
 

@@ -128,3 +128,17 @@ export function createSkierMaterials(
   const list = Object.values(m) as THREE.Material[];
   return { ...m, flutter, list };
 }
+
+/**
+ * Recolour the jacket in place (cosmetics): jacket, its sheen, the matching goggle strap and the
+ * contrasting stripe follow the same rules as createSkierMaterials. No shader recompile.
+ */
+export function setJacketColor(m: SkierMaterials, jacketColor: number): void {
+  const jc = new THREE.Color(jacketColor);
+  m.jacket.color.copy(jc);
+  const phys = m.jacket as THREE.MeshPhysicalMaterial;
+  if (phys.isMeshPhysicalMaterial) phys.sheenColor.copy(jc.clone().lerp(new THREE.Color(0xffffff), 0.45));
+  m.strap.color.copy(jc);
+  const lum = jc.r * 0.3 + jc.g * 0.59 + jc.b * 0.11;
+  m.stripe.color.set(lum > 0.7 ? 0x23262d : 0xf1efe8);
+}

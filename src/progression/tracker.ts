@@ -99,6 +99,17 @@ export class ProgressTracker {
     return true;
   }
 
+  /**
+   * An explicit player choice outside the award flow (equipping a cosmetic): applied to the saved
+   * state (and the working copy of a tracked run) and written straight away. Not subject to the
+   * run persist policy, which only governs what gameplay *awards*.
+   */
+  updateSaved(fn: (s: ProgressSave) => void): void {
+    fn(this.saved);
+    if (this.working) fn(this.working);
+    this.store?.write(this.saved);
+  }
+
   /** Is the run being tracked still allowed to persist? */
   get persisting(): boolean {
     return !!this.working && !this.tainted && !!this.store && this.persist();

@@ -42,3 +42,8 @@
 .ach-toast-kicker { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #ffd98a; }
 .ach-toast-name { font: 900 19px var(--display); letter-spacing: 0.04em; }
 .ach-toast-sub { font-size: 12px; color: var(--ink-dim); }
+
+/* locker */
+.locker .menu-row.kind-select .val { min-width: 170px; }
+.locker-locked { margin: 2px 0; }
+.locker-locked b { color: var(--ink); }

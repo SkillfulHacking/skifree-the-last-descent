@@ -21,6 +21,7 @@ import type { AutopilotStyle } from '../debug/autopilot';
 import { ProgressTracker } from '../progression/tracker';
 import { reconcileProgress, viewAchievements } from '../progression/achievements';
 import { browserStorage, loadProgress, writeProgress } from '../progression/save';
+import { COSMETIC_CATEGORY_LABEL, equip, getCosmetic, grantRewards, lockerItems, reconcileOwnership, resolveLoadout, skierLook } from '../progression/cosmetics';
 import { AchievementToast, achievementsGrid, achievementsSummary } from '../ui/achievementsView';
 
 type Mode = 'loading' | 'menu' | 'playing' | 'paused' | 'results';
@@ -189,7 +190,7 @@ export class App {
       this.loadingBar.style.width = `${(f * 100).toFixed(0)}%`;
       this.loadingLabel.textContent = label;
     });
-    this.skier = new SkierModel({ quality: q });
+    this.skier = new SkierModel({ quality: q, jacketColor: skierLook(this.progress.saved.cosmetics).jacketColor });
     this.yeti = new YetiModel({ quality: q });
     world.scene.add(this.skier.root, this.yeti.root);
     // cold rim light that makes the white beast read against white snow (always in the scene: no recompiles)
@@ -235,11 +236,59 @@ export class App {
     const loaded = loadProgress(kv);
     const store = loaded.readOnly ? null : { write: (sv: typeof loaded.save) => void writeProgress(kv, sv) };
     this.progressNote = loaded.readOnly ? 'saved by a newer version: read-only here' : this.debugHarness ? 'test mode (?debug): progress is not saved' : null;
-    // goals already met by stored statistics (achievements added in an update) are earned now
-    if (reconcileProgress(loaded.save.stats, loaded.save.achievements, Date.now()).length && store && !this.debugHarness) store.write(loaded.save);
-    this.progress = new ProgressTracker(loaded.save, store);
+    // goals already met by stored statistics (achievements added in an update) are earned now,
+    // and rewards of earned achievements are owned (rewards added in an update)
+    const sv = loaded.save;
+    const now = Date.now();
+    const changed = reconcileProgress(sv.stats, sv.achievements, now).length + reconcileOwnership(sv.cosmetics, Object.keys(sv.achievements), now).length;
+    if (changed && store && !this.debugHarness) store.write(sv);
+    this.progress = new ProgressTracker(sv, store, undefined, undefined, (w, earned, t) => void grantRewards(w.cosmetics, earned, t));
     this.toast = new AchievementToast(this.ui);
-    this.progress.onUnlock = (def, persisted) => this.toast.show(def.name, def.icon, persisted ? null : 'Test run: not saved');
+    this.progress.onUnlock = (def, persisted) => {
+      const reward = def.reward ? getCosmetic(def.reward) : undefined;
+      const sub = !persisted ? 'Test run: not saved' : reward ? `New ${COSMETIC_CATEGORY_LABEL[reward.category].toLowerCase()}: ${reward.name} (Locker)` : null;
+      this.toast.show(def.name, def.icon, sub);
+    };
+  }
+
+  /** Apply the equipped cosmetics to the skier model (visual only). */
+  private applyCosmetics() {
+    this.skier?.setJacketColor(skierLook(this.progress.saved.cosmetics).jacketColor);
+  }
+
+  private lockerScreen(): Screen {
+    const st = this.progress.saved.cosmetics;
+    const items = lockerItems(st, 'jacket');
+    const owned = items.filter((i) => i.owned);
+    const locked = items.filter((i) => !i.owned);
+    const worn = resolveLoadout(st).jacket!;
+    const lockedHtml = locked.length
+      ? `<h3>Locked</h3>${locked.map((i) => `<p class="menu-note locker-locked"><b>${i.def.name}</b> — earn <i>${i.unlockedBy?.name ?? 'a future achievement'}</i></p>`).join('')}`
+      : '<p class="menu-note">Every jacket unlocked.</p>';
+    return {
+      id: 'locker',
+      title: 'LOCKER',
+      subtitle: 'Cosmetic only: nothing here changes how the skier handles.',
+      cls: 'wide locker',
+      onBack: () => this.menu.pop(),
+      items: [
+        {
+          kind: 'select',
+          label: 'Jacket',
+          note: worn.description,
+          options: owned.map((i) => ({ value: i.def.id, label: i.def.name })),
+          get: () => resolveLoadout(this.progress.saved.cosmetics).jacket!.id,
+          set: (v) => {
+            this.progress.updateSaved((s) => void equip(s.cosmetics, v));
+            this.applyCosmetics();
+            this.menu.replace(this.lockerScreen());
+          },
+        },
+        { kind: 'info', html: lockedHtml },
+        { kind: 'info', html: '<p class="menu-note">More gear (helmets, goggles, skis, outfits, Yeti cosmetics, victory poses) will arrive with the biome and Daily rewards. See docs/PROGRESSION.md.</p>' },
+        { kind: 'button', label: 'Back', action: () => this.menu.pop() },
+      ],
+    };
   }
 
   /** Start evaluating achievements for the session's events (persist policy: a real, unassisted run). */
@@ -262,7 +311,8 @@ export class App {
       cls: 'wide achievements',
       onBack: () => this.menu.pop(),
       items: [
-        { kind: 'info', html: achievementsGrid(views) },
+        { kind: 'info', html: achievementsGrid(views, (id) => getCosmetic(id)?.name ?? null) },
+        { kind: 'button', label: 'Locker', hint: 'cosmetic jackets', action: () => this.menu.push(this.lockerScreen()) },
         { kind: 'button', label: 'Back', action: () => this.menu.pop() },
       ],
     };
