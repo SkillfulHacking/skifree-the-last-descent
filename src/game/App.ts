@@ -14,7 +14,7 @@ import { Hud } from '../ui/Hud';
 import { MenuSystem, type Screen, type MenuItem } from '../ui/Menu';
 import { applyRun, loadRecordBook, loadSettings, recordsFor, saveRecordBook, saveSettings, type RecordBook, type RunStats, type Settings, type Records } from '../core/settings';
 import type { QualityPreset } from '../core/types';
-import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
+import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, exampleCodes, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
 import { fmtDistance } from '../ui/Hud';
 import { getBiome, hasBiome, listBiomes } from '../world/biome';
 import { capabilitiesOf } from '../world/capabilities';
@@ -455,7 +455,7 @@ export class App {
             // keep what was typed and say why, right next to the field (E1)
             this.codeDraft = v.slice(0, 32);
             const esc = this.codeDraft.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
-            this.codeError = `“${esc}” is not a course code (or that day hasn't happened yet). Codes look like DAILY-${today}-STD, CLASSIC-END or SEED-1234-SPR-H.`;
+            this.codeError = `“${esc}” is not a course code (or that day hasn't happened yet). Codes look like ${exampleCodes(today)}.`;
             changed();
             return false;
           }
@@ -587,7 +587,7 @@ export class App {
     const html = `<div class="stats">
       ${row('Course', `${courseLabel(this.world!.course)}`)}
       ${row('Course code', `<span class="code">${id}</span> · seed ${stats.seed ?? this.world!.seed}`)}
-      ${row('Result', won ? 'Reached the resort' : stats.banked ? `Retired at refuge ${stats.checkpoints}` : endless ? `Caught after ${stats.checkpoints} refuge${stats.checkpoints === 1 ? '' : 's'}` : 'Caught by the Yeti')}
+      ${row('Result', won ? `Reached the ${this.world!.finishDef.goal ?? 'resort'}` : stats.banked ? `Retired at refuge ${stats.checkpoints}` : endless ? `Caught after ${stats.checkpoints} refuge${stats.checkpoints === 1 ? '' : 's'}` : 'Caught by the Yeti')}
       ${row('Score', stats.score.toLocaleString('en-US') + nb('score'))}
       ${row('Time', fmtTime(stats.time) + (won ? nb('time') : ''))}
       ${row('Distance', fmtDistance(stats.distance) + nb('distance'))}

@@ -73,6 +73,8 @@ export type SkierEvent =
   | { type: 'crash'; reason: string; intensity: number }
   | { type: 'pop' }
   | { type: 'recover' }
+  /** put back on the piste after going out of bounds (see SkierPhysics.relocate) */
+  | { type: 'relocate'; reason: string; x: number; z: number }
   | { type: 'trick'; name: string; points: number };
 
 export class SkierState {
@@ -187,7 +189,8 @@ export class SkierPhysics {
       q.surface = s.surface;
       q.t = s.time;
       this.env.sample(q, E);
-      if (E.crash && !s.crashed) this.crash(E.crash.reason, E.crash.intensity);
+      if (E.relocate) this.relocate(E.relocate.x, E.relocate.z, E.relocate.reason);
+      else if (E.crash && !s.crashed) this.crash(E.crash.reason, E.crash.intensity);
       else if (E.knock) this.knock(E.knock.keep, E.knock.wobble);
     }
 
@@ -683,6 +686,25 @@ export class SkierPhysics {
     s.vel.multiplyScalar(Math.exp(-1.5 * PHYS_DT));
     s.wobble = Math.max(s.wobble, 0.4);
     if (fresh || vn > 1.5) this.emit({ type: 'impact', kind: kind === 'tree-heavy' ? 'branch' : 'rock-light', intensity: clamp(vn / heavyAt, 0.1, 0.4), x: ox, z: oz });
+  }
+
+  /**
+   * Out of bounds (the location's rule, e.g. over a sea cliff's crest): put the skier back on the
+   * piste at (x, z), stopped and crashed (they get up facing downhill), keeping the run's stats.
+   */
+  relocate(x: number, z: number, reason: string) {
+    const s = this.s;
+    s.pos.set(x, this.mountain.heightAt(x, z), z);
+    s.vel.set(0, 0, 0);
+    s.grounded = true;
+    s.airTime = 0;
+    s.airSpin = 0;
+    s.pathSlope = 0;
+    s.touching.clear();
+    this.emit({ type: 'relocate', reason, x, z });
+    s.crashed = false;
+    this.crash(reason, 0.6);
+    s.heading = 0;
   }
 
   /** Struck by something (a Yeti snowball): keep `keep` of the speed and stagger. */

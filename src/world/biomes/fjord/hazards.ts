@@ -201,7 +201,7 @@ export const SCOURED_ROCK: HazardKind<RockParams> = {
     }
     // 2) across the racing line now and then: the fast line clips the patch's core; the way round
     //    on the other side stays inside the obstacle-free lane (LANE_HALF + 1.5)
-    if (ctx.rng.chance(0.45 * Math.min(1.5, ctx.density))) {
+    if (ctx.rng.chance(0.55 * Math.min(1.5, ctx.density))) {
       const z = ctx.z0 + ctx.rng.range(0.1, 0.9) * (ctx.z1 - ctx.z0);
       const r = ctx.rng.range(6.5, 8);
       const side = ctx.rng.chance(0.5) ? 1 : -1;

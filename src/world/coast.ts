@@ -19,7 +19,8 @@
  *
  * Sprint (≤ 4 km) has a single reach: from the summit you look straight down at the harbour.
  *
- * Convention: the sea is on −X (the skier's left when facing downhill). The rim is measured from
+ * Convention: the sea is on −X, the skier's RIGHT when facing downhill (the camera looks down +Z,
+ * so +X is on the left of the screen). The rim is measured from
  * the piste edge; the far shore and islands are placed in absolute x.
  */
 import { Rng, clamp, fbm, gnoise, ridged, smoothstep } from '../core/rng';
@@ -71,7 +72,7 @@ export interface Hamlet {
 
 /** A scenic viewpoint on the rim: optional, off the racing line, discovered by skiing into it. */
 export interface Lookout {
-  /** stable id within the course ("lookout-<n>", n counts down the course) */
+  /** stable id, unique per course and location ("vp-<world seed>-<length>-<z>") */
   readonly id: string;
   readonly n: number;
   readonly x: number;
@@ -79,6 +80,11 @@ export interface Lookout {
   /** discovery radius (m) */
   readonly r: number;
 }
+
+/** viewpoints: free stretches start this far down the run-in / past a refuge, end this far before a trigger */
+const LOOKOUT_RUNIN = 90;
+const LOOKOUT_AFTER_REFUGE = 170;
+const LOOKOUT_BEFORE_TRIGGER = 45;
 
 /** discovery radius of a viewpoint */
 export const LOOKOUT_RADIUS = 14;
@@ -104,7 +110,6 @@ export class Coast {
   private nextHamletReach = 0;
   private rng: Rng;
   private lookoutList: Lookout[] = [];
-  private lookoutZ = 380;
   /** terrain sampler (set by the Mountain) for placement checks */
   terrain: ((x: number, z: number) => number) | null = null;
   readonly finite: boolean;
@@ -329,23 +334,45 @@ export class Coast {
 
   // --- scenic viewpoints --------------------------------------------------------------------
   /**
-   * Viewpoints on the cliff rim overlapping [z0, z1]: every 0.95–1.5 km, away from cave shelves,
-   * refuges, the summit and the finish approach, inside the cornice zone's edge, never more than a
-   * gentle climb above the piste. Deterministic (generated in order down the course).
+   * Viewpoints on the cliff rim overlapping [z0, z1]. They sit only where nothing is chasing you,
+   * so exploring never costs the chase: the free run-in before the first cave's trigger, and the
+   * reprieve after each refuge before the next cave. One every 350–550 m of such a stretch (at least
+   * one per stretch), inside the cornice zone's edge, a gentle climb from the racing line.
+   * Deterministic (generated stretch by stretch, in order down the course).
    */
   lookouts(z0: number, z1: number): Lookout[] {
     const P = this.profile;
-    const end = this.finite ? this.finishZ - 420 : Infinity;
-    while (this.lookoutZ < Math.min(z1 + 400, end)) {
-      const rr = new Rng((this.seed ^ Math.imul(this.lookoutList.length + 3, 0x6b43a9b5) ^ Math.imul(Math.floor(this.lookoutZ), 0x27d4eb2d)) >>> 0);
-      let z = this.lookoutZ + rr.range(200, 500);
-      this.lookoutZ += rr.range(950, 1500);
-      if (z > end) break;
-      const busy = (q: number) => P.encounters(q - 400, q + 400).some((e) => q > e.caveZ - 360 && q < e.caveZ + 220) || P.checkpoints(q - 400, q + 400).some((c) => Math.abs(q - c) < 330);
+    while (this.lookoutStretch >= 0) {
+      const k = this.lookoutStretch;
+      const enc = P.encounters(-Infinity, Math.max(z1, 0) + 3000).filter((e) => e.index === k)[0];
+      if (!enc) {
+        // no more caves: a finite course ends in a chase to the finish (nothing more to place)
+        if (!P.endless) this.lookoutStretch = -1;
+        break;
+      }
+      const prev = k === 0 ? null : P.encounters(-Infinity, enc.caveZ).find((e) => e.index === k - 1);
+      const a = k === 0 ? LOOKOUT_RUNIN : (prev?.checkpointZ ?? prev?.chaseEndZ ?? enc.caveZ) + LOOKOUT_AFTER_REFUGE;
+      const b = enc.triggerZ - LOOKOUT_BEFORE_TRIGGER;
+      if (a > z1 + 400 && this.lookoutStretch > 0) break;
+      this.placeLookouts(k, a, b);
+      this.lookoutStretch++;
+      if (b > z1 + 400) break;
+    }
+    return this.lookoutList.filter((l) => l.z >= z0 && l.z <= z1);
+  }
+  private lookoutStretch = 0;
+
+  private placeLookouts(k: number, a: number, b: number) {
+    const P = this.profile;
+    if (b - a < 40) return;
+    const rr = new Rng((this.seed ^ Math.imul(k + 3, 0x6b43a9b5)) >>> 0);
+    const n = Math.max(1, Math.floor((b - a) / 450));
+    const lenTag = Number.isFinite(P.length) ? `${Math.round(P.length / 1000)}k` : 'inf';
+    for (let j = 0; j < n; j++) {
+      let z = a + ((j + rr.range(0.3, 0.7)) / n) * (b - a);
       let ok = false;
-      for (let k = 0; k < 6 && !ok; k++) {
-        if (k > 0) z += 70;
-        if (busy(z)) continue;
+      for (let t = 0; t < 7 && !ok; t++) {
+        if (t > 0) z = a + ((j + rr.range(0.05, 0.95)) / n) * (b - a);
         const x = this.rimX(z) + LOOKOUT_INSET;
         const H = this.terrain;
         if (!H) {
@@ -356,13 +383,14 @@ export class Coast {
         const rx = P.routeX(z);
         const rise = H(x, z) - H(rx, z);
         const dist = rx - x;
-        if (dist > 20 && dist < 110 && rise < 14 && rise / dist < 0.2) ok = true;
+        if (dist > 20 && dist < 110 && rise < 9 && rise / dist < 0.15) ok = true;
       }
       if (!ok) continue;
-      const n = this.lookoutList.length;
-      this.lookoutList.push({ id: `lookout-${n}`, n, x: this.rimX(z) + LOOKOUT_INSET, z, r: LOOKOUT_RADIUS });
+      const n0 = this.lookoutList.length;
+      // unique per course and location: the world seed mixes in the biome; the length and z name the spot
+      const id = `vp-${(this.seed >>> 0).toString(36)}-${lenTag}-${Math.round(z)}`;
+      this.lookoutList.push({ id, n: n0, x: this.rimX(z) + LOOKOUT_INSET, z, r: LOOKOUT_RADIUS });
     }
-    return this.lookoutList.filter((l) => l.z >= z0 && l.z <= z1);
   }
 
   // --- gap jumps ------------------------------------------------------------------------------

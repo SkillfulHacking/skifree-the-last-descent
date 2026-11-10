@@ -10,7 +10,9 @@
  *                    without changing their speed; edging (braking) resists it, tuck/drift add to it;
  *  - out.balance   → minimum wobble while grounded (gusts, rough ground);
  *  - out.knock     → speed loss + stagger (once, like a snowball hit);
- *  - out.crash     → a crash with that reason.
+ *  - out.crash     → a crash with that reason;
+ *  - out.relocate  → out of bounds (e.g. over a sea cliff's crest): the skier falls and is put back
+ *                    on the piste at (x, z), crashed, so the run goes on (no invisible failure zone).
  *
  * With no environment (null) or an identity one (Alpine), the output is bit-identical to the
  * original physics. Pure: no three.js.
@@ -44,6 +46,7 @@ export interface EnvSample {
   balance: number;
   knock: { keep: number; wobble: number } | null;
   crash: { reason: string; intensity: number } | null;
+  relocate: { x: number; z: number; reason: string } | null;
 }
 
 export interface PhysicsEnvironment {
@@ -53,7 +56,7 @@ export interface PhysicsEnvironment {
 }
 
 export function makeEnvSample(): EnvSample {
-  return { surface: { ...IDENTITY_SURFACE }, airAccelX: 0, airAccelZ: 0, groundSlipX: 0, groundSlipZ: 0, balance: 0, knock: null, crash: null };
+  return { surface: { ...IDENTITY_SURFACE }, airAccelX: 0, airAccelZ: 0, groundSlipX: 0, groundSlipZ: 0, balance: 0, knock: null, crash: null, relocate: null };
 }
 
 export function makeEnvQuery(): EnvQuery {

@@ -8,6 +8,7 @@
  * event bus (achievements, stats, audio cues) can subscribe without the environment knowing about
  * it. Alpine produces surface-change events only (it has no hazards and calm physics).
  */
+import { smoothstep } from '../../core/rng';
 import type { SurfaceType } from '../../core/types';
 import type { Mountain } from '../course';
 import type { EnvQuery, EnvSample, PhysicsEnvironment } from '../../physics/environment';
@@ -36,6 +37,13 @@ export type EnvironmentEvent =
   | { type: 'hazard-passed'; hazard: HazardInstance; kind: string; hit: boolean; entered: boolean; closest: number; t: number };
 
 export type EnvironmentListener = (e: EnvironmentEvent) => void;
+
+/**
+ * Sea-cliff rim guard (coastal locations): the onshore updraft (m/s², airborne) over the last
+ * `reach` metres before the crest; past the crest by `over` m (grounded, or `drop` m below the
+ * crest in the air) the skier is out of bounds and goes back to the route `back` m upslope.
+ */
+export const RIM_GUARD = { reach: 16, updraft: 30, over: 1.5, drop: 10, back: 6 } as const;
 
 /** how far ahead (m) a periodic hazard's telegraph/active transitions are reported */
 export const HAZARD_ALERT_RANGE = 150;
@@ -132,6 +140,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     }
     out.knock = null;
     out.crash = null;
+    out.relocate = null;
     if (this.physicsIdentity) {
       // Alpine: leave the sample at identity (it never changes from makeEnvSample)
       return;
@@ -174,6 +183,18 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     out.groundSlipX = q.grounded && !q.crashed ? px : 0;
     out.groundSlipZ = q.grounded && !q.crashed ? pz : 0;
     out.balance = q.grounded ? cpl.balance * gust : 0;
+    // 4) a sea coast's rim: the cornice (surface model) stops a grounded skier; in the air, the
+    //    updraft off the cliff pushes back onshore, and anyone who still ends up over the crest is
+    //    put back on the piste (crashed, with a cue) — never stranded on the cliff
+    const coast = this.mountain.coast;
+    if (coast && !q.crashed) {
+      const b = coast.beyondRim(q.x, q.z);
+      if (!q.grounded && b > -RIM_GUARD.reach) out.airAccelX += RIM_GUARD.updraft * smoothstep(-RIM_GUARD.reach, 0, b);
+      if (b > RIM_GUARD.over && (q.grounded || q.y < this.mountain.heightAt(coast.rimX(q.z), q.z) - RIM_GUARD.drop)) {
+        const z = q.z - RIM_GUARD.back;
+        out.relocate = { x: this.mountain.routeX(z), z, reason: 'over the cornice' };
+      }
+    }
   }
 
   /** wind x/z (m/s, airborne coupling) and grounded side-slip x/z (m/s) from hazards this step */

@@ -5,6 +5,10 @@
 import * as THREE from 'three';
 import type { Encounter, Sighting } from '../world/course';
 import { DIFFICULTY } from './CourseConfig';
+import { capabilitiesOf } from '../world/capabilities';
+
+/** style points for discovering a scenic viewpoint (they sit outside the chases: exploring is free) */
+export const VIEWPOINT_POINTS = 500;
 import { PHYS_DT, SkierPhysics, type SkierEvent, type SkierInput, DRIFT_MIN_SPEED } from '../physics/SkierPhysics';
 import { YetiAI } from '../yeti/YetiAI';
 import { RunState } from './RunState';
@@ -388,6 +392,10 @@ export class GameSession implements Stage {
     }
     this.telemetry.step(s, PHYS_DT);
     this.checkLookouts();
+    if (this.pendingSurfCaption && s.time > 4 && this.run.controllable) {
+      this.pendingSurfCaption = false;
+      this.envCaption('[surf booms against the cliffs far below]', 3);
+    }
 
     // tutorial bookkeeping
     if (this.run.phase === 'learn') {
@@ -450,10 +458,13 @@ export class GameSession implements Stage {
     this.seenSightings.add(sg.z);
     const m = this.world.mountain;
     const z = sg.z + 160;
-    const x = m.centerX(z) + sg.side * (m.halfWidth(z) + 140);
+    // on a coast the other side is the sea: the Yeti howls from the land side (+X)
+    const side = m.coast ? 1 : sg.side;
+    const x = m.centerX(z) + side * (m.halfWidth(z) + 140);
     const p = new THREE.Vector3(x, m.heightAt(x, z) + 4, z);
     this.audio.playYetiGrowl(p, true);
-    this.hud.caption(sg.side > 0 ? '[a howl from the ridge to your right]' : '[a howl from the ridge to your left]', 3);
+    // facing downhill (+Z), +X is on the skier's LEFT
+    this.hud.caption(side > 0 ? '[a howl from the ridge to your left]' : '[a howl from the ridge to your right]', 3);
   }
 
   private mouthOf(e: Encounter): THREE.Vector3 {
@@ -472,9 +483,14 @@ export class GameSession implements Stage {
     this.world.focusEncounter = null;
     this.audio.setMusicMode('explore');
     if (this.endless) this.hud.title(`REFUGE ${this.run.checkpointsReached}`, `Run banked: ${this.banked.toLocaleString('en-US')} pts. Retire from the pause menu, or push on.`, 'intro', 4);
-    else this.hud.title(`REFUGE ${this.run.checkpointsReached}`, 'The Yeti lost your trail… for now. The resort is still a long way down.', 'intro', 4);
+    else this.hud.title(`REFUGE ${this.run.checkpointsReached}`, `${this.refugeName} reached. The Yeti lost your trail… for now. The ${this.world.finishDef.goal ?? 'resort'} is still a long way down.`, 'intro', 4);
     this.hud.caption('[a furious howl fades behind you]', 3);
     this.audio.playUiMove();
+  }
+
+  /** what refuges are called here ("Coastal shelter", "Ski patrol cabin") */
+  private get refugeName(): string {
+    return capabilitiesOf(this.world.biome).refuge.name;
   }
 
   /** Endless: score safely banked at the last refuge */
@@ -562,6 +578,13 @@ export class GameSession implements Stage {
         this.cleanTime = 0;
         break;
       case 'recover':
+        break;
+      case 'relocate':
+        // out of bounds (over a sea cliff's crest): back on the piste, with a clear cue
+        this.prevPos.copy(s.pos);
+        this.follow.snap(this.followTarget());
+        this.hud.title('BACK ON THE PISTE', 'You went over the cornice. Keep inside the cairns along the cliff.', 'intro', 3);
+        this.hud.caption('[you tumble over the cornice — back on the piste]', 3);
         break;
       case 'trick':
         this.style += Math.round(e.points * this.multiplier);
@@ -690,6 +713,7 @@ export class GameSession implements Stage {
   }
 
   // --- location events (scenic viewpoints, hazards) ----------------------------------
+  // (VIEWPOINT_POINTS: see the top of the file)
   /** viewpoints discovered this run (once per run per id) */
   readonly discovered = new Set<string>();
   private envOff: (() => void) | null = null;
@@ -702,8 +726,30 @@ export class GameSession implements Stage {
         if (!e.hit && (e.kind !== 'scoured-rock' || !e.entered)) this.reportHazardSurvived(e.kind);
       } else if (e.type === 'hazard-telegraph' || e.type === 'hazard-active' || e.type === 'hazard-hit') {
         if (e.cue) this.audio.playCue(e.cue, new THREE.Vector3(e.hazard.x, e.hazard.y + 2, e.hazard.z));
-      } else if (e.type === 'hazard-enter' && e.kind === 'scoured-rock') this.audio.playCue('rock-scrape', null);
+        if (e.type === 'hazard-telegraph' && e.kind === 'sea-gust') {
+          // captioned like the Yeti's cues (the windsock alone is easy to miss at speed)
+          const lane = ((e.hazard.params as { slip?: number }).slip ?? 0) > 0;
+          this.envCaption(lane ? '[a squall builds off the sea — it will push you left]' : '[a squall gusts across the jump ahead]', 2.4);
+        }
+      } else if (e.type === 'hazard-enter' && e.kind === 'scoured-rock') {
+        this.audio.playCue('rock-scrape', null);
+        this.envCaption('[skis scrape over bare rock]', 1.6);
+      }
     });
+    // the sea below: the coastal ambience is captioned once per run
+    if (capabilitiesOf(this.world.biome).audio.ambience.includes('surf')) this.pendingSurfCaption = true;
+  }
+
+  private pendingSurfCaption = false;
+  private envCaptionAt = -Infinity;
+  /**
+   * Caption a location sound (squall, rock, surf, viewpoint). Never replaces a caption that is
+   * still on screen (the Yeti's cues come first) and at most one every 3 s.
+   */
+  private envCaption(text: string, seconds: number) {
+    const t = this.phys.s.time;
+    if (t - this.envCaptionAt < 3) return;
+    if (this.hud.caption(text, seconds, { soft: true })) this.envCaptionAt = t;
   }
 
   /** Optional viewpoints on a coast's rim: reaching one reports ScenicLocationDiscovered once per run. */
@@ -715,10 +761,12 @@ export class GameSession implements Stage {
       if (this.discovered.has(l.id) || Math.hypot(s.pos.x - l.x, s.pos.z - l.z) > l.r || s.crashed) continue;
       this.discovered.add(l.id);
       this.reportScenicDiscovered(l.id);
-      const pts = 250;
+      const pts = VIEWPOINT_POINTS;
       this.style += pts;
       this.hud.popTrick('VIEWPOINT DISCOVERED', pts);
       this.audio.playCue('viewpoint', null);
+      this.envCaptionAt = -Infinity;
+      this.envCaption('[gulls cry over open water — a viewpoint]', 2.4);
     }
   }
 

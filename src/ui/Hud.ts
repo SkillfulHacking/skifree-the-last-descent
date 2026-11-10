@@ -175,12 +175,17 @@ export class Hud {
 
   captionsOn = true;
   private capTimer = 0;
-  /** Closed caption for important non-speech sounds. */
-  caption(text: string, seconds = 2.2) {
-    if (!this.captionsOn) return;
+  /**
+   * Closed caption for important non-speech sounds. `soft`: only if no caption is showing (lower
+   * priority location sounds never hide a Yeti cue). Returns whether it was shown.
+   */
+  caption(text: string, seconds = 2.2, opts: { soft?: boolean } = {}): boolean {
+    if (!this.captionsOn) return false;
+    if (opts.soft && this.capTimer > 0) return false;
     this.cap.textContent = text;
     this.cap.classList.add('on');
     this.capTimer = seconds;
+    return true;
   }
 
   clearCaption() {

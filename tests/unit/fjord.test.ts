@@ -198,7 +198,8 @@ describe('Fjord Coast: 50 km without repeats', () => {
       expect(same).toBeLessThan(Math.max(3, land * 0.25));
     }
     expect(c.hamlets(0, 50000).length).toBeGreaterThan(12);
-    expect(c.lookouts(0, 50000).length).toBeGreaterThan(25);
+    // a viewpoint in the run-in and in every reprieve after a refuge (never inside a chase)
+    expect(c.lookouts(0, 50000).length).toBeGreaterThanOrEqual(m.profile.encounters(-Infinity, 50000).length);
   });
 });
 
@@ -226,7 +227,10 @@ describe('Fjord Coast: physics (cornice guard, crosswind)', () => {
 
   it('the cornice only acts near the rim: the piste and the inland side ski like Alpine', () => {
     const e = env();
+    const rocks = collectPlacements(m, worldSeed(course('standard')), [getHazardKind('sea-gust'), getHazardKind('scoured-rock')], 1, 0, 10000).filter((h) => h.kind === 'scoured-rock');
     for (let z = 300; z < 9000; z += 211) {
+      // (scoured rock patches are hazards, not the surface model: skip points on one)
+      if (rocks.some((h) => Math.hypot(m.routeX(z) - h.x, z - h.z) < h.r + 1)) continue;
       const s = probe(e, m.routeX(z), z, 1, 20).sample.surface;
       expect(s.dragAdd).toBe(0);
       expect(s.friction).toBe(1);
@@ -275,7 +279,7 @@ describe('Fjord Coast: hazards', () => {
   const gust = getHazardKind('sea-gust');
   const rock = getHazardKind('scoured-rock');
 
-  it('placement is deterministic; squalls sit on jumps; rock patches are beside (never on) the racing line', () => {
+  it('placement is deterministic; squalls sit on jumps or across exposed stretches of the line; rock on the line always leaves a way round', () => {
     const a = collectPlacements(m, seed, [gust, rock], 1, 0, 10000);
     const b = collectPlacements(m, seed, [gust, rock], 1, 0, 10000);
     expect(a).toEqual(b);
@@ -284,10 +288,18 @@ describe('Fjord Coast: hazards', () => {
     expect(gusts.length).toBeGreaterThan(3);
     expect(rocks.length).toBeGreaterThan(10);
     for (const r of rocks) {
-      expect(Math.abs(r.x - m.routeX(r.z)) - r.r).toBeGreaterThan(LANE_HALF);
       expect(Math.abs(r.x - m.centerX(r.z))).toBeLessThan(m.halfWidth(r.z));
+      // the far side of the patch from the line leaves ≥ 2.5 m of the obstacle-free lane clear
+      const d = Math.abs(r.x - m.routeX(r.z));
+      if (d < r.r) expect(LANE_HALF + 1.5 - (r.r - d)).toBeGreaterThan(2.5);
     }
     for (const g of gusts) {
+      const slip = (g.params as { slip: number }).slip;
+      if (slip > 0) {
+        // a squall lane spans the racing line
+        expect(Math.abs(g.x - m.routeX(g.z))).toBeLessThan(g.r * 0.5);
+        continue;
+      }
       const k = m.profile.kickersNear(g.z - 30, g.z + 5, []);
       const cl = m.profile.cliffsNear(g.z - 30, g.z + 5, []);
       expect(k.length + cl.length).toBeGreaterThan(0);
@@ -369,13 +381,13 @@ describe('Fjord Coast: optional viewpoints', () => {
       const m = mtn(len);
       const c = m.coast!;
       const list = c.lookouts(0, m.finishZ);
-      expect(list.length, len).toBeGreaterThanOrEqual(len === 'sprint' ? 1 : 4);
+      expect(list.length, len).toBeGreaterThanOrEqual(m.profile.encounters(-Infinity, m.finishZ).length);
       expect(new Set(list.map((l) => l.id)).size).toBe(list.length);
       const seed = worldSeed(course(len));
       for (const l of list.slice(0, 6)) {
         const lane = Math.abs(l.x - m.routeX(l.z));
         expect(lane).toBeGreaterThan(LANE_HALF + LOOKOUT_RADIUS); // the racing line never passes through one
-        expect(m.heightAt(l.x, l.z) - m.heightAt(m.routeX(l.z), l.z)).toBeLessThan(14);
+        expect(m.heightAt(l.x, l.z) - m.heightAt(m.routeX(l.z), l.z)).toBeLessThan(9);
         expect(c.guard(l.x, l.z)).toBe(0); // outside the cornice
         const band = generateBand(m, seed, Math.floor(l.z / BAND));
         for (const o of band) if (o.kind === 'tree' || o.kind === 'boulder') expect(Math.hypot(o.x - l.x, o.z - l.z)).toBeGreaterThan(10);
