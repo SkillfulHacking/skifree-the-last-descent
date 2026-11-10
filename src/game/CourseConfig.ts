@@ -175,6 +175,21 @@ function parseBaseCourseId(s: string): CourseConfig | null {
   return null;
 }
 
+/**
+ * A course code as a URL query parameter (`course=CLASSIC-SPR%40FJORD`). The location separator
+ * '@' (and anything else) is percent-encoded, so codes survive share links and query strings.
+ * Nothing in the game puts codes in URLs yet; use these two helpers when something does.
+ */
+export function courseCodeQuery(c: CourseConfig, key = 'course'): string {
+  return `${encodeURIComponent(key)}=${encodeURIComponent(courseId(c))}`;
+}
+
+/** The course named by a query string's `key` parameter (null if absent or not a valid code). */
+export function courseFromQuery(search: string, key = 'course'): CourseConfig | null {
+  const v = new URLSearchParams(search).get(key);
+  return v ? parseCourseId(v) : null;
+}
+
 export function courseLabel(c: CourseConfig): string {
   const name = c.mode === 'daily' ? `Daily Mountain · ${c.date} (UTC)` : c.mode === 'custom' ? `Custom seed “${c.customText}”` : 'The Last Descent';
   const d = c.difficulty && c.difficulty !== 'normal' ? ` · ${DIFFICULTY[c.difficulty].label}` : '';

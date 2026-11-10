@@ -31,7 +31,7 @@ export function hazardReserved(m: Mountain, x: number, z: number, r: number): bo
   const ad = Math.abs(x - m.centerX(z));
   const fz = P.finishZ;
   if (Number.isFinite(fz) && z + r > fz - 120 && ad - r < 160) return true; // finish approach, chute & finish area
-  if (z - r < 60 && z + r > -80 && ad - r < 50) return true; // start platform & run-in
+  if (z - r < 60) return true; // summit, start platform & run-in (also keeps the menu view clean)
   if (P.checkpoints(z - 160, z + 160).some((c) => Math.abs(z - c) < 140 + r && ad - r < 120)) return true; // refuges
   for (const e of P.encounters(z - 120, z + 120)) {
     const a = e.anchor;
