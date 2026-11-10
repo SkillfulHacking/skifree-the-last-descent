@@ -127,7 +127,7 @@ export class Hud {
 
   setSkipHint(text: string | null) {
     this.skipHint.classList.toggle('hidden', !text);
-    if (text) this.skipHint.textContent = text;
+    if (text) this.skipHint.innerHTML = text; // text carries <kbd> glyph markup from g()
   }
 
   g(a: Action): string {

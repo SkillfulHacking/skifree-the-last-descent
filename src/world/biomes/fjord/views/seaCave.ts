@@ -18,7 +18,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
   group.name = 'FjordSeaCave';
   const rnd = new Rand(31337 + Math.round(c.anchor.z));
   const K = kitMaterials();
-  const basalt = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, flatShading: true });
+  const basalt = new THREE.MeshStandardMaterial({ vertexColors: true, color: 0x4a4a4a, roughness: 0.7, metalness: 0.05, flatShading: true });
   const ice = new THREE.MeshPhysicalMaterial({ color: 0xcfe8ff, roughness: 0.08, transmission: 0.0, transparent: true, opacity: 0.85, emissive: 0x16304a, emissiveIntensity: 0.25 });
   const net = new THREE.MeshStandardMaterial({ color: 0x3f5f4a, roughness: 0.9, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
   const M: Record<string, THREE.Material> = { ...K, basalt, ice };

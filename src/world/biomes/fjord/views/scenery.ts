@@ -36,6 +36,7 @@ export class FjordScenery implements SceneryView {
   private ships: Array<{ obj: THREE.Group; reach: number; x: number; z0: number; z1: number; speed: number; phase: number; level: number }> = [];
   private shipGeo: THREE.Mesh[] = [];
   private hi: boolean;
+  private terrainU: SceneryContext['terrain'];
   private time = 0;
 
   constructor(private ctx: SceneryContext) {
@@ -45,6 +46,7 @@ export class FjordScenery implements SceneryView {
     this.m = ctx.mountain;
     this.hi = ctx.quality === 'high' || ctx.quality === 'ultra';
     this.group.name = 'FjordScenery';
+    this.terrainU = ctx.terrain;
     this.water = new FjordWater(coast, ctx.terrain, ctx.sunDir, new THREE.Color(...ctx.biome.ranges.skyColor), ctx.quality);
     this.group.add(this.water.group);
     this.mist = new SeaMist(coast, ctx.mountain, ctx.sunDir, ctx.quality);
@@ -170,6 +172,8 @@ export class FjordScenery implements SceneryView {
   update(dt: number, time: number, f: SceneryFrame): void {
     this.time += dt;
     this.water.update(time, f.camPos, f.origin);
+    // clear skies: only thin, high cloud shadows drift over the snow (cinematics may still dim)
+    if (this.terrainU.uCloudShadow.value === 1) this.terrainU.uCloudShadow.value = 0.45;
     this.mist.update(time, f.camPos);
     for (const s of this.ships) {
       const span = s.z1 - s.z0;
