@@ -707,7 +707,9 @@ export class Harbour implements FinishEnvironment {
       const base = { hatColor: 0xffffff, hatColor2: 0xffffff, scarf: null, fur: null, gloves: null, mug: null, mugColor: 0xffffff, beard: false } as const;
       const look: GuestLook = { ...base, male: true, height: 1.86, skin: 0xe8b898, hair: 0xb8b0a0, hairStyle: 'short', headwear: 'beanie', hatColor: 0x1f3554, hatColor2: 0x1f3554, top: 'parka', topColor: 0xe8b21e, accent: 0x6b4a10, pants: 'ski', pantsColor: 0x1d2838, boots: 'snow', bootColor: 0x1a1a1a, gloves: 0x2a2a2a, lips: 0xa0605a, eyes: 0x4a6a8a, beard: true };
       const pTop = this.presentAt.y + 0.55;
-      const g = new Guest(look, { cheerStyle: 'armsUp', canWalk: false, seed: 263, waveArm: 'R', energy: 0.6 }, guestMat, () => pTop);
+      const pa = this.presentAt.clone();
+      // on his crates, or on the ground when the victory script brings him to the skier
+      const g = new Guest(look, { cheerStyle: 'armsUp', canWalk: false, seed: 263, waveArm: 'R', energy: 0.6 }, guestMat, (x, z) => (Math.hypot(x - pa.x, z - pa.z) < 1.4 ? pTop : ground(x, z)));
       g.place(this.presentAt.x, this.presentAt.z, Math.atan2(this.stop.x - this.presentAt.x, this.stop.z - this.presentAt.z), null);
       this.presenter = g;
       this.guests.push(g);
@@ -851,6 +853,7 @@ export class Harbour implements FinishEnvironment {
     this.plunger.group.position.copy(this.plungerHome);
     this.splashT = -1;
     this.ring.visible = false;
+    this.presenter.place(this.presentAt.x, this.presentAt.z, Math.atan2(this.stop.x - this.presentAt.x, this.stop.z - this.presentAt.z), null);
   }
 
   dispose(): void {

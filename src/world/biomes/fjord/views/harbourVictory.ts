@@ -77,8 +77,11 @@ export class HarbourVictory implements VictoryScript {
       ya.pos.set(p.x, m.heightAt(p.x, p.z), p.z);
     }
     const rack = h.rack ? h.rack.clone() : this.yetiStop.clone().add(new THREE.Vector3(3, 0, 2));
+    // where the harbourmaster stands for the presentation: on his crates by default; at the beat he
+    // steps up face to face with the skier wherever (and however turned) the skier came to rest
     const presentAt = h.presentAt ? h.presentAt.clone() : F.clone().add(new THREE.Vector3(-5.5, 0, 38.5));
-    const presHead = () => presentAt.clone().add(new THREE.Vector3(0, 0.55 + 1.75, 0));
+    let presTop = 0.55;
+    const presHead = () => (h.presenter ? h.presenter.position.clone().add(new THREE.Vector3(0, 1.75, 0)) : presentAt.clone().add(new THREE.Vector3(0, presTop + 1.75, 0)));
     const yetiHead = () => st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.5, 0));
 
     // 1) onto the quay: low tracking at ski height, houses sliding past, to the stop
@@ -207,8 +210,18 @@ export class HarbourVictory implements VictoryScript {
     tl.at(7.3, () => ((this.yetiState = 'leave'), (this.yetiT = 0), st.setYetiMode('turnAway')));
     // the presentation
     tl.at(B.present, () => {
+      if (h.presenter) {
+        const s0 = sk();
+        const hd = st.skier.root.rotation.y;
+        const f = new THREE.Vector3(Math.sin(hd), 0, Math.cos(hd));
+        const at = s0.clone().addScaledVector(f, 3.0);
+        h.presenter.place(at.x, at.z, Math.atan2(s0.x - at.x, s0.z - at.z), null);
+        presTop = 0;
+        presentAt.copy(h.presenter.position);
+        // he already holds the lighthouse as the shot opens
+        h.presenter.handWorld('R', this.trophyFrom);
+      } else r.trophy.getWorldPosition(this.trophyFrom);
       this.presentT = 0;
-      r.trophy.getWorldPosition(this.trophyFrom);
       if (r.trophy.parent !== st.world.scene) st.world.scene.attach(r.trophy);
       st.audio.playCrowdCheer(0.8);
     });

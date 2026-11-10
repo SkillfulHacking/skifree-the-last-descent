@@ -53,19 +53,31 @@ async function shot(name, note) {
   manifest.shots.push({ name, note, camera: st.cam, phase: st.s?.phase ?? 'menu', z: st.s?.z ?? null, cinematicTime: st.s?.cinematicTime ?? null, course: st.course?.id });
   log('shot', name);
 }
-/** frames until a predicate on the session state holds (deterministic 1/30 s steps) */
-async function framesUntil(pred, max = 900) {
+/**
+ * frames until a predicate on the session state holds (deterministic 1/30 s steps). With
+ * `finishTick`, the finish environment is animated on the same clock (the held harness does not
+ * run App's per-frame finish update, so guests, the plunge, boats and the trophy presenter would
+ * otherwise stand still in the victory captures).
+ */
+async function framesUntil(pred, max = 900, finishTick = false) {
   return ev(
-    ([src, max]) => {
+    ([src, max, tick]) => {
       const f = new Function('s', `return (${src})(s);`);
+      const w = window.__skifree.world?.();
+      const fin = tick && w ? w.resort : null;
+      window.__evT = window.__evT ?? 0;
       for (let i = 0; i < max; i++) {
         const s = window.__skifree.state().session;
         if (f(s)) return { ok: true, i, s };
         window.__skifree.frames(1);
+        if (fin) {
+          window.__evT += 1 / 30;
+          fin.update(1 / 30, window.__evT, { cheer: 1, lookAt: null, welcome: 1 });
+        }
       }
       return { ok: false, s: window.__skifree.state().session };
     },
-    [pred.toString(), max],
+    [pred.toString(), max, finishTick],
   );
 }
 const freeCam = (pos, look, fov = 50) => ev(([p, l, f]) => window.__skifree.freeCam(p, l, f), [pos, look, fov]);
@@ -290,7 +302,7 @@ if (G.finite && (want('finish') || want('victory'))) {
           ];
     const onlyBeats = process.env.BEATS ? process.env.BEATS.split(',') : null;
     for (const [t, name, note] of beats) {
-      await framesUntil(`(s) => s.cinematicTime >= ${t}`, 900);
+      await framesUntil(`(s) => s.cinematicTime >= ${t}`, 900, biome !== 'alpine');
       if (onlyBeats && !onlyBeats.includes(name)) continue;
       await settle(1500);
       await shot(name, note);
