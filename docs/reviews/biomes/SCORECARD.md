@@ -37,5 +37,26 @@ lights; missing water on far fjord arms (Expedition/Endless); viewpoints all ins
 cliff soft-lock over the cornice; Fjord harder than Alpine for non-experts because of flatter,
 powder-heavier terrain; Fjord-specific branches/gaps missing.
 
+### Round 2 — build `aec1812` — **FAIL** (all six reviewers; large improvement)
+
+| Category | A | B | C | D | E | F | Gate |
+|---|---|---|---|---|---|---|---|
+| Visual art direction | **7** | 7.5 (lc) | 7 | 7.5 (lc) | 8 (lc) | 6.5 | ✗ |
+| Environmental uniqueness | **7.5** | 7.5 | 7.5 | 8.5 (lc) | 8.5 (lc) | 7 | ✗ |
+| Skiing and hazard mechanics | 6.5 (lc) | **8** | 7 (lc) | 8 (lc) | 8.5 | 5.5 | ✗ |
+| Difficulty and fairness | 7 (lc) | **7.5** | 7 (lc) | 8 (lc) | 8 | 5 | ✗ |
+| Cinematics | 7 | n/a | **7** | 8 (lc) | 8 (lc) | 6.5 | ✗ |
+| Performance and stability | 7 (lc) | 8 (lc) | 7 (lc) | **7.5** | 8 | 7 (lc) | ✗ |
+| Accessibility and controls | 7.5 (lc) | 8 (lc) | 7 (lc) | 7.5 (lc) | **8.5** | 7.5 (lc) | ✗ |
+| Overall player experience | 7 | 7.5 | 7 | 7.5 (lc) | 8 | **6** | ✗ |
+
+Fixed (verified by reviewers): sky artefact, cliff soft-lock, viewpoints inside chases, scenery
+hitches (mostly), streamed lights, far-arm water, captions, wording, code input, flat starts, après set.
+Remaining: difficulty ladder inverted on fresh seeds (Fjord easier than Alpine at Standard+);
+viewpoint placement bug + only one viewpoint per course; signature mechanic still slight; cave
+encounter still Alpine choreography/shape with no sea; cliff crest cones/smearing/snow strip; far-field
+faceting; harbour water edge; trophy floating; fish gag shot from behind; reveal framing/timing;
+splash decal; mist seams on water; single-frame rock-view and sea-cave builds; heavy start/harbour.
+
 ## Whiteout Ridge, Frozen Frontier, Volcanic Expanse
 Not started.
