@@ -71,8 +71,18 @@ export class HarbourVictory implements VictoryScript {
 
     // a dried cod for the gag (a flattened, split fish: tail and two halves), hidden until grabbed
     {
-      const g = new THREE.ConeGeometry(0.14, 0.95, 5).scale(1, 1, 0.35);
-      const mtl = new THREE.MeshStandardMaterial({ color: 0xb9a172, roughness: 0.8 });
+      // a stockfish: a flat, split, headless body tapering to a forked tail (0.62 m), not a cone
+      const sh = new THREE.Shape();
+      sh.moveTo(-0.09, 0.31);
+      sh.quadraticCurveTo(-0.12, 0.05, -0.04, -0.2);
+      sh.lineTo(-0.1, -0.31);
+      sh.lineTo(0.0, -0.25);
+      sh.lineTo(0.1, -0.31);
+      sh.lineTo(0.04, -0.2);
+      sh.quadraticCurveTo(0.12, 0.05, 0.09, 0.31);
+      sh.lineTo(-0.09, 0.31);
+      const g = new THREE.ExtrudeGeometry(sh, { depth: 0.025, bevelEnabled: false }).translate(0, 0, -0.012);
+      const mtl = new THREE.MeshStandardMaterial({ color: 0xb9a172, roughness: 0.8, side: THREE.DoubleSide });
       this.fish = new THREE.Mesh(g, mtl);
       this.fish.visible = false;
       this.fish.castShadow = true;
@@ -115,8 +125,8 @@ export class HarbourVictory implements VictoryScript {
     tl.shot({
       start: 5.3,
       end: B.present,
-      from: () => pose(this.yetiStop.clone().add(new THREE.Vector3(2.6, 2.0, -5.6)), yetiHead().add(new THREE.Vector3(-0.2, -0.35, 0)), 40),
-      to: () => pose(this.yetiStop.clone().add(new THREE.Vector3(2.9, 2.1, -6.0)), yetiHead().add(new THREE.Vector3(-0.2, -0.3, 0)), 42),
+      from: () => pose(this.yetiStop.clone().add(new THREE.Vector3(4.4, 2.0, -4.9)), yetiHead().add(new THREE.Vector3(-0.5, -0.4, 0)), 42),
+      to: () => pose(this.yetiStop.clone().add(new THREE.Vector3(4.8, 2.1, -5.3)), yetiHead().add(new THREE.Vector3(-0.5, -0.35, 0)), 44),
       handheld: 0.02,
     });
     // 3) the presentation: over the skier's shoulder onto the harbourmaster's face and the trophy
@@ -196,8 +206,8 @@ export class HarbourVictory implements VictoryScript {
       c.width = c.height = 64;
       const g = c.getContext('2d')!;
       const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-      grd.addColorStop(0, 'rgba(255,240,200,1)');
-      grd.addColorStop(0.25, 'rgba(255,170,70,0.85)');
+      grd.addColorStop(0, 'rgba(255,214,150,1)');
+      grd.addColorStop(0.18, 'rgba(255,140,40,0.8)');
       grd.addColorStop(1, 'rgba(255,120,40,0)');
       g.fillStyle = grd;
       g.fillRect(0, 0, 64, 64);
@@ -227,7 +237,7 @@ export class HarbourVictory implements VictoryScript {
       this.fishState = 'held';
       this.fish.visible = true;
     });
-    this.faceYeti.copy(this.yetiStop).add(new THREE.Vector3(2.6, 0, -5.6));
+    this.faceYeti.copy(this.yetiStop).add(new THREE.Vector3(4.4, 0, -4.9));
     tl.at(5.7, () => ((this.yetiState = 'bite'), (this.yetiT = 0), st.setYetiMode('eat')));
     tl.at(6.45, () => {
       this.yetiState = 'disgust';
@@ -247,9 +257,9 @@ export class HarbourVictory implements VictoryScript {
     tl.at(B.present, () => {
       if (h.presenter) {
         const s0 = sk();
-        const hd = st.skier.root.rotation.y;
-        const f = new THREE.Vector3(Math.sin(hd), 0, Math.cos(hd));
-        const at = s0.clone().addScaledVector(f, 3.0);
+        // always on the seaward side of the skier (downhill): the over-the-shoulder shot then has
+        // the quay and the fjord behind him, and the reverse angle the descent behind the skier
+        const at = s0.clone().add(new THREE.Vector3(0.5, 0, 3.1));
         h.presenter.place(at.x, at.z, Math.atan2(s0.x - at.x, s0.z - at.z), null);
         presTop = 0;
         presentAt.copy(h.presenter.position);
@@ -313,7 +323,7 @@ export class HarbourVictory implements VictoryScript {
       const tb = t - HARBOUR_BEATS.reveal;
       const on = Math.min(1, Math.max(0, tb / 1.5)) * (t < HARBOUR_BEATS.results ? 1 : 0);
       const flick = 0.85 + 0.15 * Math.sin(t * 9.1) * Math.sin(t * 5.3 + 1);
-      this.beacon.scale.setScalar(0.05 * on * flick);
+      this.beacon.scale.setScalar(0.03 * on * flick);
     }
     // the fish prop: in his fist; at his mouth for the bite
     if (this.fishState === 'held') {
@@ -322,10 +332,10 @@ export class HarbourVictory implements VictoryScript {
         const mouth = new THREE.Vector3();
         st.yeti.getMouthWorldPosition(mouth);
         const k = Math.min(1, this.yetiT / 0.25);
-        this.hand.lerp(mouth.add(new THREE.Vector3(0, -0.12, 0)), k);
+        this.hand.lerp(mouth.add(new THREE.Vector3(Math.cos(st.yetiAI.heading) * 0.22, -0.18, -Math.sin(st.yetiAI.heading) * 0.22)), k);
       }
       this.fish.position.copy(this.hand);
-      this.fish.rotation.set(Math.PI * 0.85, st.yetiAI.heading + 1.2, 0.4);
+      this.fish.rotation.set(0.3, st.yetiAI.heading + Math.PI / 2, 0.5);
     } else if (this.fishState === 'flying') {
       this.fishVel.y -= 9.81 * dt;
       this.fish.position.addScaledVector(this.fishVel, dt);

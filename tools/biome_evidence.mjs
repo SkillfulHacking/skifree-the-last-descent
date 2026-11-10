@@ -162,9 +162,19 @@ if (want('hazard')) {
       await ev(() => window.__skifree.freeCam(null));
       await goTo(rock.z - 120, 0);
       await ev(() => window.__skifree.hold(true));
-      await P(`(w, m) => { const cx = ${rock.x} + 14, cz = ${rock.z} - 26; window.__skifree.freeCam([cx, m.heightAt(cx, cz) + 7, cz], [${rock.x}, ${rock.y}, ${rock.z} + 2], 50); }`);
+      // round 3 (A N7): aim at the scoured-rock view actually streamed near here (the merged build
+      // moved the hazards; the round-2 camera kept the stale pose), from above and behind, so the
+      // patch, its ribs and the line beside it are in frame
+      const live = await ev((z0) => { const hs = window.__skifree.hazards('scoured-rock').filter((h) => h.z > z0 - 40); hs.sort((a, b) => Math.abs(a.z - z0 - 120) - Math.abs(b.z - z0 - 120)); return hs[0] ?? null; }, rock.z - 120);
+      const R = live ?? rock;
+      await P(`(w, m) => { const hx = ${R.x}, hz = ${R.z}; const hy = m.heightAt(hx, hz); const cx = hx + 12, cz = hz - 24; window.__skifree.freeCam([cx, Math.max(m.heightAt(cx, cz), hy) + 9, cz], [hx, hy + 0.5, hz + 3], 48); }`);
       await settle(3000);
-      await shot('04b_hazard_rock', 'scoured-rock: exposed rock beside the racing line');
+      await shot('04b_hazard_rock', `scoured-rock (id ${R.id}, r ${R.r ?? '?'} m): exposed rock beside the racing line`);
+      if (biome === 'fjord') {
+        await P(`(w, m) => { const hx = ${R.x}, hz = ${R.z}; const hy = m.heightAt(hx, hz); const cx = hx + 40, cz = hz - 95; window.__skifree.freeCam([cx, Math.max(m.heightAt(cx, cz), hy) + 22, cz], [hx, hy, hz + 10], 46); }`);
+        await settle(3000);
+        await shot('04c_hazard_rock_mid', 'scoured-rock from ~100 m (mid-distance readability)');
+      }
     }
   } else {
     const k = await P(`(w, m) => { const ks = m.profile.kickersNear(500, ${G.L} - 400, []); const k = ks[Math.floor(ks.length / 2)]; return { z: k.z, x: m.centerX(k.z) + k.d, y: m.heightAt(m.centerX(k.z) + k.d, k.z) }; }`);
@@ -250,6 +260,18 @@ if (want('cave') || want('cinematic') || want('pursuit')) {
     await settle(1500);
     await shot('09_pursuit', 'Ordinary chase gameplay, normal follow camera, rear view showing the Yeti');
   }
+}
+
+// 9d) Fjord: the ordinary chase camera where the run passes closest to the cliff rim (the sea in
+// the gameplay view)
+if (biome === 'fjord' && want('pursuit')) {
+  await ev(() => { window.__skifree.hold(false); window.__skifree.freeCam(null); window.__skifree.toChase(); window.__skifree.autopilot(null); });
+  const zr = await P(`(w, m, c) => { let best = 600, bd = Infinity; for (let z = 500; z < ${G.L} - 500; z += 20) { const d = m.routeX(z) - c.rimX(z); if (d < bd) { bd = d; best = z; } } return { z: best, d: bd }; }`);
+  await goTo(zr.z - 140, 20);
+  await ev(() => { window.__skifree.hold(true); window.__skifree.hud(true); window.__skifree.autopilot('skilled'); window.__skifree.placeYeti(90); });
+  await framesUntil(`(s) => s.z >= ${zr.z - 20} || s.phase !== 'chase'`, 400);
+  await settle(1500);
+  await shot('09d_pursuit_rim', `Ordinary chase camera where the run passes closest to the rim (z≈${zr.z}, ${Math.round(zr.d)} m from the cliff edge)`);
 }
 
 // 9b) Hard: a snowball throw during ordinary chase gameplay

@@ -12,6 +12,54 @@
  *    place of a fence.
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+
+/** merge a group's static meshes per material (positions baked to group space) */
+function mergeStatic(group: THREE.Group): void {
+  group.updateMatrixWorld(true);
+  const inv = group.matrixWorld.clone().invert();
+  const by = new Map<THREE.Material, { geos: THREE.BufferGeometry[]; cast: boolean }>();
+  const old: THREE.Mesh[] = [];
+  group.traverse((o) => {
+    const me = o as THREE.Mesh;
+    if (!me.isMesh || Array.isArray(me.material)) return;
+    const mt = me.material as THREE.MeshStandardMaterial;
+    let g = me.geometry.index ? me.geometry.toNonIndexed() : me.geometry.clone();
+    g.applyMatrix4(inv.clone().multiply(me.matrixWorld));
+    const keep = new Set(['position', 'normal', ...(mt.map ? ['uv'] : []), ...(mt.vertexColors ? ['color'] : [])]);
+    for (const k of Object.keys(g.attributes)) if (!keep.has(k)) g.deleteAttribute(k);
+    if (!g.getAttribute('normal')) g.computeVertexNormals();
+    if (mt.map && !g.getAttribute('uv')) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute('position').count * 2), 2));
+    if (mt.vertexColors) {
+      const c = g.getAttribute('color');
+      if (!c) g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(g.getAttribute('position').count * 3).fill(1), 3));
+      else if (c.itemSize !== 3) {
+        const a = new Float32Array(c.count * 3);
+        for (let i = 0; i < c.count; i++) a.set([c.getX(i), c.getY(i), c.getZ(i)], i * 3);
+        g.setAttribute('color', new THREE.Float32BufferAttribute(a, 3));
+      }
+    }
+    let e = by.get(mt);
+    if (!e) by.set(mt, (e = { geos: [], cast: false }));
+    e.geos.push(g);
+    e.cast ||= me.castShadow;
+    old.push(me);
+  });
+  for (const me of old) {
+    me.removeFromParent();
+    me.geometry.dispose();
+  }
+  for (const [mt, e] of by) {
+    const mg = mergeGeometries(e.geos, false);
+    for (const g of e.geos) g.dispose();
+    if (!mg) continue;
+    mg.computeBoundingSphere();
+    const mesh = new THREE.Mesh(mg, mt);
+    mesh.castShadow = e.cast;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+}
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Rng } from '../../../../core/rng';
 import type { Mountain } from '../../../course';
@@ -187,11 +235,13 @@ export function buildFjordStart(m: Mountain, group: THREE.Group, woodTexture: (s
     pm.rotation.set(0.15 * Math.sin(i), 0, 0.12 * Math.cos(i * 1.7));
   }
   // short posts at the gate's foot carrying a rope line strung with floats (the "fence")
-  for (const side of [-1, 1]) {
+  // round 3 (F minor): not Alpine's symmetric pair of fences — one long rope line on the cliff
+  // (sea) side only, swinging out toward the rim; the inland side gets a line of trail cairns
+  for (const side of [-1]) {
     let prev: THREE.Vector3 | null = null;
-    for (let i = 0; i < 7; i++) {
-      const zz = -4 - i * 3.2;
-      const x = m.routeX(zz) + side * (5 + i * 0.7);
+    for (let i = 0; i < 11; i++) {
+      const zz = -4 - i * 3.2 + (i > 6 ? (i - 6) * 1.4 : 0);
+      const x = m.routeX(zz) + side * (5 + i * 0.7 + Math.max(0, i - 5) * 1.6);
       const gy = m.heightAt(x, zz);
       add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 1.1, 7), drift)).position.set(x, gy + 0.45, zz);
       const top = new THREE.Vector3(x, gy + 0.95, zz);
@@ -354,6 +404,27 @@ export function buildFjordStart(m: Mountain, group: THREE.Group, woodTexture: (s
     add(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 0.03), red), false).position.set(kx + 0.55, yy - 0.5, kz);
     add(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.36, 0.03), red), false).position.set(kx + 0.55, yy - 0.7, kz);
   }
+
+  // trail cairns on the inland side, stepping down beside the run
+  for (let i = 0; i < 3; i++) {
+    const kz = 6 + i * 9;
+    const kx = m.routeX(kz) + 9 + i * 1.5;
+    let yy = m.heightAt(kx, kz) - 0.1;
+    let r = 0.42;
+    for (let k = 0; k < 3; k++) {
+      const g = new THREE.DodecahedronGeometry(r, 0).scale(1, 0.6, 1);
+      const t = 0.3 + rng.range(-0.05, 0.05);
+      const cc = new Float32Array((g.attributes.position as THREE.BufferAttribute).count * 3);
+      for (let q = 0; q < cc.length; q += 3) cc.set([t, t * 1.02, t * 1.08], q);
+      g.setAttribute('color', new THREE.BufferAttribute(cc, 3));
+      add(new THREE.Mesh(g, stone)).position.set(kx, yy + r * 0.5, kz);
+      yy += r * 0.9;
+      r *= 0.76;
+    }
+  }
+
+  // round 3 (tech review D5): every prop above is static — merge per material (124 draws → ~15)
+  mergeStatic(group);
 
   const geos = new Set<THREE.BufferGeometry>();
   const mats = new Set<THREE.Material>();

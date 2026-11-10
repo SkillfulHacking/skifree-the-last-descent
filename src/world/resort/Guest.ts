@@ -1251,7 +1251,7 @@ export class Guest {
       if (this.hold > 0) {
         // present: both hands together in front of the chest (raised with holdLift)
         const lift = clamp01(this.holdLift);
-        this.tmpB.set(side * 0.11, -0.02 + 0.42 * lift, 0.36 - 0.06 * lift);
+        this.tmpB.set(side * 0.1 - 0.17, -0.04 + 0.4 * lift, 0.36 - 0.06 * lift);
         T.lerp(this.tmpB, clamp01(this.hold));
         this.tmpA.set(side * 0.9, -1, -0.1);
         P.lerp(this.tmpA, clamp01(this.hold)).normalize();

@@ -90,9 +90,11 @@ const coastRockGlsl = (T: Biome['terrainLook']) => /* glsl */ `
     gneiss = mix(gneiss, gneiss * vec3(1.25, 1.12, 0.92), smoothstep(0.55, 0.8, blk2) * 0.6);
     // darker overall than the inland rock: wet, dark gneiss walls read as rock (not an ice shelf)
     // even when the low sun lights them square-on
-    rock = mix(rock, gneiss, 0.82) * 0.56;
-    float mj = abs(sf_sideN(vec2(0.045, 0.012), 47.0) - 0.5);
-    rock *= 1.0 - 0.3 * sf_aa(0.46, 0.5, mj) * (1.0 - farA) * smoothstep(0.6, 0.85, slope);
+    // round 3 (A2): the shared rock (with its fall-line streaks) is replaced, not blended: the 18 %
+    // left in round 2 still drew vertical striation down the km-high faces
+    rock = mix(rock, gneiss, 0.97) * 0.56;
+    float mj = abs(sf_sideN(vec2(0.03, 0.016), 47.0) - 0.5);
+    rock *= 1.0 - 0.18 * sf_aa(0.47, 0.5, mj) * (1.0 - farA) * smoothstep(0.6, 0.85, slope);
     float seep = smoothstep(0.92, 0.965, sf_sideN(vec2(0.03, 0.003), 21.0)) * smoothstep(0.7, 0.95, slope);
     rock = mix(rock, vec3(0.72, 0.84, 0.93), seep * 0.85);
   }
@@ -137,7 +139,10 @@ const SHORE_GLSL = /* glsl */ `
     sf_rock = max(sf_rock, wash);
     // round 2 (art review D3): the lowest 40–120 m of every wall and steep shore is spray-washed
     // bare rock, darker and wetter towards the water: no white snow skirt at sea level
-    float lowWall = (1.0 - smoothstep(60.0 + 40.0 * sn2, 150.0 + 40.0 * sn2, dh)) * smoothstep(0.1, 0.28, slope);
+    // round 3 (A2): also on the gentler foot of the walls (the white apron at the waterline in 06),
+    // still never on the flat harbour ground
+    float lowWall = max((1.0 - smoothstep(60.0 + 40.0 * sn2, 150.0 + 40.0 * sn2, dh)) * smoothstep(0.1, 0.28, slope),
+                        (1.0 - smoothstep(18.0 + 20.0 * sn2, 55.0 + 25.0 * sn2, dh)) * smoothstep(0.035, 0.1, slope));
     vec3 wetRock = rock * mix(0.5, 0.9, smoothstep(0.0, 70.0, dh));
     col = mix(col, wetRock, lowWall * (1.0 - wash) * (1.0 - spray * 0.5));
     sf_rock = max(sf_rock, lowWall);

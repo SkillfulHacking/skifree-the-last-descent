@@ -92,7 +92,8 @@ void main() {
   // fjord water: very dark teal-blue, a little lighter in the ripple troughs facing the sky
   vec3 deep = vec3(0.010, 0.034, 0.052);
   vec3 body = mix(deep, vec3(0.02, 0.07, 0.09), 0.35 * (h0 - 0.4));
-  vec3 col = mix(body, skyCol, F * 0.92);
+  // close to the camera at grazing angles the haze reflection washed the water to a pale sheet
+  vec3 col = mix(body, skyCol, F * 0.92 * (1.0 - 0.3 * nearK));
   // low-sun glitter path + a soft sheen
   float sd = max(dot(R, uSun), 0.0);
   col += vec3(1.0, 0.86, 0.66) * (pow(sd, 900.0) * 18.0 + pow(sd, 90.0) * 0.55 + pow(sd, 12.0) * 0.06);

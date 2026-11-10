@@ -185,12 +185,15 @@ export function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardV
     pos.push(x, m.heightAt(x, z) + 0.02, z);
     const { n1, n2 } = tone(x, z);
     // core → rim: gneiss / ice glaze → gravel → wind crust → snow
-    const rock = new THREE.Color(0.055 + 0.05 * n2, 0.062 + 0.05 * n2, 0.075 + 0.06 * n2);
-    const ice = new THREE.Color(0.5, 0.66, 0.78);
-    const gravel = new THREE.Color(0.2 + 0.1 * n2, 0.2 + 0.1 * n2, 0.21 + 0.09 * n2);
+    // round 3 (A6, visual only): a darker, larger exposed core with lichen-stained patches and only
+    // thin glaze, a narrow gravel ring — it reads as rock at 100+ m instead of a grey smudge
+    const rock = new THREE.Color(0.03 + 0.04 * n2, 0.034 + 0.038 * n2, 0.04 + 0.045 * n2);
+    if (n1 > 0.7) rock.lerp(new THREE.Color(0.09, 0.08, 0.045), (n1 - 0.7) * 2.2);
+    const ice = new THREE.Color(0.42, 0.56, 0.66);
+    const gravel = new THREE.Color(0.16 + 0.08 * n2, 0.16 + 0.08 * n2, 0.17 + 0.07 * n2);
     const crust = new THREE.Color(0.8, 0.85, 0.92);
-    c.copy(rock).lerp(ice, Math.max(0, n1 - 0.62) * 1.6 * (1 - k));
-    c.lerp(gravel, Math.min(1, Math.max(0, (k - 0.45 + 0.2 * (n2 - 0.5)) / 0.25)));
+    c.copy(rock).lerp(ice, Math.max(0, n1 - 0.8) * 1.5 * (1 - k));
+    c.lerp(gravel, Math.min(1, Math.max(0, (k - 0.6 + 0.2 * (n2 - 0.5)) / 0.2)));
     c.lerp(crust, Math.min(1, Math.max(0, (k - 0.72 + 0.15 * (n1 - 0.5)) / 0.2)));
     const a = 1 - Math.min(1, Math.max(0, (k - 0.82) / 0.18));
     col.push(c.r, c.g, c.b, a);
@@ -223,13 +226,13 @@ export function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardV
 
   // rock ribs breaking through along the wind grain, half-buried
   const ribs: THREE.BufferGeometry[] = [];
-  const nRib = 4 + (v % 3);
+  const nRib = 6 + (v % 3);
   for (let i = 0; i < nRib; i++) {
     const a = h.rot + i * 2.39996 + v;
     const d = h.r * (0.12 + 0.55 * h01(i, v + 3));
     const x = h.x + Math.cos(a) * d;
     const z = h.z + Math.sin(a) * d;
-    const L = 2.2 + 3.0 * h01(i + 7, v);
+    const L = 3.0 + 3.6 * h01(i + 7, v);
     const W = 0.8 + 0.9 * h01(i + 11, v);
     const T = 0.3 + 0.16 * h01(i + 13, v);
     const box = new THREE.BoxGeometry(L, T * 2.4, W, 6, 2, 3);

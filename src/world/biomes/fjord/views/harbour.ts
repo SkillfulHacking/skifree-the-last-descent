@@ -359,7 +359,7 @@ export class Harbour implements FinishEnvironment {
       // the fill and its apron (top just under the boardwalk planks)
       b.add('stone', new THREE.BoxGeometry(4.02, deckY - 0.08 - wallBase, zs - z0), mat(px, (deckY - 0.08 + wallBase) / 2, (z0 + zs) / 2), new THREE.Color(t * 1.1, t * 1.1, t * 1.13));
       // coursed face blocks (three courses, staggered joints, each block its own tone)
-      for (let c = 0; c < 3; c++) {
+      for (let c = 0; c < (hi ? 3 : 0); c++) {
         const y0 = wallBase + 0.4 + c * ((deckY - 0.35 - wallBase - 0.4) / 3);
         const hC = (deckY - 0.35 - wallBase - 0.4) / 3 - 0.06;
         const split = c % 2 ? 1.3 : 2.4;
@@ -382,10 +382,11 @@ export class Harbour implements FinishEnvironment {
     plankDeck(b, F.x, deckY + 0.03, (bwz0 + bwz1) / 2, Math.PI / 2, quayW * 2, bwz1 - bwz0, rnd);
     // snow swept to the landward edge of the boardwalk (a strip, not a sheet)
     nb.add('snow', new THREE.BoxGeometry(quayW * 2 - 2, 0.05, 1.2), mat(F.x, deckY + 0.07, bwz0 + 0.8), 0xffffff);
-    for (let x = -quayW + 2; x < quayW; x += 4)
+    // (low preset: half the piles and railing posts — round 3, tech review D5)
+    for (let x = -quayW + 2; x < quayW; x += hi ? 4 : 8)
       for (const pz of [bwz0 + 0.4, bwz1 - 0.4]) b.add('planks', new THREE.CylinderGeometry(0.18, 0.2, 7, 6), mat(F.x + x, deckY - 3.6, pz), 0x2e231a);
     // railing posts with rope along the outer edge
-    for (let x = -quayW + 1; x < quayW; x += 3) b.add('planks', new THREE.CylinderGeometry(0.06, 0.07, 1.0, 5), mat(F.x + x, deckY + 0.5, bwz1 - 0.2), 0x3b2c22);
+    for (let x = -quayW + 1; x < quayW; x += hi ? 3 : 6) b.add('planks', new THREE.CylinderGeometry(0.06, 0.07, 1.0, 5), mat(F.x + x, deckY + 0.5, bwz1 - 0.2), 0x3b2c22);
     b.add('metal', new THREE.BoxGeometry(quayW * 2, 0.05, 0.05), mat(F.x, deckY + 0.95, bwz1 - 0.2), 0xd8c8a0);
     // finger piers (planks on piles), with bollards and tyres
     const piers = [-58, 22, 92];
@@ -710,6 +711,70 @@ export class Harbour implements FinishEnvironment {
     this.group.add(this.beaconLight);
     this.seaward.set(F.x + 60, sea + 7, zq + 330);
 
+    // ---------------- island dressing (round 3, A3) ----------------
+    // the islands off the harbour (the finish, the reveal) get life: sparse pine stands on their
+    // flanks, a red boathouse at a landing, a small light on an outlying skerry. Island tops are
+    // found by sampling the terrain on a coarse grid once.
+    {
+      const sz = coast.shoreZ(F.x);
+      const tops: Array<{ x: number; z: number; h: number }> = [];
+      const step = hi ? 70 : 110;
+      for (let z = sz + 450; z < sz + 3200; z += step)
+        for (let x = F.x - 2400; x < F.x + 2400; x += step) {
+          const h = H(x, z);
+          if (h < sea + 14) continue;
+          if (H(x + step, z) > h || H(x - step, z) > h || H(x, z + step) > h || H(x, z - step) > h) continue;
+          tops.push({ x, z, h });
+        }
+      tops.sort((a, c) => c.h - a.h);
+      const pine = (x: number, y: number, z: number, hgt: number) => {
+        b.add('paint', new THREE.CylinderGeometry(0.06 * hgt, 0.09 * hgt, hgt * 0.3, 5), mat(x, y + hgt * 0.15, z), 0x3a2a1e);
+        for (let k = 0; k < 3; k++) b.add('paint', new THREE.ConeGeometry(hgt * (0.3 - k * 0.07), hgt * 0.45, 6), mat(x, y + hgt * (0.35 + k * 0.2), z), k === 2 ? 0x32523e : 0x1f3a2b);
+      };
+      const nIsl = Math.min(tops.length, hi ? 7 : 4);
+      for (let i = 0; i < nIsl; i++) {
+        const t = tops[i]!;
+        const rh = t.h - sea;
+        if (i % 3 !== 2) {
+          // pines on the lower flanks (sheltered), in a few clumps
+          for (let c2 = 0; c2 < (hi ? 4 : 2); c2++) {
+            const a = rnd.range(0, Math.PI * 2);
+            const d = rnd.range(0.3, 0.8) * Math.min(220, rh * 2.4);
+            const cx = t.x + Math.cos(a) * d;
+            const cz = t.z + Math.sin(a) * d;
+            for (let k = 0; k < (hi ? 7 : 4); k++) {
+              const px = cx + rnd.range(-18, 18);
+              const pz = cz + rnd.range(-18, 18);
+              const py = H(px, pz);
+              if (py < sea + 4 || py > t.h - rh * 0.15) continue;
+              pine(px, py - 0.5, pz, rnd.range(9, 16));
+            }
+          }
+        }
+        if (i % 3 === 1) {
+          // a red boathouse at a landing on the shore
+          for (let k = 0; k < 12; k++) {
+            const a = rnd.range(0, Math.PI * 2);
+            const px = t.x + Math.cos(a) * rh * 2.2;
+            const pz = t.z + Math.sin(a) * rh * 2.2;
+            const py = H(px, pz);
+            if (py > sea + 1 && py < sea + 10) {
+              house(b, px, py, pz, a + Math.PI / 2, { w: 14, d: 9, h: 6, color: 0x8e2c1d, roofH: 4, windows: false, door: 'boat' }, rnd);
+              break;
+            }
+          }
+        }
+      }
+      // a small light on the lowest outlying skerry
+      const sk = tops.filter((q) => q.h < sea + 40).pop() ?? tops[tops.length - 1];
+      if (sk) {
+        const y = H(sk.x, sk.z);
+        b.add('paint', new THREE.CylinderGeometry(2.0, 2.6, 12, 10), mat(sk.x, y + 6, sk.z), 0xf2efe7);
+        b.add('paint', new THREE.CylinderGeometry(2.05, 2.05, 3, 10), mat(sk.x, y + 8, sk.z), 0xc8281e);
+        b.add('paint', new THREE.ConeGeometry(2.4, 2.4, 10), mat(sk.x, y + 13.2, sk.z), 0xc8281e);
+      }
+    }
+
     // ---------------- moored boats (bob gently) ----------------
     this.boats = new THREE.Group();
     // round 2 (art review D6): boats where the finish cameras and the player see them — moored
@@ -730,7 +795,9 @@ export class Harbour implements FinishEnvironment {
     ];
     const hulls = [0x2d4c78, 0xc8281e, 0xf2efe7, 0x1d4a3a, 0xd59f3a, 0x15171b];
     const boatMeshes: THREE.Group[] = [];
-    for (const [dx, dz, yaw, k] of moor) {
+    for (const [mi, [dx, dz, yaw, k]] of moor.entries()) {
+      // low preset: every other moored boat (each boat is its own few draw calls)
+      if (!hi && mi % 2 === 1) continue;
       const one = new Batch();
       fishingBoat(one, 0, 0, 0, 0, { len: dx === 100 ? 18 : rnd.range(9, 13), hull: hulls[k]!, stripe: k === 2 ? 0x2d4c78 : 0xf2efe7, cabin: k === 2 ? 0x2d4c78 : 0xf2efe7 });
       const g = new THREE.Group();
