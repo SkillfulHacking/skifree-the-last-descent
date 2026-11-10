@@ -468,7 +468,8 @@ export class Coast {
     const isl = n - 0.36;
     if (isl <= -0.02) return -1e9;
     const shore = smoothstep(-0.02, 0.05, isl);
-    const top = 6 + 42 * smoothstep(0.03, 0.3, isl) + 9 * gnoise(x / 60, z / 60, s + 83);
+    // glaciated granite: rounded whalebacks broken by ridges and clefts
+    const top = 5 + 40 * smoothstep(0.03, 0.3, isl) + 9 * gnoise(x / 60, z / 60, s + 83) + 26 * (ridged(x / 45, z / 45, s + 93, 2) - 0.4) * smoothstep(0.0, 0.12, isl);
     return lv - this.p.depth + (this.p.depth + top) * shore;
   }
 

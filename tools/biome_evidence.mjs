@@ -170,7 +170,7 @@ if (want('material')) {
   const z = Math.round(G.finite ? G.L * 0.36 : 2400);
   await goTo(z, 0);
   await ev(() => { window.__skifree.hold(true); window.__skifree.hud(false); });
-  await P(`(w, m, c) => { const z = ${z}; const xr = c ? c.rimX(z) : m.centerX(z) - m.halfWidth(z) - 20; const y = m.heightAt(xr + 6, z); window.__skifree.freeCam([xr + 7, y + 3.0, z - 16], [xr - 26, y - 34, z + 26], 60); }`);
+  await P(`(w, m, c) => { const z = ${z}; const xr = c ? c.rimX(z) : m.centerX(z) - m.halfWidth(z) - 20; const y = m.heightAt(xr + 6, z); window.__skifree.freeCam([xr + 11, y + 1.7, z - 14], [xr - 4, y - 4, z + 26], 62); }`);
   await settle(3500);
   await shot('05_material', `Terrain material close-up at the rim, z=${z}`);
 }
