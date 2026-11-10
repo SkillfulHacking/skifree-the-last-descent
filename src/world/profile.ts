@@ -523,6 +523,8 @@ export interface ProfileKnobs {
    * to jump from a take-off kicker halfway along. Omit for none (original courses).
    */
   spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
+  /** slope (degrees) of the run-in at the start gate (default 6): steeper = no stall on a bump */
+  startSlope?: number;
 }
 export const DEFAULT_KNOBS: ProfileKnobs = { slopeScale: 1, widthScale: 1, swingScale: 1 };
 
@@ -646,7 +648,7 @@ export class GeneratedProfile implements CourseProfile {
     const summitEnd = Math.min(330, first - 320);
     this.keys(-400, { slope: 2, width: 70, amp: 0, route: 0, tree: 0, forest: 0.3, rock: 1, setback: 1, steep: 0.8 });
     this.keys(-60, { slope: 3, width: 66, amp: 0, route: 0 });
-    this.keys(0, { slope: 6, width: 62, amp: 0, route: 0 });
+    this.keys(0, { slope: knobs.startSlope ?? 6, width: 62, amp: 0, route: 0 });
     if (summitEnd >= 240) {
       this.keys(60, { slope: 10, width: 60, amp: 10, route: 0 });
       this.keys(240, { slope: 11, width: 56, amp: 30, route: 0.5, tree: 0.4 });

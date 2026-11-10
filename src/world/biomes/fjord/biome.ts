@@ -135,6 +135,9 @@ export function makeFjordBiome(): Biome {
       // none flatter than 14° (a flat run-in costs a non-expert the chase, not the environment)
       segmentWeights: { alpine: 3, highspeed: 2.6, powder: 0.8, basin: 0.6, ridgeline: 2.2, cliffside: 1.4, beginner: 0.3, forest: 0.35, chute: 0.4, moguls: 0.5 },
       minSlope: 14,
+      // the run-in from the start gate drops a little more steeply, so the snow's undulation never
+      // stalls a skier who has not learned to skate yet (E6)
+      startSlope: 9.5,
       altTypes: ['alpine', 'highspeed', 'powder', 'basin', 'ridgeline', 'forest'],
       // ridgeline shortcuts: every ridgeline gets a wind-packed spine bowed out toward the sea
       // cliff, with a gully to jump from a take-off halfway along (fast, exposed, optional)

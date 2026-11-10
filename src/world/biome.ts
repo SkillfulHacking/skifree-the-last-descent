@@ -190,6 +190,8 @@ export interface BiomeTerrain {
   minSlope?: number;
   /** ridgeline spines with gap jumps; omit for none (see profile.ts ProfileKnobs) */
   spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
+  /** run-in slope at the start gate (degrees, default 6) */
+  startSlope?: number;
   /** valley wall height (m) */
   wallHeight: number;
   /** ridged/fbm relief on the valley walls (m) */
