@@ -66,6 +66,8 @@ export class TerrainRenderer {
   private ahead: number;
   private farBehind = 4096;
   private farAhead: number;
+  /** coastal looks: low-pass the vertex normals of coarse LODs (see buildGeometry) */
+  private smoothNormals: boolean;
   /** Points that always get full terrain detail (e.g. cave notches). */
   pinned: Array<{ x: number; z: number; r: number }> = [];
 
@@ -77,6 +79,7 @@ export class TerrainRenderer {
     this.material = m.material;
     this.uniforms = m.uniforms;
     this.ranges = lodRanges(quality);
+    this.smoothNormals = !!mountain.coast;
     this.ahead = { low: 2400, medium: 3000, high: 3600, ultra: 4200 }[quality];
     this.farAhead = { low: 8192, medium: 10240, high: 12288, ultra: 14336 }[quality];
   }
@@ -303,16 +306,53 @@ export class TerrainRenderer {
     const vs = n + 1;
     const x0 = c.ix * CHUNK;
     const z0 = c.iz * CHUNK;
-    // heights with a 1-vertex ring for normals
-    const hs = vs + 2;
+    // heights with a 1-vertex ring for normals (2 on smoothed coastal LODs, see below)
+    const R = this.smoothNormals && step >= 2 ? 2 : 1;
+    const hs = vs + 2 * R;
     const H = new Float64Array(hs * hs);
     for (let j = 0; j < hs; j++) {
-      const z = z0 + (j - 1) * step;
-      for (let i = 0; i < hs; i++) H[j * hs + i] = m.heightAt(x0 + (i - 1) * step, z);
+      const z = z0 + (j - R) * step;
+      for (let i = 0; i < hs; i++) H[j * hs + i] = m.heightAt(x0 + (i - R) * step, z);
       if ((j & 3) === 3) yield;
     }
+    // Fjord (round 2, art review D7): on coarse LODs the rugged valley walls are under-sampled, so
+    // neighbouring vertex normals differ a lot and every triangle shows its own shading gradient
+    // (hard creases along the triangle edges). There the vertex normals are low-passed with a
+    // [1 2 1]² kernel over the grid (the ring makes chunk borders agree with their neighbours).
+    let SN: Float32Array | null = null;
+    if (R === 2) {
+      const ns = vs + 2;
+      const raw = new Float32Array(ns * ns * 3);
+      for (let j = 0; j < ns; j++)
+        for (let i = 0; i < ns; i++) {
+          const hi = (j + 1) * hs + (i + 1);
+          raw[(j * ns + i) * 3] = H[hi - 1]! - H[hi + 1]!;
+          raw[(j * ns + i) * 3 + 1] = 2 * step;
+          raw[(j * ns + i) * 3 + 2] = H[hi - hs]! - H[hi + hs]!;
+        }
+      SN = new Float32Array(vs * vs * 3);
+      const wk = [1, 2, 1];
+      for (let j = 0; j < vs; j++)
+        for (let i = 0; i < vs; i++) {
+          let ax = 0;
+          let ay = 0;
+          let az = 0;
+          for (let b = 0; b < 3; b++)
+            for (let a = 0; a < 3; a++) {
+              const w = wk[a]! * wk[b]!;
+              const q = ((j + b) * ns + (i + a)) * 3;
+              ax += raw[q]! * w;
+              ay += raw[q + 1]! * w;
+              az += raw[q + 2]! * w;
+            }
+          const l = Math.hypot(ax, ay, az);
+          SN[(j * vs + i) * 3] = ax / l;
+          SN[(j * vs + i) * 3 + 1] = ay / l;
+          SN[(j * vs + i) * 3 + 2] = az / l;
+        }
+    }
     // local vertical origin keeps vertex values small (precision on long courses)
-    const y0 = Math.round(H[(1 + (vs >> 1)) * hs + 1 + (vs >> 1)]!);
+    const y0 = Math.round(H[(R + (vs >> 1)) * hs + R + (vs >> 1)]!);
     const skirtCount = 4 * n;
     const vCount = vs * vs + skirtCount + 4;
     const pos = new Float32Array(vCount * 3);
@@ -323,17 +363,23 @@ export class TerrainRenderer {
       const z = z0 + j * step;
       for (let i = 0; i < vs; i++) {
         const x = x0 + i * step;
-        const hi = (j + 1) * hs + (i + 1);
+        const hi = (j + R) * hs + (i + R);
         pos[k * 3] = i * step;
         pos[k * 3 + 1] = H[hi]! - y0;
         pos[k * 3 + 2] = j * step;
-        const nx = H[hi - 1]! - H[hi + 1]!;
-        const nz = H[hi - hs]! - H[hi + hs]!;
-        const ny = 2 * step;
-        const l = Math.hypot(nx, ny, nz);
-        nor[k * 3] = nx / l;
-        nor[k * 3 + 1] = ny / l;
-        nor[k * 3 + 2] = nz / l;
+        if (SN) {
+          nor[k * 3] = SN[k * 3]!;
+          nor[k * 3 + 1] = SN[k * 3 + 1]!;
+          nor[k * 3 + 2] = SN[k * 3 + 2]!;
+        } else {
+          const nx = H[hi - 1]! - H[hi + 1]!;
+          const nz = H[hi - hs]! - H[hi + hs]!;
+          const ny = 2 * step;
+          const l = Math.hypot(nx, ny, nz);
+          nor[k * 3] = nx / l;
+          nor[k * 3 + 1] = ny / l;
+          nor[k * 3 + 2] = nz / l;
+        }
         if (step <= 8) {
           const w = m.surfaceWeights(x, z);
           surf[k * 3] = w.ice;

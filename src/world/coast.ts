@@ -464,15 +464,23 @@ export class Coast {
     let Lc = clamp(Hc * this.steep(z), 26, 1200);
     Lc = Math.max(Lc, 26 + 220 * ridge.bell);
     // buttresses and gullies: the face position wanders along the coast
-    const tj = t + (16 * gnoise(z / 47, 0.37, s + 66) + 10 * gnoise(z / 13, 2.1, s + 67)) * smoothstep(0, 40, t) + (0.22 * Lc * gnoise(z / 430, 3.3, s + 89) + 0.1 * Lc * gnoise(z / 140, 7.7, s + 90)) * smoothstep(0, 0.35 * Lc, t);
+    // round 2 (art review D3): big buttresses and coves break the wall in plan (a ridged field
+    // along the coast pushes whole sections of face seaward), on top of the old wander
+    const butt = (ridged(z / 380, 1.7, s + 101, 2) - 0.45) * 0.42 * Lc + 0.12 * Lc * gnoise(z / 900, 4.1, s + 102);
+    const tj = t + (16 * gnoise(z / 47, 0.37, s + 66) + 10 * gnoise(z / 13, 2.1, s + 67)) * smoothstep(0, 40, t) + (0.22 * Lc * gnoise(z / 430, 3.3, s + 89) + 0.1 * Lc * gnoise(z / 140, 7.7, s + 90) - butt) * smoothstep(0, 0.35 * Lc, t);
     const u = tj / Lc;
     let out: number;
     if (u < 1) {
-      let f = 0.8 * smoothstep(0, 0.52, u) + 0.2 * smoothstep(0.35, 1, u);
-      // ledges (fjord walls step down in benches that hold snow)
-      const q = f * 7 + 0.4 * gnoise(z / 210, 5.5, s + 68);
-      const stair = (Math.floor(q) + smoothstep(0.25, 1, q - Math.floor(q))) / 7;
-      f = clamp(f + (stair - f) * 0.38 * smoothstep(0.04, 0.2, u) * (1 - smoothstep(0.8, 1, u)), 0, 1);
+      // the face profile: steeper towards the sea (no long snow apron at the waterline)
+      let f = 0.72 * smoothstep(0, 0.5, u) + 0.28 * smoothstep(0.3, 1, u) * (0.7 + 0.3 * u);
+      f = f / (0.72 + 0.28);
+      // ledges (fjord walls step down in benches that hold snow): count and strength vary along
+      // the coast, so the banding is never a regular stack
+      const nL = 5 + 4 * (0.5 + 0.5 * gnoise(z / 520, 6.2, s + 103));
+      const q = f * nL + 0.4 * gnoise(z / 210, 5.5, s + 68);
+      const stair = (Math.floor(q) + smoothstep(0.25, 1, q - Math.floor(q))) / nL;
+      const stairK = 0.2 + 0.3 * (0.5 + 0.5 * gnoise(z / 330, 2.9, s + 104));
+      f = clamp(f + (stair - f) * stairK * smoothstep(0.04, 0.2, u) * (1 - smoothstep(0.8, 1, u)), 0, 1);
       // here and there a broad bench (a hanging shelf with snow and stunted pines) breaks the wall
       const bench = smoothstep(0.15, 0.55, gnoise(z / 650, 8.8, s + 91));
       if (bench > 0) {
@@ -480,9 +488,12 @@ export class Coast {
         f = f + (bc - f) * bench * 0.8 * (1 - smoothstep(0.03, 0.12, Math.abs(f - bc)));
       }
       out = hRim + berm - (hRim - foot) * f;
-      // couloirs: grooves running down the face (snow-filled, between rock ribs)
-      const g = ridged(z / 64, 0.5 + f * 0.6, s + 84, 2);
-      out -= (10 + 0.05 * Hc) * g * 4 * f * (1 - f);
+      // couloirs: grooves running down the face (snow-filled, between rock ribs); irregular spacing
+      // (warped z), and gathered into gullied sections between smooth slabby faces
+      const zw = z + 70 * gnoise(z / 230, 3.4, s + 105);
+      const g = ridged(zw / 75, 0.5 + f * 0.6, s + 84, 2);
+      const gul = 0.35 + 0.65 * smoothstep(-0.2, 0.45, gnoise(z / 600, 8.3, s + 106));
+      out -= (10 + 0.05 * Hc) * g * 4 * f * (1 - f) * gul;
     } else {
       const tf = (u - 1) * Lc;
       const flat = 80 * hm;
@@ -491,7 +502,7 @@ export class Coast {
       // rocks and skerries at the cliff foot
       out += Math.max(0, gnoise(x / 23, z / 23, s + 69) - 0.45) * 30 * smoothstep(0, 25, tf) * (1 - smoothstep(30, 240, tf)) * (1 - hm);
       // islands in the fjord (smooth rounded skerries and a few bigger wooded islets)
-      const k = smoothstep(160, 420, tf);
+      const k = smoothstep(380, 720, tf);
       if (k > 0) {
         const isl = this.island(x, z, lv);
         if (isl > out) out += (isl - out) * k;
@@ -521,18 +532,81 @@ export class Coast {
   }
 
   /**
-   * Islands and skerries in the fjord / sea: low rounded domes of rock (8–45 m) with steep shores,
-   * a few broad enough to carry pines; returns the island's surface height (or far below the bed).
+   * Islands and skerries in the fjord / sea (round 2, art review D2): not an even fbm scatter but a
+   * few deliberate clusters. Space is cut into ~1.35 km cells; about four in ten hold a cluster: one
+   * main island (a glaciated whaleback, 0.3–1 km along its long axis, 30–150 m high, with a steep
+   * rocky shore and a flatter, snow-holding top split by a cleft or two) plus 1–4 islets strung
+   * along the same grain (wave-washed rock, 12–34 m). Shores are irregular (domain-warped outline),
+   * so silhouettes read as land at distance. Returns the island surface height, or far below the bed.
    */
   private island(x: number, z: number, lv: number): number {
-    const s = this.seed;
-    const n = fbm(x / 380, z / 380, s + 71, 3) + 0.25 * gnoise(x / 120, z / 120, s + 72);
-    const isl = n - 0.36;
-    if (isl <= -0.02) return -1e9;
-    const shore = smoothstep(-0.02, 0.05, isl);
-    // glaciated granite: rounded whalebacks broken by ridges and clefts
-    const top = 5 + 40 * smoothstep(0.03, 0.3, isl) + 9 * gnoise(x / 60, z / 60, s + 83) + 26 * (ridged(x / 45, z / 45, s + 93, 2) - 0.4) * smoothstep(0.0, 0.12, isl);
-    return lv - this.p.depth + (this.p.depth + top) * shore;
+    const CELL = 1350;
+    const ci = Math.floor(x / CELL);
+    const cj = Math.floor(z / CELL);
+    let best = -1e9;
+    // warp the sample point a little so outlines are ragged (coves, points), not ellipses
+    const wx = x + 38 * gnoise(x / 170, z / 170, this.seed + 94) + 12 * gnoise(x / 41, z / 41, this.seed + 95);
+    const wz = z + 38 * gnoise(x / 170 + 7.3, z / 170, this.seed + 96) + 12 * gnoise(x / 41, z / 41 + 3.1, this.seed + 97);
+    for (let dj = -1; dj <= 1; dj++)
+      for (let di = -1; di <= 1; di++) {
+        const cl = this.cluster(ci + di, cj + dj, CELL);
+        for (const b of cl) {
+          const ex = wx - b.x;
+          const ez = wz - b.z;
+          if (Math.abs(ex) > b.a * 1.3 + 60 || Math.abs(ez) > b.a * 1.3 + 60) continue;
+          // rotated, elongated distance: q = 1 at the shoreline
+          const u = (ex * b.c + ez * b.s) / b.a;
+          const v = (-ex * b.s + ez * b.c) / b.b;
+          const q = Math.sqrt(u * u + v * v);
+          if (q > 1.25) continue;
+          const shore = 1 - smoothstep(0.92, 1.25, q);
+          // steep shore (the first ~18 % inside the waterline rises fast: bare rock), then a
+          // flatter rounded top where snow lies; clefts and ridges follow the grain (along u)
+          const rise = smoothstep(1.0, 0.78, q);
+          const dome = Math.pow(Math.max(0, 1 - q * q), 0.75);
+          const grain = ridged(u * 2.4 + b.k, v * 0.9, this.seed + 98, 2) - 0.45;
+          const cleft = 1 - 0.35 * smoothstep(0.82, 1.0, 1 - Math.abs(gnoise(u * 1.7 + b.k, 0.5, this.seed + 99)));
+          // mostly a rounded dome (it must stay rounded when the 64 m far-field tiles sample it),
+          // with a steeper rocky rim near the waterline
+          const top = (2.5 + b.h * (0.28 * rise + 0.72 * Math.pow(dome, 1.25)) * cleft + b.h * 0.2 * grain * dome) * shore;
+          const hgt = lv - this.p.depth + (this.p.depth + top) * smoothstep(1.25, 0.98, q);
+          if (hgt > best) best = hgt;
+        }
+      }
+    return best;
+  }
+
+  private clusterCache = new Map<number, Array<{ x: number; z: number; a: number; b: number; c: number; s: number; h: number; k: number }>>();
+  /** the islands of one cluster cell (deterministic, cached) */
+  private cluster(ci: number, cj: number, cell: number) {
+    const key = (ci + 4096) * 65536 + (cj + 32768);
+    let out = this.clusterCache.get(key);
+    if (out) return out;
+    out = [];
+    const r = new Rng((this.seed ^ Math.imul(ci + 977, 0x2c1b3c6d) ^ Math.imul(cj + 131, 0x297a2d39)) >>> 0);
+    if (r.float() < 0.42) {
+      const cx = (ci + r.range(0.2, 0.8)) * cell;
+      const cz = (cj + r.range(0.2, 0.8)) * cell;
+      const ang = r.range(0, Math.PI);
+      // sizes are chosen to be resolved by the 64 m far-field terrain tiles (most of the sea is
+      // drawn by them): nothing smaller than ~150 m across
+      const big = r.float() < 0.6;
+      const a = big ? r.range(260, 480) : r.range(140, 240);
+      const main = { x: cx, z: cz, a, b: a * r.range(0.4, 0.62), c: Math.cos(ang), s: Math.sin(ang), h: big ? r.range(95, 185) : r.range(40, 80), k: r.range(0, 50) };
+      out.push(main);
+      // satellite islets and skerries along the grain, off the ends and one side
+      const n = r.int(1, 4);
+      for (let i = 0; i < n; i++) {
+        const along = (r.float() < 0.5 ? -1 : 1) * r.range(1.0, 1.8) * a;
+        const across = r.range(-0.9, 0.9) * main.b;
+        const sa = r.range(75, 150);
+        const aa = ang + r.range(-0.4, 0.4);
+        out.push({ x: cx + main.c * along - main.s * across, z: cz + main.s * along + main.c * across, a: sa, b: sa * r.range(0.45, 0.75), c: Math.cos(aa), s: Math.sin(aa), h: r.range(12, 34), k: r.range(0, 50) });
+      }
+    }
+    if (this.clusterCache.size > 4096) this.clusterCache.clear();
+    this.clusterCache.set(key, out);
+    return out;
   }
 
   /** finite courses: beyond the harbour shoreline the land slopes away into the open sea */
@@ -551,7 +625,11 @@ export class Coast {
     let bed = W - 4 - (this.p.depth - 4) * smoothstep(sz, sz + 700, z);
     // islands and skerries out to sea
     void s;
-    const ki = smoothstep(sz + 150, sz + 500, z);
+    // keep the harbour mouth and the victory reveal's sightline (out to sea, then back up the
+    // mountain) clear of islands
+    const dxH = x - this.profile.centerX(this.finishZ) - 120;
+    const lane = (1 - smoothstep(380, 650, Math.abs(dxH))) * (1 - smoothstep(sz + 2200, sz + 2800, z));
+    const ki = smoothstep(sz + 150, sz + 500, z) * (1 - lane);
     if (ki > 0) {
       const isl = this.island(x, z, W);
       if (isl > bed) bed += (isl - bed) * ki;

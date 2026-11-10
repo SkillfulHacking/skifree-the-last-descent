@@ -17,6 +17,8 @@ import type { Mountain } from '../course';
 import type { CaveAnchor } from '../caveTerrain';
 import type { Biome } from '../biome';
 import type { Cave } from '../Cave';
+import type { Timeline } from '../../cinematic/Timeline';
+import type { Stage } from '../../game/Stage';
 
 export interface CaveDressing {
   readonly group: THREE.Object3D;
@@ -34,10 +36,31 @@ export interface CaveDressingContext {
   biome: Biome;
 }
 
+/** What a location's cave-cinematic hook gets: the stage, the cave, the shared timeline. */
+export interface CaveCinematicContext {
+  st: Stage;
+  cave: Cave;
+  /** the shared encounter's timeline: add beats with `at`, override shots by adding later ones */
+  tl: Timeline;
+  /** a point offset from the mouth (along the cave's outward direction, up, +z), as the shared shots use */
+  at(ox: number, oy: number, oz: number): THREE.Vector3;
+}
+
+/** Extra, location-specific beats layered on the shared cave cinematic (owned and disposed by it). */
+export interface CaveCinematicExtras {
+  update?(dt: number, t: number): void;
+  dispose(): void;
+}
+
 export interface CavePresentation {
   readonly id: string;
   /** extra props/materials around the cave; omit (or return null) for none */
   dress?(ctx: CaveDressingContext): CaveDressing | null;
+  /**
+   * Optional location beats for the cave cinematic (spray, birds, shot overrides). Called once when
+   * the cinematic starts; omit for none (Alpine), which leaves the shared encounter unchanged.
+   */
+  cinematic?(ctx: CaveCinematicContext): CaveCinematicExtras | null;
 }
 
 const caves = new Map<string, CavePresentation>();

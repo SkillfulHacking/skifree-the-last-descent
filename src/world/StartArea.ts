@@ -62,11 +62,26 @@ function woodTexture(seed: number): THREE.CanvasTexture {
   return t;
 }
 
+/**
+ * Location hook: a biome can register its own start dressing (built into `group`, returning what to
+ * dispose). Without one (Alpine) the shared start below is built, unchanged.
+ */
+export type StartDressing = (m: Mountain, group: THREE.Group, wood: typeof woodTexture) => Array<{ dispose(): void }>;
+const startDressings = new Map<string, StartDressing>();
+export function registerStartDressing(biomeId: string, f: StartDressing): void {
+  startDressings.set(biomeId, f);
+}
+
 export class StartArea {
   readonly group = new THREE.Group();
   private disposables: Array<{ dispose(): void }> = [];
 
   constructor(m: Mountain) {
+    const custom = startDressings.get(m.biome.id);
+    if (custom) {
+      this.disposables.push(...custom(m, this.group, woodTexture));
+      return;
+    }
     const grain = woodTexture(77);
     const wood = new THREE.MeshStandardMaterial({ color: 0xc9a27e, map: grain, bumpMap: grain, bumpScale: 1.2, roughness: 0.82 });
     const darkWood = new THREE.MeshStandardMaterial({ color: 0x8a6a52, map: grain, bumpMap: grain, bumpScale: 1.2, roughness: 0.85 });

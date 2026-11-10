@@ -127,6 +127,9 @@ kbd {
 .hud-sub { position: absolute; left: 0; right: 0; top: calc(40% + clamp(52px, 9vw, 120px)); text-align: center; font-size: 18px; letter-spacing: 0.2em; color: var(--ink-dim); opacity: 0; transition: opacity 0.8s 0.3s !important; }
 .hud-sub.on { opacity: 1; }
 .hud-sub.victory, .hud-sub.defeat { top: calc(22% + clamp(46px, 7vw, 96px)); }
+/* titles over bright scenery (e.g. the Fjord reveal): a dark halo keeps the subtitle legible */
+.hud-sub.scrim { color: #fff; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.95), 0 0 14px rgba(0,0,0,0.7), 0 0 34px rgba(0,0,0,0.45); }
+.hud-center.scrim { text-shadow: 0 0 40px rgba(255, 196, 90, 0.35), 0 2px 4px rgba(0,0,0,0.7), 0 6px 30px rgba(0,0,0,0.6); }
 .hud-sub.intro { top: calc(18% + clamp(40px, 6vw, 80px)); letter-spacing: 0.1em; font-size: 16px; }
 .hud-skip { position: absolute; right: 32px; bottom: calc(11vh + 18px); font-size: 13px; color: var(--ink-dim); letter-spacing: 0.1em; }
 .hud-fps { position: absolute; left: 12px; bottom: 10px; font: 11px ui-monospace, monospace; color: #cfe; background: rgba(0,0,0,0.45); padding: 4px 8px; border-radius: 6px; }

@@ -118,7 +118,7 @@ export function makeFjordBiome(): Biome {
       exposure: 0.8,
     },
     // crisp, clear air: long views across the fjord; haze stays thin over the water
-    atmosphere: { fogColor: [0.68, 0.79, 0.93], fogDensity: 0.000145, sunHaze: [1.0, 0.84, 0.66], linear: 1 / 46000, falloff: 1 / 2600 },
+    atmosphere: { fogColor: [0.68, 0.79, 0.93], fogDensity: 0.000125, sunHaze: [1.0, 0.84, 0.66], linear: 1 / 46000, falloff: 1 / 2600 },
     weather: { flakeDensity: 0.3, flakeSize: 0.07, flakeOpacity: 0.55, flakeColor: 0xffffff },
     terrainLook: {
       snow: [0.88, 0.92, 0.975],
@@ -133,7 +133,7 @@ export function makeFjordBiome(): Biome {
       shadeTint: [0.84, 0.93, 1.12],
       skylightTint: [0.84, 0.97, 1.28],
     },
-    ranges: { skyColor: [0.46, 0.61, 0.88], snow: [0.93, 0.95, 0.995], stoneDark: [0.085, 0.095, 0.115], stoneLight: [0.24, 0.255, 0.28], lowland: [0.06, 0.075, 0.09], openSector: { center: 2.2, halfWidth: 1.35, floor: 0.03 } },
+    ranges: { skyColor: [0.46, 0.61, 0.88], snow: [0.93, 0.95, 0.995], stoneDark: [0.085, 0.095, 0.115], stoneLight: [0.24, 0.255, 0.28], lowland: [0.06, 0.075, 0.09], openSector: { center: 2.2, halfWidth: 1.35, floor: 0.03 }, horizonHaze: 0.62 },
     trees: {
       species: [
         // Scots pine: tall bare red-brown trunk, a high, open, flat-topped crown

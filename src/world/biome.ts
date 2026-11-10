@@ -114,6 +114,11 @@ export interface BiomeRangesLook {
    * way down the course, is π/2; −X is π); `halfWidth` in radians. Omitted: ridges all around.
    */
   openSector?: { center: number; halfWidth: number; floor: number };
+  /**
+   * Optional peak opacity of the horizon haze band (default 0.92). Lower = a crisper horizon (Fjord:
+   * clear coastal air, islands and the far shore stay readable).
+   */
+  horizonHaze?: number;
 }
 
 /** One conifer species (shape + needle colour). See props.ts pineGeometry. */

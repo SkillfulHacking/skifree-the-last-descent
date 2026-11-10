@@ -53,19 +53,31 @@ async function shot(name, note) {
   manifest.shots.push({ name, note, camera: st.cam, phase: st.s?.phase ?? 'menu', z: st.s?.z ?? null, cinematicTime: st.s?.cinematicTime ?? null, course: st.course?.id });
   log('shot', name);
 }
-/** frames until a predicate on the session state holds (deterministic 1/30 s steps) */
-async function framesUntil(pred, max = 900) {
+/**
+ * frames until a predicate on the session state holds (deterministic 1/30 s steps). With
+ * `finishTick`, the finish environment is animated on the same clock (the held harness does not
+ * run App's per-frame finish update, so guests, the plunge, boats and the trophy presenter would
+ * otherwise stand still in the victory captures).
+ */
+async function framesUntil(pred, max = 900, finishTick = false) {
   return ev(
-    ([src, max]) => {
+    ([src, max, tick]) => {
       const f = new Function('s', `return (${src})(s);`);
+      const w = window.__skifree.world?.();
+      const fin = tick && w ? w.resort : null;
+      window.__evT = window.__evT ?? 0;
       for (let i = 0; i < max; i++) {
         const s = window.__skifree.state().session;
         if (f(s)) return { ok: true, i, s };
         window.__skifree.frames(1);
+        if (fin) {
+          window.__evT += 1 / 30;
+          fin.update(1 / 30, window.__evT, { cheer: 1, lookAt: null, welcome: 1 });
+        }
       }
       return { ok: false, s: window.__skifree.state().session };
     },
-    [pred.toString(), max],
+    [pred.toString(), max, finishTick],
   );
 }
 const freeCam = (pos, look, fov = 50) => ev(([p, l, f]) => window.__skifree.freeCam(p, l, f), [pos, look, fov]);
@@ -204,9 +216,20 @@ if (want('cave') || want('cinematic') || want('pursuit')) {
   await ev(() => { window.__skifree.hold(true); window.__skifree.toCave(); });
   await framesUntil(`(s) => s.phase === 'caveCinematic'`, 600);
   if (want('cinematic')) {
+    if (biome === 'fjord' && process.env.CAVE_EXTRAS) {
+      // the Fjord cave beats: gulls scattering off the basalt on the rumble, spray on the roar
+      await framesUntil(`(s) => s.cinematicTime >= 3.0`, 600);
+      await settle(1500);
+      await shot('08c_yeti_cinematic_gulls', 'Cave cinematic, t≈3.0 s (Fjord: gulls scatter off the columns on the rumble)');
+    }
     await framesUntil(`(s) => s.cinematicTime >= 9.5`, 600);
     await settle(1500);
     await shot('08_yeti_cinematic', 'Cave cinematic, t≈9.5 s (emergence)');
+    if (biome === 'fjord' && process.env.CAVE_EXTRAS) {
+      await framesUntil(`(s) => s.cinematicTime >= 11.6`, 600);
+      await settle(1500);
+      await shot('08d_yeti_cinematic_roar', 'Cave cinematic, t≈11.6 s (Fjord: the roar, spray and sea smoke out of the mouth)');
+    }
     await framesUntil(`(s) => s.cinematicTime >= 14.6`, 400);
     await settle(1500);
     await shot('08b_yeti_cinematic', 'Cave cinematic, t≈14.6 s');
@@ -268,15 +291,33 @@ if (G.finite && (want('finish') || want('victory'))) {
     await goTo(G.L - 50, 22);
     await ev(() => { window.__skifree.autopilot('skilled'); window.__skifree.placeYeti(45); });
     await framesUntil(`(s) => s.phase === 'victory' || s.outcome === 'victory'`, 600);
-    await framesUntil(`(s) => s.cinematicTime >= 9.6`, 600);
-    await settle(1500);
-    await shot('11_victory_trophy', 'Victory: trophy hand-off');
-    await framesUntil(`(s) => s.cinematicTime >= 13.4`, 300);
-    await settle(1500);
-    await shot('11b_victory_celebration', 'Victory: the celebration beat');
-    await framesUntil(`(s) => s.cinematicTime >= 19.5`, 400);
-    await settle(1500);
-    await shot('11c_victory_reveal', 'Victory: the closing reveal');
+    // the beats to capture: the shared three (trophy, celebration, closing shot), at the times of
+    // this location's script; Fjord (round 2) has its own beat sheet and a few extra beats
+    const beats =
+      biome === 'fjord'
+        ? [
+            [2.2, '11d_victory_quay', 'Victory: onto the quay (low tracking shot)'],
+            [4.7, '11e_victory_racks', 'Victory: the Yeti arrives at the stockfish rack'],
+            [6.6, '11f_victory_gag', 'Victory: the Yeti gags on a dried cod'],
+            [8.7, '11g_victory_present', 'Victory: the harbourmaster presents the trophy (over the shoulder)'],
+            [10.9, '11_victory_trophy', 'Victory: the trophy caught and held up (reverse angle)'],
+            [12.9, '11b_victory_celebration', 'Victory: apres on the quay (tub, bonfire, sauna, the plunge)'],
+            [14.5, '11h_victory_splash', 'Victory: the cannonball splash'],
+            [18.6, '11i_victory_reveal_mid', 'Victory: the reveal, mid-move'],
+            [22.6, '11c_victory_reveal', 'Victory: the closing reveal (summit), title'],
+          ]
+        : [
+            [9.6, '11_victory_trophy', 'Victory: trophy hand-off'],
+            [13.4, '11b_victory_celebration', 'Victory: the celebration beat'],
+            [19.5, '11c_victory_reveal', 'Victory: the closing reveal'],
+          ];
+    const onlyBeats = process.env.BEATS ? process.env.BEATS.split(',') : null;
+    for (const [t, name, note] of beats) {
+      await framesUntil(`(s) => s.cinematicTime >= ${t}`, 900, biome !== 'alpine');
+      if (onlyBeats && !onlyBeats.includes(name)) continue;
+      await settle(1500);
+      await shot(name, note);
+    }
   }
 }
 
