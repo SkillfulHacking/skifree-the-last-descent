@@ -50,8 +50,8 @@ Events come only from **validated gameplay state**: physics results, `RunState` 
 | `YetiEncountered` | `encounter, difficulty` | the cave cinematic ends and the chase begins |
 | `YetiEscaped` | `encounter, via` (`refuge`/`finish`), `chaseTime, closestGap` (nearest the Yeti got in that chase, m) | a refuge is reached, or the finish is crossed |
 | `RefugeReached` | `index` | a refuge (checkpoint) is reached |
-| `ScenicLocationDiscovered` | `biome, id` | biome code reports a viewpoint (none yet) |
-| `HazardSurvived` | `biome, kind` | biome code reports a hazard passed safely (none yet) |
+| `ScenicLocationDiscovered` | `biome, id` | the skier reaches a viewpoint on a coast's rim (Fjord Coast: `lookout-<n>`), once per run per id |
+| `HazardSurvived` | `biome, kind` | an environment `hazard-passed` without a hit (Fjord: `sea-gust`; `scoured-rock` only if the skier kept off it) |
 
 The schema is a discriminated union (`GameEvent`). Adding a field is backward compatible. Renaming or removing a field is not, because achievement criteria read the fields.
 
@@ -125,12 +125,12 @@ The function is pure apart from mutating the state passed in. The clock is injec
 | `daily-ritual` | Daily Ritual | Reach the resort on the Daily Mountain on **3 different dates**. Each win must be the Daily of the UTC day it was played on: the event's `date` equals the UTC date when `RunFinished` is evaluated. Replaying a past day doesn't count. Any length, any difficulty. Stored as `sets.dailyDays`. Progress bar. | works |
 | `dodgeball` | Dodgeball | `counters.snowballsDodged` ≥ 10. A dodge is a snowball that lands with the skier outside its 4 m zone (Hard only). Progress bar. | works |
 | `close-shave` | Close Shave (hidden) | `YetiEscaped` with `closestGap < 6 m`. The catch distance is 2.7 m. | works |
-| `scenic-route` | Scenic Route | `ScenicLocationDiscovered` with `biome: 'fjord'` | needs the Fjord Coast to emit it |
+| `scenic-route` | Scenic Route | `ScenicLocationDiscovered` with `biome: 'fjord'` | works (Fjord Coast viewpoints) |
 | `whiteout-survivor` | Whiteout Survivor | `RunFinished` victory with `biome: 'whiteout'` and difficulty `normal` or `hard` | needs the Whiteout Ridge biome |
 | `ice-dancer` | Ice Dancer | `DriftCompleted` with `controlled`, `surfaces.ice ≥ 3 s`, in a run whose `biome` is `frozen` | needs the Frozen Frontier |
 | `steam-runner` | Steam Runner | `HazardSurvived` with `biome: 'volcanic'`, `kind: 'vent-zone'` | needs the Volcanic Expanse |
 
-The four location achievements are defined and visible now, with a dashed card reading "Needs the … location (coming soon)". Alpine never emits their events, so they cannot be earned there; `tests/unit/achievements.test.ts` checks this. They unlock without any further change once a biome emits its events.
+Scenic Route works since Fjord Coast shipped. The other three location achievements are defined and visible now, with a dashed card reading "Needs the … location (coming soon)". Alpine never emits their events, so they cannot be earned there; `tests/unit/achievements.test.ts` checks this. They unlock without any further change once a biome emits its events.
 
 ### Achievements screen
 

@@ -15,7 +15,11 @@ course profile (`src/world/profile.ts`) and the `CourseConfig`. Every location u
 physics, collision system, controls, course architecture, streaming and pursuit logic. A location
 changes the numbers, not the engine.
 
-The game ships one location, **Alpine** (`alpine`). It is the technical reference: its terrain
+The game ships two locations. **Fjord Coast** (`fjord`, code `FJORD`, 2/5 Scenic) is the first new
+one and the *reference implementation* for the rest: every capability below is used by it, in
+`src/world/biomes/fjord/` (see [Fjord Coast: the reference location](#fjord-coast-the-reference-location)).
+
+**Alpine** (`alpine`) is the technical reference: its terrain
 heights, obstacles, shaders, physics, course codes and record keys are bit-for-bit those of the
 pre-biome game. The goldens in `tests/unit/biome.test.ts` and the identity tests in
 `tests/unit/capabilities.test.ts` enforce this.
@@ -56,7 +60,9 @@ Biome (data)                                 src/world/biome.ts
      ├─ refuge  : { id, name } ► RefugeDefinition       presentation/refuge.ts  │  + typed EnvironmentEvents (listen())
      ├─ cave    : { id }  ──► CavePresentation          presentation/cave.ts    │
      ├─ audio   : { ambience: ids }                                             │
+     ├─ scenery?: { id } ──► SceneryDefinition (three, streamed) presentation/scenery.ts
      └─ rating  : { level 1..5, label }  ──► Location row in the menu (ui/location.ts)
+Biome.terrain.coast?: CoastParams ──► Mountain.coast (pure, src/world/coast.ts): cliffs, sea levels, islands, harbour shore
                                                                                  │
 World (per course)                                                               │
  ├─ environment = new BiomeEnvironment(mountain, seed)  ◄────────────────────────┘
@@ -250,9 +256,11 @@ the hazard kinds. To add a bed, add the generator to `src/audio/ambience.ts`, ad
 `KNOWN_AMBIENCE` and route it in `AudioEngine.setAmbience`. The existing `Biome.audio` fields
 (`windGain` and `windPitch`) remain the wind bed's mix.
 
-> Gap: the audio engine still plays only the wind bed and does not yet consume `ambience` ids or
-> hazard cue ids. The first biome that needs them wires `AudioEngine` to `capabilitiesOf(biome)
-> .audio` and to the `hazard-*` events' `cue` fields.
+Since Fjord Coast the engine consumes both: `App.buildWorld` passes `capabilitiesOf(biome).audio
+.ambience` to `AudioEngine.setAmbience(mix, beds)`, which creates the extra beds (`surf`, `gulls`:
+`src/audio/coastal.ts`, level from `AudioFrameState.coast`). `GameSession` forwards the `cue` of
+`hazard-telegraph` / `hazard-active` / `hazard-hit` events to `AudioEngine.playCue(id, pos)`; add a
+new cue's synthesis to `coastCue` (or a sibling module) and its id to the hazard kind.
 
 ### rating
 
@@ -262,6 +270,30 @@ line. The ladder from the production brief: Alpine 1 Beginner · Fjord Coast 2 �
 Frozen Frontier 4 · Volcanic Expanse 5.
 
 ---
+
+### scenery (optional)
+
+```ts
+capabilities.scenery = { id: 'fjord-coast' }
+registerScenery({ id, build(ctx: { mountain, quality, biome, terrain /* TerrainUniforms */, sunDir }): SceneryView })
+interface SceneryView { group; stream(z); update(dt, time, { focus, camPos, origin }); menuCamera?(t, out): boolean; stats?(); dispose() }
+```
+
+Streamed set dressing that is neither terrain, obstacles, hazards, refuges, caves nor the finish:
+World builds it once, calls `stream(z)` with the obstacle window (build near, dispose far: bounded on
+Endless) and `update` every frame. `menuCamera` lets a location frame its own main-menu preview.
+Fjord: water surfaces, sea mist, fishing hamlets, cairns, viewpoints, ferries.
+
+### coast (terrain, optional)
+
+`Biome.terrain.coast: CoastParams` turns the −X side of the valley into a sea coast
+(`src/world/coast.ts`, pure). `Mountain.heightAt` = `coast.shape(x, z, landHeight, landAt)`; with no
+coast the land height is returned untouched (Alpine is bit-identical). The model provides the
+cliff rim (`rimX`, `beyondRim`, `guard` for the cornice), per-arm water levels (`reaches`,
+`seaLevelAt`: a long course is a chain of fjord arms whose level edges are hidden under headland
+ridges, so the walls stay 0.3–1.3 km high on a 50 km descent), the harbour shore (`shoreZ`, the
+open sea beyond a finite course), strand-flat `hamlets` and optional `lookouts` (viewpoints).
+Obstacles and vegetation keep off the rim, the cliffs, the water and the viewpoints.
 
 ## Course rules
 
@@ -457,6 +489,21 @@ Tuning notes:
   `docs/ASSETS_AND_LICENSES.md`.
 
 ---
+
+## Fjord Coast: the reference location
+
+| Piece | Where |
+|---|---|
+| Biome data, surface (cornice guard), weather (onshore breeze, airborne-only coupling), coast params | `src/world/biomes/fjord/biome.ts` |
+| Hazard kinds `sea-gust` (squall across jumps; windsock telegraph, 1.3 s) and `scoured-rock` (bare rock beside the line) | `src/world/biomes/fjord/hazards.ts` |
+| Terrain: cliffs, fjord arms, islands, harbour shore, viewpoints, hamlets | `src/world/coast.ts` |
+| Water (per-arm level surfaces), sea mist, hamlets, cairns, viewpoints, ferries | `src/world/biomes/fjord/views/{water,mist,scenery,viewpoint,buildings}.ts` |
+| Finish `fjord-harbour` + victory (trophy, cold plunge, sea-to-summit reveal) | `views/harbour.ts`, `views/harbourVictory.ts` |
+| Refuge `coastal-shelter`, cave dressing `fjord-sea-cave`, hazard views | `views/shelter.ts`, `views/seaCave.ts`, `views/hazardViews.ts` |
+| Surf / gulls beds and cues | `src/audio/coastal.ts` |
+| Viewpoints → `ScenicLocationDiscovered`, hazards → `HazardSurvived` | `GameSession.checkLookouts`, `GameSession.listenEnvironment` |
+| Tests | `tests/unit/fjord.test.ts`, balance table `tests/review/fjord_balance.test.ts` |
+| Evidence | `tools/biome_evidence.mjs <biome> <mode:length> <outDir> [WxH]` |
 
 ## What is deliberately not parameterised
 

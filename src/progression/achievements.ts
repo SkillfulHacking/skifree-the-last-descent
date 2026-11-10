@@ -230,7 +230,6 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     category: 'exploration',
     icon: 'viewpoint',
     biome: BIOME_IDS.fjord,
-    requires: 'Fjord Coast location',
     unlock: (e) => e.type === 'ScenicLocationDiscovered' && e.biome === BIOME_IDS.fjord,
   },
   {
