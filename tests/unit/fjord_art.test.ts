@@ -70,8 +70,13 @@ describe('Fjord sea cave: props keep out of the cave-cinematic cameras', () => {
       expect(props.some((p) => p.kind === 'column')).toBe(true);
       const lines = caveCameraSightlines(cave.mouth, cave.outward, cave.lipTop);
       for (const p of props) expect(clearOfCaveCameras(lines, p.p, p.r), `${p.kind} at ${p.p.toArray().map((v) => v.toFixed(1))}`).toBe(true);
-      // and off the Yeti's exit path / ledge
-      for (const p of props) for (const e of cave.exitPath) expect(Math.hypot(p.p.x - e.x, p.p.z - e.z)).toBeGreaterThan(p.r + 4);
+      // and off the Yeti's exit path / ledge (the lintel's column ends stand overhead, above the
+      // mouth: they are checked for headroom instead)
+      for (const p of props)
+        for (const e of cave.exitPath) {
+          if (p.p.y - p.r > e.y + 5.5) continue;
+          expect(Math.hypot(p.p.x - e.x, p.p.z - e.z)).toBeGreaterThan(p.r + 4);
+        }
       d.dispose();
     });
   }

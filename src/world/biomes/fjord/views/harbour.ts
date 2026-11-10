@@ -130,6 +130,8 @@ export class Harbour implements FinishEnvironment {
   readonly seaward = new THREE.Vector3();
   /** quay front z */
   readonly quayZ: number;
+  /** the quay wall's top front edge, per 4 m bay (victory staging, tests) */
+  quayFront: THREE.Vector3[] = [];
   private cols: CircleCollider[] = [];
   private podiumTop = new THREE.Vector3();
   private stamp = new THREE.Vector3();
@@ -258,12 +260,52 @@ export class Harbour implements FinishEnvironment {
     // round 2 (art review D6, critic 4): a real boardwalk of individual planks on piles, finger
     // piers of planks, a granite quay wall with a capping course and bollards
     const quayW = 150;
-    for (let x = -quayW; x < quayW; x += 4) {
+    // round 3 (art review A1): a granite quay WALL standing at the real waterline along the whole
+    // waterfront. The heightfield's shore wanders in x (shoreZ is taken at the centre only), so a
+    // straight wall at zq left a sloping, wet-blotched snow bank between the houses and the water.
+    // Per 4 m bay: find where the ground meets the sea, fill the bank with a solid granite quay
+    // (its top, the apron, at deck level), face it with coursed blocks, a capping course, a wet
+    // weed line at the tide mark and iron bollards.
+    const shoreAt = (x: number) => {
+      let z = zq - 24;
+      while (z < zq + 140 && H(x, z) > sea + 0.15) z += 2;
+      let lo = z - 2;
+      let hi2 = z;
+      for (let k = 0; k < 5; k++) {
+        const mid = (lo + hi2) / 2;
+        if (H(x, mid) > sea + 0.15) lo = mid;
+        else hi2 = mid;
+      }
+      return hi2;
+    };
+    const wallBase = sea - 2.6;
+    this.quayFront = [];
+    for (let x = -quayW - 12; x < quayW + 12; x += 4) {
       const px = F.x + x + 2;
+      const zs = Math.max(zq + 1.4, Math.min(shoreAt(px - 1.5), shoreAt(px), shoreAt(px + 1.5)) + 0.6);
+      this.quayFront.push(new THREE.Vector3(px, deckY, zs));
+      const z0 = zq - 4;
       const t = 0.33 + 0.05 * Math.sin(x * 1.7);
-      b.add('stone', new THREE.BoxGeometry(4.05, 6, 2.4), mat(px, deckY - 3.15, zq + 1.2), new THREE.Color(t, t * 1.01, t * 1.05));
-      b.add('stone', new THREE.BoxGeometry(4.0, 0.3, 2.6), mat(px, deckY - 0.02, zq + 1.2), new THREE.Color(t * 1.25, t * 1.25, t * 1.28));
-      if (((x + quayW) / 4) % 5 === 2) b.add('metal', new THREE.CylinderGeometry(0.22, 0.28, 0.6, 10), mat(px, deckY + 0.4, zq + 1.8), 0x1e2226);
+      // the fill and its apron (top just under the boardwalk planks)
+      b.add('stone', new THREE.BoxGeometry(4.02, deckY - 0.08 - wallBase, zs - z0), mat(px, (deckY - 0.08 + wallBase) / 2, (z0 + zs) / 2), new THREE.Color(t * 1.1, t * 1.1, t * 1.13));
+      // coursed face blocks (three courses, staggered joints, each block its own tone)
+      for (let c = 0; c < 3; c++) {
+        const y0 = wallBase + 0.4 + c * ((deckY - 0.35 - wallBase - 0.4) / 3);
+        const hC = (deckY - 0.35 - wallBase - 0.4) / 3 - 0.06;
+        const split = c % 2 ? 1.3 : 2.4;
+        for (const [a0, a1] of [
+          [-2, -2 + split],
+          [-2 + split, 2],
+        ] as const) {
+          const tb = 0.28 + 0.1 * Math.abs(Math.sin(x * 3.1 + c * 1.7 + a0));
+          b.add('stone', new THREE.BoxGeometry(a1 - a0 - 0.06, hC, 0.5), mat(px + (a0 + a1) / 2, y0 + hC / 2, zs + 0.18), new THREE.Color(tb, tb * 1.02, tb * 1.07));
+        }
+      }
+      // capping course, proud of the face
+      b.add('stone', new THREE.BoxGeometry(4.0, 0.32, 0.95), mat(px, deckY - 0.18, zs + 0.1), new THREE.Color(t * 1.35, t * 1.35, t * 1.38));
+      // wet weed band at the tide line
+      b.add('stone', new THREE.BoxGeometry(4.04, 0.9, 0.12), mat(px, sea + 0.25, zs + 0.45), new THREE.Color(0.07, 0.085, 0.06));
+      if (((x + quayW + 12) / 4) % 5 === 2) b.add('metal', new THREE.CylinderGeometry(0.22, 0.28, 0.6, 10), mat(px, deckY + 0.25, zs - 0.35), 0x1e2226);
     }
     const bwz0 = zq + 2.2;
     const bwz1 = zq + 10;

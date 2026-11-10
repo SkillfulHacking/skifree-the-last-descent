@@ -3,8 +3,8 @@
  * beyond a finite course's harbour.
  *
  * Each surface is a camera-following quad at its arm's level, clipped to the arm's [z0, z1) (the
- * shader also discards outside it; the headland ridges between arms always stand above both levels,
- * so the cut edges are hidden under rock). At most SEA_SLOTS arms are drawn — the one under the
+ * headland ridges between arms always stand above both levels, so the cut edges are hidden under
+ * rock). At most SEA_SLOTS arms are drawn — the one under the
  * camera and those ahead first (waterReaches): 1–4 draw calls, 2 triangles each, drawn after the
  * terrain. The same reaches are handed to the terrain shader (uSea) for its wet shore band and surf.
  *
@@ -69,7 +69,8 @@ float sf_wave(vec2 p, float t, float nearK) {
 }
 void main() {
   vec3 P = vW + uOrigin; // absolute world position
-  if (P.z < uZ0 || P.z >= uZ1) discard;
+  // (no discard: update() clips each quad to its arm's [z0, z1) exactly — round 3, tech review D
+  // minor 4 — so the depth test can run early on the water)
   vec3 rel = vW - cameraPosition;
   float d = length(rel);
   vec3 V = -rel / d;

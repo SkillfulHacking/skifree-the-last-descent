@@ -26,6 +26,7 @@ import * as THREE from 'three';
 import type { CaveDressing, CaveDressingContext } from '../../../presentation/cave';
 import { Batch, Rand, mat } from '../../../resort/util';
 import { kitMaterials } from './buildings';
+import { PrismSet, clinkerHull, hullKeelY } from './basaltKit';
 import { caveCameraSightlines } from '../../../../cinematic/CaveCinematic';
 
 /** distance from p to the segment ab */
@@ -57,40 +58,53 @@ export function clearOfCaveCameras(lines: Array<{ cam: THREE.Vector3; look: THRE
   return true;
 }
 
-/** basalt column material: per-column tone (vertex colour), cross-joints and weathering by height */
+/** basalt column material: per-column tone (vertex colour), cross-joints, wet foot, salt rime and lichen */
 function basaltMaterial(): THREE.MeshStandardMaterial {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.0 });
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.0, flatShading: true });
+  // the Fjord sky environment is bright: at full strength its (rough) reflection alone lifts a
+  // near-black albedo to mid grey (round 2 measured RGB ≈ 90). Basalt keeps a little sheen only.
+  m.envMapIntensity = 0.28;
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec3 aJ;\nvarying vec3 vJ;\nvarying vec3 vBN;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvJ = aJ;\nvBN = normal;');
+      .replace('#include <common>', '#include <common>\nattribute vec3 aJ;\nvarying vec3 vJ;\nvarying vec3 vBN;\nvarying vec3 vBW;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvJ = aJ;\nvBN = normal;\nvBW = (modelMatrix * vec4(position, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vJ;\nvarying vec3 vBN;\nfloat bs_h(float n){ return fract(sin(n) * 43758.5453); }')
+      .replace('#include <common>', '#include <common>\nvarying vec3 vJ;\nvarying vec3 vBN;\nvarying vec3 vBW;\nfloat bs_h(float n){ return fract(sin(n) * 43758.5453); }\nfloat bs_n(vec3 p){ vec3 i = floor(p); vec3 f = fract(p); f = f * f * (3.0 - 2.0 * f); float n = dot(i, vec3(1.0, 57.0, 113.0)); return mix(mix(mix(bs_h(n), bs_h(n + 1.0), f.x), mix(bs_h(n + 57.0), bs_h(n + 58.0), f.x), f.y), mix(mix(bs_h(n + 113.0), bs_h(n + 114.0), f.x), mix(bs_h(n + 170.0), bs_h(n + 171.0), f.x), f.y), f.z); }')
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
 {
-  // vJ = (column seed, height above the snow, column height)
+  // vJ = (column seed, height above the snow along the column, column height)
   float seed = vJ.x;
   float y = vJ.y;
-  float side = 1.0 - abs(normalize(vBN).y);
-  // cross-joints: irregular spacing per column (0.5–1.1 m), slightly wavy; anti-aliased (they
-  // fade out once a joint is about a pixel wide, so distant columns do not sparkle)
-  float sp = 0.5 + 0.6 * bs_h(seed * 3.1);
-  float q = y / sp + bs_h(seed * 7.7) + 0.06 * sin(y * 3.7 + seed);
+  vec3 bn = normalize(vBN);
+  float side = 1.0 - abs(bn.y);
+  // cross-joints: irregular spacing per column (0.45–1.2 m), slightly wavy, anti-aliased
+  float sp = 0.45 + 0.75 * bs_h(seed * 3.1);
+  float q = y / sp + bs_h(seed * 7.7) + 0.08 * sin(y * 3.7 + seed);
   float fq = fwidth(q);
   float d = abs(fract(q) - 0.5);
   float joint = smoothstep(0.5 - 0.06 - fq, 0.5 - fq * 0.5, d) * (1.0 - smoothstep(0.15, 0.4, fq));
-  diffuseColor.rgb *= 1.0 - 0.6 * joint * side;
-  // wet, near-black low down; a faint cold sheen higher up (no per-pixel hash detail: it sparkled)
-  float wet = 1.0 - smoothstep(0.0, 1.8, y);
-  diffuseColor.rgb *= 1.0 - 0.35 * wet;
-  diffuseColor.rgb *= 0.9 + 0.2 * smoothstep(0.0, vJ.z, y);
+  diffuseColor.rgb *= 1.0 - 0.7 * joint * side;
+  // wet and blackest at the foot; a faint cold sheen higher up
+  float wet = 1.0 - smoothstep(0.0, 1.6, y);
+  diffuseColor.rgb *= 1.0 - 0.4 * wet;
+  // vesicular grain / weathering mottling (world space, two scales)
+  float g = bs_n(vBW * 2.3) * 0.6 + bs_n(vBW * 7.1) * 0.4;
+  diffuseColor.rgb *= 0.75 + 0.5 * g;
+  // salt rime and frost on the upper faces, pale grey-green crust lichen in places
+  float rime = smoothstep(0.62, 0.85, bs_n(vBW * vec3(1.1, 3.5, 1.1) + seed)) * smoothstep(0.6, 2.5, y) * side;
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.07, 0.075, 0.08), rime * 0.5);
+  float lich = smoothstep(0.7, 0.86, bs_n(vBW * 1.7 + 40.0)) * (1.0 - side * 0.6);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.045, 0.045, 0.03), lich * 0.5);
 }`,
       )
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.45, 1.0 - smoothstep(0.0, 1.4, vJ.y));');
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.4, 1.0 - smoothstep(0.0, 1.2, vJ.y));')
+      // the Fjord sky light (irradiance ≈ 5) lifts even a 0.02 albedo to mid grey: basalt takes a
+      // third of it (it reads black in sun, as the reference photos of wet basalt do)
+      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.indirectDiffuse *= 0.32;\nreflectedLight.directDiffuse *= 0.5;');
   };
-  m.customProgramCacheKey = () => 'fjord-basalt-v1';
+  m.customProgramCacheKey = () => 'fjord-basalt-v3';
   return m;
 }
 
@@ -103,11 +117,14 @@ function basaltCaveRock(cave: CaveDressingContext['cave']): void {
   const prev = m.onBeforeCompile;
   m.onBeforeCompile = (sh, r) => {
     prev.call(m, sh, r);
-    sh.fragmentShader = sh.fragmentShader.replace(
-      '  // --- floor: compacted rubble and grit',
-      `  {
-    // Fjord: columnar basalt — hexagonal joints in plan (columns ~1 m across), cross-joints along
-    // them, near-black and wet low down, salt crust and lichen higher up
+    sh.fragmentShader = sh.fragmentShader
+      .replace('float cv_dist = 0.0;', 'float cv_dist = 0.0;\nfloat fj_bas = 0.0;')
+      .replace(
+        '  // --- floor: compacted rubble and grit',
+        `  {
+    // Fjord: columnar basalt — hexagonal joints in plan (columns ~1 m across), near-black and wet.
+    // It REPLACES the shared bedded rock (round 2 kept 8 % of it: its pale weathering ovals then
+    // dominated the black and read as camouflage blotches)
     vec2 hp = ap.xz / 0.95;
     vec2 hs = vec2(1.0, 1.7320508);
     vec4 hC = floor(vec4(hp, hp - vec2(0.5, 1.0)) / hs.xyxy) + 0.5;
@@ -116,20 +133,32 @@ function basaltCaveRock(cave: CaveDressingContext['cave']): void {
     vec2 ha = abs(hc.xy);
     float he = 0.5 - max(dot(ha, hs * 0.5), ha.x);
     float hid = fract(sin(dot(hc.zw, vec2(12.9898, 78.233))) * 43758.5453);
-    vec3 bas = vec3(0.011, 0.012, 0.014) * (0.8 + 0.4 * hid);
-    // column joints read as vertical seams on steep faces only, and not every seam is open (a
-    // plan-view hexagon grid on gentler surfaces, or a full grid of seams, read as tiles)
-    float colFace = smoothstep(0.6, 0.9, steep) * (1.0 - smoothstep(14.0, 45.0, cv_dist)) * step(0.35, hid);
-    bas *= 1.0 - 0.4 * (1.0 - smoothstep(0.0, 0.04, he)) * colFace;
-    float salt = smoothstep(0.6, 0.85, cv_n3(vec3(ap.x * 0.6, ap.y * 1.4, ap.z * 0.6) + 11.0)) * steep;
-    bas = mix(bas, vec3(0.3, 0.32, 0.34), salt * 0.15);
-    rock = mix(rock, bas, 0.92);
+    vec3 bas = vec3(0.016, 0.017, 0.02) * (0.75 + 0.5 * hid);
+    // column joints read as vertical seams on steep faces only (open in most cells)
+    float colFace = smoothstep(0.55, 0.85, steep) * (1.0 - smoothstep(18.0, 60.0, cv_dist)) * step(0.2, hid);
+    bas *= 1.0 - 0.55 * (1.0 - smoothstep(0.0, 0.05, he)) * colFace;
+    // cross-joints along the columns (horizontal partings on the steep faces)
+    float cj = 1.0 - smoothstep(0.0, 0.06, abs(fract(ap.y / (0.7 + 0.5 * hid) + hid) - 0.5) - 0.44);
+    bas *= 1.0 - 0.35 * cj * colFace;
+    // faint salt crust high on the faces
+    float salt = smoothstep(0.66, 0.88, cv_n3(vec3(ap.x * 0.6, ap.y * 1.4, ap.z * 0.6) + 11.0)) * steep;
+    bas = mix(bas, vec3(0.2, 0.21, 0.22), salt * 0.12);
+    rock = bas;
+    fj_bas = 1.0 - kind;
   }
   // --- floor: compacted rubble and grit`,
-    );
+      )
+      .replace(
+        'reflectedLight.indirectDiffuse *= mix(vec3(0.88, 0.97, 1.2), vec3(1.0), (1.0 - cv_snow) * 0.5);',
+        `reflectedLight.indirectDiffuse *= mix(vec3(0.88, 0.97, 1.2), vec3(1.0), (1.0 - cv_snow) * 0.5);
+// basalt: the bright sky's reflection would lift the black rock to mid grey (round 2: RGB ≈ 95)
+reflectedLight.indirectSpecular *= 1.0 - 0.75 * fj_bas * (1.0 - cv_snow);
+reflectedLight.indirectDiffuse *= 1.0 - 0.68 * fj_bas * (1.0 - cv_snow);
+reflectedLight.directDiffuse *= 1.0 - 0.45 * fj_bas * (1.0 - cv_snow);`,
+      );
   };
   const key = m.customProgramCacheKey?.bind(m);
-  m.customProgramCacheKey = () => (key ? key() : '') + '|fjord-basalt';
+  m.customProgramCacheKey = () => (key ? key() : '') + '|fjord-basalt-v3';
   m.needsUpdate = true;
 }
 
@@ -196,6 +225,66 @@ function iceTexture(): THREE.CanvasTexture {
 
 export interface SeaCavePerch {
   p: THREE.Vector3;
+  /** on the portal or the lintel (framed by the brow shot) */
+  brow?: boolean;
+}
+
+/** smooth value noise in 2D (deterministic, cheap) for column heights */
+function vn2(x: number, z: number, seed: number): number {
+  const h = (i: number, j: number) => {
+    const s = Math.sin(i * 127.1 + j * 311.7 + seed * 74.7) * 43758.5453;
+    return s - Math.floor(s);
+  };
+  const i = Math.floor(x);
+  const j = Math.floor(z);
+  const fx = x - i;
+  const fz = z - j;
+  const u = fx * fx * (3 - 2 * fx);
+  const v = fz * fz * (3 - 2 * fz);
+  return (h(i, j) * (1 - u) + h(i + 1, j) * u) * (1 - v) + (h(i, j + 1) * (1 - u) + h(i + 1, j + 1) * u) * v;
+}
+
+/**
+ * How far the cave's rock face stands out (along the outward direction) at a lateral offset and a
+ * height above the mouth: sampled from the rock mesh's own vertices (one pass, binned 0.5 m), so
+ * the portal columns and the lintel's column ends sit ON the face. Falls back to the mouth line.
+ */
+function faceSampler(cave: CaveDressingContext['cave'], mouth: THREE.Vector3, out: THREE.Vector3, tan: THREE.Vector3) {
+  const A0 = -16;
+  const NA = 64;
+  const Y0 = -2;
+  const NY = 40;
+  const bins = new Float32Array(NA * NY).fill(-Infinity);
+  const rock = cave.group.getObjectByName('cave-rock') as THREE.Mesh | undefined;
+  const P = rock?.geometry?.getAttribute('position') as THREE.BufferAttribute | undefined;
+  if (rock && P) {
+    rock.updateMatrixWorld(true);
+    const mw = rock.matrixWorld;
+    const v = new THREE.Vector3();
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i).applyMatrix4(mw).sub(mouth);
+      const a = Math.floor((v.dot(tan) - A0) / 0.5);
+      const y = Math.floor((v.y - Y0) / 0.5);
+      if (a < 0 || a >= NA || y < 0 || y >= NY) continue;
+      const o = v.dot(out);
+      const k = y * NA + a;
+      if (o > bins[k]!) bins[k] = o;
+    }
+  }
+  return (along: number, up: number): number | null => {
+    const a = Math.floor((along - A0) / 0.5);
+    const y = Math.floor((up - Y0) / 0.5);
+    if (a < 0 || a >= NA || y < 0 || y >= NY) return null;
+    let best = -Infinity;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let da = -1; da <= 1; da++) {
+        const aa = a + da;
+        const yy = y + dy;
+        if (aa < 0 || aa >= NA || yy < 0 || yy >= NY) continue;
+        best = Math.max(best, bins[yy * NA + aa]!);
+      }
+    return Number.isFinite(best) ? best : null;
+  };
 }
 
 export function dressSeaCave(c: CaveDressingContext): CaveDressing {
@@ -209,10 +298,11 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
   const ice = new THREE.MeshPhysicalMaterial({ color: 0xd8ecff, roughness: 0.06, transparent: true, opacity: 0.88, emissive: 0x16304a, emissiveIntensity: 0.22, clearcoat: 1 });
   const net = new THREE.MeshStandardMaterial({ color: 0x3f5f4a, roughness: 0.9, side: THREE.DoubleSide, alphaTest: 0.4 });
   const drift = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
+  const hullMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, flatShading: true, envMapIntensity: 0.5 });
   const iceTex = iceTexture();
   const seaIce = new THREE.MeshPhysicalMaterial({ map: iceTex, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.05, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
   const plates = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0 });
-  const M: Record<string, THREE.Material> = { ...K, basalt, ice, drift, plates };
+  const M: Record<string, THREE.Material> = { ...K, basalt, ice, drift, plates, hull: hullMat };
   const b = new Batch();
   const out = cave.outward.clone().setY(0).normalize();
   const tan = new THREE.Vector3(out.z, 0, -out.x);
@@ -229,62 +319,141 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     return new THREE.Vector3(x, m.heightAt(x, z), z);
   };
   basaltCaveRock(cave);
+  // the shared cave's own icicles hang inside the mouth, where against the dark chamber they read
+  // as pale floating shards (round 2, A4): the Fjord hangs its icicles from the lintel instead
+  const sharedIce = cave.group.getObjectByName('cave-icicles');
+  if (sharedIce) sharedIce.visible = false;
+  const face = faceSampler(cave, mouth, out, tan);
+  const up = new THREE.Vector3(0, 1, 0);
 
-  // ---------------- basalt columns ----------------
-  const colPos: number[] = [];
-  const colCol: number[] = [];
-  const colJ: number[] = [];
-  const addColumn = (p: THREE.Vector3, R: number, h: number, seed: number) => {
-    // seat: base sunk below the lowest ground under the footprint
+  // ---------------- basalt columns (round 3: irregular, not a bollard grid) ----------------
+  // 5–7-sided prisms of varied girth on a jittered hexagonal packing; heights from a smooth field
+  // stepped into terraces (a causeway, not a staircase of equal treads), broken and slanted tops,
+  // a little lean; snow only on some near-level tops. Three bodies: a large causeway stepping down
+  // from the wall on one side, a smaller, partly collapsed one on the other, and a colonnade of
+  // tall columns flanking the mouth up to the brow, with a lintel of column ends above the opening
+  // (the portal no longer has the shared cave's silhouette).
+  const cols = new PrismSet();
+  const icicles: Array<{ top: THREE.Vector3; len: number; r: number }> = [];
+  const seat = (p: THREE.Vector3, r: number) => {
     let gy = Infinity;
-    for (let k = 0; k < 6; k++) gy = Math.min(gy, m.heightAt(p.x + Math.cos(k) * R, p.z + Math.sin(k) * R));
-    const base = gy - 0.6;
-    const topY = Math.max(p.y, gy) + h;
-    const centre = new THREE.Vector3(p.x, (base + topY) / 2, p.z);
-    const rad = Math.max(R, (topY - base) / 2);
-    if (!ok(centre, rad)) return;
-    const g = new THREE.CylinderGeometry(R * 0.985, R, topY - base, 6, 1);
-    // chamfer the top rim slightly (a bevel ring)
-    const P = g.attributes.position as THREE.BufferAttribute;
-    for (let k = 0; k < P.count; k++) if (P.getY(k) > 0) P.setXYZ(k, P.getX(k) * 0.97, P.getY(k), P.getZ(k) * 0.97);
-    // flat faces toward the neighbours along the row
-    g.rotateY(Math.atan2(tan.x, tan.z));
-    g.translate(p.x, (base + topY) / 2, p.z);
-    const ng = g.toNonIndexed();
-    g.dispose();
-    ng.computeVertexNormals();
-    const NP = ng.attributes.position as THREE.BufferAttribute;
-    // (the Fjord sky environment lights dark surfaces strongly: basalt needs a very low albedo to read black)
-    const tone = 0.006 + 0.006 * ((seed * 7.31) % 1);
-    for (let k = 0; k < NP.count; k++) {
-      colPos.push(NP.getX(k), NP.getY(k), NP.getZ(k));
-      colCol.push(tone, tone * 1.04, tone * 1.13);
-      colJ.push(seed, NP.getY(k) - gy, topY - gy);
-    }
-    ng.dispose();
-    // snow cushion seated exactly on the top (a flattened dome of the same hexagon)
-    const cap = new THREE.CylinderGeometry(R * 0.9, R * 0.95, 0.22, 6, 1);
-    cap.rotateY(Math.atan2(tan.x, tan.z));
-    b.add('snow', cap, mat(p.x, topY + 0.1, p.z), 0xffffff);
-    b.add('snow', new THREE.SphereGeometry(R * 0.78, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.22, 1), mat(p.x, topY + 0.19, p.z), 0xffffff);
-    perches.push({ p: new THREE.Vector3(p.x, topY + 0.3, p.z) });
-    props.push({ p: centre, r: rad, kind: 'column' });
+    for (let k = 0; k < 6; k++) gy = Math.min(gy, m.heightAt(p.x + Math.cos(k) * r, p.z + Math.sin(k) * r));
+    return gy;
   };
-  for (const s of [-1, 1]) {
-    const rows = hi ? 5 : 4;
-    for (let r = 0; r < rows; r++)
-      for (let k = 0; k < 8; k++) {
-        // tightly packed hexagonal prisms (flat to flat), so the mass reads as one jointed body
-        const R = 0.8;
-        const along = 6.4 + k * Math.sqrt(3) * R + (r % 2) * Math.sqrt(3) * R * 0.5;
-        const back = -7 + r * 1.5 * R;
-        const p = place(s * along, back);
-        // tallest against the wall, stepping down toward the piste like a giant's staircase
-        const h = Math.max(0.5, (10.5 - k * 1.05 - (rows - 1 - r) * 1.0) * rnd.range(0.82, 1.04));
-        const seed = rnd.next() * 100;
-        if (rnd.next() < 0.04) continue;
-        addColumn(p, R, h, seed);
+  const column = (p: THREE.Vector3, r: number, top: number, seed: number, kind: string, opts: { slant?: boolean; lean?: number; brow?: boolean } = {}) => {
+    const gy = seat(p, r);
+    const base = gy - 0.7;
+    const h = top - base;
+    if (h < 0.9) return false;
+    const centre = new THREE.Vector3(p.x, (base + top) / 2, p.z);
+    const rad = Math.max(r, h / 2);
+    if (!ok(centre, rad)) return false;
+    const lean = opts.lean ?? 0.035;
+    const mtx = new THREE.Matrix4().compose(new THREE.Vector3(p.x, base, p.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd.range(-lean, lean), 0, rnd.range(-lean, lean))), new THREE.Vector3(1, 1, 1));
+    const broken = opts.slant && rnd.next() < 0.35;
+    const slant: [number, number] = broken ? [rnd.range(-0.45, 0.45), rnd.range(-0.45, 0.45)] : [rnd.range(-0.05, 0.05), rnd.range(-0.05, 0.05)];
+    const tone = 0.012 + 0.012 * rnd.next();
+    cols.prism(mtx, { sides: rnd.next() < 0.6 ? 6 : rnd.next() < 0.5 ? 5 : 7, r, h, rot: rnd.range(0, 6.28), slant, tone, seed, ground: gy - base, rnd, snow: rnd.next() < 0.6, up });
+    if (!broken) perches.push({ p: new THREE.Vector3(p.x, top + 0.25, p.z), brow: opts.brow });
+    props.push({ p: centre, r: rad, kind });
+    return true;
+  };
+  /** a causeway body: jittered hex packing over (along, back) with a terraced height field */
+  const causeway = (a0: number, a1: number, b0: number, b1: number, peak: number, wallSide: number, seedK: number, density: number) => {
+    const S = 1.3;
+    for (let j = 0; ; j++) {
+      const bk = b0 + j * S * 0.866;
+      if (bk > b1) break;
+      for (let i = 0; ; i++) {
+        const al = a0 + i * S + (j % 2) * S * 0.5;
+        if (al > a1) break;
+        if (rnd.next() > density) continue;
+        const ja = al + rnd.range(-0.18, 0.18) * S;
+        const jb = bk + rnd.range(-0.18, 0.18) * S;
+        // height: highest against the wall and toward the mouth side, falling off in an
+        // irregular front; terraces of ~1.1 m with per-column scatter
+        const fromWall = Math.abs(ja - wallSide) / Math.max(1, Math.abs(a1 - a0));
+        const f = vn2(ja * 0.22, jb * 0.22, seedK);
+        let hgt = peak * Math.max(0, 1 - fromWall * 0.9 - (b1 - jb) * 0.04) * (0.55 + 0.7 * f);
+        hgt = Math.round(hgt / 1.1) * 1.1 + rnd.range(-0.3, 0.3);
+        if (rnd.next() < 0.1) hgt *= 0.35; // a snapped stump
+        if (hgt < 0.4) continue;
+        const p = place(ja, jb);
+        const r = S * rnd.range(0.46, 0.56);
+        column(p, r, seat(p, r) + hgt, rnd.next() * 100, 'column', { slant: true });
       }
+    }
+  };
+  const big = rnd.next() < 0.5 ? -1 : 1;
+  causeway(big > 0 ? 6.0 : -19, big > 0 ? 19 : -6.0, -10.5, -1.0, 7.5, big > 0 ? 6 : -6, 3.1, hi ? 0.92 : 0.7);
+  causeway(big > 0 ? -13 : 6.5, big > 0 ? -6.5 : 13, -6.5, -1.5, 4.2, big > 0 ? -6.5 : 6.5, 8.4, hi ? 0.78 : 0.6);
+  // fallen drums from the collapsed side lying in the snow (column sections on their sides)
+  for (let i = 0; i < (hi ? 5 : 3); i++) {
+    const p = place(-big * rnd.range(7, 14), -rnd.range(7, 12));
+    const r = rnd.range(0.45, 0.62);
+    const len = rnd.range(0.9, 2.2);
+    const yaw = rnd.range(0, 6.28);
+    const centre = p.clone().setY(p.y + r * 0.5);
+    if (!ok(centre, len / 2 + r)) continue;
+    const mtx = new THREE.Matrix4().compose(new THREE.Vector3(p.x, p.y + r * 0.45, p.z).addScaledVector(new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)), -len / 2), new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, yaw, rnd.range(-0.2, 0.2), 'YXZ')), new THREE.Vector3(1, 1, 1));
+    cols.prism(mtx, { sides: 6, r, h: len, rot: rnd.range(0, 6), tone: 0.014, seed: rnd.next() * 100, ground: -1, rnd });
+    props.push({ p: centre, r: len / 2 + r, kind: 'drum' });
+  }
+  // the portal: tall columns flanking the mouth, standing on the face line, rising to the brow
+  const brow = cave.lipTop.y - mouth.y;
+  for (const s of [-1, 1]) {
+    let al = 5.0;
+    let n = 0;
+    while (al < (s === big ? 9.5 : 8.0) && n < 8) {
+      const r = rnd.range(0.55, 0.72);
+      const f0 = face(s * al, 2.0);
+      const back = f0 === null ? 0.3 : -f0 + r * 0.55;
+      const p = place(s * al, back);
+      const top = mouth.y + brow * (1.05 - (al - 5) * 0.06) + rnd.range(-0.6, 0.4);
+      column(p, r, top, rnd.next() * 100, 'column', { lean: 0.02, brow: true });
+      al += r * 1.75;
+      n++;
+    }
+  }
+  // the lintel: column ends standing out of the brow above the opening, fanned like the curved
+  // columns over Fingal's Cave (axis = outward, tilted up more toward the sides)
+  {
+    const hw = 4.6;
+    const lowY = 6.1;
+    for (let row = 0; row < 4; row++) {
+      const yUp = lowY + row * 0.95;
+      for (let al = -hw - 0.6 + (row % 2) * 0.55; al <= hw + 0.6; al += 1.1) {
+        if (rnd.next() < 0.14) continue;
+        const f = face(al, yUp);
+        if (f === null) continue;
+        const r = rnd.range(0.48, 0.6);
+        // protrusion: an irregular, mostly shallow relief; the lowest row overhangs the opening
+        const len = rnd.next() < 0.2 ? rnd.range(0.6, 1.2) * (row === 0 ? 1.4 : 1) : rnd.range(0.05, 0.4);
+        const tilt = 0.18 + Math.abs(al) * 0.05 + rnd.range(-0.06, 0.06);
+        const axis = out.clone().multiplyScalar(Math.cos(tilt)).add(new THREE.Vector3(0, Math.sin(tilt), 0)).addScaledVector(tan, al * 0.03).normalize();
+        const base = mouth.clone().addScaledVector(tan, al).add(new THREE.Vector3(0, yUp, 0)).addScaledVector(out, f - 1.1);
+        const tip = base.clone().addScaledVector(axis, 0.9 + len);
+        const centre = base.clone().lerp(tip, 0.6);
+        if (!clearOfCaveCameras(lines, centre, r + 0.2)) continue;
+        const q = new THREE.Quaternion().setFromUnitVectors(up, axis);
+        const mtx = new THREE.Matrix4().compose(base, q, new THREE.Vector3(1, 1, 1));
+        cols.prism(mtx, { sides: rnd.next() < 0.7 ? 6 : 5, r, h: 0.9 + len, rot: rnd.range(0, 6.28), tone: 0.012 + 0.01 * rnd.next(), seed: rnd.next() * 100, ground: -2, rnd });
+        props.push({ p: centre, r: r + 0.2, kind: 'lintel' });
+        // a perch on top of the column end, near its tip
+        if (axis.y < 0.5 && rnd.next() < 0.5) perches.push({ p: base.clone().addScaledVector(axis, 0.6 + len * 0.8).add(new THREE.Vector3(0, r * 0.85, 0)), brow: true });
+        // icicles from the underside of the lowest row of column ends (seated on a lip)
+        if (row === 0 && rnd.next() < (hi ? 0.75 : 0.5)) {
+          const nI = 1 + Math.floor(rnd.next() * 3);
+          for (let k = 0; k < nI; k++) {
+            const lenI = rnd.next() < 0.2 ? rnd.range(1.2, 2.2) : rnd.range(0.3, 0.9);
+            const tipP = base.clone().addScaledVector(axis, 0.6 + len * rnd.range(0.3, 0.95)).addScaledVector(tan, rnd.range(-0.3, 0.3));
+            const pI = tipP.clone().add(new THREE.Vector3(0, -r * 0.9 - lenI / 2, 0));
+            if (!clearOfCaveCameras(lines, pI, lenI / 2)) continue;
+            icicles.push({ top: pI.clone().add(new THREE.Vector3(0, lenI / 2, 0)), len: lenI, r: 0.05 + rnd.range(0, 0.06) });
+          }
+        }
+      }
+    }
   }
   // ---------------- the frozen tide pool on the cave floor + broken sea-ice plates ----------------
   {
@@ -343,57 +512,35 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     break;
   }
 
-  // ---------------- icicles: clusters, a few long ones, gaps ----------------
-  const lip = cave.lipTop;
-  const nI = hi ? 30 : 16;
-  let tI = -5;
-  for (let i = 0; i < nI && tI < 5; i++) {
-    tI += rnd.next() < 0.2 ? rnd.range(0.7, 1.4) : rnd.range(0.12, 0.38);
-    const x = lip.x + tan.x * tI + out.x * 0.6;
-    const z = lip.z + tan.z * tI + out.z * 0.6;
-    const long = rnd.next() < 0.12;
-    const len = (long ? rnd.range(1.8, 3.2) : rnd.range(0.25, 1.1)) * (1 - Math.abs(tI) / 7);
-    if (len < 0.2) continue;
-    const r0 = (long ? 0.13 : 0.07) + rnd.range(0, 0.05);
-    const p = new THREE.Vector3(x, lip.y - 1.4 - len / 2 + rnd.range(-0.25, 0.15), z);
-    if (!clearOfCaveCameras(lines, p, len / 2)) continue;
-    b.add('ice', new THREE.ConeGeometry(r0, len, 6).rotateX(Math.PI), mat(p.x, p.y, p.z, rnd.range(-0.06, 0.06), 0, rnd.range(-0.06, 0.06)), 0xffffff);
-  }
-
   // ---------------- wreckage: the beachcombing hoard ----------------
-  // an overturned clinker rowing boat, staved in, lying on one gunwale against the columns
+  // an overturned clinker rowing boat (round 3: modelled strakes, keel, stem and stern posts, a
+  // faded painted sheer strake and a staved-in hole), keel up on the snow, a drift banked on one side
   {
-    const p = place(-9.5, -9);
-    if (ok(p.clone().setY(p.y + 0.6), 2.8)) {
-      const yaw = Math.atan2(tan.x, tan.z) + 0.5;
-      const L = 4.6;
-      const B = 1.5;
-      // an overturned clinker hull: a half-ellipsoid shell with plank bands (tarred, faded blue
-      // paint on the top strakes) and a dark staved-in patch, half-buried on its side
-      const hull = new THREE.SphereGeometry(1, 22, 10, 0, Math.PI * 2, 0, Math.PI / 2);
-      const HP = hull.attributes.position as THREE.BufferAttribute;
-      for (let k = 0; k < HP.count; k++) {
-        const hx = HP.getX(k);
-        const hy = HP.getY(k);
-        const hz2 = HP.getZ(k);
-        const pinch = 1 - 0.35 * Math.pow(Math.abs(hz2), 3);
-        HP.setXYZ(k, hx * (B / 2) * pinch, hy * 0.62, hz2 * (L / 2));
-      }
-      hull.computeVertexNormals();
-      b.add('drift', hull, mat(p.x, p.y - 0.12, p.z, 0.12, yaw, 0.32), (q, nn) => {
-        // plank bands by height on the hull, a dark hole on one side
-        const band = Math.floor((q.y - p.y + 0.6) / 0.13);
-        const t = 0.2 + 0.05 * ((band * 7) % 3);
-        const c = band % 4 === 3 ? new THREE.Color(0.16, 0.24, 0.34) : new THREE.Color(t * 1.15, t, t * 0.85);
-        if (nn.x > 0.5 && Math.abs(q.z - p.z) < 0.7) c.multiplyScalar(0.25);
-        return c;
-      });
-      // keel and a broken spar
-      b.add('drift', new THREE.BoxGeometry(0.12, 0.12, L * 0.95), mat(p.x, p.y + 0.5, p.z, 0.12, yaw, 0.32), new THREE.Color(0.22, 0.19, 0.16));
-      b.add('drift', new THREE.CylinderGeometry(0.06, 0.08, 3.2, 6).rotateZ(Math.PI / 2), mat(p.x + tan.x * 1.5, p.y + 0.12, p.z + tan.z * 1.5, 0, yaw + 0.8, 0.05), new THREE.Color(0.55, 0.52, 0.48));
-      // snow drifted into its lee
-      b.add('snow', new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.9, 0.22, L * 0.42), mat(p.x + Math.cos(yaw) * 0.9, p.y - 0.04, p.z - Math.sin(yaw) * 0.9, 0, yaw, 0), 0xffffff);
-      props.push({ p: p.clone().setY(p.y + 0.6), r: 2.8, kind: 'boat' });
+    const p = place(-big * 9.0, -9.5);
+    const HL = 5.4;
+    const HB = 1.8;
+    const HD = 0.72;
+    if (ok(p.clone().setY(p.y + 0.6), 3.0)) {
+      const yaw = Math.atan2(tan.x, tan.z) - big * 0.55;
+      const gy = Math.min(m.heightAt(p.x, p.z), seat(p, 2.0));
+      const mtx = new THREE.Matrix4().compose(new THREE.Vector3(p.x, gy - 0.06, p.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0.07)), new THREE.Vector3(1, 1, 1));
+      const hg = clinkerHull(HL, HB, HD);
+      hg.applyMatrix4(mtx);
+      const hm = new THREE.Mesh(hg, hullMat);
+      hm.castShadow = true;
+      hm.receiveShadow = true;
+      hm.name = 'fjord-hull';
+      group.add(hm);
+      const ky = hullKeelY(HD);
+      // keel, with the stem and stern posts curving down at the ends
+      b.add('drift', new THREE.BoxGeometry(0.1, 0.12, HL * 0.92), mtx.clone().multiply(new THREE.Matrix4().makeTranslation(0, ky + 0.04, 0)), new THREE.Color(0.1, 0.08, 0.06));
+      for (const e of [-1, 1]) b.add('drift', new THREE.BoxGeometry(0.1, ky + 0.1, 0.14), mtx.clone().multiply(new THREE.Matrix4().makeTranslation(0, (ky + 0.1) / 2, e * HL * 0.49)), new THREE.Color(0.1, 0.08, 0.06));
+      // a broken oar beside it and snow along the keel and in the lee
+      b.add('drift', new THREE.CylinderGeometry(0.035, 0.035, 2.6, 6).rotateZ(Math.PI / 2), mtx.clone().multiply(new THREE.Matrix4().makeTranslation(-HB * 0.9, 0.05, 0.4)).multiply(new THREE.Matrix4().makeRotationY(0.4)), new THREE.Color(0.55, 0.5, 0.42));
+      b.add('drift', new THREE.BoxGeometry(0.16, 0.03, 0.5), mtx.clone().multiply(new THREE.Matrix4().makeTranslation(-HB * 0.9 - 1.2, 0.05, 0.9)).multiply(new THREE.Matrix4().makeRotationY(0.4)), new THREE.Color(0.55, 0.5, 0.42));
+      b.add('snow', new THREE.SphereGeometry(1, 12, 4, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.22, 0.09, HL * 0.4), mtx.clone().multiply(new THREE.Matrix4().makeTranslation(0.06, ky + 0.08, 0)), 0xffffff);
+      b.add('snow', new THREE.SphereGeometry(1, 12, 5, 0, Math.PI * 2, 0, Math.PI / 2).scale(0.9, 0.35, HL * 0.46), mtx.clone().multiply(new THREE.Matrix4().makeTranslation(-HB * 0.55, -0.05, 0)), 0xffffff);
+      props.push({ p: p.clone().setY(p.y + 0.6), r: 3.0, kind: 'boat' });
     }
   }
   // silver driftwood logs
@@ -407,7 +554,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
   }
   // lobster pots: wooden slat cages with a net funnel end
   for (let i = 0; i < 3; i++) {
-    const p = place(8.5 + i * 1.25, -9 - rnd.range(0, 2.5));
+    const p = place(-big * (8.5 + i * 1.25), -10 - rnd.range(0, 2.5));
     if (!ok(p.clone().setY(p.y + 0.35), 0.9)) continue;
     const yaw = rnd.range(0, 3);
     for (let k = 0; k < 5; k++) {
@@ -417,17 +564,22 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     b.add('drift', new THREE.BoxGeometry(1.04, 0.05, 0.7), mat(p.x, p.y + 0.03, p.z, 0, yaw, 0), new THREE.Color(0.36, 0.28, 0.2));
     props.push({ p: p.clone().setY(p.y + 0.35), r: 0.7, kind: 'pot' });
   }
-  // floats on a grounded line (lying on the snow, partly buried)
+  // floats on a line lying on the snow: the rope follows the ground (sampled every 0.3 m), the
+  // floats are half sunk into it (round 2: the line was a straight chord and hung in the air)
   {
     let prev: THREE.Vector3 | null = null;
     for (let i = 0; i < 6; i++) {
-      const p = place(rnd.range(-13, -5) + i * 0.3, -rnd.range(10, 13));
+      const p = place(-big * (rnd.range(3, 8) + i * 0.4), -rnd.range(15, 17.5));
       if (!ok(p.clone().setY(p.y + 0.2), 0.4)) continue;
-      b.add('paint', new THREE.SphereGeometry(0.26, 10, 8), mat(p.x, p.y + 0.12, p.z), i % 2 ? 0xe86a1e : 0xf2efe7);
+      b.add('paint', new THREE.SphereGeometry(0.26, 10, 8), mat(p.x, p.y + 0.07, p.z), i % 2 ? 0xe86a1e : 0xf2efe7);
       if (prev) {
-        const a = prev.clone().setY(prev.y + 0.05);
-        const c2 = p.clone().setY(p.y + 0.05);
-        b.add('drift', new THREE.TubeGeometry(new THREE.LineCurve3(a, c2), 2, 0.02, 3), undefined, new THREE.Color(0.8, 0.72, 0.55));
+        const n = Math.max(2, Math.ceil(prev.distanceTo(p) / 0.3));
+        const pts: THREE.Vector3[] = [];
+        for (let k = 0; k <= n; k++) {
+          const q = prev.clone().lerp(p, k / n);
+          pts.push(q.setY(m.heightAt(q.x, q.z) + 0.03));
+        }
+        b.add('drift', new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), n, 0.02, 3), undefined, new THREE.Color(0.8, 0.72, 0.55));
       }
       props.push({ p: p.clone().setY(p.y + 0.2), r: 0.3, kind: 'float' });
       prev = p;
@@ -443,30 +595,39 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     props.push({ p: p.clone().setY(p.y + 0.05), r: 0.5, kind: 'bones' });
   }
 
-  // build columns
-  if (colPos.length) {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(colPos, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(colCol, 3));
-    g.setAttribute('aJ', new THREE.Float32BufferAttribute(colJ, 3));
-    g.computeVertexNormals();
-    const cm = new THREE.Mesh(g, basalt);
+  // build the columns (one mesh), their snow, and the icicles (one instanced mesh: the cave
+  // cinematic drops them in the icicle-shatter beat)
+  if (cols.count) {
+    const cm = new THREE.Mesh(cols.geometry(), basalt);
     cm.castShadow = true;
     cm.receiveShadow = true;
     cm.name = 'fjord-basalt-columns';
     group.add(cm);
+    const sg = cols.snowGeometry();
+    if (sg) {
+      const sm = new THREE.Mesh(sg, K['snow']!);
+      sm.receiveShadow = true;
+      sm.name = 'fjord-basalt-snow';
+      group.add(sm);
+    }
   }
   for (const me of b.build(M, { cast: true, receive: true })) group.add(me);
-  // the drums use the basalt shader: give them the joint attribute
-  group.traverse((o) => {
-    const me = o as THREE.Mesh;
-    if (me.isMesh && me.material === basalt && !me.geometry.getAttribute('aJ')) {
-      const n = me.geometry.getAttribute('position').count;
-      const j = new Float32Array(n * 3);
-      for (let k = 0; k < n; k++) j.set([k * 0.01, 0.5, 1], k * 3);
-      me.geometry.setAttribute('aJ', new THREE.BufferAttribute(j, 3));
-    }
-  });
+  let iceMesh: THREE.InstancedMesh | null = null;
+  if (icicles.length) {
+    iceMesh = new THREE.InstancedMesh(new THREE.ConeGeometry(1, 1, 6).rotateX(Math.PI), ice, icicles.length);
+    const o = new THREE.Object3D();
+    icicles.forEach((ic, i) => {
+      o.position.copy(ic.top).add(new THREE.Vector3(0, -ic.len / 2, 0));
+      o.scale.set(ic.r, ic.len, ic.r);
+      o.rotation.set(0, 0, 0);
+      o.updateMatrix();
+      iceMesh!.setMatrixAt(i, o.matrix);
+    });
+    iceMesh.name = 'fjord-brow-icicles';
+    iceMesh.userData['icicles'] = icicles;
+    iceMesh.computeBoundingSphere();
+    group.add(iceMesh);
+  }
 
   // a torn net draped over the lowest column step on the left (rests on it, sways a little)
   const netG = new THREE.PlaneGeometry(3.4, 2.4, 14, 10);
@@ -508,6 +669,8 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
       tex.dispose();
       seaIce.dispose();
       iceTex.dispose();
+      hullMat.dispose();
+      iceMesh?.dispose();
       group.removeFromParent();
     },
   };

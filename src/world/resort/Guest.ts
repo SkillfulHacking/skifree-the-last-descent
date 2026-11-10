@@ -362,6 +362,16 @@ export class Guest {
   private SR: THREE.Vector3;
   private mugHand: THREE.Bone | null = null;
   private sipping = 0;
+  /**
+   * Scripted-pose overrides for victory staging (0 = off: no guest outside a scripted beat ever
+   * sets them, so every existing pose is unchanged).
+   *  - hold: both hands together in front of the chest, as if presenting an object;
+   *  - holdLift: 0 chest height … 1 raised to head height (with `hold`);
+   *  - tuck: a cannonball (knees to the chest, arms hugging the shins).
+   */
+  hold = 0;
+  holdLift = 0;
+  tuck = 0;
 
   constructor(look: GuestLook, beh: GuestBehaviour, material: THREE.Material, groundAt: (x: number, z: number) => number) {
     this.look = look;
@@ -1121,6 +1131,18 @@ export class Guest {
       b[Bn.SPINE]!.rotation.set(0.03 + crouch * 0.4 - wa * 0.04, -Math.sin(wp) * 0.1 * wa, shift * 0.06);
       rootY = air;
     }
+    if (this.tuck > 0) {
+      const k = clamp01(this.tuck);
+      for (const [th, sh, ft, sd] of [
+        [Bn.THIGH_L, Bn.SHIN_L, Bn.FOOT_L, 1],
+        [Bn.THIGH_R, Bn.SHIN_R, Bn.FOOT_R, -1],
+      ] as const) {
+        b[th]!.rotation.set(b[th]!.rotation.x + (-2.15 - b[th]!.rotation.x) * k, 0, sd * 0.12 * k);
+        b[sh]!.rotation.set(b[sh]!.rotation.x + (2.45 - b[sh]!.rotation.x) * k, 0, 0);
+        b[ft]!.rotation.set(0.5 * k, 0, 0);
+      }
+      b[Bn.SPINE]!.rotation.x += 0.55 * k;
+    }
     // breathing
     const breath = Math.sin(t * 1.7) * 0.015;
     b[Bn.CHEST]!.rotation.set(-breath - cheer * 0.06, 0, 0);
@@ -1220,11 +1242,27 @@ export class Guest {
         T.lerp(ct, ww);
         P.lerp(this.tmpA, ww).normalize();
       }
+      if (this.hold > 0) {
+        // present: both hands together in front of the chest (raised with holdLift)
+        const lift = clamp01(this.holdLift);
+        this.tmpB.set(side * 0.11, -0.02 + 0.42 * lift, 0.36 - 0.06 * lift);
+        T.lerp(this.tmpB, clamp01(this.hold));
+        this.tmpA.set(side * 0.9, -1, -0.1);
+        P.lerp(this.tmpA, clamp01(this.hold)).normalize();
+      }
+      if (this.tuck > 0) {
+        // hug the shins
+        this.tmpB.set(side * 0.16, -0.32, 0.36);
+        T.lerp(this.tmpB, clamp01(this.tuck));
+        this.tmpA.set(side, -0.3, -0.6);
+        P.lerp(this.tmpA, clamp01(this.tuck)).normalize();
+      }
       const S = isL ? this.SL : this.SR;
       solveArm(b[isL ? Bn.UARM_L : Bn.UARM_R]!, b[isL ? Bn.FARM_L : Bn.FARM_R]!, S, T, P);
       // wrist
       const hand = b[isL ? Bn.HAND_L : Bn.HAND_R]!;
       if (!hasMug) hand.rotation.set(-0.15, side * 0.2, 0);
+      if (this.hold > 0 && !hasMug) hand.rotation.set(-0.15 - 0.6 * this.hold, side * (0.2 + 0.9 * this.hold), 0);
     }
 
     // ---------- place group ----------

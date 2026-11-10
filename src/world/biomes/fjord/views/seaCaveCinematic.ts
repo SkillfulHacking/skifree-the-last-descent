@@ -1,21 +1,27 @@
 /**
- * Fjord beats layered on the shared cave cinematic (round 2, cinematic review 1). Registered as the
- * "fjord-sea-cave" presentation's `cinematic` hook; Alpine has none, so its encounter is unchanged.
+ * Fjord beats layered on the shared cave cinematic. Registered as the "fjord-sea-cave"
+ * presentation's `cinematic` hook; Alpine has none, so its encounter is unchanged.
  *
- *  - gulls: a dozen herring gulls sit on the basalt column tops in the establishing shot; the
- *    rumble at 2.45 s scatters them, screaming, out over the slope (and the slough shot is re-framed
- *    a little higher and wider so they burst through it);
- *  - spray and sea smoke: on the roar a plume of freezing spray and mist bursts out of the mouth
- *    and rolls down over the ledge, and icicles shatter off the brow (shards fall and bounce);
- *  - the roar's wide shot opens a touch wider (the plume and the columns frame the Yeti).
+ * Round 3 (C1, F3: "the shared encounter plus garnish"): the Fjord gets its own shots and beats,
+ * on the shared timing and the shared Yeti choreography (grounding contract untouched):
+ *  - 2.4 s gulls: herring gulls perched on the portal columns and the lintel's column ends, white
+ *    on black basalt, burst off screaming on the rumble; the slough shot is re-framed tight on the
+ *    brow so they read;
+ *  - 7.9 s the emergence is filmed FROM INSIDE THE SEA CAVE, low behind the Yeti: he rises out of
+ *    the dark mouth as a silhouette against the fjord, the islands and the far shore (when the mouth
+ *    faces the sea; otherwise a high three-quarter angle);
+ *  - 11.05 s the roar blows a plume of freezing spray and sea smoke out over the ledge, and the
+ *    icicles under the lintel actually drop and shatter on the ice (the real icicle meshes);
+ *  - 14.6 s the leap is seen from the ledge behind him, down the slope onto the skier, the sea
+ *    beyond — not the shared over-the-skier angle.
  *
- * The extra shots reuse the shared camera stations (CAVE_CAMS), so the dressing's camera
- * clearance (seaCave.ts) covers them.
+ * The extra shots stay inside the chamber or on the ledge (no dressing there), or reuse the shared
+ * camera stations (CAVE_CAMS), so the dressing's camera clearance (seaCave.ts) covers them.
  */
 import * as THREE from 'three';
 import type { CaveCinematicContext, CaveCinematicExtras } from '../../../presentation/cave';
 import { CAVE_CAMS } from '../../../../cinematic/CaveCinematic';
-import { pose } from '../../../../cinematic/Timeline';
+import { ease, pose } from '../../../../cinematic/Timeline';
 import type { SeaCavePerch } from './seaCave';
 
 interface Gull {
@@ -73,8 +79,10 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
   const { st, cave, tl, at } = ctx;
   const M = cave.mouth.clone();
   const O = cave.outward.clone().setY(0).normalize();
-  // perches: the column tops of this cave's dressing (nearest dressing group to the mouth)
+  const T = new THREE.Vector3(O.z, 0, -O.x);
+  // perches: the portal column tops and the lintel of this cave's dressing (nearest dressing group)
   let perches: SeaCavePerch[] = [];
+  let icicles: THREE.InstancedMesh | null = null;
   let best = Infinity;
   st.world.scene.traverse((o) => {
     if (o.name !== 'FjordSeaCave') return;
@@ -83,18 +91,23 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
     if (d < best) {
       best = d;
       perches = (o.userData['perches'] as SeaCavePerch[]) ?? [];
+      icicles = (o.getObjectByName('fjord-brow-icicles') as THREE.InstancedMesh | undefined) ?? null;
     }
   });
-  if (best > 5) perches = [];
+  if (best > 5) {
+    perches = [];
+    icicles = null;
+  }
   const group = new THREE.Group();
   group.name = 'fjord-cave-gulls';
   st.world.scene.add(group);
   const G = gullMeshes();
   const gulls: Gull[] = [];
-  const tops = [...perches].sort((a, b) => b.p.y - a.p.y);
-  const n = Math.min(12, tops.length);
+  // the brow perches first (in the slough shot's frame), then the highest causeway tops
+  const tops = [...perches].sort((a, b) => (b.brow ? 1 : 0) - (a.brow ? 1 : 0) || b.p.y - a.p.y);
+  const n = Math.min(14, tops.length);
   for (let i = 0; i < n; i++) {
-    const home = tops[(i * 5) % tops.length]!.p.clone().add(new THREE.Vector3(Math.sin(i * 2.3) * 0.3, 0.12, Math.cos(i * 1.7) * 0.3));
+    const home = tops[i]!.p.clone().add(new THREE.Vector3(Math.sin(i * 2.3) * 0.15, 0.05, Math.cos(i * 1.7) * 0.15));
     const o = new THREE.Group();
     o.add(new THREE.Mesh(G.body, G.mat));
     const wl = new THREE.Group();
@@ -109,12 +122,12 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
     o.add(wl, wr);
     o.position.copy(home);
     o.rotation.y = Math.atan2(O.x, O.z) + Math.sin(i * 3.1) * 1.2;
-    o.scale.setScalar(1.15);
+    o.scale.setScalar(1.25);
     group.add(o);
     // scatter: out from the cliff and up, each its own way
-    const side = new THREE.Vector3(O.z, 0, -O.x).multiplyScalar(Math.sin(i * 1.9) * 3);
-    const vel = O.clone().multiplyScalar(4 + (i % 3)).add(side).add(new THREE.Vector3(0, 3.2 + (i % 4) * 0.5, Math.cos(i) * 1.5));
-    gulls.push({ o, wl, wr, home, vel, ph: i * 0.7, t0: 2.45 + (i % 5) * 0.09, flying: false });
+    const side = T.clone().multiplyScalar(Math.sin(i * 1.9) * 3.5);
+    const vel = O.clone().multiplyScalar(3.5 + (i % 3)).add(side).add(new THREE.Vector3(0, 2.6 + (i % 4) * 0.5, 0));
+    gulls.push({ o, wl, wr, home, vel, ph: i * 0.7, t0: 2.5 + (i % 5) * 0.08, flying: false });
   }
   // folded wings while perched
   for (const g of gulls) {
@@ -122,29 +135,87 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
     g.wr.rotation.set(0, 1.35, 0.25);
   }
 
-  // shot overrides (later shots win over the shared ones covering the same time)
+  // does the mouth look out over the sea? (the cave can sit either side of the piste)
+  const coast = st.world.mountain.coast;
+  const seaward = coast ? Math.sign(O.x) === Math.sign(coast.rimX(M.z) - M.x) : false;
+  const ep = cave.exitPath;
+  const pathAt = (s: number) => {
+    // exitPath[i] lies at depth 14 − 0.75·i (the last one is the ledge)
+    const i = THREE.MathUtils.clamp(Math.round((14 - s) / 0.75), 0, ep.length - 1);
+    return ep[i]!.clone();
+  };
+  const yetiAt = () => st.yeti.root.position.clone();
+
+  // --- shot overrides (later shots win over the shared ones covering the same time)
+  // 2.4 s: tight on the brow, the gulls on the portal and the lintel against the black rock
   const brow = cave.lipTop.clone();
-  tl.shot({ start: 2.4, end: 3.8, from: () => pose(at(...CAVE_CAMS.slough0), brow.clone().add(new THREE.Vector3(0, 2.2, 0)), 46), to: () => pose(at(...CAVE_CAMS.slough1), brow.clone().add(new THREE.Vector3(0, 1.4, 0)), 44), handheld: 0.03 });
-  tl.shot({ start: 11.0, end: 12.3, from: () => pose(at(...CAVE_CAMS.roar0), M.clone().add(new THREE.Vector3(-1.5, 3.2, 0)), 52), to: () => pose(at(...CAVE_CAMS.roar1), M.clone().add(new THREE.Vector3(-1.5, 3.4, 0)), 49) });
+  const browLook = brow.clone().addScaledVector(O, 1.2).add(new THREE.Vector3(0, -1.2, 0));
+  tl.shot({ start: 2.4, end: 3.8, from: () => pose(at(...CAVE_CAMS.slough0), browLook.clone().add(new THREE.Vector3(0, 0.6, 0)), 30), to: () => pose(at(...CAVE_CAMS.slough1), browLook.clone().add(new THREE.Vector3(0, 1.6, 0)), 34), handheld: 0.03 });
+  // 7.9 s: the emergence from inside the cave
+  if (seaward) {
+    const camIn = pathAt(3.6);
+    const ceil = cave.clearanceAt(camIn.x, camIn.z);
+    camIn.y += Math.min(1.25, Math.max(0.8, ceil - 1.2));
+    camIn.addScaledVector(T, 0.6);
+    const horizon = M.clone().addScaledVector(O, 220).setY(M.y - 40);
+    tl.shot({
+      start: 7.9,
+      end: 11.0,
+      from: () => pose(camIn, yetiAt().add(new THREE.Vector3(0, 1.5, 0)).lerp(horizon, 0.04), 56),
+      to: () => pose(camIn.clone().addScaledVector(O, -0.4), yetiAt().add(new THREE.Vector3(0, 1.9, 0)).lerp(horizon, 0.06), 60),
+      easing: ease.inOut,
+      handheld: 0.015,
+    });
+  } else {
+    // the sea lies behind the cave: a high three-quarter angle across the portal
+    tl.shot({
+      start: 7.9,
+      end: 11.0,
+      from: () => pose(M.clone().addScaledVector(O, 9).addScaledVector(T, 7).add(new THREE.Vector3(0, 5.5, 0)), yetiAt().add(new THREE.Vector3(0, 1.6, 0)), 46),
+      to: () => pose(M.clone().addScaledVector(O, 8.4).addScaledVector(T, 6.2).add(new THREE.Vector3(0, 5.0, 0)), yetiAt().add(new THREE.Vector3(0, 2.0, 0)), 46),
+      handheld: 0.02,
+    });
+  }
+  // 11.0 s: the roar, opened wider for the plume and the falling icicles
+  tl.shot({ start: 11.0, end: 12.3, from: () => pose(at(...CAVE_CAMS.roar0), M.clone().add(new THREE.Vector3(0, 3.6, 0)).addScaledVector(O, 1.2), 56), to: () => pose(at(...CAVE_CAMS.roar1), M.clone().add(new THREE.Vector3(0, 3.8, 0)).addScaledVector(O, 1.2), 52) });
+  // 14.6 s: the leap, from the ledge behind him, down onto the skier (and the sea beyond)
+  const P = st.phys.s.pos.clone();
+  const ledgeCam = cave.ledge.clone().addScaledVector(O, -2.6).addScaledVector(T, 1.4).add(new THREE.Vector3(0, 2.7, 0));
+  const leapLook = () => yetiAt().add(new THREE.Vector3(0, 1.2, 0)).lerp(P.clone().add(new THREE.Vector3(0, 1.0, 0)), 0.55);
+  tl.shot({ start: 14.6, end: 16.95, from: () => pose(ledgeCam, leapLook(), 50), to: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), 54) });
+  const followPos = new THREE.Vector3();
+  const followLook = new THREE.Vector3();
+  const followPose = () => {
+    const s = st.phys.s;
+    st.follow.idealPose({ pos: s.pos, vel: s.vel, heading: s.heading, grounded: s.grounded, crashed: false, speed: s.speed }, followPos, followLook);
+    return pose(followPos, followLook, 64);
+  };
+  tl.shot({ start: 16.95, end: 18.0, from: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), 54), via: () => pose(P.clone().add(new THREE.Vector3(0, 3.2, -5)), P.clone().add(new THREE.Vector3(0, 1.2, 4)), 58), to: followPose, easing: ease.inOutCubic });
 
   tl.at(2.5, () => {
     st.audio.playCue('gull', M.clone().add(new THREE.Vector3(0, 8, 0)));
     st.hud.caption('[gulls scream and scatter]', 1.4);
   });
   tl.at(3.1, () => st.audio.playCue('gull', M.clone().add(new THREE.Vector3(4, 10, 3))));
+  tl.at(9.0, () => {
+    // his weight on the frozen tide pool: the sea ice cracks under him
+    const p = yetiAt();
+    st.world.particles.emit({ x: p.x, y: p.y + 0.1, z: p.z, vx: 0, vy: 1.6, vz: 0, spread: 1.2, size: 0.12, life: 0.9, count: 30, gravity: 1, drag: 0.4, grow: 0, alpha: 1, color: 0.92 });
+    st.audio.playImpact('rock-light', 0.35);
+  });
   tl.at(11.05, () => {
-    // freezing spray and sea smoke out of the mouth, rolling over the ledge
-    for (let k = 0; k < 6; k++)
-      st.world.particles.emit({ x: M.x + O.x * 0.5, y: M.y + 1.0 + k * 0.35, z: M.z + O.z * 0.5, vx: O.x * (6 + k), vy: 1.2 + k * 0.4, vz: O.z * (6 + k), spread: 2.2, size: 1.6, life: 2.6, count: 26, gravity: 0.15, drag: 1.1, grow: 2.2, alpha: 0.6, color: 0.97 });
-    st.world.particles.emit({ x: M.x + O.x, y: M.y + 1.6, z: M.z + O.z, vx: O.x * 9, vy: 3.5, vz: O.z * 9, spread: 3, size: 0.18, life: 1.2, count: 80, gravity: 1, drag: 0.6, grow: 0.2, alpha: 0.95, color: 1 });
+    // freezing spray and sea smoke blown out of the mouth: it billows up the portal and rolls over
+    // the ledge (kept short of the lens: round 2's plume filled the roar shot with white)
+    for (let k = 0; k < 7; k++)
+      st.world.particles.emit({ x: M.x + O.x * 0.3 + T.x * (k - 3) * 0.7, y: M.y + 0.6 + k * 0.55, z: M.z + O.z * 0.3 + T.z * (k - 3) * 0.7, vx: O.x * (1.8 + k * 0.25), vy: 1.4 + k * 0.25, vz: O.z * (1.8 + k * 0.25), spread: 1.6, size: 1.3, life: 2.4, count: 12, gravity: -0.05, drag: 1.4, grow: 1.6, alpha: 0.38, color: 0.98 });
+    st.world.particles.emit({ x: M.x + O.x * 0.5, y: M.y + 1.6, z: M.z + O.z * 0.5, vx: O.x * 4.5, vy: 4.2, vz: O.z * 4.5, spread: 2.6, size: 0.12, life: 1.3, count: 90, gravity: 1, drag: 0.5, grow: 0.1, alpha: 1, color: 1 });
   });
-  tl.at(11.25, () => {
-    // icicles shatter off the brow
-    const p = cave.lipTop;
-    for (let k = 0; k < 5; k++)
-      st.world.particles.emit({ x: p.x + O.x * 0.6 + (k - 2) * O.z * 1.6, y: p.y - 1.8, z: p.z + O.z * 0.6 - (k - 2) * O.x * 1.6, vx: O.x * 1.5, vy: -1, vz: O.z * 1.5, spread: 1.2, size: 0.12, life: 1.1, count: 18, gravity: 1, drag: 0.2, grow: 0, alpha: 1, color: 1 });
-    st.audio.playImpact('rock-light', 0.5);
-  });
+  // the icicles under the lintel let go one after another on the roar and shatter below
+  const ice = icicles as THREE.InstancedMesh | null;
+  const ics = (ice?.userData['icicles'] as Array<{ top: THREE.Vector3; len: number; r: number }> | undefined) ?? [];
+  const falls = ics.map((ic, i) => ({ ic, t0: 11.2 + ((i * 0.37) % 1) * 0.6, y: 0, v: 0, done: false, spin: (i % 2 ? 1 : -1) * (1 + (i % 3)) }));
+  const tmp = new THREE.Object3D();
+  if (falls.length) tl.at(11.25, () => st.audio.playImpact('rock-light', 0.5));
 
   return {
     update(dt, t) {
@@ -166,6 +237,30 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
         g.wl.rotation.set(0, 0, a);
         g.wr.rotation.set(0, 0, -a);
         if (k > 9) g.o.visible = false;
+      }
+      if (ice && falls.length) {
+        let dirty = false;
+        falls.forEach((f, i) => {
+          if (f.done || t < f.t0) return;
+          f.v += 9.81 * dt;
+          f.y += f.v * dt;
+          const c = f.ic.top.clone().add(new THREE.Vector3(0, -f.ic.len / 2 - f.y, 0));
+          const g = st.world.mountain.heightAt(c.x, c.z);
+          const fy = Math.max(g, cave.floorHeightAt(c.x, c.z));
+          if (c.y - f.ic.len / 2 <= fy) {
+            f.done = true;
+            tmp.scale.setScalar(0);
+            st.world.particles.emit({ x: c.x, y: fy + 0.1, z: c.z, vx: 0, vy: 2.2, vz: 0, spread: 0.8, size: 0.09, life: 0.8, count: 16, gravity: 1, drag: 0.3, grow: 0, alpha: 1, color: 1 });
+          } else {
+            tmp.position.copy(c);
+            tmp.rotation.set(0, 0, Math.min(1.2, f.y * 0.15) * f.spin * 0.3);
+            tmp.scale.set(f.ic.r, f.ic.len, f.ic.r);
+          }
+          tmp.updateMatrix();
+          ice.setMatrixAt(i, tmp.matrix);
+          dirty = true;
+        });
+        if (dirty) ice.instanceMatrix.needsUpdate = true;
       }
     },
     dispose() {

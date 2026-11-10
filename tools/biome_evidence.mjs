@@ -211,28 +211,34 @@ if (want('cave') || want('cinematic') || want('pursuit')) {
     await P(`(w) => { const c = w.cave; const o = c.outward; const p = [c.mouth.x + o.x * 26 + o.z * 9, c.mouth.y + 7, c.mouth.z + o.z * 26 - o.x * 9 - 8]; window.__skifree.freeCam(p, [c.mouth.x, c.mouth.y + 3, c.mouth.z], 50); }`);
     await settle(3500);
     await shot('07_yeti_cave', 'The Yeti cave with the location dressing, before the encounter');
+    if (biome === 'fjord') {
+      // the sea cave from inside its mouth: the basalt portal framing the run and the fjord beyond
+      await P(`(w) => { const c = w.cave; const o = c.outward; const i = Math.min(c.exitPath.length - 1, Math.round((14 - 4.5) / 0.75)); const q = c.exitPath[i]; window.__skifree.freeCam([q.x, q.y + 1.6, q.z], [c.mouth.x + o.x * 60, c.mouth.y - 14, c.mouth.z + o.z * 60], 62); }`);
+      await settle(3000);
+      await shot('07b_yeti_cave_outlook', 'Fjord: the sea cave from inside its mouth, looking out past the basalt portal to the fjord');
+    }
     await ev(() => { window.__skifree.freeCam(null); window.__skifree.hud(true); });
   }
   await ev(() => { window.__skifree.hold(true); window.__skifree.toCave(); });
   await framesUntil(`(s) => s.phase === 'caveCinematic'`, 600);
   if (want('cinematic')) {
-    if (biome === 'fjord' && process.env.CAVE_EXTRAS) {
-      // the Fjord cave beats: gulls scattering off the basalt on the rumble, spray on the roar
-      await framesUntil(`(s) => s.cinematicTime >= 3.0`, 600);
+    if (biome === 'fjord') {
+      // the Fjord cave beats: gulls scattering off the basalt portal on the rumble
+      await framesUntil(`(s) => s.cinematicTime >= 2.95`, 600);
       await settle(1500);
-      await shot('08c_yeti_cinematic_gulls', 'Cave cinematic, t≈3.0 s (Fjord: gulls scatter off the columns on the rumble)');
+      await shot('08c_yeti_cinematic_gulls', 'Cave cinematic, t≈2.95 s (Fjord: gulls burst off the basalt portal on the rumble)');
     }
     await framesUntil(`(s) => s.cinematicTime >= 9.5`, 600);
     await settle(1500);
-    await shot('08_yeti_cinematic', 'Cave cinematic, t≈9.5 s (emergence)');
-    if (biome === 'fjord' && process.env.CAVE_EXTRAS) {
-      await framesUntil(`(s) => s.cinematicTime >= 11.6`, 600);
+    await shot('08_yeti_cinematic', biome === 'fjord' ? 'Cave cinematic, t≈9.5 s (Fjord: the emergence seen from inside the sea cave, the Yeti against the fjord)' : 'Cave cinematic, t≈9.5 s (emergence)');
+    if (biome === 'fjord') {
+      await framesUntil(`(s) => s.cinematicTime >= 11.65`, 600);
       await settle(1500);
-      await shot('08d_yeti_cinematic_roar', 'Cave cinematic, t≈11.6 s (Fjord: the roar, spray and sea smoke out of the mouth)');
+      await shot('08d_yeti_cinematic_roar', 'Cave cinematic, t≈11.65 s (Fjord: the roar blows spray and sea smoke out of the mouth; the lintel icicles drop and shatter)');
     }
-    await framesUntil(`(s) => s.cinematicTime >= 14.6`, 400);
+    await framesUntil(biome === "fjord" ? `(s) => s.cinematicTime >= 15.0` : `(s) => s.cinematicTime >= 14.6`, 400);
     await settle(1500);
-    await shot('08b_yeti_cinematic', 'Cave cinematic, t≈14.6 s');
+    await shot('08b_yeti_cinematic', biome === 'fjord' ? 'Cave cinematic, t≈15.0 s (Fjord: the leap from the ledge, down onto the skier)' : 'Cave cinematic, t≈14.6 s');
   }
   // 9) pursuit with the rear view
   if (want('pursuit')) {
