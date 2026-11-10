@@ -470,7 +470,8 @@ export class App {
       { kind: 'button', label: 'Achievements', hint: `${Object.keys(this.progress.saved.achievements).filter((id) => this.progress.defs.some((d) => d.id === id)).length} / ${this.progress.defs.length}`, action: () => this.menu.push(this.achievementsScreen()) },
       { kind: 'button', label: 'Controls', action: () => this.menu.push(this.controlsScreen()) },
       { kind: 'button', label: 'Settings', action: () => this.menu.push(this.settingsScreen()) },
-      { kind: 'button', label: 'Credits & Licences', action: () => this.menu.push(this.creditsScreen()) },
+      // Credits & Licences moved to the bottom of Settings: the Achievements row takes its place so
+      // the main menu keeps its height budget for 1366x768 (pass 4)
     );
     return {
       id: 'main',
@@ -642,6 +643,7 @@ export class App {
       { kind: 'slider', label: 'Interface text size', min: 0.85, max: 1.5, step: 0.05, get: () => s.uiScale, set: (v) => ((s.uiScale = v), changed()), fmt: pct },
       { kind: 'toggle', label: 'Sound captions', get: () => s.captions, set: (v) => ((s.captions = v), changed()) },
       { kind: 'toggle', label: 'Tutorial prompts', get: () => s.showTutorial, set: (v) => ((s.showTutorial = v), changed()) },
+      { kind: 'button', label: 'Credits & Licences', action: () => this.menu.push(this.creditsScreen()) },
       { kind: 'button', label: 'Reset settings to defaults', action: () => {
         const keepQ = s.quality;
         Object.assign(s, loadSettings({ getItem: () => null, setItem: () => {} }));

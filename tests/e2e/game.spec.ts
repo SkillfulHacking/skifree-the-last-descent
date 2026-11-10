@@ -60,7 +60,7 @@ test('main menu loads with a rendered 3D background and no fatal errors', async 
   expect(s.mode).toBe('menu');
   expect(s.menu).toBe('main');
   await expect(page.locator('.hero-title')).toHaveText('SKIFREE');
-  await expect(page.locator('.menu-row.kind-button')).toHaveCount(5); // Start, Achievements, Controls, Settings, Credits
+  await expect(page.locator('.menu-row.kind-button')).toHaveCount(4); // Start, Achievements, Controls, Settings (Credits is under Settings)
   const perf = await page.evaluate(() => window.__skifree.perf());
   expect(perf.calls).toBeGreaterThan(20); // the scene really draws
   expect(perf.triangles).toBeGreaterThan(50_000);
