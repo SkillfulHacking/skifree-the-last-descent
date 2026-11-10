@@ -54,10 +54,10 @@ export const SQUALL = {
   /** peak onshore side-slip of a grounded skier, m/s (× the edge factor, SkierPhysics SLIP_EDGE) */
   slip: 3.6,
   /** extra v² drag at the peak of the gust (the wind leaning on the skier; everyone pays it) */
-  drag: 0.0035,
+  drag: 0.006,
 };
 /** the squall cycle (s): dormant → telegraph (windsock, spindrift, caption) → active → recovery */
-export const SQUALL_TIMING = { dormant: 2.8, telegraph: 1.3, active: 2.0, recovery: 0.9 } as const;
+export const SQUALL_TIMING = { dormant: 2.4, telegraph: 1.3, active: 2.6, recovery: 0.9 } as const;
 /** share of kickers (and gap take-offs) with a squall over them */
 const JUMP_SQUALL_CHANCE = 0.7;
 /** peak onshore push on an airborne skier over a squall jump, m/s² (~1.5–5 m of drift, by airtime) */
@@ -67,7 +67,7 @@ export const JUMP_ROCK_INSET = 2.5;
 /** chance per band of a rock patch across the racing line (1 on a ridgeline with a spine) */
 const ROCK_ON_LINE_CHANCE = 0.7;
 /** footprint radius of a squall lane (it spans the piste around the racing line) */
-export const SQUALL_LANE_R = 22;
+export const SQUALL_LANE_R = 26;
 /** squall lanes sit this far seaward of the racing line (the gust comes off the sea) */
 const LANE_SEAWARD = 4;
 /**

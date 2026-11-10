@@ -165,14 +165,14 @@ export function makeFjordBiome(): Biome {
       // Endurance 15.5°, against Alpine's 14.8° / 16.5° / 16.2°; the same line swing) and the
       // location's extra difficulty comes from its environment (./hazards.ts). Large open runs
       // and exposed ridgelines still dominate; the floor keeps flat run-ins out.
-      slopeScale: 0.92,
+      slopeScale: 0.88,
       widthScale: 1.08,
       swingScale: 1,
       segmentWeights: { alpine: 3, highspeed: 1.4, powder: 1.2, basin: 1.0, ridgeline: 2.2, cliffside: 1.2, beginner: 0.6, forest: 0.8, chute: 0.4, moguls: 0.8 },
       minSlope: 11,
       // the run-in from the start gate drops a little more steeply, so the snow's undulation never
       // stalls a skier who has not learned to skate yet (E6)
-      startSlope: 9.5,
+      startSlope: 8,
       // the Yeti's caves are cut into the sea side, the fjord showing over them (art request R4)
       caveSide: -1,
       altTypes: ['alpine', 'highspeed', 'powder', 'basin', 'ridgeline', 'cliffside', 'forest'],
@@ -199,7 +199,7 @@ export function makeFjordBiome(): Biome {
       weather: FJORD_WEATHER,
       // the same squalls and rock on every difficulty; on Relaxed they push and drag a little more
       // than half as hard, on Hard a little harder (the Yeti is not touched: brief §2)
-      hazards: { kinds: ['sea-gust', 'scoured-rock', 'gap-marker'], density: 1, intensity: { relaxed: 0.4, normal: 1, hard: 1.1 } },
+      hazards: { kinds: ['sea-gust', 'scoured-rock', 'gap-marker'], density: 1, intensity: { relaxed: 0.5, normal: 1, hard: 1.0 } },
       finish: { id: 'fjord-harbour' },
       refuge: { id: 'coastal-shelter', name: 'Coastal shelter' },
       cave: { id: 'fjord-sea-cave' },
