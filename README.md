@@ -16,6 +16,9 @@ The mountain's look, vegetation, obstacle mix and terrain character come from a 
 the only one so far; `docs/BIOMES.md` explains how to add more. A non-default location is shown in
 the menu (a Location row appears once there is more than one) and in course codes as a suffix,
 e.g. `DAILY-2026-11-08-STD-N@DUSK`; Alpine codes are unchanged.
+Beyond looks, a location can plug in capability modules — surface physics, weather, hazards, its
+own finish and victory cinematic, refuges, cave dressing, ambience and a 1–5 difficulty rating —
+each defaulting to Alpine's original behaviour (see `docs/BIOMES.md`).
 
 ## Quick start
 

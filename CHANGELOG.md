@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased — Pass 4 Stage 1: biome capability foundations
+- **Biome capabilities** (`src/world/capabilities/`, `docs/BIOMES.md`): optional modules on a
+  biome — surface physics modifiers, deterministic weather (wind/visibility/snowfall + physics
+  coupling), hazards, finish environment, refuge, cave dressing, ambience ids and a 1–5
+  environmental difficulty rating. Every module defaults to Alpine, which stays bit-for-bit
+  unchanged (terrain goldens + new physics/simulation identity tests).
+- **One physics hook**: `SkierPhysics` takes an optional `PhysicsEnvironment`
+  (`src/physics/environment.ts`); `BiomeEnvironment` composes surface + weather + streamed hazards
+  and reports typed gameplay events (`surface-change`, `hazard-telegraph/active/enter/exit/hit/passed`).
+- **Hazard framework** (`src/world/hazards/`): registered kinds with pure placement/timing/effects,
+  fairness validation (≥ 0.8 s telegraph for knock/crash, view + audio cues), per-band
+  deterministic placement streamed with the obstacles, views created/disposed with their band
+  (`HazardLayer`), and a test kit. No hazards on Alpine.
+- **Finish/refuge/cave registries** (`src/world/presentation/`): the Resort is the
+  `alpine-resort` finish; its victory sequence moved unchanged into
+  `src/cinematic/victory/alpineResort.ts` behind a thin `VictoryCinematic` shell.
+- **Course rules:** the hand-authored Classic Sprint layout is Alpine-only; other locations'
+  Sprint is generated with their own terrain. Codes, seeds and records unchanged;
+  `courseCodeQuery`/`courseFromQuery` percent-encode `@` for future URLs.
+- **Menu:** the Location row (shown when more than one location exists) shows the name, rating
+  pips + label and a one-line description. `?debug&testbiome` adds an internal test location.
+
 ## 0.4.0 — Long-course pacing, snowball fixes, biome support (2026-11-08)
 - **~10 % free skiing on every length.** Endurance/Expedition are now a chain of chases
   (`longCoursePlan()` in `src/world/profile.ts`): first cave at 560 m, a refuge at the end of each
