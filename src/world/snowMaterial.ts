@@ -95,6 +95,10 @@ const SHORE_GLSL = /* glsl */ `
     // a sprinkle of snow survives on the rocks just above the spray
     shore = mix(shore, col * 0.85, smoothstep(0.62, 0.8, sn) * smoothstep(1.5, 3.0, dh) * 0.7);
     col = mix(col, shore, wash);
+    // the spray zone: on low skerries and shores the wind and salt keep the rock bare in patches
+    float spray = (1.0 - smoothstep(2.0, 11.0 + 6.0 * sn2, dh)) * smoothstep(0.42, 0.62, sf_vnBL(vNPos.xz * 0.08 + 9.0, sf_fp(sf_fY, vec2(0.08))));
+    col = mix(col, wet * 1.4, spray * 0.85 * (1.0 - wash));
+    sf_rock = max(sf_rock, spray * 0.85);
     sf_rock = max(sf_rock, wash);
     // surf: a bright, breaking line at the water's edge (animated)
     float ph = uTime * 0.55 + sf_vn(vNPos.xz * 0.02) * 6.0;

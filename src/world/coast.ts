@@ -469,10 +469,16 @@ export class Coast {
   /** finite courses: beyond the harbour shoreline the land slopes away into the open sea */
   private oceanCut(x: number, z: number, h: number): number {
     const W = this.oceanLevel;
-    const sz = this.shoreZ(x);
-    const k = smoothstep(sz - 6, sz + 36 + 0.85 * Math.max(0, h - W), z);
-    if (k <= 0) return h;
     const s = this.seed;
+    const sz = this.shoreZ(x);
+    const tall = Math.max(0, h - W);
+    // the headlands meet the sea in rugged buttresses, not a planar cut
+    const n1 = gnoise(x / 170, 2.7, s + 85);
+    const k0 = smoothstep(sz - 6, sz + 36 + 0.85 * tall * (0.75 + 0.45 * (0.5 + 0.5 * n1)), z + Math.min(160, tall * 0.25) * gnoise(x / 95, 5.1, s + 86));
+    if (k0 <= 0) return h;
+    const k = k0 * k0 * (3 - 2 * k0);
+    const relief = (ridged(x / 120, z / 120, s + 87, 3) - 0.35) * Math.min(220, tall * 0.35) * k * (1 - k) * 4;
+    h -= relief;
     let bed = W - 4 - (this.p.depth - 4) * smoothstep(sz, sz + 700, z);
     // islands and skerries out to sea
     void s;

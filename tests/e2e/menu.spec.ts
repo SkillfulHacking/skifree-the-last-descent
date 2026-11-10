@@ -174,20 +174,21 @@ test('a course code typed into the menu selects that course', async ({ page }) =
   expect(await page.evaluate(() => (window as unknown as { __skifree: { state(): { course: { label: string } } } }).__skifree.state().course.label)).toContain('AVALANCHE');
 });
 
-test('with a second location (debug-only test location) the Location row shows name, rating and description and the menu still fits', async ({ page }) => {
+test('the Location row (Alpine, Fjord Coast) shows name, rating and description and the menu still fits', async ({ page }) => {
   test.setTimeout(30 * 60 * 1000);
   await page.setViewportSize({ width: 1920, height: 1080 });
-  await boot(page, {}, '/?debug&testbiome');
+  await boot(page, {}, '/?debug');
   const row = page.locator('.menu-row', { hasText: 'Location' });
   await expect(row).toHaveCount(1);
   await expect(row.locator('.val')).toHaveText('Alpine');
   await expect(row.locator('.loc-rating')).toHaveText('●○○○○ Beginner');
   await expect(row.locator('.loc-note')).toContainText('Clear winter day');
-  // pick the test location with the mouse: the code gains its tag, the note follows
+  // pick Fjord Coast with the mouse: the code gains its tag, the note follows
   await row.locator('.inc').click({ force: true }); // software rendering: the focus transition never reports 'stable'
-  await expect(page.locator('.menu-row', { hasText: 'Location' }).locator('.val')).toHaveText('[debug] Test Range');
-  await expect(page.locator('.menu-row', { hasText: 'Location' }).locator('.loc-rating')).toHaveText('●●●○○ Test');
-  expect((await page.evaluate(() => (window as unknown as MW).__skifree.currentCourse())).id).toMatch(/@DBGTEST$/);
+  await expect(page.locator('.menu-row', { hasText: 'Location' }).locator('.val')).toHaveText('Fjord Coast');
+  await expect(page.locator('.menu-row', { hasText: 'Location' }).locator('.loc-rating')).toHaveText('●●○○○ Scenic');
+  await expect(page.locator('.menu-row', { hasText: 'Location' }).locator('.loc-note')).toContainText('Sea cliffs');
+  expect((await page.evaluate(() => (window as unknown as MW).__skifree.currentCourse())).id).toMatch(/@FJORD$/);
   for (const [w, h] of [
     [1366, 768],
     [1920, 1080],
@@ -205,6 +206,6 @@ test('with a second location (debug-only test location) the Location row shows n
       return n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).fontSize);
     });
     expect(noteEm).toBeLessThan(1.8); // one line of text
-    await page.screenshot({ path: `docs/reviews/pass4/menu/e2e_menu_location_${w}x${h}.png`, timeout: 600_000 }); // software rendering is slow at 2560x1440
+    await page.screenshot({ path: `docs/reviews/biomes/fjord/round-1/e2e_menu_location_${w}x${h}.png`, timeout: 600_000 }); // software rendering is slow at 2560x1440
   }
 });

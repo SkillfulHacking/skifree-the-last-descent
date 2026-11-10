@@ -176,6 +176,32 @@ describe('Fjord Coast: deterministic, continuous coastal terrain at every length
   }
 });
 
+describe('Fjord Coast: 50 km without repeats', () => {
+  it('every fjord arm differs (length, level drop, width, far heights, hamlets); no 6 km section repeats', () => {
+    const m = mtn('expedition');
+    const c = m.coast!;
+    const rs = c.reaches(0, 50000).filter((r) => Number.isFinite(r.z1));
+    expect(rs.length).toBeGreaterThan(10);
+    const sig = rs.map((r) => [Math.round(r.z1 - r.z0), Math.round(c.farShore((r.z0 + r.z1) / 2)), Math.round(c.rimOffset((r.z0 + r.z1) / 2))].join(':'));
+    expect(new Set(sig).size).toBe(sig.length);
+    // cross-sections 6 km apart never match
+    for (let z = 1000; z < 44000; z += 1700) {
+      let same = 0;
+      let land = 0;
+      for (let x = -3000; x < 300; x += 50) {
+        const a = m.heightAt(x, z) - c.seaLevelAt(z);
+        const b = m.heightAt(x, z + 6000) - c.seaLevelAt(z + 6000);
+        if (a < 0 && b < 0) continue; // fjord bed under both
+        land++;
+        if (Math.abs(a - b) < 2) same++;
+      }
+      expect(same).toBeLessThan(Math.max(3, land * 0.25));
+    }
+    expect(c.hamlets(0, 50000).length).toBeGreaterThan(12);
+    expect(c.lookouts(0, 50000).length).toBeGreaterThan(25);
+  });
+});
+
 describe('Fjord Coast: physics (cornice guard, crosswind)', () => {
   const m = mtn('standard');
   const env = () => new BiomeEnvironment(m, worldSeed(course('standard')));
