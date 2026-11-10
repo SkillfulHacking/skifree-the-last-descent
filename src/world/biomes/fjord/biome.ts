@@ -161,9 +161,10 @@ export function makeFjordBiome(): Biome {
     terrain: {
       // round 3 (B N1, F2): the round-2 terrain (minSlope 14, highspeed-heavy, swing 0.8) made the
       // Fjord the faster mountain on unseen seeds. The terrain alone now skis like Alpine's for a
-      // skilled skier (route gradient ~15.7–15.9° against Alpine's 16.0–16.3°, the same line swing)
-      // and the location's extra difficulty comes from its environment (./hazards.ts). Large open
-      // runs and exposed ridgelines still dominate; the floor keeps flat run-ins out.
+      // skilled skier (measured route gradient on 8 unseen seeds: Sprint 14.8° / Standard 15.8° /
+      // Endurance 15.5°, against Alpine's 14.8° / 16.5° / 16.2°; the same line swing) and the
+      // location's extra difficulty comes from its environment (./hazards.ts). Large open runs
+      // and exposed ridgelines still dominate; the floor keeps flat run-ins out.
       slopeScale: 0.92,
       widthScale: 1.08,
       swingScale: 1,
