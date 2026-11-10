@@ -92,7 +92,7 @@ export function makeFjordBiome(): Biome {
       exposure: 0.8,
     },
     // crisp, clear air: long views across the fjord; haze stays thin over the water
-    atmosphere: { fogColor: [0.68, 0.79, 0.93], fogDensity: 0.00019, sunHaze: [1.0, 0.84, 0.66], linear: 1 / 30000, falloff: 1 / 1500 },
+    atmosphere: { fogColor: [0.68, 0.79, 0.93], fogDensity: 0.000145, sunHaze: [1.0, 0.84, 0.66], linear: 1 / 46000, falloff: 1 / 2600 },
     weather: { flakeDensity: 0.3, flakeSize: 0.07, flakeOpacity: 0.55, flakeColor: 0xffffff },
     terrainLook: {
       snow: [0.88, 0.92, 0.975],

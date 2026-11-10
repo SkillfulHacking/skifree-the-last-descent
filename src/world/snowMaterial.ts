@@ -96,7 +96,7 @@ const SHORE_GLSL = /* glsl */ `
     shore = mix(shore, col * 0.85, smoothstep(0.62, 0.8, sn) * smoothstep(1.5, 3.0, dh) * 0.7);
     col = mix(col, shore, wash);
     // the spray zone: on low skerries and shores the wind and salt keep the rock bare in patches
-    float spray = (1.0 - smoothstep(2.0, 11.0 + 6.0 * sn2, dh)) * smoothstep(0.42, 0.62, sf_vnBL(vNPos.xz * 0.08 + 9.0, sf_fp(sf_fY, vec2(0.08))));
+    float spray = (1.0 - smoothstep(3.0, 18.0 + 10.0 * sn2, dh)) * smoothstep(0.42, 0.62, sf_vnBL(vNPos.xz * 0.08 + 9.0, sf_fp(sf_fY, vec2(0.08))));
     col = mix(col, wet * 1.4, spray * 0.85 * (1.0 - wash));
     sf_rock = max(sf_rock, spray * 0.85);
     sf_rock = max(sf_rock, wash);

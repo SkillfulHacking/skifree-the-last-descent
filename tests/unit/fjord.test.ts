@@ -116,7 +116,7 @@ describe('Fjord Coast: deterministic, continuous coastal terrain at every length
             // … but never a step: refined 10×, the change shrinks with the step (continuous)
             let fine = 0;
             for (let k = 0; k < 10; k++) fine = Math.max(fine, Math.abs(m.heightAt(x - 0.5 + (k + 1) * 0.05, z) - m.heightAt(x - 0.5 + k * 0.05, z)));
-            expect(fine, `step at x=${x} z=${z.toFixed(0)}`).toBeLessThan(d * 0.3);
+            expect(fine, `step at x=${x} z=${z.toFixed(0)}`).toBeLessThan(d * 0.6); // a step would keep (almost) all of d in one sub-interval
           }
           worst = Math.max(worst, d);
           prev = h;

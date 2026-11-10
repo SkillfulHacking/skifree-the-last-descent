@@ -437,11 +437,11 @@ export class Coast {
       const [a, b] = p.farHeight;
       const massif = clamp(0.2 + 1.0 * ridged(x / 1700, z / 1700, s + 73, 4), 0, 1.2);
       const peaks = a + (b - a) * massif;
-      const rise = smoothstep(-160, 1100, ef);
-      // summits: a ridged field at ~900 m wavelength sharpened near the top of the wall
+      // a steep wall from the water (dark rock with snow on its benches), then the summits
+      const rise = smoothstep(-120, 720 + 260 * (0.5 + 0.5 * gnoise(z / 900, 6.6, s + 88)), ef);
       const summit = (ridged(x / 760, z / 760, s + 79, 4) - 0.32) * 520 * smoothstep(250, 1300, ef);
-      const couloir = (ridged(x / 210, z / 95, s + 74, 2) - 0.4) * 90 * smoothstep(80, 600, ef);
-      out = Math.max(out, lvS - p.depth + (peaks + p.depth) * Math.pow(rise, 0.7) + summit + couloir);
+      const couloir = (ridged(x / 160, z / 70, s + 74, 2) - 0.4) * 150 * smoothstep(60, 500, ef) * (1 - smoothstep(900, 1600, ef));
+      out = Math.max(out, lvS - p.depth + (peaks + p.depth) * (1 - Math.pow(1 - rise, 1.6)) + summit + couloir);
     }
     // the headland ridge between two arms (and the fjord head): hides where the levels change
     if (ridge.bell > 0.002) {
