@@ -329,7 +329,7 @@ export class Coast {
 
   // --- scenic viewpoints --------------------------------------------------------------------
   /**
-   * Viewpoints on the cliff rim overlapping [z0, z1]: every 1.2–2.2 km, away from cave shelves,
+   * Viewpoints on the cliff rim overlapping [z0, z1]: every 0.95–1.5 km, away from cave shelves,
    * refuges, the summit and the finish approach, inside the cornice zone's edge, never more than a
    * gentle climb above the piste. Deterministic (generated in order down the course).
    */
@@ -338,12 +338,13 @@ export class Coast {
     const end = this.finite ? this.finishZ - 420 : Infinity;
     while (this.lookoutZ < Math.min(z1 + 400, end)) {
       const rr = new Rng((this.seed ^ Math.imul(this.lookoutList.length + 3, 0x6b43a9b5) ^ Math.imul(Math.floor(this.lookoutZ), 0x27d4eb2d)) >>> 0);
-      let z = this.lookoutZ + rr.range(250, 600);
-      this.lookoutZ += rr.range(1200, 2200);
+      let z = this.lookoutZ + rr.range(200, 500);
+      this.lookoutZ += rr.range(950, 1500);
       if (z > end) break;
       const busy = (q: number) => P.encounters(q - 400, q + 400).some((e) => q > e.caveZ - 360 && q < e.caveZ + 220) || P.checkpoints(q - 400, q + 400).some((c) => Math.abs(q - c) < 330);
       let ok = false;
-      for (let k = 0; k < 6 && !ok; k++, z += 70) {
+      for (let k = 0; k < 6 && !ok; k++) {
+        if (k > 0) z += 70;
         if (busy(z)) continue;
         const x = this.rimX(z) + LOOKOUT_INSET;
         const H = this.terrain;
@@ -420,7 +421,7 @@ export class Coast {
       const bedDrop = smoothstep(flat, flat + 420, tf);
       out = foot - (p.depth - 5 + 9.5 * hm) * bedDrop;
       // rocks and skerries at the cliff foot
-      out += Math.max(0, gnoise(x / 23, z / 23, s + 69) - 0.45) * 30 * (1 - smoothstep(30, 240, tf)) * (1 - hm);
+      out += Math.max(0, gnoise(x / 23, z / 23, s + 69) - 0.45) * 30 * smoothstep(0, 25, tf) * (1 - smoothstep(30, 240, tf)) * (1 - hm);
       // islands in the fjord (smooth rounded skerries and a few bigger wooded islets)
       const k = smoothstep(160, 420, tf);
       if (k > 0) {

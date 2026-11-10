@@ -196,6 +196,8 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
   const kickers = P.kickersNear(zA - 40, zB + 40, []);
   const caves = P.encounters(zA - 60, zB + 60).map((e) => ({ x: e.anchor.centerX + e.anchor.side * e.anchor.d, z: e.anchor.z, side: e.anchor.side, d: e.anchor.d }));
   const hasAlt = P.altRoutes(zA - 10, zB + 10).length > 0;
+  const coast = m.coast;
+  const lookouts = coast ? coast.lookouts(zA - 20, zB + 20) : [];
   const nearKicker = (x: number, z: number) => kickers.some((k) => z > k.z - k.run - 18 && z < k.z + 26 && Math.abs(x - (m.centerX(k.z) + k.d)) < k.width * 0.5 + 6);
   let local = 0;
   const add = (o: Omit<Obstacle, 'id' | 'collidable' | 'y'>) => {
@@ -226,6 +228,8 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
       if (caves.some((c) => Math.hypot(x - c.x, z - c.z) < 26)) continue; // cave mouth
       if (nearKicker(x, z)) continue;
       if (caves.some((c) => d * c.side > c.d - 16 && Math.abs(z - c.z) < 40)) continue; // keep cave clearing open
+      // coast: nothing on the cornice, the cliff or in the water; viewpoints stay clear
+      if (coast && (coast.beyondRim(x, z) > -5 || lookouts.some((l) => Math.hypot(x - l.x, z - l.z) < 13))) continue;
 
       // altitude/biome tree line: open alpine where the profile says so, forests elsewhere
       const treeLine = P.treeLine(z);

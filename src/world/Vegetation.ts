@@ -198,6 +198,7 @@ export class Vegetation {
     // decorative forests on the outer valley walls (render only, no collision)
     const zA = band * BAND;
     const decorK = mountain.biome.trees.decorDensity;
+    const coast = mountain.coast;
     const speciesW = mountain.biome.trees.speciesWeights;
     if (zA + BAND > -300) {
       const rng = new Rng((seed ^ 0xf0e57 ^ Math.imul(band + 101, 0x27d4eb2d)) >>> 0);
@@ -216,6 +217,8 @@ export class Vegetation {
         if (Math.abs(x) < 560) continue; // corridor trees come from the obstacle field
         if (z < -300) continue;
         const y = mountain.heightAt(x, z);
+        // coast: no trees in or at the water, nor on the cornice
+        if (coast && (y < coast.seaLevelAt(z) + 5 || (coast.beyondRim(x, z) > -5 && coast.beyondRim(x, z) < 60))) continue;
         // tree line by altitude relative to the local valley floor
         const rel = y - mountain.heightAt(cx, z);
         const dens = smoothstep(260, 120, rel) * (0.5 + 0.5 * smoothstep(-0.3, 0.3, fbm(x / 140, z / 140, seed + 3, 2))) * (0.35 + 0.65 * mountain.profile.treeLine(z)) * decorK;
@@ -237,6 +240,7 @@ export class Vegetation {
         const seedA = rng.float();
         if (Math.abs(x) < 560 || z < -300) continue;
         const y = mountain.heightAt(x, z);
+        if (coast && y < coast.seaLevelAt(z) + 1) continue;
         const gx = (mountain.heightAt(x + 6, z) - y) / 6;
         const gz = (mountain.heightAt(x, z + 6) - y) / 6;
         const g = Math.hypot(gx, gz);
