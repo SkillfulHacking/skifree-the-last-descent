@@ -28,23 +28,33 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
   const mouth = cave.mouth;
   const clearOfPath = (x: number, z: number, r: number) => cave.exitPath.every((p) => Math.hypot(p.x - x, p.z - z) > r + 4.5) && Math.hypot(cave.ledge.x - x, cave.ledge.z - z) > r + 5;
 
-  // basalt column clusters either side of the mouth
+  // basalt column clusters either side of the mouth: hexagonal packing, stepped heights, near-black
   for (const s of [-1, 1]) {
-    const n = hi ? 26 : 16;
-    for (let i = 0; i < n; i++) {
-      const along = 6.5 + rnd.range(0, 11);
-      const back = rnd.range(-6, 3.5);
+    const rows = hi ? 5 : 4;
+    for (let r = 0; r < rows; r++)
+      for (let k = 0; k < 7; k++) {
+        const R = 0.95;
+        const along = 6.2 + k * R * 1.73 + (r % 2) * R * 0.87 + rnd.range(-0.05, 0.05);
+        const back = -6 + r * R * 1.5;
+        const x = mouth.x + tan.x * s * along - out.x * back;
+        const z = mouth.z + tan.z * s * along - out.z * back;
+        if (!clearOfPath(x, z, R) || rnd.next() < 0.12) continue;
+        const y = m.heightAt(x, z);
+        // tallest against the wall, stepping down toward the piste like a giant's staircase
+        const h = Math.max(0.8, (11 - k * 1.3 - (rows - 1 - r) * 1.2) * rnd.range(0.75, 1.05));
+        const tone = 0.032 + rnd.range(0, 0.03);
+        const tilt = 0.06 * s;
+        b.add('basalt', new THREE.CylinderGeometry(R * 0.98, R, h, 6), mat(x, y + h / 2 - 0.6, z, rnd.range(-0.03, 0.03), Math.PI / 6 + Math.atan2(tan.x, tan.z), tilt), new THREE.Color(tone, tone * 1.05, tone * 1.15));
+        b.add('snow', new THREE.CylinderGeometry(R * 0.99, R * 0.99, 0.2, 6), mat(x + Math.sin(tilt) * h * 0.5, y + h - 0.5, z, 0, Math.PI / 6 + Math.atan2(tan.x, tan.z), tilt), 0xffffff);
+      }
+    // a few broken drums lying in the snow
+    for (let i = 0; i < 3; i++) {
+      const along = rnd.range(7, 16);
+      const back = rnd.range(-14, -8);
       const x = mouth.x + tan.x * s * along - out.x * back;
       const z = mouth.z + tan.z * s * along - out.z * back;
-      const r = rnd.range(0.55, 0.95);
-      if (!clearOfPath(x, z, r)) continue;
-      const y = m.heightAt(x, z);
-      // taller toward the wall, stepping down toward the piste
-      const h = (2.5 + 9 * (1 - (along - 6.5) / 11)) * rnd.range(0.6, 1.1) + Math.max(0, -back) * 0.4;
-      const tone = 0.07 + rnd.range(0, 0.05);
-      b.add('basalt', new THREE.CylinderGeometry(r * 0.96, r, h, 6), mat(x, y + h / 2 - 0.6, z, rnd.range(-0.05, 0.05), rnd.range(0, 1), rnd.range(-0.05, 0.05)), new THREE.Color(tone, tone * 1.04, tone * 1.12));
-      // snow cap on each column top
-      b.add('snow', new THREE.CylinderGeometry(r * 0.97, r * 0.97, 0.18, 6), mat(x, y + h - 0.5, z, 0, 0, 0), 0xffffff);
+      if (!clearOfPath(x, z, 1.5)) continue;
+      b.add('basalt', new THREE.CylinderGeometry(0.9, 0.9, rnd.range(1.2, 2.2), 6).rotateZ(Math.PI / 2), mat(x, m.heightAt(x, z) + 0.45, z, 0, rnd.range(0, 6), 0), new THREE.Color(0.045, 0.048, 0.055));
     }
   }
   // icicle curtain along the brow
