@@ -233,7 +233,7 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
       // coast: nothing on the cornice, the cliff or in the water; viewpoints stay clear
       if (coast && (coast.beyondRim(x, z) > -5 || lookouts.some((l) => Math.hypot(x - l.x, z - l.z) < 13))) continue;
       // …and the swerve from the line to a chase viewpoint beside it stays clear
-      if (lookouts.some((l) => l.chase && z > l.z - 60 && z < l.z + 30 && x > l.x - 5 && x < m.routeX(z))) continue;
+      if (lookouts.some((l) => l.chase && z > l.z - 75 && z < l.z + 85 && x > l.x - 6 && x < m.routeX(z))) continue;
 
       // altitude/biome tree line: open alpine where the profile says so, forests elsewhere
       const treeLine = P.treeLine(z);

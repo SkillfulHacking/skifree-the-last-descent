@@ -51,7 +51,7 @@ export const CORNICE = { dragAdd: 0.12, friction: 10, grip: 0.7 } as const;
  * the course (× friction) and, unlike the icy alternate lines elsewhere, it holds an edge (× grip,
  * which brings the alternate line's ice grip back to about packed snow).
  */
-export const SPINE_SNOW = { friction: 0.45, grip: 3.1 } as const;
+export const SPINE_SNOW = { friction: 0.3, grip: 3.1 } as const;
 
 /** 0..1 weight of a ridgeline spine's lane at (x, z) (0 off it) */
 function spineLane(m: NonNullable<SurfaceQuery['mountain']>, x: number, z: number): number {
@@ -164,7 +164,7 @@ export function makeFjordBiome(): Biome {
       // skilled skier (route gradient ~15.7–15.9° against Alpine's 16.0–16.3°, the same line swing)
       // and the location's extra difficulty comes from its environment (./hazards.ts). Large open
       // runs and exposed ridgelines still dominate; the floor keeps flat run-ins out.
-      slopeScale: 0.95,
+      slopeScale: 0.92,
       widthScale: 1.08,
       swingScale: 1,
       segmentWeights: { alpine: 3, highspeed: 1.4, powder: 1.2, basin: 1.0, ridgeline: 2.2, cliffside: 1.2, beginner: 0.6, forest: 0.8, chute: 0.4, moguls: 0.8 },
@@ -172,6 +172,8 @@ export function makeFjordBiome(): Biome {
       // the run-in from the start gate drops a little more steeply, so the snow's undulation never
       // stalls a skier who has not learned to skate yet (E6)
       startSlope: 9.5,
+      // the Yeti's caves are cut into the sea side, the fjord showing over them (art request R4)
+      caveSide: -1,
       altTypes: ['alpine', 'highspeed', 'powder', 'basin', 'ridgeline', 'cliffside', 'forest'],
       // ridgeline shortcuts: every ridgeline gets a spine line on the crest (bowed a little toward
       // the sea, wind-packed fast snow: SPINE_SNOW) with a gully to jump from a take-off halfway
@@ -196,7 +198,7 @@ export function makeFjordBiome(): Biome {
       weather: FJORD_WEATHER,
       // the same squalls and rock on every difficulty; on Relaxed they push and drag a little more
       // than half as hard, on Hard a little harder (the Yeti is not touched: brief §2)
-      hazards: { kinds: ['sea-gust', 'scoured-rock', 'gap-marker'], density: 1, intensity: { relaxed: 0.55, normal: 1, hard: 1.15 } },
+      hazards: { kinds: ['sea-gust', 'scoured-rock', 'gap-marker'], density: 1, intensity: { relaxed: 0.4, normal: 1, hard: 1.1 } },
       finish: { id: 'fjord-harbour' },
       refuge: { id: 'coastal-shelter', name: 'Coastal shelter' },
       cave: { id: 'fjord-sea-cave' },

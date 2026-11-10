@@ -228,17 +228,19 @@ describe('Fjord Coast: physics (cornice guard, crosswind)', () => {
 
   it('the cornice only acts near the rim: the piste and the inland side ski like Alpine', () => {
     const e = env();
-    const rocks = collectPlacements(m, worldSeed(course('standard')), [getHazardKind('sea-gust'), getHazardKind('scoured-rock')], 1, 0, 10000).filter((h) => h.kind === 'scoured-rock');
+    const hz = collectPlacements(m, worldSeed(course('standard')), [getHazardKind('sea-gust'), getHazardKind('scoured-rock')], 1, 0, 10000);
     for (let z = 300; z < 9000; z += 211) {
-      // (scoured rock patches are hazards, not the surface model: skip points on one)
-      if (rocks.some((h) => Math.hypot(m.routeX(z) - h.x, z - h.z) < h.r + 1)) continue;
+      // (scoured rock patches and squalls are hazards, not the surface model: skip points in one)
+      if (hz.some((h) => Math.hypot(m.routeX(z) - h.x, z - h.z) < h.r + 5)) continue;
+      // (nor where a spine's fast wind-packed lane runs over the line, at its ends)
+      if (m.altLane(m.routeX(z), z) > 0) continue;
       const s = probe(e, m.routeX(z), z, 1, 20).sample.surface;
       expect(s.dragAdd).toBe(0);
       expect(s.friction).toBe(1);
     }
   });
 
-  it('crosswind: deterministic, bounded, zero on the ground; a jump drifts less than 2.5 m', () => {
+  it('crosswind (the breeze, away from squalls): deterministic, bounded, zero on the ground; a jump drifts less than 2.5 m', () => {
     expect(validateWeather(FJORD_WEATHER)).toEqual([]);
     const a = makeWeatherSample();
     const b = makeWeatherSample();
@@ -247,8 +249,11 @@ describe('Fjord Coast: physics (cornice guard, crosswind)', () => {
     expect(a).toEqual(b);
     const e = env();
     let maxAir = 0;
+    const squalls = collectPlacements(m, worldSeed(course('standard')), [getHazardKind('sea-gust')], 1, 0, 10000);
     for (let t = 0; t < 600; t += 3.7) {
       const z = 400 + t * 15;
+      // squalls push on purpose (their own tests); this is the breeze everywhere else
+      if (squalls.some((h) => Math.abs(z - h.z) < h.r + 6)) continue;
       const q = makeEnvQuery();
       q.x = m.routeX(z);
       q.z = z;
@@ -311,7 +316,8 @@ describe('Fjord Coast: hazards', () => {
     const e = new BiomeEnvironment(m, seed);
     const h = collectPlacements(m, seed, [gust, rock], 1, 0, 10000).find((q) => q.kind === 'sea-gust')!;
     e.stream(h.z - 60);
-    const tTel = timeOfPhase(gust, h, 'telegraph');
+    // a telegraph from its start (t = 0 may fall inside one)
+    const tTel = timeOfPhase(gust, h, 'telegraph', timeOfPhase(gust, h, 'dormant'));
     const tAct = timeOfPhase(gust, h, 'active', tTel);
     expect(tAct - tTel).toBeGreaterThanOrEqual(1.29);
     const events: EnvironmentEvent[] = [];

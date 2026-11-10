@@ -17,6 +17,8 @@ export const CHUNK = 128;
 export const CORRIDOR_X = { x0: -512, x1: 512 } as const;
 const FAR_TILE = 2048;
 const FAR_STEP = 64;
+/** coastal looks: far tiles within |x| ≤ this use FAR_STEP / 2 (art request R3) */
+const FAR_FINE_X = 3072;
 const FAR_X = 7168;
 const STEPS = [1, 2, 4, 8, 16] as const;
 
@@ -66,6 +68,8 @@ export class TerrainRenderer {
   private ahead: number;
   private farBehind = 4096;
   private farAhead: number;
+  /** coastal looks: finer far-field tiles beside the corridor (see buildFar) */
+  private readonly fineFar: boolean;
   /** coastal looks: low-pass the vertex normals of coarse LODs (see buildGeometry) */
   private smoothNormals: boolean;
   /** Points that always get full terrain detail (e.g. cave notches). */
@@ -80,6 +84,7 @@ export class TerrainRenderer {
     this.uniforms = m.uniforms;
     this.ranges = lodRanges(quality);
     this.smoothNormals = !!mountain.coast;
+    this.fineFar = !!mountain.coast;
     this.ahead = { low: 2400, medium: 3000, high: 3600, ultra: 4200 }[quality];
     this.farAhead = { low: 8192, medium: 10240, high: 12288, ultra: 14336 }[quality];
   }
@@ -452,12 +457,25 @@ export class TerrainRenderer {
     const m = this.mountain;
     const X0 = tile.ix * FAR_TILE;
     const Z0 = tile.iz * FAR_TILE;
-    const n = FAR_TILE / FAR_STEP;
+    // coastal looks (round 3, art request R3): the tiles beside the corridor — the sea-side cliffs
+    // and the inland wall that fill most chase and reveal frames — at 32 m instead of 64 m, so the
+    // big walls lose their large flat facets. Their outer edges are welded to the 64 m neighbours
+    // (odd vertices on the shared edge lie on the coarse edge: no T-junction cracks).
+    const fine = this.fineFar && X0 >= -FAR_FINE_X && X0 + FAR_TILE <= FAR_FINE_X;
+    const FAR_S = fine ? FAR_STEP / 2 : FAR_STEP;
+    const n = FAR_TILE / FAR_S;
     const vs = n + 1;
     const H = new Float64Array(vs * vs);
     for (let j = 0; j <= n; j++) {
-      for (let i = 0; i <= n; i++) H[j * vs + i] = m.heightAt(X0 + i * FAR_STEP, Z0 + j * FAR_STEP);
-      if ((j & 7) === 7) yield;
+      for (let i = 0; i <= n; i++) H[j * vs + i] = m.heightAt(X0 + i * FAR_S, Z0 + j * FAR_S);
+      if ((j & (fine ? 3 : 7)) === (fine ? 3 : 7)) yield;
+    }
+    if (fine) {
+      for (const i of [0, n]) {
+        const x = X0 + i * FAR_S;
+        if (x > -FAR_FINE_X && x < FAR_FINE_X) continue; // a fine neighbour: nothing to weld
+        for (let j = 1; j < n; j += 2) H[j * vs + i] = (H[(j - 1) * vs + i]! + H[(j + 1) * vs + i]!) / 2;
+      }
     }
     const y0 = Math.round(H[(vs >> 1) * vs + (vs >> 1)]!);
     const pos = new Float32Array(vs * vs * 3);
@@ -465,14 +483,14 @@ export class TerrainRenderer {
     for (let j = 0; j <= n; j++)
       for (let i = 0; i <= n; i++) {
         const k = j * vs + i;
-        const x = X0 + i * FAR_STEP;
+        const x = X0 + i * FAR_S;
         // inside the corridor strip the far tile is a sunk backstop: the detailed chunks win
         // wherever they exist, and beyond their streaming window the valley floor still exists
         // (no gap or cut wall edges at the end of the view)
         const sunk = x > CORRIDOR_X.x0 && x < CORRIDOR_X.x1 ? 28 : 0;
-        pos[k * 3] = i * FAR_STEP;
+        pos[k * 3] = i * FAR_S;
         pos[k * 3 + 1] = H[k]! - y0 - sunk;
-        pos[k * 3 + 2] = j * FAR_STEP;
+        pos[k * 3 + 2] = j * FAR_S;
         surf[k * 3 + 1] = 0.6;
       }
     const idx: number[] = [];

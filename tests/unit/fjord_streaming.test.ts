@@ -10,7 +10,7 @@ import * as THREE from 'three';
 import '../../src/world/biomes';
 import { buildMountain, makeCourse, worldSeed } from '../../src/game/CourseConfig';
 import { createSnowMaterial, SEA_SLOTS } from '../../src/world/snowMaterial';
-import { HazardLayer, SCENERY_BUDGET_MS, getScenery, presentationOf, type RefugeView } from '../../src/world/presentation';
+import { HAZARD_VIEW_BUDGET_MS, HazardLayer, SCENERY_BUDGET_MS, getScenery, presentationOf, type RefugeView } from '../../src/world/presentation';
 import { BiomeEnvironment } from '../../src/world/capabilities/environment';
 import { waterReaches } from '../../src/world/biomes/fjord/views/water';
 import { ResourceTracker, countLights } from '../support/resourceTracker';
@@ -30,7 +30,7 @@ describe('Fjord Coast: Endless streaming of scenery, hazard views and shelters (
     const lodges = new Map<number, RefugeView>();
     const tr = new ResourceTracker();
     const origin = new THREE.Vector3();
-    const peak = { chunks: 0, pending: 0, views: 0, lodges: 0, lights: 0 };
+    const peak: Record<string, number> = { chunks: 0, pending: 0, views: 0, lodges: 0, lights: 0, viewQueue: 0 };
     let shelters = 0;
     let streamZ = -Infinity;
     let t = 0;
@@ -67,7 +67,9 @@ describe('Fjord Coast: Endless streaming of scenery, hazard views and shelters (
       sc.pump?.(SCENERY_BUDGET_MS);
       const cam = new THREE.Vector3(m.routeX(z), m.heightAt(m.routeX(z), z) + 3, z - 6);
       sc.update(1 / 60, t, { focus: cam, camPos: cam, origin });
+      layer.pump(HAZARD_VIEW_BUDGET_MS, z);
       layer.update(1 / 60, z);
+      peak.viewQueue = Math.max(peak.viewQueue!, layer.pendingCount);
       const st = sc.stats!();
       peak.chunks = Math.max(peak.chunks, st['chunks']!);
       peak.pending = Math.max(peak.pending, st['pending']!);

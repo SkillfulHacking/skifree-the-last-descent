@@ -531,6 +531,12 @@ export interface ProfileKnobs {
    * RIM_LINE_CLEAR from the cliff rim, and spines bow inland where the rim is too close.
    */
   coast?: CoastParams;
+  /**
+   * Which side of the piste the Yeti caves are cut into (default +1, the original). A coast puts
+   * them on the sea side (−1), in front of the cliff (art request R4); see Mountain.landHeight and
+   * Coast.rimX for the ground around them.
+   */
+  caveSide?: 1 | -1;
 }
 export const DEFAULT_KNOBS: ProfileKnobs = { slopeScale: 1, widthScale: 1, swingScale: 1 };
 
@@ -694,7 +700,7 @@ export class GeneratedProfile implements CourseProfile {
       caveZ,
       triggerZ: caveZ + 22,
       foreshadowZ: foreshadowFor(caveZ),
-      anchor: { z: caveZ, centerX: 0, side: 1, d: CAVE_D }, // centerX resolved once the keys exist
+      anchor: { z: caveZ, centerX: 0, side: this.knobs.caveSide ?? 1, d: CAVE_D }, // centerX resolved once the keys exist
       chaseEndZ: chaseEnd,
       checkpointZ,
       speedMul,

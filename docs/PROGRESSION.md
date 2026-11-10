@@ -50,7 +50,7 @@ Events come only from **validated gameplay state**: physics results, `RunState` 
 | `YetiEncountered` | `encounter, difficulty` | the cave cinematic ends and the chase begins |
 | `YetiEscaped` | `encounter, via` (`refuge`/`finish`), `chaseTime, closestGap` (nearest the Yeti got in that chase, m) | a refuge is reached, or the finish is crossed |
 | `RefugeReached` | `index` | a refuge (checkpoint) is reached |
-| `ScenicLocationDiscovered` | `biome, id` | the skier reaches a viewpoint on a coast's rim (Fjord Coast: `lookout-<n>`), once per run per id |
+| `ScenicLocationDiscovered` | `biome, id` | the skier reaches a viewpoint on a coast's rim, once per run per id. Fjord Coast ids are `vp-<world seed, base 36>-<length tag>-<z>` (e.g. `vp-14k00at-10k-2610`; length tag `3k`/`10k`/`20k`/`50k`/`inf`), unique per course and location and stable whatever order the course is streamed in (`Coast.lookouts`) |
 | `HazardSurvived` | `biome, kind` | an environment `hazard-passed` without a hit (Fjord: `sea-gust`; `scoured-rock` only if the skier kept off it) |
 
 The schema is a discriminated union (`GameEvent`). Adding a field is backward compatible. Renaming or removing a field is not, because achievement criteria read the fields.
@@ -61,7 +61,7 @@ Biome hazards and scenery must not import the progression code. They report thro
 
 ```ts
 session.reportHazardSurvived('vent-zone');   // → { type: 'HazardSurvived', biome: <course biome>, kind: 'vent-zone' }
-session.reportScenicDiscovered('lookout-1'); // → { type: 'ScenicLocationDiscovered', biome: <course biome>, id: 'lookout-1' }
+session.reportScenicDiscovered('vp-14k00at-3k-1484'); // → { type: 'ScenicLocationDiscovered', biome: <course biome>, id: 'vp-14k00at-3k-1484' }
 session.emitEvent(e);                         // any other GameEvent
 ```
 

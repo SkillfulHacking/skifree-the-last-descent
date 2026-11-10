@@ -53,8 +53,8 @@ export const ROCK = { friction: 5, drag: 0.012 };
 export const SQUALL = {
   /** peak onshore side-slip of a grounded skier, m/s (× the edge factor, SkierPhysics SLIP_EDGE) */
   slip: 3.6,
-  /** extra v² drag at the peak of the gust (the wind leaning on the skier) */
-  drag: 0.0022,
+  /** extra v² drag at the peak of the gust (the wind leaning on the skier; everyone pays it) */
+  drag: 0.0035,
 };
 /** the squall cycle (s): dormant → telegraph (windsock, spindrift, caption) → active → recovery */
 export const SQUALL_TIMING = { dormant: 2.8, telegraph: 1.3, active: 2.0, recovery: 0.9 } as const;
@@ -102,6 +102,8 @@ export interface SquallLane {
   r: number;
   wind: number;
   slip: number;
+  /** the scoured rock in the lane's lee (onshore, downstream): where the gust sets a skier down */
+  lee: { x: number; z: number; r: number };
 }
 
 const kTmp: Kicker[] = [];
@@ -119,7 +121,7 @@ function poleClear(ctx: HazardPlacementContext, x: number, z: number, r: number)
 /** squall lanes are planned per group of this many bands (≈ 1 km) … */
 export const LANE_GROUP = 4;
 /** … with at least this many lanes per group wherever the course leaves room (round 3, F1: no 0-lane Sprints) */
-export const MIN_LANES_PER_GROUP = 2;
+export const MIN_LANES_PER_GROUP = 3;
 
 interface LaneCandidate {
   band: number;
@@ -151,9 +153,23 @@ function laneCandidate(ctx: HazardPlacementContext, band: number): LaneCandidate
     const x = m.routeX(z) - LANE_SEAWARD;
     if (ctx.reserved(x, z, r + 30)) continue;
     if (!poleClear(ctx, x, z, r)) continue;
-    return { band, roll, exposure: Math.min(0.95, ex * 1.3 * Math.min(1.5, ctx.density)), lane: { x, z, r, wind, slip } };
+    // the lee rock must fit (on the piste, clear of the cornice and of alternate lines)
+    const lr = rng.range(6, 8);
+    const lz = z + rng.range(12, 22);
+    const lx = m.routeX(lz) + LEE_ROCK_INSET + 0.55 * lr;
+    if (!rockFits(ctx, lx, lz, lr) || ctx.reserved(lx, lz, lr)) continue;
+    return { band, roll, exposure: Math.min(0.95, ex * 1.3 * Math.min(1.5, ctx.density)), lane: { x, z, r, wind, slip, lee: { x: lx, z: lz, r: lr } } };
   }
   return null;
+}
+
+/** a rock patch at (x, z) lies on the piste, outside the cornice zone and clear of any alternate line */
+function rockFits(ctx: HazardPlacementContext, x: number, z: number, r: number): boolean {
+  const m = ctx.mountain;
+  if (Math.abs(x - m.centerX(z)) > m.halfWidth(z) - r * 0.5) return false;
+  if (m.coast && m.coast.guard(x - r, z) > 0) return false;
+  const alt = m.profile.altRouteX(z);
+  return alt === null || Math.abs(x - alt) >= LANE_HALF + r;
 }
 
 /**
@@ -281,19 +297,19 @@ export const SCOURED_ROCK: HazardKind<RockParams> = {
       const alt = P.altRouteX(z);
       return alt === null || Math.abs(x - alt) >= LANE_HALF + r;
     };
-    // 1) the lee of each squall lane: where a skier the gust carries off the line ends up
-    for (const L of squallLanes(ctx)) {
-      const r = ctx.rng.range(6, 8);
-      const z = L.z + ctx.rng.range(12, 22);
-      const x = m.routeX(z) + LEE_ROCK_INSET + 0.55 * r;
-      if (z >= ctx.z1 || !onPiste(x, z, r) || !clearOfAlt(x, z, r) || ctx.reserved(x, z, r)) continue;
+    // 1) the lee of each squall lane: where a skier the gust carries off the line ends up (planned
+    //    with the lane, so every lane has one; placed by the band it falls in)
+    for (const L of [...squallLanes({ ...ctx, band: ctx.band - 1, z0: ctx.z0 - BAND, z1: ctx.z1 - BAND }), ...squallLanes(ctx)]) {
+      const { x, z, r } = L.lee;
+      if (z < ctx.z0 || z >= ctx.z1) continue;
       out.push({ x, z, r, rot: ctx.rng.range(0, Math.PI * 2), params: { v: ctx.rng.int(0, 7) } });
     }
     // 1b) the landing of each squall jump: where the gust sets down a skier who took off in it
     for (const J of jumpSqualls(ctx)) {
       const r = ctx.rng.range(6, 7.5);
       const z = J.lipZ + ctx.rng.range(17, 23);
-      const x = J.lipX + JUMP_ROCK_INSET + 0.55 * r;
+      // where a skier who took off along the line comes down, then a few metres onshore
+      const x = J.lipX + (m.routeX(z) - m.routeX(J.lipZ)) + JUMP_ROCK_INSET + 0.55 * r;
       if (z >= ctx.z1 || !onPiste(x, z, r) || !clearOfAlt(x, z, r) || ctx.reserved(x, z, r)) continue;
       out.push({ x, z, r, rot: ctx.rng.range(0, Math.PI * 2), params: { v: ctx.rng.int(0, 7) } });
     }

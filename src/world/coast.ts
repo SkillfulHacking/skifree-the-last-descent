@@ -81,7 +81,7 @@ export function nearRimDistance(p: CoastParams, seed: number, z: number): number
 /** where the rim may come in close (0 = keeps to the piste edge): open stretches, away from set pieces */
 export function nearRimMask(P: CourseProfile, z: number): number {
   let k = smoothstep(380, 600, z);
-  if (Number.isFinite(P.finishZ)) k *= 1 - smoothstep(P.finishZ - 700, P.finishZ - 480, z);
+  if (Number.isFinite(P.finishZ)) k *= 1 - smoothstep(P.finishZ - 560, P.finishZ - 360, z);
   for (const e of P.encounters(z - 900, z + 900)) {
     k *= smoothstep(260, 440, Math.abs(z - e.caveZ));
     if (e.checkpointZ !== null) k *= smoothstep(380, 560, Math.abs(z - e.checkpointZ));
@@ -122,6 +122,11 @@ export interface Lookout {
   readonly chase?: boolean;
 }
 
+/** a sea-side cave: the rim crest runs this far behind the cave cliff's base line (m) … */
+export const SEA_CAVE_BACK = 72;
+/** … within this z distance of the cave, fading out by the next */
+const SEA_CAVE_RIM_NEAR = 150;
+const SEA_CAVE_RIM_FAR = 260;
 /** rim cache grid (m) */
 const RIM_CELL = 8;
 /** viewpoints: free stretches start this far down the run-in / past a refuge, end this far before a trigger */
@@ -132,12 +137,12 @@ const LOOKOUT_BEFORE_TRIGGER = 45;
 const LOOKOUT_CHASE_AFTER_CAVE = 260;
 const LOOKOUT_CHASE_BEFORE_END = 320;
 /** one chase viewpoint per this many metres of chase */
-const LOOKOUT_CHASE_SPACING = 900;
+const LOOKOUT_CHASE_SPACING = 600;
 /** a chase viewpoint stands this far inside the rim crest (outside the cornice zone) … */
-const LOOKOUT_CHASE_INSET = 40;
+const LOOKOUT_CHASE_INSET = 37;
 /** … and this far (min/max) to the sea side of the racing line */
-export const LOOKOUT_CHASE_MIN = 16;
-export const LOOKOUT_CHASE_MAX = 22;
+export const LOOKOUT_CHASE_MIN = 15;
+export const LOOKOUT_CHASE_MAX = 20;
 
 /** discovery radius of a viewpoint */
 export const LOOKOUT_RADIUS = 14;
@@ -322,7 +327,17 @@ export class Coast {
 
   private rimAt(z: number): number {
     const P = this.profile;
-    const edge = P.centerX(z) - P.halfWidth(z) - rimOffsetRaw(this.p, this.seed, z);
+    let edge = P.centerX(z) - P.halfWidth(z) - rimOffsetRaw(this.p, this.seed, z);
+    // a Yeti cave on the sea side (art request R4): the cliff runs behind its hillside, close enough
+    // that the fjord shows over it in the encounter's shots, far enough to leave the hill whole
+    for (const e of P.encounters(z - 300, z + 300)) {
+      const a = e.anchor;
+      if (a.side > 0) continue;
+      const k = 1 - smoothstep(SEA_CAVE_RIM_NEAR, SEA_CAVE_RIM_FAR, Math.abs(z - a.z));
+      if (k <= 0) continue;
+      const behind = a.centerX - a.d - SEA_CAVE_BACK;
+      if (behind < edge) edge += (behind - edge) * k;
+    }
     if (!this.p.nearRim) return edge;
     const near = P.routeX(z) - nearRimDistance(this.p, this.seed, z);
     if (near <= edge) return edge;
@@ -420,7 +435,7 @@ export class Coast {
    *    reprieve after each refuge. One every 350–550 m (at least one per stretch), inside the
    *    cornice zone's edge, a gentle climb from the racing line.
    *  - chase stretches (round 3, B N2 / E2): where the rim runs close to the line (CoastParams
-   *    .nearRim), a platform 16–22 m off the line on the sea side, reached by a few metres' swerve
+   *    .nearRim), a platform 15–20 m off the line on the sea side, reached by a few metres' swerve
    *    (its discovery radius reaches to within 2–16 m of the line): a measured detour costs a
    *    tenth of a second or two, so looking at the view never costs the chase.
    * Deterministic and independent of how it is queried: generated stretch by stretch, in order down
@@ -470,22 +485,29 @@ export class Coast {
     for (let j = 0; j < n; j++) {
       let z = a + ((j + rr.range(0.3, 0.7)) / n) * (b - a);
       let ok = false;
-      for (let t = 0; t < 7 && !ok; t++) {
+      let xv = this.rimX(z) + LOOKOUT_INSET;
+      for (let t = 0; t < 9 && !ok; t++) {
         if (t > 0) z = a + ((j + rr.range(0.05, 0.95)) / n) * (b - a);
-        const x = this.rimX(z) + LOOKOUT_INSET;
         const H = this.terrain;
+        xv = this.rimX(z) + LOOKOUT_INSET;
         if (!H) {
           ok = true;
           break;
         }
-        // a short, gentle climb from the racing line
+        // a short, gentle climb from the racing line: as close to the rim as that allows (where a
+        // hillside rises toward the rim — e.g. around a sea-side cave — the platform moves in)
         const rx = P.routeX(z);
-        const rise = H(x, z) - H(rx, z);
-        const dist = rx - x;
-        if (dist > 20 && dist < 110 && rise < 9 && rise / dist < 0.15) ok = true;
+        for (let x = xv; x < rx - 20 && !ok; x += 6) {
+          const rise = H(x, z) - H(rx, z);
+          const dist = rx - x;
+          if (dist < 110 && rise < 9 && rise / dist < 0.15) {
+            ok = true;
+            xv = x;
+          }
+        }
       }
       if (!ok) continue;
-      this.lookoutList.push({ id: this.lookoutId(z), n: this.lookoutList.length, x: this.rimX(z) + LOOKOUT_INSET, z, r: LOOKOUT_RADIUS });
+      this.lookoutList.push({ id: this.lookoutId(z), n: this.lookoutList.length, x: xv, z, r: LOOKOUT_RADIUS });
     }
   }
 
@@ -516,18 +538,23 @@ export class Coast {
     const kick: Kicker[] = [];
     const cliffs: CliffBand[] = [];
     for (let j = 0; j < n; j++) {
-      for (let t = 0; t < 9; t++) {
+      for (let t = 0; t < 32; t++) {
         const z = a + ((j + rr.range(0.1, 0.9)) / n) * (b - a);
         const rx = P.routeX(z);
         const x = Math.max(this.rimX(z) + LOOKOUT_CHASE_INSET, rx - LOOKOUT_CHASE_MAX);
         const off = rx - x;
         if (off < LOOKOUT_CHASE_MIN) continue;
+        // not into deep snow off the groomed line (a powder segment's ungroomed sides cost seconds)
+        if (Math.max(P.powderBias(z - 70), P.powderBias(z), P.powderBias(z + 70)) > 0.3) continue;
+        // where the line itself bows inland here, the swerve out to the sea side is that much longer
+        const bow = rx - (P.routeX(z - 80) + P.routeX(z + 80)) / 2;
+        if (off + Math.max(0, bow) > LOOKOUT_CHASE_MAX + 1) continue;
         // the guard must be clean, the swerve flat, and no jump or alternate line in the way
-        if (this.guard(x - 4, z) > 0) continue;
-        if (Math.abs(H(x, z) - H(rx, z)) > 3) continue;
+        if (this.guard(x, z) > 0) continue;
+        if (H(x, z) - H(rx, z) > 1.3 || H(rx, z) - H(x, z) > 2 || P.slopeDeg(z) < 12) continue;
         // smooth snow on the way (no edge moguls, drifts or rollers to bounce over at speed)
         if (!this.smoothSwerve(H, rx, x, z)) continue;
-        if (P.kickersNear(z - 100, z + 140, kick).length || P.cliffsNear(z - 100, z + 140, cliffs).length) continue;
+        if (P.kickersNear(z - 100, z + 95, kick).length || P.cliffsNear(z - 100, z + 95, cliffs).length) continue;
         if (P.altRoutes(z - 80, z + 80).length) continue;
         this.lookoutList.push({ id: this.lookoutId(z), n: this.lookoutList.length, x, z, r: LOOKOUT_RADIUS, chase: true });
         break;

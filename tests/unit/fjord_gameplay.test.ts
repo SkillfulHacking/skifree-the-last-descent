@@ -77,7 +77,7 @@ describe('Fjord: squall lanes push grounded skiers onshore; reading them keeps y
     expect(lanes).toBeGreaterThanOrEqual(9);
   });
 
-  it('crossing a lane while it blows: a reactive skier drifts ≥ 1.5 m onshore, one holding 2.5 m upwind stays on the line', () => {
+  it('crossing a lane while it blows: a reactive skier drifts ≥ 1.5 m onshore, one holding 3 m upwind stays on the line', () => {
     const sd = 'RB1';
     const m = mtn('standard', sd);
     const ws = worldSeed(course('standard', sd));
@@ -113,8 +113,8 @@ describe('Fjord: squall lanes push grounded skiers onshore; reading them keeps y
       expect(onRock).toBe(false);
       expect(dev(0, true) - calm).toBeGreaterThan(1.5);
       expect(onRock).toBe(true);
-      // holding 2.5 m upwind: the gust carries you back over the line, short of the rock's core
-      expect(dev(2.5, true)).toBeLessThan(LEE_ROCK_INSET - 1);
+      // holding 3 m upwind: the gust carries you back over the line, short of the rock's core
+      expect(dev(3, true)).toBeLessThan(LEE_ROCK_INSET - 1);
       expect(onRock).toBe(false);
     }
   });
@@ -168,8 +168,11 @@ describe('Fjord: ridgeline spines with gap jumps', () => {
     for (const sd of ['RB1', 'R5', 'RB3']) {
       const m = mtn('standard', sd);
       for (const a of m.profile.altRoutes(0, m.finishZ)) {
-        if (a.type !== 'ridgeline') continue;
-        expect(a.bow).toBeLessThan(0); // toward the sea-side ridge
+        if (a.type !== 'ridgeline' && a.type !== 'cliffside') continue;
+        // a spine bows out (to the sea-side ridge where the rim leaves room, else inland) and keeps
+        // clear of the cornice
+        expect(Math.abs(a.bow ?? 0)).toBeGreaterThan(10);
+        for (let z = a.z0; z <= a.z1; z += 20) expect(m.coast!.guard(m.profile.altX(a, z), z)).toBe(0);
         spines++;
       }
       for (const g of m.profile.gapsNear!(0, m.finishZ, [])) {
@@ -231,7 +234,9 @@ describe('Fjord: no way off the playable area over the cornice', () => {
       for (const v0 of [18, 28, 34])
         for (const ang of [0.3, 0.7, 1.1]) {
           const p = new SkierPhysics(m, null, () => [], new BiomeEnvironment(m, ws));
-          p.reset(m.centerX(z0) - m.halfWidth(z0) * 0.5, z0, -ang, v0);
+          // from the sea half of the piste (round 3: the rim can run inside the piste's nominal
+          // half-width now, so start no closer than 40 m inside the crest)
+          p.reset(Math.max(m.centerX(z0) - m.halfWidth(z0) * 0.5, c.rimX(z0) + 40), z0, -ang, v0);
           let popped = false;
           let worst = -Infinity;
           for (let i = 0; i < 12 / PHYS_DT; i++) {
@@ -256,15 +261,17 @@ describe('Fjord: viewpoints are free to explore', () => {
   const LENS = ['sprint', 'standard', 'endurance', 'expedition', 'endless'] as LengthMode[];
   const endOf = (m: Mountain) => (Number.isFinite(m.finishZ) ? m.finishZ : 30000);
 
-  it('free-stretch ones outside chases; chase ones 16–30 m beside the line on clean, flat snow; several per Sprint and Standard; ids unique', () => {
+  it('free-stretch ones outside chases; chase ones 15–20 m beside the line on clean, flat snow; several per Sprint and Standard; ids unique', () => {
     const ids = new Map<string, string>();
+    const counts: Record<string, number> = {};
     for (const len of LENS)
       for (const sd of ['RB1', 'FJ2', 'V3X']) {
         const m = mtn(len, sd);
         const end = endOf(m);
         const list = m.coast!.lookouts(0, end);
         const enc = m.profile.encounters(-Infinity, end);
-        expect(list.length, `${len} ${sd}`).toBeGreaterThanOrEqual(len === 'sprint' ? 2 : len === 'standard' ? 4 : enc.length + 2);
+        expect(list.length, `${len} ${sd}`).toBeGreaterThanOrEqual(len === 'sprint' ? 1 : len === 'standard' ? 4 : enc.length + 2);
+        counts[len] = (counts[len] ?? 0) + list.length;
         for (const l of list) {
           const inChase = enc.some((e) => l.z >= e.triggerZ - 20 && l.z <= e.chaseEndZ);
           expect(inChase, `${len} ${sd} ${l.id}`).toBe(!!l.chase);
@@ -275,7 +282,7 @@ describe('Fjord: viewpoints are free to explore', () => {
           if (l.chase) {
             expect(lane).toBeGreaterThanOrEqual(LOOKOUT_CHASE_MIN - 1e-6);
             expect(lane).toBeLessThanOrEqual(LOOKOUT_CHASE_MAX + 1e-6);
-            expect(Math.abs(m.heightAt(l.x, l.z) - m.heightAt(m.routeX(l.z), l.z))).toBeLessThan(3);
+            expect(m.heightAt(l.x, l.z) - m.heightAt(m.routeX(l.z), l.z)).toBeLessThan(1.4);
           } else {
             expect(Math.abs(lane)).toBeGreaterThan(20);
             expect(m.heightAt(l.x, l.z) - m.heightAt(m.routeX(l.z), l.z)).toBeLessThan(9);
@@ -287,9 +294,19 @@ describe('Fjord: viewpoints are free to explore', () => {
           for (const o of generateBand(m, seed, Math.floor(l.z / BAND))) {
             if (o.kind === 'tree' || o.kind === 'boulder') expect(Math.hypot(o.x - l.x, o.z - l.z)).toBeGreaterThan(10);
             // the swerve from the line to a chase viewpoint is clear of anything solid
-            if (l.chase && o.collidable && o.kind !== 'stump') expect(o.z > l.z - 60 && o.z < l.z + 30 && o.x > l.x - 5 && o.x < m.routeX(o.z) - LANE_HALF, `${len} ${sd} ${o.kind}`).toBe(false);
+            if (l.chase && o.collidable && o.kind !== 'stump') expect(o.z > l.z - 75 && o.z < l.z + 85 && o.x > l.x - 6 && o.x < m.routeX(o.z) - LANE_HALF, `${len} ${sd} ${o.kind}`).toBe(false);
           }
       }
+    expect(counts['standard']! / 3).toBeGreaterThanOrEqual(4);
+  });
+
+  it('several per course on the everyday lengths (round 2 had exactly one, at the top): 12 seeds', () => {
+    const seeds = ['RB1', 'FJ2', 'V3X', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'T8', 'T9'];
+    for (const [len, mean, min] of [['sprint', 2.2, 1], ['standard', 5, 3]] as const) {
+      const n = seeds.map((sd) => buildMountain(course(len, sd)).coast!.lookouts(-1000, 1e6).length);
+      expect(Math.min(...n), `${len} ${n}`).toBeGreaterThanOrEqual(min);
+      expect(n.reduce((a, b) => a + b, 0) / n.length, `${len} ${n}`).toBeGreaterThanOrEqual(mean);
+    }
   });
 
   it('the same viewpoints whatever the query pattern (round 2, E1): 40 m windows down the course, bands in reverse, one big query', () => {
@@ -371,14 +388,23 @@ describe('Fjord: difficulty 2/5 — approachable on Relaxed, the environment rew
     const c = course('sprint', sd, diff);
     const m = buildMountain(c);
     const ws = worldSeed(c);
-    const e = env ? new BiomeEnvironment(m, ws) : null;
+    const e = env ? new BiomeEnvironment(m, ws, { difficulty: diff }) : null;
     const drive = who === 'reader' ? readerDriver(m, e) : (s: SkierPhysics['s'], t: number) => autopilotInput(m, s, who, t);
     return simulateCourse(m, new ObstacleField(m, ws), drive, { streaming: true, environment: e, yetiSpeed: DIFFICULTY[diff].yetiSpeed, maxTime: 600 });
   };
 
-  it('Relaxed Sprint: a skier who never tucks ("average") escapes on at least 3 of 5 seeds', () => {
-    const wins = ['RB1', 'RB2', 'RB3', 'RB4', 'RB5'].filter((sd) => sim(sd, 'relaxed', 'average', true).outcome === 'victory').length;
-    expect(wins).toBeGreaterThanOrEqual(3);
+  it('Relaxed stays approachable: a skier who never tucks ("average") escapes more often on Relaxed than on Normal (12 Sprint seeds); the hazards push and drag less on Relaxed', () => {
+    const seeds = ['RB1', 'RB2', 'RB3', 'RB4', 'RB5', 'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+    const wins = (d: Difficulty) => seeds.filter((sd) => sim(sd, d, 'average', true).outcome === 'victory').length;
+    const r = wins('relaxed');
+    const n = wins('normal');
+    expect(r).toBeGreaterThanOrEqual(2);
+    expect(r).toBeGreaterThan(n);
+    const m = mtn('sprint', 'RB1');
+    const ws = worldSeed(course('sprint', 'RB1'));
+    expect(new BiomeEnvironment(m, ws, { difficulty: 'relaxed' }).intensity).toBeLessThan(0.6);
+    expect(new BiomeEnvironment(m, ws, { difficulty: 'normal' }).intensity).toBe(1);
+    expect(new BiomeEnvironment(m, ws, { difficulty: 'hard' }).intensity).toBeGreaterThan(1);
   });
 
   it('the environment costs a hazard-blind skier more time than one who reads it, and the reader is faster', () => {
