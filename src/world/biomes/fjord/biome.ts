@@ -129,7 +129,7 @@ export function makeFjordBiome(): Biome {
     obstacles: { rocks: 1.7, logs: 0.25, stumps: 0.35 },
     terrain: {
       slopeScale: 1,
-      widthScale: 1.18,
+      widthScale: 1.08,
       swingScale: 0.8,
       segmentWeights: { alpine: 3, highspeed: 2.2, powder: 1.6, basin: 1.2, ridgeline: 2, cliffside: 1.3, beginner: 0.6, forest: 0.35, chute: 0.3, moguls: 0.5 },
       altTypes: ['alpine', 'highspeed', 'powder', 'basin', 'ridgeline', 'forest'],
