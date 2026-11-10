@@ -204,3 +204,16 @@ kbd {
   .main .menu-row { font-size: 19px; }
   .main .course-card { font-size: 15px; }
 }
+
+/* Readability over bright snow, sea and sky (Fjord round-1 E4): a soft dark scrim behind the HUD
+   corner clusters and the Yeti meter, small labels no smaller than 12 px and heavier, the cinematic
+   skip hint and the rear-view label with a stronger shadow. */
+.hud-tl::before, .hud-tr::before, .hud-br::before, .hud-yeti::before { content: ''; position: absolute; inset: -14px -22px; z-index: -1; border-radius: 22px; background: radial-gradient(ellipse at center, rgba(4, 10, 22, 0.34) 0%, rgba(4, 10, 22, 0.18) 55%, rgba(4, 10, 22, 0) 80%); pointer-events: none; }
+.hud-label { font-size: 12.5px; font-weight: 800; color: rgba(236, 244, 255, 0.86); }
+.hud-speed-unit { font-size: 13px; color: rgba(236, 244, 255, 0.86); }
+.hud-mult { text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }
+.hud-yeti-label { font-size: 14px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 2px 12px rgba(0, 0, 0, 0.6); }
+.hud-yeti.near .hud-yeti-label { color: #ffc4c4; }
+.hud-skip { font-size: 14px; color: rgba(236, 244, 255, 0.9); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8); }
+.rear-view::after { font-size: 12px; }
+.menu-row .label small { font-size: 12px; }
