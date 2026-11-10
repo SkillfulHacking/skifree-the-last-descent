@@ -58,7 +58,7 @@ function settTexture(): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = c.height = 512;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#d9dfe6';
+  g.fillStyle = '#c9d0d8';
   g.fillRect(0, 0, 512, 512);
   const r = new Rand(911);
   const rows = 16;
@@ -67,7 +67,7 @@ function settTexture(): THREE.CanvasTexture {
     let x = j % 2 ? -h * 0.5 : 0;
     while (x < 512) {
       const w = h * r.range(0.9, 1.5);
-      const t = Math.round(88 + r.range(-22, 22));
+      const t = Math.round(110 + r.range(-14, 14));
       const warm = r.range(-6, 6);
       g.fillStyle = `rgb(${t + warm},${t + 2},${t + 6 - warm})`;
       const m = r.range(2, 4);
@@ -82,7 +82,7 @@ function settTexture(): THREE.CanvasTexture {
     }
   }
   // swept snow patches lying in drifts
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 40; i++) {
     const grd = g.createRadialGradient(0, 0, 0, 0, 0, 1);
     grd.addColorStop(0, 'rgba(236,241,247,0.85)');
     grd.addColorStop(1, 'rgba(236,241,247,0)');
@@ -442,9 +442,14 @@ export class Harbour implements FinishEnvironment {
           const x = F.x + dx;
           const z = F.z + dz;
           pos.push(x, Math.max(H(x, z), j === nz ? deckY : -Infinity) + 0.03, z);
-          uv.push(dx / 3, dz / 3);
-          const edge = Math.min(1, (dz - z0) / 10, (x1 - Math.abs(dx)) / 6);
-          const a = Math.max(0, Math.min(1, edge + 0.25 * Math.sin(dx * 0.7 + dz * 0.3)));
+          uv.push(dx / 4.5, dz / 4.5);
+          // a street that widens into the quay square near the water; the edge is feathered
+          // and ragged (swept snow banks), never a rectangle
+          const toQuay = (z1 - dz) / Math.max(1, z1 - z0);
+          const halfW = 11 + 23 * (1 - Math.min(1, Math.max(0, (toQuay - 0.15) / 0.45)));
+          const wob = 2.2 * Math.sin(dz * 0.31 + dx * 0.2) + 1.4 * Math.sin(dz * 0.83 - dx * 0.5);
+          const edge = Math.min(1, (dz - z0) / 14, (halfW + wob - Math.abs(dx)) / 7);
+          const a = Math.max(0, Math.min(1, edge));
           col.push(1, 1, 1, a);
         }
       for (let j = 0; j < nz; j++)
@@ -470,9 +475,9 @@ export class Harbour implements FinishEnvironment {
       paving.name = 'harbour-paving';
       this.group.add(paving);
     }
-    // the presentation spot: a low stack of fish crates the harbourmaster stands on, 5 m beyond
-    // the stop point, facing back up the run-out
-    const pod = W(-1.5, 44);
+    // the presentation spot: a low stack of fish crates the harbourmaster stands on, beside the
+    // stop point (off the line the skier comes in on), facing the skier
+    const pod = W(-5.5, 38.5);
     this.presentAt.copy(pod);
     {
       const crate = (x: number, y: number, z: number, c: number, ry: number) => {
@@ -638,7 +643,7 @@ export class Harbour implements FinishEnvironment {
     this.materials.push(guestMat);
     this.stop.copy(W(0, 38));
     // the Yeti stops at the stockfish rack (round 2: C7 — the gag is staged at the rack)
-    this.yetiPt.copy(W(-49.5, 7.5));
+    this.yetiPt.copy(W(-46.6, 1.6));
     const ground = (x: number, z: number) => Math.max(H(x, z), x > F.x - quayW && x < F.x + quayW && z > zq ? deckY + 0.1 : -Infinity);
     const seat = () => this.stamp.y - 0.42;
     const pierY = () => deckY + 0.1;
@@ -669,6 +674,8 @@ export class Harbour implements FinishEnvironment {
     this.plunger = this.guests[this.guests.length - 1]!;
     this.plungerHome.copy(this.plunger.group.position);
     this.plungerScale = this.plunger.group.scale.x;
+    // yaw first, then the forward roll about the bather's own right axis
+    this.plunger.group.rotation.order = 'YXZ';
     // the harbourmaster in yellow oilskins, standing on the crates, who presents the trophy
     {
       const base = { hatColor: 0xffffff, hatColor2: 0xffffff, scarf: null, fur: null, gloves: null, mug: null, mugColor: 0xffffff, beard: false } as const;
@@ -755,13 +762,15 @@ export class Harbour implements FinishEnvironment {
       const edge = this.plungerHome.clone().lerp(this.plungeTo, 0.18);
       edge.y = this.plungerHome.y;
       const g = this.plunger.group;
+      // the guest's own update places it at home: run it first, then override the root
+      this.plunger.update(dt, time, k < 0.22 ? 1 : 0, null, 0);
+      const yaw = g.rotation.y;
       if (k < 0.22) {
         const u = k / 0.22;
         g.position.lerpVectors(this.plungerHome, edge, u);
         g.position.y = this.plungerHome.y + Math.abs(Math.sin(u * Math.PI * 3)) * 0.12;
-        g.rotation.x = 0.25 * u;
+        g.rotation.set(0.25 * u, yaw, 0);
         g.scale.setScalar(this.plungerScale);
-        this.plunger.update(dt, time, 1, null, 0);
       } else {
         const u = (k - 0.22) / 0.78;
         const p = edge.clone().lerp(this.plungeTo, u);
@@ -770,8 +779,7 @@ export class Harbour implements FinishEnvironment {
         // tuck: knees to chest (squashed into a ball), a slow forward roll
         const tuck = Math.min(1, u / 0.25);
         g.scale.set(this.plungerScale * (1 + 0.15 * tuck), this.plungerScale * (1 - 0.42 * tuck), this.plungerScale * (1 + 0.15 * tuck));
-        g.rotation.x = 0.25 + u * 1.3;
-        this.plunger.update(dt, time, 0, null, 0);
+        g.rotation.set(0.25 + u * 1.3, yaw, 0);
       }
       if (k >= 1 && !this.splashed) {
         this.splashed = true;

@@ -237,6 +237,25 @@ export function sparkSled(b: Batch, x: number, y: number, z: number, yaw: number
   b.add('metal', new THREE.CylinderGeometry(0.018, 0.018, 0.55, 5).rotateZ(Math.PI / 2).translate(0, 1.05, -0.98), M, 0x2a2a2a);
 }
 
+/** one dried cod hanging by its tail: a flat, split body widening downward, a forked tail at the top */
+function stockfish(): THREE.BufferGeometry {
+  const sh = new THREE.Shape();
+  sh.moveTo(-0.05, 0);
+  sh.lineTo(-0.12, 0.06);
+  sh.lineTo(-0.03, 0.02);
+  sh.lineTo(0.03, 0.02);
+  sh.lineTo(0.12, 0.06);
+  sh.lineTo(0.05, 0);
+  sh.lineTo(0.03, -0.12);
+  sh.quadraticCurveTo(0.13, -0.42, 0.09, -0.7);
+  sh.quadraticCurveTo(0.0, -0.78, -0.09, -0.7);
+  sh.quadraticCurveTo(-0.13, -0.42, -0.03, -0.12);
+  sh.closePath();
+  const g = new THREE.ExtrudeGeometry(sh, { depth: 0.025, bevelEnabled: false, curveSegments: 4 });
+  g.translate(0, 0, -0.0125);
+  return g;
+}
+
 /** A stockfish drying rack ("hjell"): an A-frame timber rack hung with rows of split cod. */
 export function fishRack(b: Batch, x: number, y: number, z: number, yaw: number, len: number, rnd: Rand): void {
   const M = mat(x, y, z, 0, yaw, 0);
@@ -256,12 +275,9 @@ export function fishRack(b: Batch, x: number, y: number, z: number, yaw: number,
     const zz = (spread / 2) * (1 - yy / H);
     for (let k = -len / 2 + 0.25; k < len / 2; k += 0.28) {
       if (rnd.next() < 0.12) continue;
-      const tone = 0.62 + rnd.range(-0.08, 0.08);
-      const c = new THREE.Color(tone * 1.1, tone * 0.95, tone * 0.72);
-      for (const s of [-1, 1]) {
-        const g = new THREE.ConeGeometry(0.09, 0.75, 4).scale(1, 1, 0.45);
-        b.add('paint', g, mat(x, y, z, 0, yaw, 0).multiply(new THREE.Matrix4().makeTranslation(k, yy - 0.42, s * (zz + 0.06))).multiply(new THREE.Matrix4().makeRotationX(Math.PI + s * 0.12)), c);
-      }
+      const tone = 0.5 + rnd.range(-0.08, 0.08);
+      const c = new THREE.Color(tone * 1.12, tone * 0.92, tone * 0.66);
+      for (const s of [-1, 1]) b.add('paint', stockfish(), mat(x, y, z, 0, yaw, 0).multiply(new THREE.Matrix4().makeTranslation(k, yy - 0.06, s * (zz + 0.05))).multiply(new THREE.Matrix4().makeRotationX(s * 0.1)), c);
     }
   }
   // snow on the top rail

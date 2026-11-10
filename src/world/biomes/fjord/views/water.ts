@@ -55,8 +55,11 @@ float wv_n(vec2 q) {
   return mix(mix(wv_h(i), wv_h(i + vec2(1, 0)), u.x), mix(wv_h(i + vec2(0, 1)), wv_h(i + vec2(1, 1)), u.x), u.y);
 }
 // ripple height field: big slow swell + wind ripples running inland (+x) with the breeze
-float sf_wave(vec2 p, float t) {
+float sf_wave(vec2 p, float t, float nearK) {
   float h = 0.0;
+  // round 2 (art review D10): close to the camera, fine cat's-paw ripples carry the surface (the
+  // big swell alone smeared into blotches at the bathing pier)
+  if (nearK > 0.0) h += nearK * uDetail * (0.014 * wv_n(p * 1.1 + vec2(t * 0.9, t * 0.2)) + 0.006 * wv_n(p * 2.9 - vec2(t * 1.6, -t * 0.4)));
   h += 0.55 * wv_n(p * 0.012 + vec2(t * 0.020, t * 0.006));
   h += 0.28 * wv_n(p * 0.035 + vec2(t * 0.055, -t * 0.012));
   h += 0.12 * wv_n(p * 0.11 + vec2(t * 0.16, t * 0.03)) * uDetail;
@@ -71,11 +74,12 @@ void main() {
   vec3 V = -rel / d;
   // ripple normal (finite differences), flattened with distance so the far water doesn't alias
   vec2 p = P.xz;
-  float e = 1.5 + d * 0.004;
-  float h0 = sf_wave(p, uTime);
-  float hx = sf_wave(p + vec2(e, 0.0), uTime);
-  float hz = sf_wave(p + vec2(0.0, e), uTime);
-  float amp = 2.6 * (1.0 - smoothstep(800.0, 9000.0, d) * 0.85);
+  float nearK = 1.0 - smoothstep(60.0, 400.0, d);
+  float e = mix(0.14, 1.5, smoothstep(20.0, 220.0, d)) + d * 0.004;
+  float h0 = sf_wave(p, uTime, nearK);
+  float hx = sf_wave(p + vec2(e, 0.0), uTime, nearK);
+  float hz = sf_wave(p + vec2(0.0, e), uTime, nearK);
+  float amp = 2.6 * (1.0 - smoothstep(800.0, 9000.0, d) * 0.85) * mix(0.32, 1.0, smoothstep(30.0, 320.0, d));
   vec3 N = normalize(vec3(-(hx - h0) * amp / e * 6.0, 1.0, -(hz - h0) * amp / e * 6.0));
   float cosT = max(dot(N, V), 0.0);
   float F = 0.02 + 0.98 * pow(1.0 - cosT, 5.0);

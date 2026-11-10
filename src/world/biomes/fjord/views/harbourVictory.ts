@@ -77,7 +77,7 @@ export class HarbourVictory implements VictoryScript {
       ya.pos.set(p.x, m.heightAt(p.x, p.z), p.z);
     }
     const rack = h.rack ? h.rack.clone() : this.yetiStop.clone().add(new THREE.Vector3(3, 0, 2));
-    const presentAt = h.presentAt ? h.presentAt.clone() : F.clone().add(new THREE.Vector3(-1.5, 0, 44));
+    const presentAt = h.presentAt ? h.presentAt.clone() : F.clone().add(new THREE.Vector3(-5.5, 0, 38.5));
     const presHead = () => presentAt.clone().add(new THREE.Vector3(0, 0.55 + 1.75, 0));
     const yetiHead = () => st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.5, 0));
 
@@ -93,31 +93,46 @@ export class HarbourVictory implements VictoryScript {
     tl.shot({
       start: B.racks,
       end: 5.3,
-      from: () => pose(rack.clone().add(new THREE.Vector3(7.5, 2.4, -9.5)), yetiHead(), 42),
-      to: () => pose(rack.clone().add(new THREE.Vector3(6.8, 2.2, -8.6)), yetiHead(), 38),
+      from: () => pose(rack.clone().add(new THREE.Vector3(8.5, 2.5, -15.5)), yetiHead().add(new THREE.Vector3(0, -0.3, 2.0)), 42),
+      to: () => pose(rack.clone().add(new THREE.Vector3(7.6, 2.3, -14.2)), yetiHead().add(new THREE.Vector3(0, -0.3, 1.5)), 38),
     });
     // 2b) closer: grab, bite, gag, fling
     tl.shot({
       start: 5.3,
       end: B.present,
-      from: () => pose(this.yetiStop.clone().add(new THREE.Vector3(3.2, 1.9, -5.6)), yetiHead().add(new THREE.Vector3(0, 0.1, 0)), 36),
-      to: () => pose(this.yetiStop.clone().add(new THREE.Vector3(3.6, 1.8, -6.2)), yetiHead(), 38),
+      from: () => pose(this.yetiStop.clone().add(new THREE.Vector3(4.6, 2.0, -4.4)), yetiHead().add(new THREE.Vector3(0, -0.2, 0.6)), 38),
+      to: () => pose(this.yetiStop.clone().add(new THREE.Vector3(5.0, 1.9, -5.0)), yetiHead().add(new THREE.Vector3(0, -0.3, 0.6)), 40),
       handheld: 0.02,
     });
     // 3) the presentation: over the skier's shoulder onto the harbourmaster's face and the trophy
-    tl.shot({
-      start: B.present,
-      end: B.toss + 0.4,
-      from: () => pose(sk().add(new THREE.Vector3(1.0, 1.95, -2.4)), presHead().add(new THREE.Vector3(0, -0.2, 0)), 36),
-      to: () => pose(sk().add(new THREE.Vector3(0.8, 1.9, -2.0)), presHead().add(new THREE.Vector3(0, 0.0, 0)), 34),
-    });
+    //    (framed from where the skier actually stopped: the lens tightens with the distance)
+    const ots = (back: number, side: number, lift: number) => () => {
+      const s = sk();
+      const ph = presHead();
+      const dir = ph.clone().sub(s).setY(0);
+      const dist = Math.max(1, dir.length());
+      dir.normalize();
+      const right = new THREE.Vector3(dir.z, 0, -dir.x);
+      const cam = s.clone().addScaledVector(dir, -back).addScaledVector(right, side).add(new THREE.Vector3(0, 1.75 + lift, 0));
+      const fov = THREE.MathUtils.clamp(26 + 70 / dist, 24, 40);
+      return pose(cam, ph.clone().add(new THREE.Vector3(0, -0.15, 0)), fov);
+    };
+    tl.shot({ start: B.present, end: B.toss + 0.4, from: ots(1.6, 0.75, 0.15), to: ots(1.3, 0.65, 0.1) });
     // 3b) reverse: the skier's face as the lighthouse lands in their hand; the descent behind
     const toPres = () => presentAt.clone().sub(sk()).setY(0).normalize();
     tl.shot({
       start: B.toss + 0.4,
       end: B.apres,
-      from: () => pose(sk().addScaledVector(toPres(), 3.0).add(new THREE.Vector3(1.0, 1.5, 0)), sk().add(new THREE.Vector3(0, 1.45, 0)), 42),
-      to: () => pose(sk().addScaledVector(toPres(), 2.6).add(new THREE.Vector3(1.3, 1.25, 0)), sk().add(new THREE.Vector3(0, 1.65, 0)), 40),
+      from: () => {
+        const d2 = toPres();
+        const right = new THREE.Vector3(d2.z, 0, -d2.x);
+        return pose(sk().addScaledVector(d2, 4.6).addScaledVector(right, -1.4).add(new THREE.Vector3(0, 1.45, 0)), sk().add(new THREE.Vector3(0, 1.5, 0)), 46);
+      },
+      to: () => {
+        const d2 = toPres();
+        const right = new THREE.Vector3(d2.z, 0, -d2.x);
+        return pose(sk().addScaledVector(d2, 4.0).addScaledVector(right, -1.8).add(new THREE.Vector3(0, 1.3, 0)), sk().add(new THREE.Vector3(0, 1.7, 0)), 46);
+      },
       easing: ease.inOut,
     });
     // 4) après: from the water side of the bathing pier (tub near, bonfire and sauna behind)
@@ -127,15 +142,15 @@ export class HarbourVictory implements VictoryScript {
     tl.shot({
       start: B.apres,
       end: B.splashCut,
-      from: () => pose(tub.clone().add(new THREE.Vector3(-1.5, 2.3, 9.5)), tub.clone().add(new THREE.Vector3(0.8, 0.3, -1.5)), 46),
-      to: () => pose(tub.clone().add(new THREE.Vector3(0.5, 2.0, 9.0)), from.clone().lerp(to, 0.35).add(new THREE.Vector3(-1.5, 0.4, -2)), 46),
+      from: () => pose(tub.clone().add(new THREE.Vector3(2.5, 3.0, 12.5)), tub.clone().add(new THREE.Vector3(-1.8, 0.8, -2.5)), 50),
+      to: () => pose(tub.clone().add(new THREE.Vector3(3.3, 2.7, 12.0)), tub.clone().add(new THREE.Vector3(0.2, 0.9, -1.5)).lerp(from, 0.3), 50),
     });
     // 4b) low over the water for the cannonball and the splash
     tl.shot({
       start: B.splashCut,
       end: B.reveal,
-      from: () => pose(to.clone().add(new THREE.Vector3(-5.5, 1.1, 7.5)), to.clone().add(new THREE.Vector3(0, 1.4, 0)), 44),
-      to: () => pose(to.clone().add(new THREE.Vector3(-6.2, 1.0, 8.2)), to.clone().add(new THREE.Vector3(0, 0.9, 0)), 46),
+      from: () => pose(to.clone().add(new THREE.Vector3(-4.5, 2.8, 8.0)), to.clone().add(new THREE.Vector3(-0.5, 0.9, 0)), 46),
+      to: () => pose(to.clone().add(new THREE.Vector3(-5.0, 2.6, 8.6)), to.clone().add(new THREE.Vector3(-0.3, 0.5, 0)), 48),
     });
     // 5) the reveal: from low over the sea past the lighthouse, rise and pull back over the open
     //    fjord (the headland frames the right edge) until the camera looks up at the summit
@@ -143,12 +158,14 @@ export class HarbourVictory implements VictoryScript {
     const xs = m.routeX(0);
     const summit = new THREE.Vector3(xs, m.heightAt(xs, 0) + 30, 0);
     const harbourLook = F.clone().add(new THREE.Vector3(0, 8, 150));
-    const endPos = sea.clone().add(new THREE.Vector3(-380, 330, 1450));
+    // the camera stays out over the open fjord (−x of the harbour mouth) so the headland on +x
+    // only frames the right edge of the picture (round 2: C5/A 11c)
+    const endPos = sea.clone().add(new THREE.Vector3(-700, 360, 1500));
     tl.shot({
       start: B.reveal,
       end: B.revealEnd,
-      from: () => pose(sea.clone().add(new THREE.Vector3(-30, -2, 40)), harbourLook.clone(), 40),
-      via: () => pose(sea.clone().add(new THREE.Vector3(-170, 90, 600)), harbourLook.clone().lerp(summit, 0.5), 44),
+      from: () => pose(sea.clone().add(new THREE.Vector3(-110, -2, 40)), harbourLook.clone(), 40),
+      via: () => pose(sea.clone().add(new THREE.Vector3(-430, 100, 620)), harbourLook.clone().lerp(summit, 0.5), 44),
       to: () => pose(endPos, summit.clone().lerp(harbourLook, 0.18), 46),
       easing: ease.inOutCubic,
     });
