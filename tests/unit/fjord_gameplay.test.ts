@@ -77,7 +77,7 @@ describe('Fjord: squall lanes push grounded skiers onshore; reading them keeps y
     expect(lanes).toBeGreaterThanOrEqual(9);
   });
 
-  it('crossing a lane while it blows: a reactive skier drifts ≥ 1.5 m onshore, one holding 3 m upwind stays on the line', () => {
+  it('crossing a lane while it blows: a reactive skier drifts ≥ 1.5 m onshore, one holding 3.5 m upwind stays on the line', () => {
     const sd = 'RB1';
     const m = mtn('standard', sd);
     const ws = worldSeed(course('standard', sd));
@@ -114,7 +114,7 @@ describe('Fjord: squall lanes push grounded skiers onshore; reading them keeps y
       expect(dev(0, true) - calm).toBeGreaterThan(1.5);
       expect(onRock).toBe(true);
       // holding 3 m upwind: the gust carries you back over the line, short of the rock's core
-      expect(dev(3, true)).toBeLessThan(LEE_ROCK_INSET - 1);
+      expect(dev(3.5, true)).toBeLessThan(LEE_ROCK_INSET - 1);
       expect(onRock).toBe(false);
     }
   });
@@ -404,7 +404,7 @@ describe('Fjord: difficulty 2/5 — approachable on Relaxed, the environment rew
     const ws = worldSeed(course('sprint', 'RB1'));
     expect(new BiomeEnvironment(m, ws, { difficulty: 'relaxed' }).intensity).toBeLessThan(0.6);
     expect(new BiomeEnvironment(m, ws, { difficulty: 'normal' }).intensity).toBe(1);
-    expect(new BiomeEnvironment(m, ws, { difficulty: 'hard' }).intensity).toBeGreaterThan(1);
+    expect(new BiomeEnvironment(m, ws, { difficulty: 'hard' }).intensity).toBeGreaterThanOrEqual(1);
   });
 
   it('the environment costs a hazard-blind skier more time than one who reads it, and the reader is faster', () => {

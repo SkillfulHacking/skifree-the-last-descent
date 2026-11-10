@@ -74,7 +74,7 @@ const LANE_SEAWARD = 4;
  * The rough core of the scoured rock downwind of a lane starts this far onshore of the racing line
  * (its thin outer edge comes within ~1 m of the line): a skier the gust carries 3–4 m lands in it.
  */
-export const LEE_ROCK_INSET = 3;
+export const LEE_ROCK_INSET = 3.5;
 /** the windsock pole stands at h.x − 0.6 r − 1.5 (views/hazardViews.ts); keep it off the lines */
 const POLE_CLEAR = 4.5;
 

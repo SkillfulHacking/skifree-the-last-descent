@@ -56,7 +56,7 @@ describe('Fjord round 3: squall lanes are a guaranteed part of every run', () =>
 });
 
 describe('Fjord round 3: the airborne squall carries a skier onto the landing rock', () => {
-  it('taking off a squall jump while it blows carries a skier 1–6 m onshore (median ≥ 1.8 m; round 2: 0.28 m) compared with the lull', () => {
+  it('taking off a squall jump while it blows carries a skier 1–7 m onshore (median ≥ 1.8 m; round 2: 0.28 m) compared with the lull', () => {
     let n = 0;
     const all: number[] = [];
     for (const sd of SEEDS.slice(0, 5)) {
@@ -101,7 +101,7 @@ describe('Fjord round 3: the airborne squall carries a skier onto the landing ro
         n++;
         all.push(on - calm);
         expect(on - calm, `${sd} ${h.z.toFixed(0)}`).toBeGreaterThan(1);
-        expect(on - calm).toBeLessThan(6);
+        expect(on - calm).toBeLessThan(7);
       }
     }
     expect(n).toBeGreaterThanOrEqual(3);

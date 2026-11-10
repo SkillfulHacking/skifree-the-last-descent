@@ -84,7 +84,7 @@ export function readerDriver(m: Mountain, env: BiomeEnvironment | null, o: Reade
           for (let u = t0; u <= t1 + 1e-6 && !live; u += 0.25) live = hazardPhase(k, h, u).phase === 'active';
           if (!live) continue;
           // hold a line upwind (the sea side) so the gust carries you back onto it
-          tx -= 3 * smooth(h.z - h.r - 60, h.z - h.r - 15, tz) * (1 - smooth(h.z + h.r - 5, h.z + h.r + 15, tz));
+          tx -= 3.5 * smooth(h.z - h.r - 60, h.z - h.r - 15, tz) * (1 - smooth(h.z + h.r - 5, h.z + h.r + 15, tz));
           const inside = Math.hypot(s.pos.x - h.x, s.pos.z - h.z) < h.r + 2;
           if (o.standUp && inside && hazardPhase(k, h, t).phase === 'active') standUp = true;
         }
