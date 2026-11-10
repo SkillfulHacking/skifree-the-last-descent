@@ -24,7 +24,7 @@
   - Vegetation talus rejection, gated on `coast`, with the RNG call order unchanged.
 
   The one deliberate cross-biome change is the Hard-mode snowball readability (item 11), as the
-  brief asked. `npx tsc --noEmit` is clean. `npx vitest run` passes (15 files, including the new
+  brief asked. `npx tsc --noEmit` is clean. `npx vitest run` passes (14 files, 246 tests, including the new
   `tests/unit/fjord_art.test.ts` and the Alpine terrain goldens).
 - **Evidence harness note.** In held captures (`?debug` + `hold(true)` + `frames(n)`), App never runs
   the finish environment's per-frame update, so in every round-1 victory still the guests, boats,
