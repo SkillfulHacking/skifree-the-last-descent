@@ -28,6 +28,19 @@ async function boot(page: Page, settings: Record<string, unknown> = {}, url = '/
   await page.waitForFunction(() => (window as unknown as MW).__ready === true, null, { timeout: 240_000, polling: 1000 });
 }
 
+/**
+ * A real click (Playwright's actionability checks: visible, stable, enabled, not covered) on a menu
+ * control. Under software rendering the rows' 0.12 s focus/hover transitions span several slow
+ * frames and Playwright never sees a stable box, so the tests switch CSS transitions off (layout
+ * and hit-testing are unchanged) and wait for the control to be visible first, instead of forcing
+ * the click past those checks.
+ */
+async function click(page: Page, target: ReturnType<Page['locator']>) {
+  await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; animation: none !important; }' });
+  await expect(target).toBeVisible();
+  await target.click({ timeout: 60_000 });
+}
+
 /** one key press per rendered frame (the menu reads input once per frame) */
 async function press(page: Page, key: string) {
   await page.keyboard.press(key);
@@ -113,7 +126,7 @@ test('keyboard, mouse and gamepad drive the course controls; the choice persists
   await press(page, 'ArrowRight');
   expect((await page.evaluate(() => (window as unknown as MW).__skifree.currentCourse())).length).toBe('expedition');
   // mouse: click the Mountain row's ▶ → Daily (the Day row appears)
-  await page.locator('.menu-row', { hasText: 'Mountain' }).locator('.inc').click({ force: true }); // software rendering: the click never settles
+  await click(page, page.locator('.menu-row', { hasText: 'Mountain' }).locator('.inc'));
   expect((await page.evaluate(() => (window as unknown as MW).__skifree.currentCourse())).mode).toBe('daily');
   await expect(page.locator('.menu-row', { hasText: 'Day (UTC)' })).toHaveCount(1);
   // gamepad: d-pad right on the Day row → yesterday (press, then release)
@@ -162,7 +175,7 @@ test('a course code typed into the menu selects that course', async ({ page }) =
   await input3.focus();
   await input3.fill('');
   await page.keyboard.type('ALSO-WRONG', { delay: 20 });
-  await page.locator('.menu-row.primary').click({ force: true }); // software rendering: the focus transition never reports 'stable'
+  await click(page, page.locator('.menu-row.primary'));
   await page.waitForTimeout(1500);
   expect(await page.evaluate(() => (window as unknown as MW).__skifree.state().mode)).toBe('menu');
   await expect(page.locator('.course-card .err')).toContainText('ALSO-WRONG');
@@ -172,7 +185,7 @@ test('a course code typed into the menu selects that course', async ({ page }) =
   await seed.focus();
   await seed.fill('');
   await page.keyboard.type('AVALANCHE', { delay: 20 });
-  await page.locator('.menu-row.primary').click({ force: true }); // software rendering: the focus transition never reports 'stable'
+  await click(page, page.locator('.menu-row.primary'));
   await page.waitForFunction(() => (window as unknown as MW).__skifree.state().mode === 'playing', null, { timeout: 600_000, polling: 1000 });
   expect(await page.evaluate(() => (window as unknown as { __skifree: { state(): { course: { label: string } } } }).__skifree.state().course.label)).toContain('AVALANCHE');
 });
@@ -187,7 +200,7 @@ test('the Location row (Alpine, Fjord Coast) shows name, rating and description 
   await expect(row.locator('.loc-rating')).toHaveText('●○○○○ Beginner');
   await expect(row.locator('.loc-note')).toContainText('Clear winter day');
   // pick Fjord Coast with the mouse: the code gains its tag, the note follows
-  await row.locator('.inc').click({ force: true }); // software rendering: the focus transition never reports 'stable'
+  await click(page, row.locator('.inc'));
   await expect(page.locator('.menu-row', { hasText: 'Location' }).locator('.val')).toHaveText('Fjord Coast');
   await expect(page.locator('.menu-row', { hasText: 'Location' }).locator('.loc-rating')).toHaveText('●●○○○ Scenic');
   await expect(page.locator('.menu-row', { hasText: 'Location' }).locator('.loc-note')).toContainText('Sea cliffs');

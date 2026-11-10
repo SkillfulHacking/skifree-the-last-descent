@@ -20,7 +20,7 @@ export const FJORD_HARBOUR = registerFinish({
 });
 
 /** red warming huts at the refuges */
-export const COASTAL_SHELTER = registerRefuge({ id: 'coastal-shelter', build: (c) => new CoastalShelter(c.mountain, c.z, c.index) });
+export const COASTAL_SHELTER = registerRefuge({ id: 'coastal-shelter', build: (c) => new CoastalShelter(c.mountain, c.z, c.index), buildSteps: (c) => CoastalShelter.sliced(c.mountain, c.z, c.index) });
 
 /** sea-worn basalt, a frozen tide pool and the Yeti's beachcombing hoard around the shared cave; gulls and spray in its cinematic */
 export const FJORD_SEA_CAVE = registerCavePresentation({ id: 'fjord-sea-cave', dress: dressSeaCave, cinematic: seaCaveCinematic });

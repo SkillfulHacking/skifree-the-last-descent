@@ -57,6 +57,15 @@ export interface CavePresentation {
   /** extra props/materials around the cave; omit (or return null) for none */
   dress?(ctx: CaveDressingContext): CaveDressing | null;
   /**
+   * Optional time-sliced form of `dress` (round 3, D2): a generator that builds the same dressing
+   * and `yield`s between pieces of work (after each column cluster, the hull, each canvas texture…).
+   * World steps it one slice per frame after the cave's own slices, so no single frame pays for the
+   * whole dressing. Preferred over `dress` when present; when it is not, World still calls `dress`
+   * in a frame of its own (never in the frame that finishes the cave). Run to completion it must
+   * return exactly what `dress` returns. Use `dressingTicker(ms)` to yield on a time budget.
+   */
+  dressSteps?(ctx: CaveDressingContext): Generator<void, CaveDressing | null, void>;
+  /**
    * Optional location beats for the cave cinematic (spray, birds, shot overrides). Called once when
    * the cinematic starts; omit for none (Alpine), which leaves the shared encounter unchanged.
    */
@@ -81,4 +90,21 @@ export function getCavePresentation(id: string): CavePresentation {
   const d = caves.get(id);
   if (!d) throw new Error(`unknown cave presentation "${id}"`);
   return d;
+}
+
+/**
+ * Time budget helper for `dressSteps` generators: `if (tick.over()) yield;` after each piece of
+ * work yields once `ms` of main-thread time has passed since the last yield (or the start).
+ */
+export function dressingTicker(ms: number): { over(): boolean } {
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  let t0 = now();
+  return {
+    over() {
+      const t = now();
+      if (t - t0 < ms) return false;
+      t0 = t;
+      return true;
+    },
+  };
 }

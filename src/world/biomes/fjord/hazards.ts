@@ -35,6 +35,8 @@ export interface GustParams {
   wind: number;
   /** peak side-slip of a grounded skier (m/s, +X), 0 over jumps/drops */
   slip: number;
+  /** peak onshore push on an airborne skier (m/s², squalls over jumps and drops), 0 on lanes */
+  push: number;
 }
 
 export interface RockParams {
@@ -50,8 +52,20 @@ export const ROCK = { friction: 5, drag: 0.012 };
 /** Squall-lane tuning (mutable for tuning tests). */
 export const SQUALL = {
   /** peak onshore side-slip of a grounded skier, m/s (× the edge factor, SkierPhysics SLIP_EDGE) */
-  slip: 3,
+  slip: 3.6,
+  /** extra v² drag at the peak of the gust (the wind leaning on the skier) */
+  drag: 0.0022,
 };
+/** the squall cycle (s): dormant → telegraph (windsock, spindrift, caption) → active → recovery */
+export const SQUALL_TIMING = { dormant: 2.8, telegraph: 1.3, active: 2.0, recovery: 0.9 } as const;
+/** share of kickers (and gap take-offs) with a squall over them */
+const JUMP_SQUALL_CHANCE = 0.7;
+/** peak onshore push on an airborne skier over a squall jump, m/s² (~3 m drift over a 1 s jump) */
+export const JUMP_PUSH = 6.5;
+/** the landing rock past a squall jump starts this far onshore of the lip's centre */
+export const JUMP_ROCK_INSET = 2.5;
+/** chance per band of a rock patch across the racing line (1 on a ridgeline with a spine) */
+const ROCK_ON_LINE_CHANCE = 0.7;
 /** footprint radius of a squall lane (it spans the piste around the racing line) */
 export const SQUALL_LANE_R = 22;
 /** squall lanes sit this far seaward of the racing line (the gust comes off the sea) */
@@ -102,59 +116,128 @@ function poleClear(ctx: HazardPlacementContext, x: number, z: number, r: number)
   return alt === null || Math.abs(px - alt) >= POLE_CLEAR + 3;
 }
 
-/**
- * The squall lanes of one band (at most one): deterministic from (course seed, band) alone, so the
- * rock kind can place its lee patches against them without depending on the gust kind's RNG.
- */
-export function squallLanes(ctx: HazardPlacementContext): SquallLane[] {
+/** squall lanes are planned per group of this many bands (≈ 1 km) … */
+export const LANE_GROUP = 4;
+/** … with at least this many lanes per group wherever the course leaves room (round 3, F1: no 0-lane Sprints) */
+export const MIN_LANES_PER_GROUP = 2;
+
+interface LaneCandidate {
+  band: number;
+  roll: number;
+  exposure: number;
+  lane: SquallLane;
+}
+
+const groupCache = new WeakMap<object, Map<string, Map<number, SquallLane>>>();
+
+/** a band's best lane spot (deterministic from course seed and band), or null where none fits */
+function laneCandidate(ctx: HazardPlacementContext, band: number): LaneCandidate | null {
   const m = ctx.mountain;
   const P = m.profile;
-  const rng = new Rng((ctx.seed ^ 0x5a11a1e5 ^ Math.imul(ctx.band + 911, 0x9e3779b1)) >>> 0);
-  const z = ctx.z0 + rng.range(0.15, 0.85) * BAND;
+  const rng = new Rng((ctx.seed ^ 0x5a11a1e5 ^ Math.imul(band + 911, 0x9e3779b1)) >>> 0);
+  const z0 = band * BAND;
   const roll = rng.float();
   const wind = SEA_GUST_WIND * rng.range(0.8, 1.0);
   const slip = SQUALL.slip * rng.range(0.9, 1.05);
-  const exposure = Math.min(0.95, (EXPOSURE[P.segmentAt(z)] ?? 0.35) * 1.3 * Math.min(1.5, ctx.density));
-  if (roll >= exposure) return [];
-  // jumps and drops have their own (airborne) squalls; keep lanes off their run-ups and landings
-  if (P.kickersNear(z - 45, z + 40, kTmp).length || P.cliffsNear(z - 40, z + 60, cTmp).length) return [];
-  // not where an alternate line leaves or joins (the lee rock would sit on it)
-  const alt = P.altRouteX(z);
-  if (alt !== null) return [];
-  const r = SQUALL_LANE_R;
-  const x = m.routeX(z) - LANE_SEAWARD;
-  if (ctx.reserved(x, z, r + 30)) return [];
-  if (!poleClear(ctx, x, z, r)) return [];
-  return [{ x, z, r, wind, slip }];
+  for (let t = 0; t < 3; t++) {
+    const z = z0 + rng.range(0.15, 0.85) * BAND;
+    const ex = EXPOSURE[P.segmentAt(z)] ?? 0.35;
+    if (ex <= 0) continue;
+    // jumps and drops have their own (airborne) squalls; keep lanes off their run-ups and landings
+    if (P.kickersNear(z - 45, z + 40, kTmp).length || P.cliffsNear(z - 40, z + 60, cTmp).length) continue;
+    // not where an alternate line leaves or joins (the lee rock would sit on it)
+    if (P.altRouteX(z) !== null) continue;
+    const r = SQUALL_LANE_R;
+    const x = m.routeX(z) - LANE_SEAWARD;
+    if (ctx.reserved(x, z, r + 30)) continue;
+    if (!poleClear(ctx, x, z, r)) continue;
+    return { band, roll, exposure: Math.min(0.95, ex * 1.3 * Math.min(1.5, ctx.density)), lane: { x, z, r, wind, slip } };
+  }
+  return null;
+}
+
+/**
+ * The squall lanes of one band (at most one): deterministic from (course seed, band) alone, so the
+ * rock kind can place its lee patches against them without depending on the gust kind's RNG.
+ * Planned per group of LANE_GROUP bands: every band whose exposure roll comes up gets one, and if
+ * that leaves fewer than MIN_LANES_PER_GROUP the most exposed remaining spots are added.
+ */
+export function squallLanes(ctx: HazardPlacementContext): SquallLane[] {
+  const g = Math.floor(ctx.band / LANE_GROUP);
+  const key = `${ctx.seed}:${ctx.density}:${g}`;
+  let perM = groupCache.get(ctx.mountain);
+  if (!perM) groupCache.set(ctx.mountain, (perM = new Map()));
+  let plan = perM.get(key);
+  if (!plan) {
+    const cands: LaneCandidate[] = [];
+    for (let b = g * LANE_GROUP; b < (g + 1) * LANE_GROUP; b++) {
+      const c = laneCandidate(ctx, b);
+      if (c) cands.push(c);
+    }
+    plan = new Map();
+    for (const c of cands) if (c.roll < c.exposure) plan.set(c.band, c.lane);
+    const rest = cands.filter((c) => !plan!.has(c.band)).sort((p, q) => p.roll / p.exposure - q.roll / q.exposure);
+    while (plan.size < MIN_LANES_PER_GROUP && rest.length) {
+      const c = rest.shift()!;
+      plan.set(c.band, c.lane);
+    }
+    if (perM.size > 4096) perM.clear();
+    perM.set(key, plan);
+  }
+  const L = plan.get(ctx.band);
+  return L ? [L] : [];
+}
+
+export interface JumpSquall {
+  x: number;
+  z: number;
+  r: number;
+  wind: number;
+  /** airborne onshore push, m/s² */
+  push: number;
+  /** the kicker's lip */
+  lipX: number;
+  lipZ: number;
+}
+
+/**
+ * Squalls over the kickers of one band (deterministic from course seed and kicker, so the rock kind
+ * can put a patch where a skier the gust carries off lands). Kickers and gap take-offs are the
+ * "gaps" a squall matters on: in the air it carries the skier ~2.5–3.5 m onshore.
+ */
+export function jumpSqualls(ctx: HazardPlacementContext): JumpSquall[] {
+  const m = ctx.mountain;
+  const out: JumpSquall[] = [];
+  for (const k of m.profile.kickersNear(ctx.z0, ctx.z1, kTmp)) {
+    if (k.z < ctx.z0 || k.z >= ctx.z1) continue;
+    const rng = new Rng((ctx.seed ^ 0x6a7e5a11 ^ Math.imul(Math.round(k.z * 4) + 7, 0x85ebca6b)) >>> 0);
+    if (rng.float() >= JUMP_SQUALL_CHANCE * Math.min(1.5, ctx.density)) continue;
+    const x = m.centerX(k.z) + k.d;
+    const z = k.z + 7;
+    if (ctx.reserved(x, z, 18) || !poleClear(ctx, x, z, 18)) continue;
+    out.push({ x, z, r: 18, wind: SEA_GUST_WIND * rng.range(0.8, 1.05), push: JUMP_PUSH * rng.range(0.9, 1.05), lipX: x, lipZ: k.z });
+  }
+  return out;
 }
 
 export const SEA_GUST: HazardKind<GustParams> = {
   id: 'sea-gust',
   label: 'Sea squall',
   severity: 'slow',
-  timing: { kind: 'periodic', dormant: 3.6, telegraph: 1.3, active: 1.7, recovery: 0.9 },
+  timing: { kind: 'periodic', dormant: SQUALL_TIMING.dormant, telegraph: SQUALL_TIMING.telegraph, active: SQUALL_TIMING.active, recovery: SQUALL_TIMING.recovery },
   reach: 4,
   keepLaneClear: false,
   place(ctx) {
     const m = ctx.mountain;
     const out: Array<HazardSpot<GustParams>> = [];
-    for (const L of squallLanes(ctx)) out.push({ x: L.x, z: L.z, r: L.r, params: { wind: L.wind, slip: L.slip } });
-    // over the jumps of this band (kickers and cliff drops are the "gaps" a squall matters on)
-    const kicks = m.profile.kickersNear(ctx.z0, ctx.z1, kTmp);
-    for (const k of kicks) {
-      if (k.z < ctx.z0 || k.z >= ctx.z1) continue;
-      if (!ctx.rng.chance(0.55 * Math.min(1.5, ctx.density))) continue;
-      const x = m.centerX(k.z) + k.d;
-      const z = k.z + 7;
-      if (ctx.reserved(x, z, 18) || !poleClear(ctx, x, z, 18)) continue;
-      out.push({ x, z, r: 18, params: { wind: SEA_GUST_WIND * ctx.rng.range(0.8, 1.05), slip: 0 } });
-    }
+    for (const L of squallLanes(ctx)) out.push({ x: L.x, z: L.z, r: L.r, params: { wind: L.wind, slip: L.slip, push: 0 } });
+    for (const J of jumpSqualls(ctx)) out.push({ x: J.x, z: J.z, r: J.r, params: { wind: J.wind, slip: 0, push: J.push } });
     for (const c of m.profile.cliffsNear(ctx.z0, ctx.z1, cTmp)) {
       if (c.z < ctx.z0 || c.z >= ctx.z1 || !ctx.rng.chance(0.6)) continue;
       const x = m.centerX(c.z) + (c.dMin + c.dMax) / 2;
       const z = c.z + 6;
       if (ctx.reserved(x, z, 20) || !poleClear(ctx, x, z, 20)) continue;
-      out.push({ x, z, r: 20, params: { wind: SEA_GUST_WIND, slip: 0 } });
+      out.push({ x, z, r: 20, params: { wind: SEA_GUST_WIND, slip: 0, push: JUMP_PUSH * 0.8 } });
     }
     return out;
   },
@@ -168,8 +251,13 @@ export const SEA_GUST: HazardKind<GustParams> = {
     else return null;
     w *= edge;
     if (w <= 0) return null;
-    if (!c.grounded || h.params.slip <= 0) return { windX: h.params.wind * w };
-    return { windX: h.params.wind * w, slipX: h.params.slip * w };
+    const I = c.intensity ?? 1;
+    const P = h.params;
+    if (!c.grounded) return P.push > 0 ? { windX: P.wind * w, airPushX: Math.min(8, P.push * w * I) } : { windX: P.wind * w };
+    if (P.slip <= 0) return { windX: P.wind * w };
+    // a squall lane: the snow blows out from under the skis (onshore side-slip) and the gust leans
+    // on the skier (a little drag) — standing up into it holds the edge
+    return { windX: P.wind * w, slipX: Math.min(4, P.slip * w * I), surface: { dragAdd: SQUALL.drag * w * I } };
   },
   audio: { telegraph: 'gust-build', active: 'gust-blow' },
   view: 'sea-gust',
@@ -185,17 +273,27 @@ export const SCOURED_ROCK: HazardKind<RockParams> = {
   place(ctx) {
     const m = ctx.mountain;
     const P = m.profile;
+    const coast = m.coast;
     const out: Array<HazardSpot<RockParams>> = [];
-    const onPiste = (x: number, z: number, r: number) => Math.abs(x - m.centerX(z)) <= m.halfWidth(z) - r * 0.5;
+    // on the piste, and (a coast) never in the cornice zone
+    const onPiste = (x: number, z: number, r: number) => Math.abs(x - m.centerX(z)) <= m.halfWidth(z) - r * 0.5 && (!coast || coast.guard(x - r, z) <= 0);
     const clearOfAlt = (x: number, z: number, r: number) => {
       const alt = P.altRouteX(z);
       return alt === null || Math.abs(x - alt) >= LANE_HALF + r;
     };
     // 1) the lee of each squall lane: where a skier the gust carries off the line ends up
     for (const L of squallLanes(ctx)) {
-      const r = ctx.rng.range(5, 7);
+      const r = ctx.rng.range(6, 8);
       const z = L.z + ctx.rng.range(12, 22);
       const x = m.routeX(z) + LEE_ROCK_INSET + 0.55 * r;
+      if (z >= ctx.z1 || !onPiste(x, z, r) || !clearOfAlt(x, z, r) || ctx.reserved(x, z, r)) continue;
+      out.push({ x, z, r, rot: ctx.rng.range(0, Math.PI * 2), params: { v: ctx.rng.int(0, 7) } });
+    }
+    // 1b) the landing of each squall jump: where the gust sets down a skier who took off in it
+    for (const J of jumpSqualls(ctx)) {
+      const r = ctx.rng.range(6, 7.5);
+      const z = J.lipZ + ctx.rng.range(17, 23);
+      const x = J.lipX + JUMP_ROCK_INSET + 0.55 * r;
       if (z >= ctx.z1 || !onPiste(x, z, r) || !clearOfAlt(x, z, r) || ctx.reserved(x, z, r)) continue;
       out.push({ x, z, r, rot: ctx.rng.range(0, Math.PI * 2), params: { v: ctx.rng.int(0, 7) } });
     }
@@ -203,8 +301,9 @@ export const SCOURED_ROCK: HazardKind<RockParams> = {
     //    on the other side stays inside the obstacle-free lane (LANE_HALF + 1.5)
     //    (on a ridgeline with a spine, the piste is scoured to rock: always one, the spine is clean)
     const zMid = (ctx.z0 + ctx.z1) / 2;
-    const ridge = P.segmentAt(zMid) === 'ridgeline' && P.altRoutes(zMid, zMid).some((a) => a.bow !== undefined);
-    if (ctx.rng.chance((ridge ? 1 : 0.55) * Math.min(1.5, ctx.density))) {
+    const seg = P.segmentAt(zMid);
+    const ridge = (seg === 'ridgeline' || seg === 'cliffside') && P.altRoutes(zMid, zMid).some((a) => a.bow !== undefined);
+    if (ctx.rng.chance((ridge ? 1 : ROCK_ON_LINE_CHANCE) * Math.min(1.5, ctx.density))) {
       const z = ctx.z0 + ctx.rng.range(0.1, 0.9) * (ctx.z1 - ctx.z0);
       const r = ctx.rng.range(6.5, 8);
       const side = ctx.rng.chance(0.5) ? 1 : -1;
@@ -230,11 +329,39 @@ export const SCOURED_ROCK: HazardKind<RockParams> = {
   effect(h, _ph, c) {
     if (!c.inside || !c.grounded) return null;
     // the core of the patch is the roughest
-    const k = 1 - Math.max(0, c.dist / Math.max(1, h.r) - 0.55) / 0.45;
-    return { surface: { friction: 1 + ROCK.friction * k, grip: 1 - 0.25 * k, dragAdd: ROCK.drag * k } };
+    const k = (1 - Math.max(0, c.dist / Math.max(1, h.r) - 0.55) / 0.45) * (c.intensity ?? 1);
+    return { surface: { friction: 1 + ROCK.friction * k, grip: 1 - 0.25 * Math.min(1, k), dragAdd: ROCK.drag * k } };
   },
   audio: { ambient: 'rock-scrape', hit: 'rock-scrape' },
   view: 'scoured-rock',
+};
+
+/**
+ * gap-marker: not a hazard of its own (the gully is terrain: Coast.gapDepth) but its telegraph —
+ * poles and pennants at the lip of each spine's gap jump, streamed and disposed with the hazard
+ * bands like every other Fjord marker. No effect on physics.
+ */
+export const GAP_MARKER: HazardKind<{ len: number; hw: number }> = {
+  id: 'gap-marker',
+  label: 'Gap jump',
+  severity: 'cosmetic',
+  timing: { kind: 'static' },
+  reach: 0,
+  keepLaneClear: false,
+  place(ctx) {
+    const out: Array<HazardSpot<{ len: number; hw: number }>> = [];
+    const P = ctx.mountain.profile;
+    if (!P.gapsNear) return out;
+    for (const g of P.gapsNear(ctx.z0, ctx.z1, [])) {
+      if (g.lipZ < ctx.z0 || g.lipZ >= ctx.z1) continue;
+      out.push({ x: g.x, z: g.z, r: g.hw, params: { len: g.len, hw: g.hw } });
+    }
+    return out;
+  },
+  effect() {
+    return null;
+  },
+  view: 'gap-marker',
 };
 
 let registered = false;
@@ -244,4 +371,5 @@ export function registerFjordHazards(): void {
   registered = true;
   registerHazardKind(SEA_GUST);
   registerHazardKind(SCOURED_ROCK);
+  registerHazardKind(GAP_MARKER);
 }

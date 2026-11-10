@@ -8,7 +8,7 @@
  * high up, dark gneiss rock.
  *
  * Gameplay (environment-driven, never a faster Yeti): wide open, steady runs (no segment flatter
- * than 14°) with alternate lines; ridgeline spines with gap jumps; a gentle onshore crosswind on
+ * than 11°) with alternate lines; ridgeline spines with gap jumps; a gentle onshore crosswind on
  * airborne skiers (weather coupling); squall lanes that blow grounded skiers onshore across exposed
  * stretches of the racing line, squalls over jumps, and wind-scoured rock on and beside the line
  * (./hazards.ts); a cornice along the cliff rim that bogs down anyone who heads for the edge (the
@@ -159,21 +159,26 @@ export function makeFjordBiome(): Biome {
     rocks: { base: [0.19, 0.198, 0.21], tintCool: [0.9, 0.97, 1.06], tintWarm: [1.1, 1.02, 0.92], tintDark: [0.5, 0.52, 0.58], snow: [0.88, 0.91, 0.965] },
     obstacles: { rocks: 1.7, logs: 0.25, stumps: 0.35 },
     terrain: {
-      slopeScale: 1,
+      // round 3 (B N1, F2): the round-2 terrain (minSlope 14, highspeed-heavy, swing 0.8) made the
+      // Fjord the faster mountain on unseen seeds. The terrain alone now skis like Alpine's for a
+      // skilled skier (route gradient ~15.7–15.9° against Alpine's 16.0–16.3°, the same line swing)
+      // and the location's extra difficulty comes from its environment (./hazards.ts). Large open
+      // runs and exposed ridgelines still dominate; the floor keeps flat run-ins out.
+      slopeScale: 0.95,
       widthScale: 1.08,
-      swingScale: 0.8,
-      // large open downhill runs: fast open segments and exposed ridgelines; few gentle ones, and
-      // none flatter than 14° (a flat run-in costs a non-expert the chase, not the environment)
-      segmentWeights: { alpine: 3, highspeed: 2.6, powder: 0.8, basin: 0.6, ridgeline: 2.2, cliffside: 1.4, beginner: 0.3, forest: 0.35, chute: 0.4, moguls: 0.5 },
-      minSlope: 14,
+      swingScale: 1,
+      segmentWeights: { alpine: 3, highspeed: 1.4, powder: 1.2, basin: 1.0, ridgeline: 2.2, cliffside: 1.2, beginner: 0.6, forest: 0.8, chute: 0.4, moguls: 0.8 },
+      minSlope: 11,
       // the run-in from the start gate drops a little more steeply, so the snow's undulation never
       // stalls a skier who has not learned to skate yet (E6)
       startSlope: 9.5,
-      altTypes: ['alpine', 'highspeed', 'powder', 'basin', 'ridgeline', 'forest'],
+      altTypes: ['alpine', 'highspeed', 'powder', 'basin', 'ridgeline', 'cliffside', 'forest'],
       // ridgeline shortcuts: every ridgeline gets a spine line on the crest (bowed a little toward
       // the sea, wind-packed fast snow: SPINE_SNOW) with a gully to jump from a take-off halfway
       // along; the piste below it is scoured to rock (./hazards.ts). Optional, ~1 s faster.
-      spine: { types: ['ridgeline'], bow: 0.25, side: -1, gap: true },
+      // round 3 (B5): also on cliffside runs (the other exposed segment type), bowed further out
+      // so it is a separate line on most of them (inland where the rim leaves no room)
+      spine: { types: ['ridgeline', 'cliffside'], bow: 0.42, side: -1, gap: true },
       wallHeight: 380,
       wallRelief: 170,
       rangeHeight: 1150,
@@ -189,7 +194,9 @@ export function makeFjordBiome(): Biome {
     capabilities: {
       surface: FJORD_SURFACE,
       weather: FJORD_WEATHER,
-      hazards: { kinds: ['sea-gust', 'scoured-rock'], density: 1 },
+      // the same squalls and rock on every difficulty; on Relaxed they push and drag a little more
+      // than half as hard, on Hard a little harder (the Yeti is not touched: brief §2)
+      hazards: { kinds: ['sea-gust', 'scoured-rock', 'gap-marker'], density: 1, intensity: { relaxed: 0.55, normal: 1, hard: 1.15 } },
       finish: { id: 'fjord-harbour' },
       refuge: { id: 'coastal-shelter', name: 'Coastal shelter' },
       cave: { id: 'fjord-sea-cave' },

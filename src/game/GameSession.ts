@@ -9,6 +9,10 @@ import { capabilitiesOf } from '../world/capabilities';
 
 /** style points for discovering a scenic viewpoint (they sit outside the chases: exploring is free) */
 export const VIEWPOINT_POINTS = 500;
+/** soft (location) caption priorities: a higher one replaces a lower one still on screen */
+export const CAPTION_PRIORITY = { ambient: 0, report: 1, warning: 2 } as const;
+/** style points for clearing a Fjord gap jump (× the multiplier) */
+export const GAP_POINTS = { cleared: 150, clean: 300 } as const;
 import { PHYS_DT, SkierPhysics, type SkierEvent, type SkierInput, DRIFT_MIN_SPEED } from '../physics/SkierPhysics';
 import { YetiAI } from '../yeti/YetiAI';
 import { RunState } from './RunState';
@@ -139,6 +143,11 @@ export class GameSession implements Stage {
     if (this.snowballs) {
       this.snowView = new SnowballView((x, z, out) => m.normalAt(x, z, out));
       world.scene.add(this.snowView.group);
+      // round 2, D8: the view creates its ball and its glint sprite (the only SpriteMaterial in the
+      // game) lazily at the first wind-up, which compiled the sprite program mid-chase. Create
+      // them now, far below the course (hidden again on the next update), so App can compile them
+      // at the start of the run (warmupObjects).
+      this.snowView.update(null, 0, new THREE.Vector3(), new THREE.Vector3(0, -5000, 0));
     }
     this.follow = new FollowCamera(camera, world.mountain, world.obstacles);
     this.follow.shakeScale = settings.cameraShake;
@@ -394,7 +403,7 @@ export class GameSession implements Stage {
     this.checkLookouts();
     if (this.pendingSurfCaption && s.time > 4 && this.run.controllable) {
       this.pendingSurfCaption = false;
-      this.envCaption('[surf booms against the cliffs far below]', 3);
+      this.envCaption('[surf booms against the cliffs far below]', 3, 'surf', CAPTION_PRIORITY.ambient);
     }
 
     // tutorial bookkeeping
@@ -547,6 +556,7 @@ export class GameSession implements Stage {
     switch (e.type) {
       case 'takeoff':
         this.audio.playTakeoff(clamp(e.speed / 30, 0, 1));
+        this.takeoff = { x: s.pos.x, z: s.pos.z };
         break;
       case 'pop':
         this.audio.playPop();
@@ -559,6 +569,7 @@ export class GameSession implements Stage {
           this.shake(0.45);
           this.audio.playExertion('grunt');
         } else if (e.airTime > 0.3) this.shake(0.12 * e.impact);
+        this.judgeGap(e.clean);
         break;
       }
       case 'impact': {
@@ -591,6 +602,28 @@ export class GameSession implements Stage {
         this.hud.popTrick(e.name, Math.round(e.points * this.multiplier));
         if (e.name.startsWith('CLEAN')) this.multiplier = Math.min(4, +(this.multiplier + 0.2).toFixed(1));
         break;
+    }
+  }
+
+  private takeoff: { x: number; z: number } | null = null;
+  /**
+   * A Fjord gap jump (a gully across a ridgeline spine, taken off its kicker): clearing it scores
+   * (more for a clean landing); coming up short lands you in the gully (it costs speed, no points).
+   */
+  private judgeGap(clean: boolean) {
+    const t = this.takeoff;
+    this.takeoff = null;
+    const P = this.world.mountain.profile;
+    if (!t || !P.gapsNear) return;
+    const s = this.phys.s;
+    for (const g of P.gapsNear(t.z - 6, t.z + 6, [])) {
+      if (Math.abs(t.z - g.lipZ) > 4 || Math.abs(t.x - g.x) > g.hw) continue;
+      if (s.pos.z > g.z + g.len) {
+        const pts = clean ? GAP_POINTS.clean : GAP_POINTS.cleared;
+        this.style += Math.round(pts * this.multiplier);
+        this.hud.popTrick(clean ? 'GAP CLEARED · CLEAN' : 'GAP CLEARED', Math.round(pts * this.multiplier));
+      } else this.envCaption('[short — you drop into the gully]', 1.8, 'gap', CAPTION_PRIORITY.report);
+      return;
     }
   }
 
@@ -684,6 +717,11 @@ export class GameSession implements Stage {
   /** Hard: the Yeti throws snowballs during the chase */
   readonly snowballs: SnowballBarrage | null;
   private snowView: SnowballView | null = null;
+
+  /** objects created with the session whose materials App compiles before the first frame */
+  get warmupObjects(): THREE.Object3D[] {
+    return this.snowView ? [this.snowView.group] : [];
+  }
   private snowEv: SnowballEvent[] = [];
   private tmpHand = new THREE.Vector3();
   private tmpHeld = new THREE.Vector3();
@@ -729,11 +767,11 @@ export class GameSession implements Stage {
         if (e.type === 'hazard-telegraph' && e.kind === 'sea-gust') {
           // captioned like the Yeti's cues (the windsock alone is easy to miss at speed)
           const lane = ((e.hazard.params as { slip?: number }).slip ?? 0) > 0;
-          this.envCaption(lane ? '[a squall builds off the sea — it will push you left]' : '[a squall gusts across the jump ahead]', 2.4);
+          this.envCaption(lane ? '[a squall builds off the sea — it will push you left]' : '[a squall gusts across the jump ahead]', 2.4, 'squall', CAPTION_PRIORITY.warning);
         }
       } else if (e.type === 'hazard-enter' && e.kind === 'scoured-rock') {
         this.audio.playCue('rock-scrape', null);
-        this.envCaption('[skis scrape over bare rock]', 1.6);
+        this.envCaption('[skis scrape over bare rock]', 1.6, 'rock', CAPTION_PRIORITY.report);
       }
     });
     // the sea below: the coastal ambience is captioned once per run
@@ -741,15 +779,17 @@ export class GameSession implements Stage {
   }
 
   private pendingSurfCaption = false;
-  private envCaptionAt = -Infinity;
+  /** last time each kind of location caption was shown (separate throttles: round 2, E3) */
+  private envCaptionAt = new Map<string, number>();
   /**
-   * Caption a location sound (squall, rock, surf, viewpoint). Never replaces a caption that is
-   * still on screen (the Yeti's cues come first) and at most one every 3 s.
+   * Caption a location sound (squall, rock, surf, viewpoint). Never replaces a Yeti caption; a
+   * warning that asks for a decision (a squall ahead) replaces a report (rock under the skis) that is
+   * still on screen; each kind at most once every 3 s, so one kind never mutes another.
    */
-  private envCaption(text: string, seconds: number) {
+  private envCaption(text: string, seconds: number, kind: string, priority: number = CAPTION_PRIORITY.report) {
     const t = this.phys.s.time;
-    if (t - this.envCaptionAt < 3) return;
-    if (this.hud.caption(text, seconds, { soft: true })) this.envCaptionAt = t;
+    if (t - (this.envCaptionAt.get(kind) ?? -Infinity) < 3) return;
+    if (this.hud.caption(text, seconds, { soft: true, priority })) this.envCaptionAt.set(kind, t);
   }
 
   /** Optional viewpoints on a coast's rim: reaching one reports ScenicLocationDiscovered once per run. */
@@ -765,8 +805,8 @@ export class GameSession implements Stage {
       this.style += pts;
       this.hud.popTrick('VIEWPOINT DISCOVERED', pts);
       this.audio.playCue('viewpoint', null);
-      this.envCaptionAt = -Infinity;
-      this.envCaption('[gulls cry over open water — a viewpoint]', 2.4);
+      this.envCaptionAt.delete('viewpoint');
+      this.envCaption('[gulls cry over open water — a viewpoint]', 2.4, 'viewpoint', CAPTION_PRIORITY.warning);
     }
   }
 

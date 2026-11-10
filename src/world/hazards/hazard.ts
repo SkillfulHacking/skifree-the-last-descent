@@ -117,6 +117,12 @@ export interface HazardEffect {
    */
   slipX?: number;
   slipZ?: number;
+  /**
+   * Horizontal push on an AIRBORNE skier (m/s², world axes), applied directly (not through the
+   * weather's airborne coupling): a gust funnelled over a jump that carries a skier a few metres
+   * sideways before they land. Keep |push| ≤ 8.
+   */
+  airPushX?: number;
   /** × fog density for the renderer (steam, fog bank) */
   visibility?: number;
 }

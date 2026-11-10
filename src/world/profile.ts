@@ -850,11 +850,20 @@ export class GeneratedProfile implements CourseProfile {
         if (sp) {
           const amount = sp.bow * Math.min(this.halfWidth(z0 + len / 2), w);
           let side: number = sp.side;
-          if (K.coast && side < 0) {
-            // the exposed ridge above the cliff, where the rim leaves room for it; inland otherwise
-            const zm = (a.z0 + a.z1) / 2;
-            const chordMid = (this.routeX(a.z0) + this.routeX(a.z1)) / 2;
-            if (chordMid - amount - 2 < this.seaBound(zm)) side = 1;
+          if (K.coast) {
+            // the line bows to whichever side keeps it furthest from the racing line (the route
+            // swings too, and the rim and the piste edge clamp it), preferring the knob's side (the
+            // exposed ridge above the sea) unless the other is clearly better
+            const sep = (b: number) => {
+              a.bow = b;
+              let sum = 0;
+              for (let k = 1; k < 8; k++) {
+                const zz = a.z0 + ((a.z1 - a.z0) * k) / 8;
+                sum += Math.min(30, Math.abs(this.altX(a, zz) - this.routeX(zz)));
+              }
+              return sum / 7;
+            };
+            if (sep(-sp.side * amount) > sep(sp.side * amount) + 3) side = -sp.side;
           }
           a.bow = side * amount;
           if (sp.gap) this.addGap(a, rng);
@@ -869,9 +878,11 @@ export class GeneratedProfile implements CourseProfile {
   /** a take-off kicker on a spine and the gully past it, where the spine is furthest from the route */
   private addGap(a: AltRoute, rng: Rng) {
     const u = rng.range(0.42, 0.58);
-    const height = rng.range(1.3, 1.6);
-    const len = rng.range(6.5, 7.5);
-    const depth = rng.range(1.7, 2.0);
+    // round 3 (B N3): a gap with a stake — cleared in a tuck at racing speed, but a skier who comes
+    // in slow (or stands up into a squall over it) lands on the far ramp and loses a few m/s
+    const height = rng.range(1.4, 1.7);
+    const len = rng.range(9.5, 11.5);
+    const depth = rng.range(2.0, 2.4);
     // the take-off must be approached at full speed: no cliff drop or other kicker on the spine
     // just before it (or just after the landing)
     const clearAt = (lip: number) => {

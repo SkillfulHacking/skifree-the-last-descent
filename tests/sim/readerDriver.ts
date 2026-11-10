@@ -3,7 +3,8 @@
  * autopilot (src/debug/autopilot.ts), plus what a player who reads the Fjord would do:
  *  - goes round scoured rock that lies on the line (the short way round, inside the piste);
  *  - before and during a squall lane's telegraph/active phase, holds a line ~3 m upwind (sea side)
- *    and stands up out of the tuck (biting edges resist the side-slip);
+ *    (optionally stands up out of the tuck: biting edges resist the side-slip);
+ *  - takes off upwind of a kicker when its squall will blow while it is in the air;
  *  - takes alternate lines (ridgeline spines, gap jumps) when they are there.
  * It only uses information the game shows (hazard positions and the windsock's phase).
  */
@@ -62,6 +63,17 @@ export function readerDriver(m: Mountain, env: BiomeEnvironment | null, o: Reade
           // ease onto the way round early and back after it (a smooth line keeps the tuck)
           const wgt = smooth(h.z - h.r - 75, h.z - h.r - 20, tz) * (1 - smooth(h.z + h.r + 2, h.z + h.r + 30, tz));
           tx += (go - lx) * wgt;
+        } else if (h.kind === 'sea-gust' && o.squalls && ((h.params as { push?: number }).push ?? 0) > 0) {
+          // a squall over a jump: if it will blow while I am in the air, take off upwind (sea side)
+          // of the kicker's centre so the gust carries me back over the landing instead of onto rock
+          const lip = h.z - 7;
+          if (s.pos.z > lip + 2 || tz < lip - 70) continue;
+          const k = getHazardKind(h.kind);
+          const tl = t + Math.max(0, (lip - s.pos.z) / Math.max(5, speed));
+          let live = false;
+          for (let u = tl - 0.25; u <= tl + 1.0 && !live; u += 0.25) live = hazardPhase(k, h, u).phase === 'active';
+          if (!live) continue;
+          tx -= 2.8 * smooth(lip - 70, lip - 25, tz) * (1 - smooth(lip + 8, lip + 30, tz));
         } else if (h.kind === 'sea-gust' && o.squalls && (h.params as { slip?: number }).slip) {
           if (s.pos.z > h.z + h.r + 4 || tz < h.z - h.r - 60) continue;
           const k = getHazardKind(h.kind);
@@ -72,7 +84,7 @@ export function readerDriver(m: Mountain, env: BiomeEnvironment | null, o: Reade
           for (let u = t0; u <= t1 + 1e-6 && !live; u += 0.25) live = hazardPhase(k, h, u).phase === 'active';
           if (!live) continue;
           // hold a line upwind (the sea side) so the gust carries you back onto it
-          tx -= 2.5 * smooth(h.z - h.r - 60, h.z - h.r - 15, tz) * (1 - smooth(h.z + h.r - 5, h.z + h.r + 15, tz));
+          tx -= 3 * smooth(h.z - h.r - 60, h.z - h.r - 15, tz) * (1 - smooth(h.z + h.r - 5, h.z + h.r + 15, tz));
           const inside = Math.hypot(s.pos.x - h.x, s.pos.z - h.z) < h.r + 2;
           if (o.standUp && inside && hazardPhase(k, h, t).phase === 'active') standUp = true;
         }

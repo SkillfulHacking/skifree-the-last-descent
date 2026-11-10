@@ -33,7 +33,7 @@ import { buildMountain, courseId, worldSeed, type CourseConfig } from './CourseC
 import type { Biome } from '../world/biome';
 import { BiomeEnvironment } from '../world/capabilities/environment';
 import { makeWeatherSample } from '../world/capabilities/weather';
-import { HazardLayer, SCENERY_BUDGET_MS, presentationOf, type BiomePresentation, type CaveDressing, type FinishDefinition, type FinishEnvironment, type RefugeView, type SceneryView } from '../world/presentation';
+import { HAZARD_VIEW_BUDGET_MS, HazardLayer, SCENERY_BUDGET_MS, presentationOf, type BiomePresentation, type CaveDressing, type FinishDefinition, type FinishEnvironment, type RefugeView, type SceneryView } from '../world/presentation';
 
 export interface CaveSlot {
   enc: Encounter;
@@ -85,7 +85,11 @@ export class World {
   private caves = new Map<number, CaveSlot>();
   /** caves being built in time slices (one step per frame) */
   private caveJobs = new Map<number, { enc: Encounter; job: Generator<void, Cave, void> }>();
+  /** location dressings being built in time slices after their cave (round 3, D2) */
+  private dressJobs = new Map<number, Generator<void, CaveDressing | null, void>>();
   private lodges = new Map<number, RefugeView>();
+  /** refuges being built in time slices */
+  private lodgeJobs = new Map<number, Generator<void, RefugeView, void>>();
   private markers = new Map<number, AltMarkers>();
   /** the encounter the session cares about now (set by GameSession) */
   focusEncounter: Encounter | null = null;
@@ -101,7 +105,7 @@ export class World {
     this.obstacles = new ObstacleField(this.mountain, this.seed);
     this.presentation = presentationOf(this.biome);
     this.finishDef = this.presentation.finish;
-    this.environment = new BiomeEnvironment(this.mountain, this.seed);
+    this.environment = new BiomeEnvironment(this.mountain, this.seed, { difficulty: course.difficulty });
     this.terrain = new TerrainRenderer(this.mountain, quality);
     this.scene.add(this.terrain.group);
     this.env = new Environment(this.scene, renderer, quality, this.biome);
@@ -123,7 +127,7 @@ export class World {
     this.scene.add(this.hazardViews.group);
     this.scenery = this.presentation.scenery?.build({ mountain: this.mountain, quality, biome: this.biome, terrain: this.terrain.uniforms, sunDir: this.env.sunDir }) ?? null;
     if (this.scenery) this.scene.add(this.scenery.group);
-    this.start = new StartArea(this.mountain);
+    this.start = new StartArea(this.mountain, quality);
     this.scene.add(this.start.group);
     const cap = { low: 2500, medium: 4500, high: 7000, ultra: 10000 }[quality];
     this.particles = new Particles(cap, renderer.getPixelRatio());
@@ -162,7 +166,10 @@ export class World {
     // hazard views further out (a windsock or a rock patch should not pop in 400 m ahead): one
     // more band per call, out to HAZARD_VIEW_AHEAD
     if (!this.environment.hazards.empty) {
-      if (all) this.environment.hazards.ensure(z - 80, z + HAZARD_VIEW_AHEAD);
+      if (all) {
+        this.environment.hazards.ensure(z - 80, z + HAZARD_VIEW_AHEAD);
+        this.hazardViews.flush();
+      }
       else
         for (let d = 400; d <= HAZARD_VIEW_AHEAD; d += BAND) {
           const before = this.environment.hazards.bandCount;
@@ -187,7 +194,7 @@ export class World {
       if (all) this.scenery?.flush?.();
       this.syncCaves(z);
       if (all) for (const j of [...this.caveJobs.values()]) this.buildCave(j.enc);
-      this.syncLodges(z);
+      this.syncLodges(z, all);
     }
   }
 
@@ -218,8 +225,12 @@ export class World {
     });
   }
 
-  /** Advance pending cave builds by one slice (called every frame). */
+  /** Advance pending cave builds by one slice (called every frame): dressings first, then caves. */
   private stepCaves() {
+    for (const i of this.dressJobs.keys()) {
+      this.stepDressing(i, false);
+      return; // one slice per frame
+    }
     for (const [i, j] of this.caveJobs) {
       const r = j.job.next();
       if (r.done) {
@@ -240,20 +251,59 @@ export class World {
       cave = r.value;
       this.caveJobs.delete(e.index);
     } else cave = new Cave(this.mountain, e.anchor, this.quality);
-    return this.installCave(e, cave);
+    return this.installCave(e, cave, true);
   }
 
-  private installCave(e: Encounter, cave: Cave): CaveSlot {
+  private installCave(e: Encounter, cave: Cave, sync = false): CaveSlot {
     const story = new StoryProps(this.mountain, this.footprints, e.anchor);
     this.scene.add(cave.group, story.group);
-    const dressing = this.presentation.cave.dress?.({ mountain: this.mountain, anchor: e.anchor, cave, quality: this.quality, biome: this.biome }) ?? null;
-    if (dressing) this.scene.add(dressing.group);
-    const slot = { enc: e, cave, story, dressing };
+    const slot: CaveSlot = { enc: e, cave, story, dressing: null };
     this.caves.set(e.index, slot);
+    // the location's dressing: built in slices of its own after the cave (never in the frame that
+    // finishes the cave); a presentation without `dressSteps` still gets a frame of its own
+    const P = this.presentation.cave;
+    const ctx = { mountain: this.mountain, anchor: e.anchor, cave, quality: this.quality, biome: this.biome };
+    const job = P.dressSteps
+      ? P.dressSteps(ctx)
+      : P.dress
+        ? (function* (): Generator<void, CaveDressing | null, void> {
+            yield;
+            return P.dress!(ctx);
+          })()
+        : null;
+    if (job) {
+      this.dressJobs.set(e.index, job);
+      if (sync) this.stepDressing(e.index, true);
+    }
     return slot;
   }
 
+  /** advance (or with `all`, finish) the dressing job of a cave; attach it when done */
+  private stepDressing(i: number, all: boolean) {
+    const job = this.dressJobs.get(i);
+    if (!job) return;
+    let r = job.next();
+    while (all && !r.done) r = job.next();
+    if (!r.done) return;
+    this.dressJobs.delete(i);
+    const slot = this.caves.get(i);
+    const d = r.value;
+    if (!d) return;
+    if (!slot) {
+      d.dispose();
+      return;
+    }
+    slot.dressing = d;
+    this.scene.add(d.group);
+  }
+
   private disposeCave(s: CaveSlot) {
+    const job = this.dressJobs.get(s.enc.index);
+    if (job) {
+      // abandon a half-built dressing (a generator's finally blocks dispose its partial work)
+      this.dressJobs.delete(s.enc.index);
+      job.return(null);
+    }
     this.scene.remove(s.cave.group, s.story.group);
     s.cave.dispose();
     s.story.dispose();
@@ -263,20 +313,44 @@ export class World {
     }
   }
 
-  private syncLodges(z: number) {
+  private addLodge(cz: number, c: RefugeView) {
+    this.scene.add(c.group);
+    this.lodges.set(cz, c);
+  }
+
+  /** one slice of a pending refuge build (called every frame) */
+  private stepLodges() {
+    for (const [cz, job] of this.lodgeJobs) {
+      const r = job.next();
+      if (r.done) {
+        this.lodgeJobs.delete(cz);
+        this.addLodge(cz, r.value);
+      }
+      return;
+    }
+  }
+
+  private syncLodges(z: number, all = false) {
     const cps = this.mountain.profile.checkpoints(z - 400, z + 1600);
     const want = new Set(cps);
     cps.forEach((cz) => {
-      if (this.lodges.has(cz)) return;
+      if (this.lodges.has(cz) || this.lodgeJobs.has(cz)) return;
       const idx = this.mountain.profile.encounters(cz - 1, cz + 1).find((e) => e.checkpointZ === cz)?.index ?? 0;
-      const c = this.presentation.refuge.build({ mountain: this.mountain, z: cz, index: idx, quality: this.quality, biome: this.biome });
-      this.scene.add(c.group);
-      this.lodges.set(cz, c);
+      const ctx = { mountain: this.mountain, z: cz, index: idx, quality: this.quality, biome: this.biome };
+      const R = this.presentation.refuge;
+      // sliced when the location offers it and the refuge is still well ahead (round 3, D6)
+      if (R.buildSteps && !all && cz - z > 600) this.lodgeJobs.set(cz, R.buildSteps(ctx));
+      else this.addLodge(cz, R.build(ctx));
     });
     for (const [cz, c] of this.lodges) {
       if (want.has(cz)) continue;
       c.dispose();
       this.lodges.delete(cz);
+    }
+    for (const [cz, job] of this.lodgeJobs) {
+      if (want.has(cz)) continue;
+      this.lodgeJobs.delete(cz);
+      job.return(undefined as unknown as RefugeView);
     }
     // trail markers along alternate lines
     const alts = this.mountain.profile.altRoutes(z - 300, z + 1600);
@@ -296,7 +370,10 @@ export class World {
 
   /** Cave for an encounter (built on demand). */
   caveFor(e: Encounter): CaveSlot {
-    return this.caves.get(e.index) ?? this.buildCave(e);
+    const slot = this.caves.get(e.index) ?? this.buildCave(e);
+    // the cinematic needs the dressing (perches, clearance): finish it if still in slices
+    this.stepDressing(e.index, true);
+    return slot;
   }
 
   /** The cave of the focus encounter (or the nearest built one). */
@@ -348,6 +425,8 @@ export class World {
   update(dt: number, time: number, focus: THREE.Vector3, camPos: THREE.Vector3, terrainBudgetMs: number) {
     this.stream(focus.z);
     this.stepCaves();
+    this.stepLodges();
+    this.hazardViews.pump(HAZARD_VIEW_BUDGET_MS, focus.z);
     this.scenery?.pump?.(SCENERY_BUDGET_MS);
     this.terrain.update(focus.x, focus.z, terrainBudgetMs, time);
     this.vegetation.update(camPos, time);
