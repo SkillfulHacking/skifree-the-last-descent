@@ -106,7 +106,7 @@ export class GameSession implements Stage {
     this.run = new RunState({ tutorialEndZ: m.profile.tutorialEndZ, finishZ: m.finishZ, encounters: (a, b) => m.profile.encounters(a, b) });
     world.focusEncounter = null;
     world.stream(2, true);
-    this.phys = new SkierPhysics(world.mountain, world.obstacles, world.extraColliders);
+    this.phys = new SkierPhysics(world.mountain, world.obstacles, world.extraColliders, world.environment);
     this.phys.reset(m.routeX(2), 2, 0, 0);
     this.yetiAI = new YetiAI(world.mountain, world.obstacles);
     this.snowballs = world.course.difficulty === 'hard' ? new SnowballBarrage(world.seed, (x, z) => m.heightAt(x, z), (x, z) => clampToPiste(m, x, z)) : null;

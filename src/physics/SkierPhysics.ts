@@ -11,13 +11,17 @@
  *  - pizza (snowplow) adds a progressive braking force; tuck lowers drag and steering authority;
  *  - airborne when the terrain falls away faster than gravity can follow (natural jumps);
  *  - landings evaluate impact speed into the surface and ski/velocity alignment;
- *  - obstacle collisions classify light / heavy / catastrophic contacts.
+ *  - obstacle collisions classify light / heavy / catastrophic contacts;
+ *  - a location (biome) changes the feel only through ONE hook, the optional PhysicsEnvironment
+ *    (./environment.ts): surface modifiers, crosswind, balance, hazard knocks/crashes. With no
+ *    environment, or Alpine's identity one, every number below is used unchanged.
  */
 import * as THREE from 'three';
 import { clamp, damp, smoothstep, wrapAngle } from '../core/rng';
 import type { ImpactKind, SurfaceType } from '../core/types';
 import type { Mountain } from '../world/course';
 import type { Obstacle, ObstacleField } from './obstacles';
+import { makeEnvQuery, makeEnvSample, type EnvSample, type PhysicsEnvironment } from './environment';
 
 export const PHYS_DT = 1 / 120;
 export const GRAVITY = 9.81;
@@ -122,16 +126,21 @@ const queryOut: number[] = [];
 export class SkierPhysics {
   readonly s = new SkierState();
   events: SkierEvent[] = [];
-  /** world-space slide direction while crashed */
+  /** what the location did to the skier this step (identity without an environment) */
+  readonly envOut: EnvSample = makeEnvSample();
+  private envQ = makeEnvQuery();
   constructor(
     private mountain: Mountain,
     private obstacles: ObstacleField | null,
     private extraColliders: () => ReadonlyArray<{ x: number; z: number; r: number }> = () => [],
+    /** the location's physics hook (surface, wind, hazards); null = original physics */
+    readonly env: PhysicsEnvironment | null = null,
   ) {}
 
   reset(x: number, z: number, heading = 0, speed = 0) {
     const s = this.s;
     Object.assign(s, new SkierState());
+    this.env?.reset?.();
     s.pos.set(x, this.mountain.heightAt(x, z), z);
     s.heading = heading;
     s.vel.set(Math.sin(heading) * speed, 0, Math.cos(heading) * speed);
@@ -158,11 +167,32 @@ export class SkierPhysics {
     s.wobble = Math.max(0, s.wobble - dt * 1.3);
     s.steerSmoothed = damp(s.steerSmoothed, input.steer, 22, dt);
 
+    if (!s.crashed && s.grounded) s.surface = this.mountain.surfaceAt(s.pos.x, s.pos.z);
+    // the location's single physics hook (see ./environment.ts)
+    const E = this.envOut;
+    if (this.env) {
+      const q = this.envQ;
+      q.x = s.pos.x;
+      q.y = s.pos.y;
+      q.z = s.pos.z;
+      q.vx = s.vel.x;
+      q.vy = s.vel.y;
+      q.vz = s.vel.z;
+      q.speed = s.vel.length();
+      q.grounded = s.grounded;
+      q.crashed = s.crashed;
+      q.surface = s.surface;
+      q.t = s.time;
+      this.env.sample(q, E);
+      if (E.crash && !s.crashed) this.crash(E.crash.reason, E.crash.intensity);
+      else if (E.knock) this.knock(E.knock.keep, E.knock.wobble);
+    }
+
     if (s.crashed) {
       this.stepCrashed(input, dt);
       return;
     }
-    if (s.recoverTime > 0) s.recoverTime = Math.max(0, s.recoverTime - dt);
+    if (s.recoverTime > 0) s.recoverTime = Math.max(0, s.recoverTime - dt * E.surface.recovery);
     const control = s.recoverTime > 0 ? 0.35 : 1;
 
     s.tuck = damp(s.tuck, input.tuck * control, 8, dt);
@@ -180,17 +210,20 @@ export class SkierPhysics {
     const s = this.s;
     this.sampleNormal();
     const n = tmpN.copy(s.normal);
-    s.surface = this.mountain.surfaceAt(s.pos.x, s.pos.z);
-    const surf = s.surface;
+    const surf = s.surface; // sampled in step()
+    const E = this.envOut;
+    const M = E.surface;
+    if (E.balance > 0) s.wobble = Math.max(s.wobble, E.balance);
 
     // keep velocity in the tangent plane
     s.vel.addScaledVector(n, -s.vel.dot(n));
     let speed = s.vel.length();
 
     // --- drift state
-    const wantDrift = input.drift && speed > DRIFT_MIN_SPEED;
+    const driftMin = DRIFT_MIN_SPEED * M.driftThreshold;
+    const wantDrift = input.drift && speed > driftMin;
     if (wantDrift) s.drifting = true;
-    else if (!input.drift || speed < DRIFT_MIN_SPEED - 3) s.drifting = false;
+    else if (!input.drift || speed < driftMin - 3) s.drifting = false;
     s.driftAmount = damp(s.driftAmount, s.drifting ? 1 : 0, s.drifting ? 7 : 4, dt);
 
     // --- steering: speed-dependent authority
@@ -198,6 +231,7 @@ export class SkierPhysics {
     let rate = authority * (1 - TUNING.tuckTurnPenalty * s.tuck) * (1 + (TUNING.driftTurnBoost - 1) * s.driftAmount);
     rate *= 1 - 0.15 * s.brake;
     rate *= control;
+    rate /= M.carveRadius;
     if (speed < 1.2) rate = 1.9 * control; // pivot / sidestep when nearly stopped
     s.heading = wrapAngle(s.heading - s.steerSmoothed * rate * dt);
 
@@ -211,7 +245,7 @@ export class SkierPhysics {
     let vl = s.vel.dot(l);
     const pizzaGrip = 1 + 0.25 * s.brake;
     const wobbleGrip = 1 - 0.35 * s.wobble;
-    const grip = THREE.MathUtils.lerp(TUNING.gripCarve, TUNING.gripDrift, s.driftAmount) * TUNING.gripMul[surf] * pizzaGrip * wobbleGrip;
+    const grip = THREE.MathUtils.lerp(TUNING.gripCarve, TUNING.gripDrift, s.driftAmount) * TUNING.gripMul[surf] * pizzaGrip * wobbleGrip * M.grip;
     const removed = vl * (1 - Math.exp(-grip * dt));
     const vlNew = vl - removed;
     const eff = THREE.MathUtils.lerp(TUNING.carveEfficiency, TUNING.driftEfficiency, s.driftAmount) * (surf === 'ice' ? 0.85 : 1);
@@ -236,10 +270,10 @@ export class SkierPhysics {
     // --- resistive forces (decelerations opposite to velocity)
     speed = s.vel.length();
     const normalLoad = -gN; // ≈ g cosθ
-    let decel = TUNING.mu[surf] * normalLoad;
-    const dragK = THREE.MathUtils.lerp(TUNING.dragUpright, TUNING.dragTuck, s.tuck) + 0.0012 * s.brake + (surf === 'powder' ? TUNING.powderDrag : 0);
+    let decel = TUNING.mu[surf] * M.friction * normalLoad;
+    const dragK = THREE.MathUtils.lerp(TUNING.dragUpright, TUNING.dragTuck, s.tuck) + 0.0012 * s.brake + (surf === 'powder' ? TUNING.powderDrag : 0) + M.dragAdd;
     decel += dragK * speed * speed;
-    decel += s.brake * (TUNING.brakeBase + TUNING.brakeSpeed * speed);
+    decel += s.brake * (TUNING.brakeBase + TUNING.brakeSpeed * speed) * M.brake;
     decel += TUNING.driftDecel * s.driftAmount + 0.55 * Math.abs(vl);
     if (speed > 1e-4) {
       const dv = Math.min(speed, decel * dt);
@@ -330,6 +364,12 @@ export class SkierPhysics {
     const sp = s.vel.length();
     const dragK = THREE.MathUtils.lerp(TUNING.dragUpright, TUNING.dragTuck, s.tuck);
     if (sp > 1e-4) s.vel.multiplyScalar(Math.max(0, sp - dragK * sp * sp * dt) / sp);
+    // crosswind (zero unless the location's weather couples to physics)
+    const E = this.envOut;
+    if (E.airAccelX !== 0 || E.airAccelZ !== 0) {
+      s.vel.x += E.airAccelX * dt;
+      s.vel.z += E.airAccelZ * dt;
+    }
     s.vel.y -= GRAVITY * dt;
     s.pos.addScaledVector(s.vel, dt);
     const h = this.mountain.heightAt(s.pos.x, s.pos.z);

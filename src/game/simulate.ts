@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { Mountain, SEED_DEFAULT, type Encounter } from '../world/course';
 import { ObstacleField, generateObstacles } from '../physics/obstacles';
 import { PHYS_DT, SkierPhysics, type SkierInput, type SkierState } from '../physics/SkierPhysics';
+import { BiomeEnvironment } from '../world/capabilities/environment';
 import { YetiAI } from '../yeti/YetiAI';
 import { yetiSpawnAfterCinematic } from '../yeti/spawn';
 import { SnowballBarrage, SNOWBALL, clampToPiste, type SnowballEvent } from '../yeti/Snowballs';
@@ -54,6 +55,11 @@ export interface SimOptions {
   snowballs?: boolean;
   /** with snowballs: the driver reads the marked landing zones and changes line (a player who watches) */
   dodge?: boolean;
+  /**
+   * the location's physics environment (surface, weather, hazards). Default: a BiomeEnvironment
+   * for the mountain's biome and the field's seed (identity on Alpine); null = none.
+   */
+  environment?: BiomeEnvironment | null;
 }
 
 export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierState, t: number) => SkierInput, opts: SimOptions = {}): SimResult {
@@ -62,7 +68,8 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
   const crashAtChase = opts.crashAtChase ?? [];
   const maxZ = opts.maxZ ?? Infinity;
   const finishZ = m.finishZ;
-  const phys = new SkierPhysics(m, f);
+  const env = opts.environment === undefined ? new BiomeEnvironment(m, f.seed) : opts.environment;
+  const phys = new SkierPhysics(m, f, undefined, env);
   phys.reset(m.routeX(0), 0, 0, 0);
   const yeti = new YetiAI(m, f);
   const balls = opts.snowballs ? new SnowballBarrage(m.seed, (x, z) => m.heightAt(x, z), (x, z) => clampToPiste(m, x, z)) : null;
@@ -104,6 +111,7 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
     if (opts.streaming) {
       f.ensure(s.pos.z - 300, s.pos.z + 700);
       f.release(s.pos.z - 400, s.pos.z + 800);
+      env?.release(s.pos.z - 400, s.pos.z + 800);
       peakBands = Math.max(peakBands, f.bandCount);
     }
     const inp = driver(s, t);
