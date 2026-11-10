@@ -402,7 +402,7 @@ export class Coast {
     let Lc = clamp(Hc * this.steep(z), 26, 1200);
     Lc = Math.max(Lc, 26 + 220 * ridge.bell);
     // buttresses and gullies: the face position wanders along the coast
-    const tj = t + (16 * gnoise(z / 47, 0.37, s + 66) + 10 * gnoise(z / 13, 2.1, s + 67)) * smoothstep(0, 40, t);
+    const tj = t + (16 * gnoise(z / 47, 0.37, s + 66) + 10 * gnoise(z / 13, 2.1, s + 67)) * smoothstep(0, 40, t) + (0.22 * Lc * gnoise(z / 430, 3.3, s + 89) + 0.1 * Lc * gnoise(z / 140, 7.7, s + 90)) * smoothstep(0, 0.35 * Lc, t);
     const u = tj / Lc;
     let out: number;
     if (u < 1) {
@@ -411,6 +411,12 @@ export class Coast {
       const q = f * 7 + 0.4 * gnoise(z / 210, 5.5, s + 68);
       const stair = (Math.floor(q) + smoothstep(0.25, 1, q - Math.floor(q))) / 7;
       f = clamp(f + (stair - f) * 0.38 * smoothstep(0.04, 0.2, u) * (1 - smoothstep(0.8, 1, u)), 0, 1);
+      // here and there a broad bench (a hanging shelf with snow and stunted pines) breaks the wall
+      const bench = smoothstep(0.15, 0.55, gnoise(z / 650, 8.8, s + 91));
+      if (bench > 0) {
+        const bc = 0.38 + 0.18 * gnoise(z / 900, 1.1, s + 92);
+        f = f + (bc - f) * bench * 0.8 * (1 - smoothstep(0.03, 0.12, Math.abs(f - bc)));
+      }
       out = hRim + berm - (hRim - foot) * f;
       // couloirs: grooves running down the face (snow-filled, between rock ribs)
       const g = ridged(z / 64, 0.5 + f * 0.6, s + 84, 2);

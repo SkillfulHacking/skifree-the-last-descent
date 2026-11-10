@@ -107,7 +107,7 @@ export function makeFjordBiome(): Biome {
       shadeTint: [0.84, 0.93, 1.12],
       skylightTint: [0.84, 0.97, 1.28],
     },
-    ranges: { skyColor: [0.46, 0.61, 0.88], snow: [0.93, 0.95, 0.995], stoneDark: [0.085, 0.095, 0.115], stoneLight: [0.24, 0.255, 0.28], lowland: [0.06, 0.075, 0.09], openSector: { center: 2.45, halfWidth: 0.95, floor: 0.05 } },
+    ranges: { skyColor: [0.46, 0.61, 0.88], snow: [0.93, 0.95, 0.995], stoneDark: [0.085, 0.095, 0.115], stoneLight: [0.24, 0.255, 0.28], lowland: [0.06, 0.075, 0.09], openSector: { center: 2.2, halfWidth: 1.35, floor: 0.03 } },
     trees: {
       species: [
         // Scots pine: tall bare red-brown trunk, a high, open, flat-topped crown

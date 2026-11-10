@@ -142,7 +142,7 @@ if (want('hazard')) {
     await framesUntil(`(s) => false`, 18);
     log('hazard', sig.kind, JSON.stringify(r.ok));
     await ev(() => window.__skifree.hud(false));
-    await P(`(w, m) => { const h = { x: ${sig.x}, y: ${sig.y}, z: ${sig.z} }; const cx = h.x + 26, cz = h.z - 34; window.__skifree.freeCam([cx, m.heightAt(cx, cz) + 6, cz], [h.x - 6, h.y + 2.5, h.z + 6], 48); }`);
+    await P(`(w, m) => { const h = { x: ${sig.x}, y: ${sig.y}, z: ${sig.z} }; const cx = h.x + 16, cz = h.z - 30; window.__skifree.freeCam([cx, m.heightAt(cx, cz) + 3.2, cz], [h.x - 8, h.y + 3.5, h.z + 4], 50); }`);
     await settle(3000);
     await shot('04_signature_hazard', `${sig.kind} (id ${sig.id}) in its active phase; kinds near: ${kinds.join(',')}`);
     const rock = all.find((h) => h.kind === 'scoured-rock');
@@ -170,7 +170,7 @@ if (want('material')) {
   const z = Math.round(G.finite ? G.L * 0.36 : 2400);
   await goTo(z, 0);
   await ev(() => { window.__skifree.hold(true); window.__skifree.hud(false); });
-  await P(`(w, m, c) => { const z = ${z}; const xr = c ? c.rimX(z) : m.centerX(z) - m.halfWidth(z) - 20; const y = m.heightAt(xr + 10, z); window.__skifree.freeCam([xr + 16, y + 2.4, z - 9], [xr - 18, y - 14, z + 22], 55); }`);
+  await P(`(w, m, c) => { const z = ${z}; const xr = c ? c.rimX(z) : m.centerX(z) - m.halfWidth(z) - 20; const y = m.heightAt(xr + 6, z); window.__skifree.freeCam([xr + 7, y + 3.0, z - 16], [xr - 26, y - 34, z + 26], 60); }`);
   await settle(3500);
   await shot('05_material', `Terrain material close-up at the rim, z=${z}`);
 }

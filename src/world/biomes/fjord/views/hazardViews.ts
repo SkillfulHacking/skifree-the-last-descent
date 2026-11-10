@@ -23,20 +23,20 @@ function mats() {
     sock: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, side: THREE.DoubleSide }),
     rock: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 }),
     stone: new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.9, flatShading: true }),
-    drift: new THREE.PointsMaterial({ size: 0.9, map: tex, color: 0xffffff, transparent: true, opacity: 0.0, depthWrite: false, sizeAttenuation: true }),
+    drift: new THREE.PointsMaterial({ size: 2.2, map: tex, color: 0xf4f8ff, transparent: true, opacity: 0.0, depthWrite: false, sizeAttenuation: true }),
     tex,
   };
   return shared;
 }
 
 function windsockGeometry(): THREE.BufferGeometry {
-  const g = new THREE.CylinderGeometry(0.42, 0.18, 2.2, 12, 5, true);
+  const g = new THREE.CylinderGeometry(0.62, 0.26, 3.4, 12, 5, true);
   g.rotateZ(-Math.PI / 2);
-  g.translate(1.1, 0, 0);
+  g.translate(1.7, 0, 0);
   const P = g.attributes.position as THREE.BufferAttribute;
   const col = new Float32Array(P.count * 3);
   for (let i = 0; i < P.count; i++) {
-    const band = Math.floor((P.getX(i) / 2.2) * 5 - 1e-3);
+    const band = Math.floor((P.getX(i) / 3.4) * 5 - 1e-3);
     const c = new THREE.Color(band % 2 ? 0xf4f1ea : 0xe8561e);
     col.set([c.r, c.g, c.b], i * 3);
   }
@@ -49,20 +49,22 @@ function gustView(h: HazardInstance, m: Mountain): HazardView {
   const obj = new THREE.Group();
   obj.name = 'sea-gust';
   // windsock on a pole at the side of the jump (upwind side: the sea, −x)
-  const px = h.x - h.r * 0.75 - 2;
-  const pz = h.z - 6;
+  const px = h.x - h.r * 0.6 - 1.5;
+  const pz = h.z - 8;
   const py = m.heightAt(px, pz);
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 5.2, 6), M.pole);
-  pole.position.set(px, py + 2.6, pz);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 7.2, 6), M.pole);
+  pole.position.set(px, py + 3.6, pz);
   pole.castShadow = true;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.05, 6, 16).rotateY(Math.PI / 2), M.stone);
   const pivot = new THREE.Group();
-  pivot.position.set(px, py + 5.0, pz);
+  pivot.position.set(px, py + 6.9, pz);
+  pivot.add(ring);
   const sockGeo = windsockGeometry();
   const sock = new THREE.Mesh(sockGeo, M.sock);
   pivot.add(sock);
   obj.add(pole, pivot);
   // spindrift streamers crossing the jump
-  const N = 70;
+  const N = 120;
   const pos = new Float32Array(N * 3);
   const seeds = new Float32Array(N * 3);
   for (let i = 0; i < N; i++) {
@@ -103,7 +105,7 @@ function gustView(h: HazardInstance, m: Mountain): HazardView {
         const s2 = seeds[i * 3 + 2]!;
         const x = h.x - span / 2 + (((s0 * span + t * (11 + 7 * s2)) % span) + span) % span;
         const z = ground[i]!;
-        const y = m.heightAt(x, z) + 0.2 + s2 * 1.8 + Math.sin(t * 3 + i) * 0.2;
+        const y = m.heightAt(x, z) + 0.3 + s2 * s2 * 4.5 + Math.sin(t * 3 + i) * 0.3;
         pos[i * 3] = x;
         pos[i * 3 + 1] = y;
         pos[i * 3 + 2] = z;
@@ -112,6 +114,7 @@ function gustView(h: HazardInstance, m: Mountain): HazardView {
     },
     dispose() {
       pole.geometry.dispose();
+      ring.geometry.dispose();
       sockGeo.dispose();
       geo.dispose();
       mat.dispose();

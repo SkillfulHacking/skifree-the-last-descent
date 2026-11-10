@@ -68,6 +68,21 @@ export interface TerrainUniforms {
   uSea?: { value: THREE.Vector3[] };
 }
 
+/**
+ * Coastal rock (appended before the snow/rock mix): fjord walls are massive gneiss, so the strata
+ * read as broad tonal zones rather than regular stripes, and frozen seeps hang down the faces as
+ * pale blue-white ice streaks.
+ */
+const coastRockGlsl = (T: Biome['terrainLook']) => /* glsl */ `
+  {
+    float zone = sf_fbmBL(vec2(wp.x * 0.004 + wp.z * 0.003, wp.y * 0.006) + 4.0, sf_fp(sf_fY, vec2(0.006)));
+    vec3 gneiss = mix(${v3(T.rockA)}, ${v3(T.rockC)}, smoothstep(0.35, 0.7, zone)) * (0.75 + 0.5 * M);
+    rock = mix(rock, gneiss * (0.85 + 0.3 * streak), 0.55);
+    float seep = smoothstep(0.84, 0.9, sf_sideN(vec2(0.11, 0.0045), 21.0)) * smoothstep(0.7, 0.95, slope);
+    rock = mix(rock, vec3(0.72, 0.84, 0.93), seep * 0.8);
+  }
+`;
+
 /** water reaches the terrain shader knows about at once (the scenery keeps the nearest ones) */
 export const SEA_SLOTS = 4;
 
@@ -302,6 +317,7 @@ float sf_sideN(vec2 sc, float off){
   float cling = sf_aa(0.52, 0.74, clingN) * (1.0 - smoothstep(0.42, 0.75, slope));
   rock = mix(rock, snow * 0.92, max(cling, ledge * 0.55));
   rock = mix(rock, rock * 0.62, smoothstep(0.6, 0.95, slope) * 0.55);
+${coastal ? coastRockGlsl(T) : ''}
   vec3 col = mix(snow, rock, sf_rock);
   // drifting cloud shadows
   float cloud = sf_fbm(wp.xz * 0.0016 + vec2(uTime * 0.004, uTime * 0.0025));
