@@ -186,9 +186,17 @@ kbd {
 .menu-root.main .menu-row.kind-select .val { min-width: 150px; }
 .menu-row .ctl input::placeholder { color: rgba(255,255,255,0.58); font-size: 13px; letter-spacing: 0.02em; }
 .course-card .err { color: #ffb4a8; font-style: normal; }
-.menu-row .label:has(.loc-note) { min-width: 0; flex: 1 1 auto; }
+/* Location row: name + value on the first line, the rating + one-line description across the full row below */
+.menu-row:has(.loc-note) { flex-wrap: wrap; row-gap: 0; }
+.menu-row .label:has(.loc-note) { display: contents; }
+.menu-row .label:has(.loc-note) small { order: 3; flex: 1 0 100%; min-width: 0; }
+.menu-row:has(.loc-note) .val { white-space: nowrap; }
 .loc-note { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .loc-note .loc-rating { color: var(--ice); letter-spacing: 0.04em; }
+/* with a Location row the main menu has one more row (+ its note): tighten rows so it still fits
+   1366x768 without scrolling (the single-location menu is unchanged) */
+.main .menu-list:has(.loc-note) .menu-row:not(.kind-info) { padding-top: clamp(4px, 0.62vh, 12px); padding-bottom: clamp(4px, 0.62vh, 12px); }
+.main .menu-list:has(.loc-note) .menu-row .label small { line-height: 1.25; }
 
 /* larger screens: scale the main menu body text with the viewport too (E10) */
 @media (min-width: 2200px) and (min-height: 1200px) {

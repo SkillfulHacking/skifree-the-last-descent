@@ -16,7 +16,7 @@ type MW = {
   };
 };
 
-async function boot(page: Page, settings: Record<string, unknown> = {}) {
+async function boot(page: Page, settings: Record<string, unknown> = {}, url = '/?debug') {
   // one init script per page: seeds settings on the first load only (reloads keep test changes)
   await page.addInitScript((s) => {
     if (!sessionStorage.getItem('booted')) {
@@ -24,7 +24,7 @@ async function boot(page: Page, settings: Record<string, unknown> = {}) {
       localStorage.setItem('skifree-tld.settings.v1', JSON.stringify({ quality: 'low', ...s }));
     }
   }, settings);
-  await page.goto('/?debug');
+  await page.goto(url);
   await page.waitForFunction(() => (window as unknown as MW).__ready === true, null, { timeout: 240_000, polling: 1000 });
 }
 
@@ -172,4 +172,39 @@ test('a course code typed into the menu selects that course', async ({ page }) =
   await page.locator('.menu-row.primary').click({ force: true }); // software rendering: the focus transition never reports 'stable'
   await page.waitForFunction(() => (window as unknown as MW).__skifree.state().mode === 'playing', null, { timeout: 600_000, polling: 1000 });
   expect(await page.evaluate(() => (window as unknown as { __skifree: { state(): { course: { label: string } } } }).__skifree.state().course.label)).toContain('AVALANCHE');
+});
+
+test('with a second location (debug-only test location) the Location row shows name, rating and description and the menu still fits', async ({ page }) => {
+  test.setTimeout(30 * 60 * 1000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await boot(page, {}, '/?debug&testbiome');
+  const row = page.locator('.menu-row', { hasText: 'Location' });
+  await expect(row).toHaveCount(1);
+  await expect(row.locator('.val')).toHaveText('Alpine');
+  await expect(row.locator('.loc-rating')).toHaveText('●○○○○ Beginner');
+  await expect(row.locator('.loc-note')).toContainText('Clear winter day');
+  // pick the test location with the mouse: the code gains its tag, the note follows
+  await row.locator('.inc').click({ force: true }); // software rendering: the focus transition never reports 'stable'
+  await expect(page.locator('.menu-row', { hasText: 'Location' }).locator('.val')).toHaveText('[debug] Test Range');
+  await expect(page.locator('.menu-row', { hasText: 'Location' }).locator('.loc-rating')).toHaveText('●●●○○ Test');
+  expect((await page.evaluate(() => (window as unknown as MW).__skifree.currentCourse())).id).toMatch(/@DBGTEST$/);
+  for (const [w, h] of [
+    [1366, 768],
+    [1920, 1080],
+    [2560, 1440],
+  ] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    for (const mode of ['classic', 'daily', 'custom']) {
+      await page.evaluate((m) => (window as unknown as MW).__skifree.setCourse(m, 'standard'), mode);
+      const l = await layout(page);
+      expect(l, `${mode} @ ${w}x${h} with Location`).toMatchObject({ panelScroll: 0, overflowX: 0, overflowY: 0, titleClipped: false, rowsOutside: 0 });
+    }
+    // the description stays on one line
+    const noteEm = await page.evaluate(() => {
+      const n = document.querySelector('.loc-note') as HTMLElement;
+      return n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).fontSize);
+    });
+    expect(noteEm).toBeLessThan(1.8); // one line of text
+    await page.screenshot({ path: `docs/reviews/pass4/menu/e2e_menu_location_${w}x${h}.png`, timeout: 600_000 }); // software rendering is slow at 2560x1440
+  }
 });
