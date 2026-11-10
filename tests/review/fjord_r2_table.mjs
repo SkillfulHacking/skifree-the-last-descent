@@ -1,6 +1,9 @@
 // Tabulate fjord_r2_balance.test.ts output: node tests/review/fjord_r2_table.mjs <file.jsonl>
 import { readFileSync } from 'node:fs';
-const rows = readFileSync(process.argv[2], 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+const all = readFileSync(process.argv[2], 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+// one row per run (the last line wins if a run was appended twice)
+const key = (r) => [r.biome, r.len, r.seed, r.diff, r.driver, r.env].join('|');
+const rows = [...new Map(all.map((r) => [key(r), r])).values()];
 const drivers = ['reader', 'skilled', 'intermediate', 'average', 'cautious', 'careless'];
 const cell = (rs) => {
   if (!rs.length) return '–';
