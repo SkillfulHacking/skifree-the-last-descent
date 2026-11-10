@@ -233,8 +233,10 @@ if (want('snowball')) {
   await ev(() => { window.__skifree.hold(true); window.__skifree.toChase(); window.__skifree.autopilot('skilled'); });
   await framesUntil(`(s) => s.phase === 'chase'`, 600);
   await framesUntil(`(s) => false`, 60);
-  await ev(() => window.__skifree.placeYeti(24));
-  const r = await framesUntil(`(s) => s.yetiThrowT !== null && s.yetiThrowT > 0.55 && s.yetiDistance < 40`, 1500);
+  // throws need a gap above SNOWBALL.minGap (25 m): place the Yeti just outside it so the throw
+  // happens close behind the skier (readable in the rear view) without the Yeti catching up first
+  await ev(() => window.__skifree.placeYeti(34));
+  const r = await framesUntil(`(s) => s.phase !== 'chase' || (s.yetiThrowT !== null && s.yetiThrowT > 0.55 && s.yetiDistance < 45)`, 1500);
   log('throw', JSON.stringify(r.ok), r.s?.yetiThrowT);
   await settle(1500);
   await shot('09b_hard_snowball', 'Hard: the Yeti winds up / releases a snowball during ordinary chase gameplay (rear view + landing marker)');
