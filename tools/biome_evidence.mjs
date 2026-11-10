@@ -165,11 +165,12 @@ if (want('hazard')) {
       // round 3 (A N7): aim at the scoured-rock view actually streamed near here (the merged build
       // moved the hazards; the round-2 camera kept the stale pose), from above and behind, so the
       // patch, its ribs and the line beside it are in frame
-      const live = await ev((z0) => { const hs = window.__skifree.hazards('scoured-rock').filter((h) => h.z > z0 - 40); hs.sort((a, b) => Math.abs(a.z - z0 - 120) - Math.abs(b.z - z0 - 120)); return hs[0] ?? null; }, rock.z - 120);
-      const R = live ?? rock;
+      // the views actually streamed (scene objects named 'scoured-rock'): aim at the nearest one
+      const live = await P(`(w) => { const out = []; w.scene.traverse((o) => { if (o.name === 'scoured-rock' && o.visible) { const sk = o.children[0]; if (!sk || !sk.geometry) return; sk.geometry.computeBoundingSphere(); const c = sk.geometry.boundingSphere.center.clone().applyMatrix4(sk.matrixWorld); out.push({ x: c.x, z: c.z, r: sk.geometry.boundingSphere.radius }); } }); out.sort((a, b) => Math.abs(a.z - ${rock.z}) - Math.abs(b.z - ${rock.z})); return out[0] ?? null; }`);
+      const R = live ? { ...live, id: rock.id } : rock;
       await P(`(w, m) => { const hx = ${R.x}, hz = ${R.z}; const hy = m.heightAt(hx, hz); const cx = hx + 12, cz = hz - 24; window.__skifree.freeCam([cx, Math.max(m.heightAt(cx, cz), hy) + 9, cz], [hx, hy + 0.5, hz + 3], 48); }`);
       await settle(3000);
-      await shot('04b_hazard_rock', `scoured-rock (id ${R.id}, r ${R.r ?? '?'} m): exposed rock beside the racing line`);
+      await shot('04b_hazard_rock', `scoured-rock (streamed view at x ${Math.round(R.x)}, z ${Math.round(R.z)}): exposed rock beside the racing line`);
       if (biome === 'fjord') {
         await P(`(w, m) => { const hx = ${R.x}, hz = ${R.z}; const hy = m.heightAt(hx, hz); const cx = hx + 40, cz = hz - 95; window.__skifree.freeCam([cx, Math.max(m.heightAt(cx, cz), hy) + 22, cz], [hx, hy, hz + 10], 46); }`);
         await settle(3000);
