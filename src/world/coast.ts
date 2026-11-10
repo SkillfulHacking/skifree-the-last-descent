@@ -356,7 +356,7 @@ export class Coast {
         const rx = P.routeX(z);
         const rise = H(x, z) - H(rx, z);
         const dist = rx - x;
-        if (dist > 20 && dist < 190 && rise < 14 && rise / dist < 0.2) ok = true;
+        if (dist > 20 && dist < 110 && rise < 14 && rise / dist < 0.2) ok = true;
       }
       if (!ok) continue;
       const n = this.lookoutList.length;

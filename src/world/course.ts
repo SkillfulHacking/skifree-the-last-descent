@@ -17,6 +17,8 @@ import type { AltRoute } from './profile';
 export { CAVE_D, CAVE_FLOOR_RAISE } from './caveTerrain';
 
 export const SEED_DEFAULT = 20261106;
+/** coastal locations: share of the valley-wall rise kept on the sea side (a low bank to the rim) */
+const SEA_BANK = 0.22;
 
 /** Classic-course constants (the original 3 km mountain). New code should ask the profile. */
 export const COURSE = {
@@ -189,9 +191,14 @@ export class Mountain {
       const rr = ridged(x / 160, z / 160, s + 7, 3);
       const rf = 0.5 + 0.5 * fbm(x / 210, z / 210, s + 17, 3);
       const rough = (0.55 * rr + 0.45 * rf) * this.kRelief * smoothstep(30, 220, e) * (0.6 + 0.4 * P.rockBias(z));
-      h += wall + rough;
-      // distant ranges
-      h += this.kRanges * smoothstep(350, 2600, e) * (0.35 + ridged(x / 900, z / 900, s + 11, 5));
+      if (side < 0 && this.coast) {
+        // a coast: the sea side is only a low bank up to the cliff rim (open views over the fjord)
+        h += (wall + rough) * SEA_BANK;
+      } else {
+        h += wall + rough;
+        // distant ranges
+        h += this.kRanges * smoothstep(350, 2600, e) * (0.35 + ridged(x / 900, z / 900, s + 11, 5));
+      }
     }
 
     // rolling large-scale undulation

@@ -187,10 +187,10 @@ export class FjordScenery implements SceneryView {
     const m = this.m;
     const x0 = m.routeX(0);
     const y0 = m.heightAt(x0, 0);
-    const a = Math.sin(time * 0.05) * 0.18;
-    out.pos.set(x0 + 16 + Math.sin(a) * 10, y0 + 7.5 + Math.sin(time * 0.1), -24 + Math.cos(a) * 4);
+    const a = Math.sin(time * 0.05) * 0.12;
+    out.pos.set(x0 + 26 + Math.sin(a) * 12, y0 + 30 + Math.sin(time * 0.1) * 2, -58 + Math.cos(a) * 5);
     out.pos.y = Math.max(out.pos.y, m.heightAt(out.pos.x, out.pos.z) + 3.5);
-    out.look.set(x0 - 120, y0 - 70, 210);
+    out.look.set(x0 - 260, y0 - 190, 430);
     out.fov = 56;
     return true;
   }

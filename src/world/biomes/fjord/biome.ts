@@ -25,7 +25,7 @@ export const FJORD_ID = 'fjord';
 export const FJORD_COAST: CoastParams = {
   reach: 3400,
   margin: [40, 130],
-  rim: [30, 95],
+  rim: [22, 70],
   steep: [0.3, 0.58],
   far: [2600, 4300],
   farHeight: [700, 1500],

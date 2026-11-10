@@ -366,12 +366,23 @@ describe('Fjord Coast: optional viewpoints', () => {
     for (const l of list) {
       f.ensure(l.z - 400, l.z + 200);
       const p = new SkierPhysics(m, f, () => [], new BiomeEnvironment(m, f.seed));
-      const z0 = l.z - 220;
+      const z0 = l.z - 300;
       p.reset(m.routeX(z0), z0, 0, 14);
       let best = Infinity;
       for (let i = 0; i < 40 / PHYS_DT; i++) {
         const s = p.s;
-        const desired = Math.atan2(l.x - s.pos.x, Math.max(4, l.z - s.pos.z));
+        let desired = Math.atan2(l.x - s.pos.x, Math.max(4, l.z - s.pos.z));
+        // like a player: look ~10 m ahead and steer round rocks and trees in the way
+        for (const o of f.inRange(s.pos.z, s.pos.z + 14)) {
+          if (o.kind === 'stump' || !o.collidable) continue;
+          const ax = Math.sin(desired);
+          const az = Math.cos(desired);
+          const dx = o.x - s.pos.x;
+          const dz = o.z - s.pos.z;
+          const along = dx * ax + dz * az;
+          const lat = dx * az - dz * ax;
+          if (along > 0 && along < 14 && Math.abs(lat) < o.r + 2.2) desired += lat > 0 ? -0.45 : 0.45;
+        }
         let err = desired - s.heading;
         err = Math.atan2(Math.sin(err), Math.cos(err));
         const inp: SkierInput = { ...NO_INPUT, steer: Math.max(-1, Math.min(1, -err * 3)), brake: s.speed > 16 ? 0.5 : 0, recover: true };

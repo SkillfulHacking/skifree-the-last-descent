@@ -18,6 +18,7 @@ import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, course
 import { fmtDistance } from '../ui/Hud';
 import { getBiome, hasBiome, listBiomes } from '../world/biome';
 import { capabilitiesOf } from '../world/capabilities';
+import { getHazardKind, hazardPhase } from '../world/hazards/hazard';
 import { locationNoteHtml, locationOptionLabel } from '../ui/location';
 import type { AutopilotStyle } from '../debug/autopilot';
 import { ProgressTracker } from '../progression/tracker';
@@ -1037,6 +1038,23 @@ export class App {
         return { visible: y.root.visible, phase: s?.run.phase ?? null, mode: s?.yetiAnim.mode ?? null, t: s?.debugState().cinematicTime ?? -1, rootAboveFloor: r.y - floor(r.x, r.z), left: out['left']!, right: out['right']!, handL, handR, headBelowRoof: headRoof, roofClearance: roof, pos: r.toArray().map((v) => +v.toFixed(3)) };
       },
       world: () => this.world,
+      /** evidence captures: hide/show the HUD (letterbox/titles stay under the session's control) */
+      hud: (v: boolean) => this.hud.show(v),
+      /** streamed hazards around the skier with their phase on the physics clock */
+      hazards: (kind?: string) => {
+        const w = this.world;
+        if (!w) return [];
+        const t = w.environment.clock;
+        return [...w.environment.hazards.all()].filter((h) => !kind || h.kind === kind).map((h) => ({ id: h.id, kind: h.kind, x: h.x, y: h.y, z: h.z, r: h.r, phase: hazardPhase(getHazardKind(h.kind), h, t).phase }));
+      },
+      /** a coastal location's features: viewpoints, sea levels, rim (evidence captures / tests) */
+      coast: (z0 = 0, z1 = 60000) => {
+        const c = this.world?.mountain.coast;
+        if (!c) return null;
+        return { lookouts: c.lookouts(z0, z1), reaches: c.reaches(z0, z1).map((r) => ({ ...r, z1: Number.isFinite(r.z1) ? r.z1 : null })), seaLevel: c.seaLevel, discovered: [...(this.session?.discovered ?? [])] };
+      },
+      /** scenery streaming counts (water surfaces, chunks, ships, mist) */
+      scenery: () => this.world?.scenery?.stats?.() ?? null,
       renderer: this.renderer,
       camera: this.camera,
       cameraPose: () => ({ pos: this.camera.position.toArray(), fov: this.camera.fov }),
