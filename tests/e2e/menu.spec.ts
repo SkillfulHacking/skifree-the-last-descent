@@ -113,7 +113,7 @@ test('keyboard, mouse and gamepad drive the course controls; the choice persists
   await press(page, 'ArrowRight');
   expect((await page.evaluate(() => (window as unknown as MW).__skifree.currentCourse())).length).toBe('expedition');
   // mouse: click the Mountain row's ▶ → Daily (the Day row appears)
-  await page.locator('.menu-row', { hasText: 'Mountain' }).locator('.inc').click();
+  await page.locator('.menu-row', { hasText: 'Mountain' }).locator('.inc').click({ force: true }); // software rendering: the click never settles
   expect((await page.evaluate(() => (window as unknown as MW).__skifree.currentCourse())).mode).toBe('daily');
   await expect(page.locator('.menu-row', { hasText: 'Day (UTC)' })).toHaveCount(1);
   // gamepad: d-pad right on the Day row → yesterday (press, then release)
