@@ -7,16 +7,19 @@
  * Nordic winter sun over the water, crisp clear air (long views), sparse pines and wind-bent spruce
  * high up, dark gneiss rock.
  *
- * Gameplay (environment-driven, never a faster Yeti): wide open runs with alternate lines (also on
- * the exposed ridgelines), gentle onshore crosswind that only acts on airborne skiers (weather
- * coupling), squalls across jumps and cliff drops and wind-scoured rock beside the racing line
- * (./hazards.ts), a cornice along the cliff rim that bogs down anyone who heads for the edge (the
- * surface model below) and optional viewpoints on the rim (Coast.lookouts).
+ * Gameplay (environment-driven, never a faster Yeti): wide open, steady runs (no segment flatter
+ * than 14°) with alternate lines; ridgeline spines with gap jumps; a gentle onshore crosswind on
+ * airborne skiers (weather coupling); squall lanes that blow grounded skiers onshore across exposed
+ * stretches of the racing line, squalls over jumps, and wind-scoured rock on and beside the line
+ * (./hazards.ts); a cornice along the cliff rim that bogs down anyone who heads for the edge (the
+ * surface model below) with an updraft and an out-of-bounds recovery for anyone who jumps it
+ * (capabilities/environment.ts); and optional viewpoints on the rim in the stretches where nothing
+ * is chasing you (Coast.lookouts).
  *
  * Pure data + pure models (no three.js); the presentation is registered in ./views.
  */
 import { ALPINE, deriveBiome, type Biome } from '../../biome';
-import { parametricWeather, resetSurface, type SurfaceModel } from '../../capabilities';
+import { parametricWeather, resetSurface, type SurfaceModel, type SurfaceQuery } from '../../capabilities';
 import type { CoastParams } from '../../coast';
 
 export const FJORD_ID = 'fjord';
@@ -39,6 +42,22 @@ export const FJORD_COAST: CoastParams = {
 export const CORNICE = { dragAdd: 0.05, friction: 6, grip: 0.7 } as const;
 
 /**
+ * Ridgeline spines (profile spine lines): wind-packed hard snow on the crest — the fastest snow on
+ * the course (× friction) and, unlike the icy alternate lines elsewhere, it holds an edge (× grip,
+ * which brings the alternate line's ice grip back to about packed snow).
+ */
+export const SPINE_SNOW = { friction: 0.45, grip: 3.1 } as const;
+
+/** 0..1 weight of a ridgeline spine's lane at (x, z) (0 off it) */
+function spineLane(m: NonNullable<SurfaceQuery['mountain']>, x: number, z: number): number {
+  for (const a of m.altsNear(z, z)) {
+    if (a.bow === undefined || z < a.z0 || z > a.z1) continue;
+    return m.altLane(x, z);
+  }
+  return 0;
+}
+
+/**
  * Fjord surface: the snow skis like Alpine snow everywhere on the course; only the deep, wind-loaded
  * cornice behind the cairns along the cliff rim changes the numbers (continuous, so the edge of
  * the zone is felt as the snow getting heavier, not as a wall).
@@ -47,8 +66,15 @@ export const FJORD_SURFACE: SurfaceModel = {
   id: 'fjord',
   modifiers(q, out) {
     resetSurface(out);
-    const c = q.mountain?.coast;
-    if (!c) return;
+    const m = q.mountain;
+    const c = m?.coast;
+    if (!m || !c) return;
+    const sp = spineLane(m, q.x, q.z);
+    if (sp > 0) {
+      out.friction = 1 + (SPINE_SNOW.friction - 1) * sp;
+      out.grip = 1 + (SPINE_SNOW.grip - 1) * sp;
+      return;
+    }
     const g = c.guard(q.x, q.z);
     if (g <= 0) return;
     out.dragAdd = CORNICE.dragAdd * g;
@@ -139,9 +165,10 @@ export function makeFjordBiome(): Biome {
       // stalls a skier who has not learned to skate yet (E6)
       startSlope: 9.5,
       altTypes: ['alpine', 'highspeed', 'powder', 'basin', 'ridgeline', 'forest'],
-      // ridgeline shortcuts: every ridgeline gets a wind-packed spine bowed out toward the sea
-      // cliff, with a gully to jump from a take-off halfway along (fast, exposed, optional)
-      spine: { types: ['ridgeline'], bow: 0.55, side: -1, gap: true },
+      // ridgeline shortcuts: every ridgeline gets a spine line on the crest (bowed a little toward
+      // the sea, wind-packed fast snow: SPINE_SNOW) with a gully to jump from a take-off halfway
+      // along; the piste below it is scoured to rock (./hazards.ts). Optional, ~1 s faster.
+      spine: { types: ['ridgeline'], bow: 0.25, side: -1, gap: true },
       wallHeight: 380,
       wallRelief: 170,
       rangeHeight: 1150,

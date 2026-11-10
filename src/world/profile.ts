@@ -818,12 +818,17 @@ export class GeneratedProfile implements CourseProfile {
       const d = onRoute ? base : clamp(base + rng.pick([-1, 1]) * rng.range(14, 22), -hw * 0.75, hw * 0.75);
       this.kick.push({ z, d, width: rng.range(7, 11), height: rng.range(1.2, type === 'highspeed' ? 2.4 : 2.0), run: rng.range(10, 15) });
     }
+    // a ridgeline spine (see ProfileKnobs.spine) has its gap jump instead of a cliff drop across it
+    const spineSeg = !!K.spine && K.spine.types.includes(type) && len > 380 && (K.altTypes ? K.altTypes.includes(type) : false);
     for (let c = 0; c < spec.cliffs; c++) {
       const z = z0 + len * (0.35 + 0.35 * c) + rng.range(-30, 30);
       const hw = this.halfWidth(z);
       const o = this.routeX(z) - this.centerX(z);
       const band = o > 0 ? { dMin: -(hw - 6), dMax: o - 13 } : { dMin: o + 13, dMax: hw - 6 };
-      if (band.dMax - band.dMin > 8) this.cliffs.push({ z, drop: rng.range(3.5, 6), ...band });
+      if (band.dMax - band.dMin > 8) {
+        const drop = rng.range(3.5, 6);
+        if (!spineSeg) this.cliffs.push({ z, drop, ...band });
+      }
     }
     // an alternate line on wide, flowing segments (decided from this segment's own rng, so the
     // plan does not depend on generation order)
