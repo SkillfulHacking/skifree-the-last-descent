@@ -24,8 +24,12 @@
   - Vegetation talus rejection, gated on `coast`, with the RNG call order unchanged.
 
   The one deliberate cross-biome change is the Hard-mode snowball readability (item 11), as the
-  brief asked. `npx tsc --noEmit` is clean. `npx vitest run` passes 14 files and 246 + 5 tests,
-  including the Alpine terrain goldens.
+  brief asked. `npx tsc --noEmit` is clean. `npx vitest run` passes (15 files, including the new
+  `tests/unit/fjord_art.test.ts` and the Alpine terrain goldens).
+- **Evidence harness note.** In held captures (`?debug` + `hold(true)` + `frames(n)`), App never runs
+  the finish environment's per-frame update, so in every round-1 victory still the guests, boats,
+  plunge and steam stood still. `tools/biome_evidence.mjs` now ticks the finish environment on the
+  simulation clock during the Fjord victory beats. Alpine victory captures are unchanged.
 
 ## Commits
 
@@ -37,6 +41,8 @@
 | `54ea10a` | Basalt/cave material pass, hull, rim outcrops, menu camera, Fjord victory beats in the evidence tool |
 | `c1ff78f` | Victory iteration: the plunge works, presenter staging, reveal path, stockfish, plaza shape, near-water ripples |
 | `1ed4486` | Rock ribs drape, matte basalt, orange snowball glint, street props, rounder islands |
+| `d0373cd` | Near-black basalt albedo, darker gneiss, per-viewport snowball glint size |
+| `0256c3d` | Presenter meets the skier face to face; finish environment ticked in victory captures |
 | (final) | This document and the final wip captures |
 
 ## Findings → changes
@@ -226,18 +232,22 @@ water is still in the distance in 10b. See request R5.
    point moved next to the rack, C7). He sniffs, grabs a dried cod (a prop in his hand), bites,
    gags (caption `[the Yeti gags on a dried cod]`), flings it, and stomps off. The rack frames the
    shot.
-3. **7.6–12.0 s, the presentation.** A new harbourmaster guest in yellow oilskins stands on fish
-   crates beside the stop point. The lighthouse rises from the crate stack into his raised hand.
-   An over-the-shoulder shot (the lens tightens with the skier's actual distance) shows his face.
-   He tosses the trophy. A reverse angle shows the skier catching it and holding it up, with the
-   descent behind them.
-4. **12.0–15.6 s, après.** Shot from the water side of the bathing pier:
+3. **7.6–12.0 s, the presentation.** A new harbourmaster guest in yellow oilskins waits on fish
+   crates beside the stop point (visible in 10b). On the beat he stands face to face with the
+   skier, 3 m in front of wherever and however turned the skier came to rest, already holding the
+   gilded lighthouse up. (The first iteration kept him on the crates; skiers stop anywhere and turn
+   in the spray stop, so the over-the-shoulder shot could not find both of them:
+   `wip/iter5_11g_victory_present.png`.) An over-the-shoulder shot shows his face. He tosses the
+   trophy. A reverse angle shows the skier catching it and holding it up, with the descent behind
+   them.
+4. **12.0–15.6 s, après.** Shot from the water side of the bathing pier
+   (`wip/compare_11b_victory_celebration.png`):
    - the deck is now planks;
    - bathers sit inside the staves (`tubR − 0.62`, lower seat);
    - the layered bonfire basket is in the mid-ground and a new sauna hut smokes behind;
    - the red-robed bather does a run-up, springs, tucks into a cannonball (squash, roll about his
-     own axis), and splashes, with an expanding foam ring. The original plunge never played: the
-     guest's own update reset its root every frame. That is fixed.
+     own axis), and splashes, with an expanding foam ring. The original plunge could never have
+     played: the guest's own update reset its root every frame. That is fixed.
    - a low cut over the water for the splash;
    - near-camera water now has fine cat's-paw ripples instead of smeared swell (A D10).
 5. **15.6–23.9 s, the reveal.** The camera starts low over the sea past the lighthouse, inside a

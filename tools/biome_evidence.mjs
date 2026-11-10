@@ -216,9 +216,20 @@ if (want('cave') || want('cinematic') || want('pursuit')) {
   await ev(() => { window.__skifree.hold(true); window.__skifree.toCave(); });
   await framesUntil(`(s) => s.phase === 'caveCinematic'`, 600);
   if (want('cinematic')) {
+    if (biome === 'fjord' && process.env.CAVE_EXTRAS) {
+      // the Fjord cave beats: gulls scattering off the basalt on the rumble, spray on the roar
+      await framesUntil(`(s) => s.cinematicTime >= 3.0`, 600);
+      await settle(1500);
+      await shot('08c_yeti_cinematic_gulls', 'Cave cinematic, t≈3.0 s (Fjord: gulls scatter off the columns on the rumble)');
+    }
     await framesUntil(`(s) => s.cinematicTime >= 9.5`, 600);
     await settle(1500);
     await shot('08_yeti_cinematic', 'Cave cinematic, t≈9.5 s (emergence)');
+    if (biome === 'fjord' && process.env.CAVE_EXTRAS) {
+      await framesUntil(`(s) => s.cinematicTime >= 11.6`, 600);
+      await settle(1500);
+      await shot('08d_yeti_cinematic_roar', 'Cave cinematic, t≈11.6 s (Fjord: the roar, spray and sea smoke out of the mouth)');
+    }
     await framesUntil(`(s) => s.cinematicTime >= 14.6`, 400);
     await settle(1500);
     await shot('08b_yeti_cinematic', 'Cave cinematic, t≈14.6 s');
