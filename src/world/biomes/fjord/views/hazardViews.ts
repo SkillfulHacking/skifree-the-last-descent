@@ -5,8 +5,10 @@
  *    lifts during the telegraph and streams flat while the squall blows) plus spindrift streamers
  *    racing across the jump, sparse in the build-up and dense in the gust. Readable at speed and in
  *    the rear-view; the same cue as the 'gust-build' sound.
- *  - scoured-rock: a dark patch of wind-scoured rock slabs and gravel flush with the snow, with a
- *    few loose stones on it — reads as "no snow here" from 100 m away.
+ *  - scoured-rock: a wind-scoured outcrop sitting in the snow: dark polished rock and blue ice glaze
+ *    in the core, low chamfered rock ribs breaking through along the wind grain with snow tails in
+ *    their lee, gravel, and a wind-crust rim that fades into the slope — reads as "no snow here"
+ *    from 100 m away.
  */
 import * as THREE from 'three';
 import { registerHazardView, type HazardView } from '../../../presentation/hazardViews';
@@ -14,14 +16,17 @@ import type { HazardInstance, HazardPhaseState } from '../../../hazards/hazard';
 import type { Mountain } from '../../../course';
 import { softParticle } from '../../../resort/textures';
 
-let shared: { pole: THREE.Material; sock: THREE.Material; rock: THREE.Material; stone: THREE.Material; drift: THREE.PointsMaterial; tex: THREE.Texture } | null = null;
+let shared: { pole: THREE.Material; sock: THREE.Material; rock: THREE.Material; skin: THREE.Material; stone: THREE.Material; drift: THREE.PointsMaterial; tex: THREE.Texture } | null = null;
 function mats() {
   if (shared) return shared;
   const tex = softParticle();
   shared = {
     pole: new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.6 }),
     sock: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, side: THREE.DoubleSide }),
-    rock: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92 }),
+    rock: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 }),
+    // ground skin: vertex alpha fades the rim into the snow; pulled toward the camera in depth
+    // instead of lifted, so it hugs the terrain at every LOD
+    skin: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }),
     stone: new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.9, flatShading: true }),
     drift: new THREE.PointsMaterial({ size: 2.2, map: tex, color: 0xf4f8ff, transparent: true, opacity: 0.0, depthWrite: false, sizeAttenuation: true }),
     tex,
@@ -123,71 +128,182 @@ function gustView(h: HazardInstance, m: Mountain): HazardView {
   };
 }
 
+/** deterministic 0..1 hash */
+function h01(a: number, b: number): number {
+  const v = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return v - Math.floor(v);
+}
+
+/**
+ * A wind-scoured outcrop (round 2, art review D8): instead of a draped polygon with cubes on it,
+ * the patch is (1) a dense ground skin that follows the terrain closely (many samples, polygon
+ * offset rather than a lift, so it can neither float nor sink), whose colour runs from dark
+ * polished gneiss and blue wind-glazed ice in the core through gravel to wind-crust and drifted
+ * snow at a ragged edge that fades into the slope (vertex alpha), and (2) a few low, flat-topped,
+ * chamfered rock ribs breaking through along the wind grain (+x), half-buried, never more than
+ * ~0.35 m proud (skis pass over them: the hazard only adds friction), with snow tails in their lee.
+ */
 function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardView {
   const M = mats();
   const obj = new THREE.Group();
   obj.name = 'scoured-rock';
-  // irregular slab patch conforming to the terrain
-  const rings = 5;
-  const segs = 28;
+  const rings = 12;
+  const segs = 44;
   const pos: number[] = [];
   const col: number[] = [];
   const idx: number[] = [];
-  const rr = (a: number) => h.r * (0.82 + 0.18 * Math.sin(a * 3 + h.params.v) + 0.08 * Math.sin(a * 7 + h.seed));
-  pos.push(h.x, m.heightAt(h.x, h.z) + 0.07, h.z);
-  col.push(0.09, 0.095, 0.105);
+  const v = h.params.v;
+  const rr = (a: number) => h.r * (1.08 + 0.16 * Math.sin(a * 3 + v) + 0.09 * Math.sin(a * 7 + h.seed) + 0.05 * Math.sin(a * 13 + v * 2));
+  const tone = (x: number, z: number) => {
+    const n1 = 0.5 + 0.5 * Math.sin(x * 1.3 + z * 0.4 + v) * Math.cos(z * 1.1 - x * 0.35);
+    const n2 = 0.5 + 0.5 * Math.sin(x * 4.1 - z * 3.3 + h.seed) * Math.sin(z * 5.3 + x * 0.9);
+    return { n1, n2 };
+  };
+  const c = new THREE.Color();
+  const push = (x: number, z: number, k: number) => {
+    pos.push(x, m.heightAt(x, z) + 0.02, z);
+    const { n1, n2 } = tone(x, z);
+    // core → rim: gneiss / ice glaze → gravel → wind crust → snow
+    const rock = new THREE.Color(0.07 + 0.06 * n2, 0.075 + 0.06 * n2, 0.085 + 0.065 * n2);
+    const ice = new THREE.Color(0.42, 0.55, 0.66);
+    const gravel = new THREE.Color(0.24 + 0.08 * n2, 0.235 + 0.08 * n2, 0.23 + 0.07 * n2);
+    const crust = new THREE.Color(0.74, 0.8, 0.88);
+    c.copy(rock).lerp(ice, Math.max(0, n1 - 0.62) * 1.6 * (1 - k));
+    c.lerp(gravel, Math.min(1, Math.max(0, (k - 0.45 + 0.2 * (n2 - 0.5)) / 0.25)));
+    c.lerp(crust, Math.min(1, Math.max(0, (k - 0.72 + 0.15 * (n1 - 0.5)) / 0.2)));
+    const a = 1 - Math.min(1, Math.max(0, (k - 0.82) / 0.18));
+    col.push(c.r, c.g, c.b, a);
+  };
+  push(h.x, h.z, 0);
   for (let r = 1; r <= rings; r++)
     for (let s = 0; s < segs; s++) {
       const a = (s / segs) * Math.PI * 2 + h.rot;
       const k = r / rings;
-      const x = h.x + Math.cos(a) * rr(a) * k;
-      const z = h.z + Math.sin(a) * rr(a) * k;
-      pos.push(x, m.heightAt(x, z) + 0.07 - (r === rings ? 0.06 : 0), z);
-      const n = 0.5 + 0.5 * Math.sin(x * 1.7 + z * 2.3) * Math.cos(x * 0.6 - z * 1.1);
-      // dark gneiss slabs, lighter gravel, a dusting of snow at the rim
-      const snow = r === rings ? 0.75 : r === rings - 1 ? 0.25 * n : 0;
-      const g = 0.08 + 0.1 * n;
-      col.push(g + (0.85 - g) * snow, g * 1.03 + (0.88 - g) * snow, g * 1.12 + (0.94 - g) * snow);
+      // a little radial jitter so the rings never read as contour lines
+      const kj = Math.min(1, k + (h01(r + v, s) - 0.5) * 0.04 * (r < rings ? 1 : 0));
+      push(h.x + Math.cos(a) * rr(a) * kj, h.z + Math.sin(a) * rr(a) * kj, kj);
     }
   for (let s = 0; s < segs; s++) idx.push(0, 1 + ((s + 1) % segs), 1 + s);
   for (let r = 1; r < rings; r++)
     for (let s = 0; s < segs; s++) {
       const a = 1 + (r - 1) * segs + s;
       const b = 1 + (r - 1) * segs + ((s + 1) % segs);
-      const c = a + segs;
-      const d = b + segs;
-      idx.push(a, b, d, a, d, c);
+      idx.push(a, b, b + segs, a, b + segs, a + segs);
     }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));
   g.setIndex(idx);
   g.computeVertexNormals();
-  const patch = new THREE.Mesh(g, M.rock);
-  patch.receiveShadow = true;
-  obj.add(patch);
-  const stones = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.35, 0), M.stone, 10);
-  const mm = new THREE.Matrix4();
-  for (let i = 0; i < 10; i++) {
-    const a = h.rot + i * 2.4;
-    const d = h.r * (0.2 + 0.6 * ((i * 0.37) % 1));
+  const skin = new THREE.Mesh(g, M.skin);
+  skin.receiveShadow = true;
+  skin.renderOrder = 1;
+  obj.add(skin);
+
+  // rock ribs breaking through along the wind grain, half-buried
+  const ribs: THREE.BufferGeometry[] = [];
+  const nRib = 4 + (v % 3);
+  for (let i = 0; i < nRib; i++) {
+    const a = h.rot + i * 2.39996 + v;
+    const d = h.r * (0.12 + 0.55 * h01(i, v + 3));
     const x = h.x + Math.cos(a) * d;
     const z = h.z + Math.sin(a) * d;
-    const s = 0.5 + ((i * 0.53) % 1) * 1.1;
-    mm.compose(new THREE.Vector3(x, m.heightAt(x, z) + 0.1, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(i, i * 2, 0)), new THREE.Vector3(s, s * 0.6, s));
+    const L = 1.6 + 2.6 * h01(i + 7, v);
+    const W = 0.55 + 0.7 * h01(i + 11, v);
+    const T = 0.22 + 0.16 * h01(i + 13, v);
+    const box = new THREE.BoxGeometry(L, T * 2.4, W, 6, 2, 3);
+    const P = box.attributes.position as THREE.BufferAttribute;
+    for (let k = 0; k < P.count; k++) {
+      const px = P.getX(k);
+      const py = P.getY(k);
+      const pz = P.getZ(k);
+      // chamfer the top edges, taper the ends, rough the faces
+      const ex = Math.abs(px) / (L / 2);
+      const ez = Math.abs(pz) / (W / 2);
+      const top = py > 0 ? 1 - 0.45 * Math.max(0, ez - 0.4) - 0.6 * Math.pow(Math.max(0, ex - 0.55), 1.5) : 1;
+      const j = 0.06 * (h01(px * 3.1 + i, pz * 2.7 + v) - 0.5);
+      P.setXYZ(k, px * (1 - 0.18 * Math.max(0, py) / T), py * top + j, pz * (1 - 0.3 * Math.pow(ex, 3)));
+    }
+    box.computeVertexNormals();
+    const yaw = 0.25 * (h01(i + 17, v) - 0.5); // along the wind (+x) with a little scatter
+    box.rotateY(yaw);
+    box.rotateZ(0.08 * (h01(i + 19, v) - 0.5));
+    // seat: the lowest terrain point under the rib, minus the buried part (~60 %)
+    let gy = Infinity;
+    for (const sx of [-L / 2, 0, L / 2]) for (const sz of [-W / 2, W / 2]) gy = Math.min(gy, m.heightAt(x + sx * Math.cos(yaw), z - sx * Math.sin(yaw) + sz));
+    box.translate(x, gy - T * 0.2, z);
+    ribs.push(box);
+    // a snow tail in the rib's lee (downwind, +x)
+    const tail = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2);
+    tail.scale(L * 0.6, 0.16, W * 0.45);
+    tail.translate(x + L * 0.75, m.heightAt(x + L * 0.75, z) - 0.04, z);
+    const TP = tail.attributes.position as THREE.BufferAttribute;
+    const tc = new Float32Array(TP.count * 3).fill(0.9);
+    tail.setAttribute('color', new THREE.BufferAttribute(tc, 3));
+    ribs.push(tail);
+  }
+  // gravel: small angular stones scattered in the gravel ring
+  const stones = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.16, 0), M.stone, 26);
+  const mm = new THREE.Matrix4();
+  for (let i = 0; i < 26; i++) {
+    const a = h.rot + i * 2.4 + v;
+    const d = h.r * (0.35 + 0.55 * h01(i + 23, v));
+    const x = h.x + Math.cos(a) * d;
+    const z = h.z + Math.sin(a) * d;
+    const s = 0.6 + 1.4 * h01(i + 29, v);
+    mm.compose(new THREE.Vector3(x, m.heightAt(x, z) + 0.02, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(i, i * 2, 0)), new THREE.Vector3(s, s * 0.55, s));
     stones.setMatrixAt(i, mm);
   }
   stones.castShadow = true;
   obj.add(stones);
+  const ribColored = ribs.map((r) => {
+    if (r.getAttribute('color')) return r.index ? r.toNonIndexed() : r;
+    const n = r.index ? r.toNonIndexed() : r;
+    const P = n.attributes.position as THREE.BufferAttribute;
+    const cc = new Float32Array(P.count * 3);
+    for (let k = 0; k < P.count; k++) {
+      const t = 0.11 + 0.08 * h01(P.getX(k) * 0.7, P.getZ(k) * 0.9);
+      cc.set([t, t * 1.04, t * 1.12], k * 3);
+    }
+    n.setAttribute('color', new THREE.BufferAttribute(cc, 3));
+    return n;
+  });
+  const merged = mergeSimple(ribColored);
+  for (const r of ribs) r.dispose();
+  for (const r of ribColored) r.dispose();
+  const ribMesh = new THREE.Mesh(merged, M.rock);
+  ribMesh.castShadow = true;
+  ribMesh.receiveShadow = true;
+  obj.add(ribMesh);
   return {
     object: obj,
     dispose() {
       g.dispose();
+      merged.dispose();
       stones.geometry.dispose();
       stones.dispose();
       obj.removeFromParent();
     },
   };
+}
+
+/** concatenate non-indexed geometries with position/normal/color */
+function mergeSimple(list: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const col: number[] = [];
+  for (const raw of list) {
+    const gg = raw.index ? raw.toNonIndexed() : raw;
+    if (!gg.getAttribute('normal')) gg.computeVertexNormals();
+    pos.push(...(gg.attributes.position as THREE.BufferAttribute).array);
+    nor.push(...(gg.attributes.normal as THREE.BufferAttribute).array);
+    col.push(...(gg.attributes.color as THREE.BufferAttribute).array);
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return out;
 }
 
 registerHazardView('sea-gust', (h, ctx) => gustView(h, ctx.mountain));

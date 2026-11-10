@@ -248,7 +248,7 @@ void main() {
   float a = 1.0 - smoothstep(-0.02, 0.16, el);
   a = a * a * (3.0 - 2.0 * a);
   // fog colour is a display-space value (as with three's built-in fog, mixed after tone mapping)
-  gl_FragColor = vec4(sf_fogColor(v), a * 0.92);
+  gl_FragColor = vec4(sf_fogColor(v), a * ${look.horizonHaze === undefined ? '0.92' : look.horizonHaze.toFixed(3)});
 }`,
     transparent: true,
     depthWrite: false,

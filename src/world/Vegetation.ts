@@ -258,7 +258,18 @@ export class Vegetation {
           const rz = z + Math.sin(a) * d * 0.6;
           const sz = Math.min(4.0, 0.7 * Math.pow(1 / Math.max(0.06, rng.float()), 0.7));
           const vv = Math.floor(((seedA * 7 + k * 0.37) % 1) * ROCK_VARIANTS);
-          get(rx).rocks[vv]!.push({ x: rx, y: mountain.heightAt(rx, rz) - sz * 0.35, z: rz, rot: rng.float() * 6.28, sx: sz * rng.range(0.85, 1.25), sy: sz * rng.range(0.85, 1.5), sz: sz, rx: rng.range(-0.4, 0.4), rz: rng.range(-0.4, 0.4) });
+          const rotA = rng.float() * 6.28;
+          const sxA = rng.range(0.85, 1.25);
+          const syA = rng.range(0.85, 1.5);
+          const rxA = rng.range(-0.4, 0.4);
+          const rzA = rng.range(-0.4, 0.4);
+          // coast (Fjord art review D9): a block spread off its cluster onto a sheer wall would hang
+          // on the face; keep only blocks whose own ground is below ~45°
+          if (coast) {
+            const yr = mountain.heightAt(rx, rz);
+            if (Math.hypot(mountain.heightAt(rx + 3, rz) - yr, mountain.heightAt(rx, rz + 3) - yr) / 3 > 1.0) continue;
+          }
+          get(rx).rocks[vv]!.push({ x: rx, y: mountain.heightAt(rx, rz) - sz * 0.35, z: rz, rot: rotA, sx: sz * sxA, sy: sz * syA, sz: sz, rx: rxA, rz: rzA });
         }
       }
     }

@@ -5,8 +5,10 @@ import { Harbour } from './harbour';
 import { HarbourVictory } from './harbourVictory';
 import { CoastalShelter } from './shelter';
 import { dressSeaCave } from './seaCave';
+import { seaCaveCinematic } from './seaCaveCinematic';
 import './hazardViews';
 import './scenery';
+import './start';
 
 /** the harbour at the end of the mountain, with its victory sequence */
 export const FJORD_HARBOUR = registerFinish({
@@ -20,5 +22,5 @@ export const FJORD_HARBOUR = registerFinish({
 /** red warming huts at the refuges */
 export const COASTAL_SHELTER = registerRefuge({ id: 'coastal-shelter', build: (c) => new CoastalShelter(c.mountain, c.z, c.index) });
 
-/** basalt columns, icicles and the Yeti's beachcombing hoard around the shared cave */
-export const FJORD_SEA_CAVE = registerCavePresentation({ id: 'fjord-sea-cave', dress: dressSeaCave });
+/** sea-worn basalt, a frozen tide pool and the Yeti's beachcombing hoard around the shared cave; gulls and spray in its cinematic */
+export const FJORD_SEA_CAVE = registerCavePresentation({ id: 'fjord-sea-cave', dress: dressSeaCave, cinematic: seaCaveCinematic });

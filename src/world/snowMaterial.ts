@@ -75,11 +75,26 @@ export interface TerrainUniforms {
  */
 const coastRockGlsl = (T: Biome['terrainLook']) => /* glsl */ `
   {
+    // round 2 (art review D3): the shared rock's fall-line streaks read as vertical texture
+    // stretching on km-high walls. Coastal gneiss replaces most of it: broad tonal zones, gently
+    // dipping foliation bands (horizontal-ish, warped), blocky joint-bounded slabs with their own
+    // tone, a few vertical master joints, and rare, discrete frozen seeps instead of many streaks.
     float zone = sf_fbmBL(vec2(wp.x * 0.004 + wp.z * 0.003, wp.y * 0.006) + 4.0, sf_fp(sf_fY, vec2(0.006)));
     vec3 gneiss = mix(${v3(T.rockA)}, ${v3(T.rockC)}, smoothstep(0.35, 0.7, zone)) * (0.75 + 0.5 * M);
-    rock = mix(rock, gneiss * (0.85 + 0.3 * streak), 0.55);
-    float seep = smoothstep(0.84, 0.9, sf_sideN(vec2(0.11, 0.0045), 21.0)) * smoothstep(0.7, 0.95, slope);
-    rock = mix(rock, vec3(0.72, 0.84, 0.93), seep * 0.8);
+    float fol = sf_sideN(vec2(0.011, 0.075), 31.0);
+    float folF = sf_sideN(vec2(0.03, 0.4), 37.0);
+    float blk = sf_triN(vec2(0.07), 41.0);
+    float blk2 = sf_triN(vec2(0.021), 43.0);
+    gneiss *= 0.78 + 0.34 * fol + 0.12 * (folF - 0.5) * sf_near + 0.26 * (blk - 0.5) + 0.3 * (blk2 - 0.5);
+    // weathered, lichen-warm patches on the upper faces, cold dark rock lower down
+    gneiss = mix(gneiss, gneiss * vec3(1.25, 1.12, 0.92), smoothstep(0.55, 0.8, blk2) * 0.6);
+    // darker overall than the inland rock: wet, dark gneiss walls read as rock (not an ice shelf)
+    // even when the low sun lights them square-on
+    rock = mix(rock, gneiss, 0.82) * 0.68;
+    float mj = abs(sf_sideN(vec2(0.045, 0.012), 47.0) - 0.5);
+    rock *= 1.0 - 0.3 * sf_aa(0.46, 0.5, mj) * (1.0 - farA) * smoothstep(0.6, 0.85, slope);
+    float seep = smoothstep(0.92, 0.965, sf_sideN(vec2(0.03, 0.003), 21.0)) * smoothstep(0.7, 0.95, slope);
+    rock = mix(rock, vec3(0.72, 0.84, 0.93), seep * 0.85);
   }
 `;
 
@@ -100,7 +115,7 @@ const SHORE_GLSL = /* glsl */ `
     if (vNPos.z >= r.x && vNPos.z < r.y) W = r.z;
   }
   float dh = vNPos.y - W;
-  if (dh < 12.0) {
+  if (dh < 150.0) {
     float sn = sf_vnBL(vNPos.xz * 0.35, sf_fp(sf_fY, vec2(0.35)));
     float sn2 = sf_vn(vNPos.xz * 0.06 + 4.0);
     float wash = 1.0 - smoothstep(1.2 + 2.2 * sn2, 3.4 + 3.0 * sn2, dh);
@@ -112,9 +127,17 @@ const SHORE_GLSL = /* glsl */ `
     col = mix(col, shore, wash);
     // the spray zone: on low skerries and shores the wind and salt keep the rock bare in patches
     float spray = (1.0 - smoothstep(3.0, 18.0 + 10.0 * sn2, dh)) * smoothstep(0.42, 0.62, sf_vnBL(vNPos.xz * 0.08 + 9.0, sf_fp(sf_fY, vec2(0.08))));
+    // round 2 (review D6/C10): never on flat ground (the harbour plaza read as camouflage blotches)
+    spray *= smoothstep(0.06, 0.16, slope);
     col = mix(col, wet * 1.4, spray * 0.85 * (1.0 - wash));
     sf_rock = max(sf_rock, spray * 0.85);
     sf_rock = max(sf_rock, wash);
+    // round 2 (art review D3): the lowest 40–120 m of every wall and steep shore is spray-washed
+    // bare rock, darker and wetter towards the water: no white snow skirt at sea level
+    float lowWall = (1.0 - smoothstep(35.0 + 30.0 * sn2, 115.0 + 30.0 * sn2, dh)) * smoothstep(0.1, 0.28, slope);
+    vec3 wetRock = rock * mix(0.5, 0.9, smoothstep(0.0, 70.0, dh));
+    col = mix(col, wetRock, lowWall * (1.0 - wash) * (1.0 - spray * 0.5));
+    sf_rock = max(sf_rock, lowWall);
     // surf: a bright, breaking line at the water's edge (animated)
     float ph = uTime * 0.55 + sf_vn(vNPos.xz * 0.02) * 6.0;
     float swell = 0.35 + 0.35 * sin(ph);
@@ -333,7 +356,7 @@ ${coastal ? coastRockGlsl(T) : ''}
   float Hd = (sf_triN(vec2(1.7), 0.0) - 0.5) * 0.05 * (1.0 - sf_ice)
            + (sast - 0.5) * 0.1 * sf_tw.y * (1.0 - sf_ice) * (1.0 - sf_rock)
            + (n2 - 0.5) * (0.04 + 0.3 * sf_rock);
-  float H = Hm + Hd * sf_near * uDetail;
+  float H = Hm + Hd * sf_near * uDetail${coastal ? ' * 0.55' : ''};
   vec3 dpx = dFdx(vWPos);
   vec3 dpy = dFdy(vWPos);
   vec3 r1 = cross(dpy, gn);
