@@ -37,6 +37,13 @@ function fakeCave(outX: number) {
   for (let s = 14; s > -2.2; s -= 0.75) exitPath.push(mouth.clone().addScaledVector(outward, -s));
   const ledge = mouth.clone().addScaledVector(outward, 2.2);
   exitPath.push(ledge.clone());
+  // a rock face standing on the mouth line (what the lintel and portal columns are seated on)
+  const group = new THREE.Group();
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(32, 20, 64, 40), new THREE.MeshBasicMaterial());
+  face.name = 'cave-rock';
+  face.rotation.y = Math.PI / 2;
+  face.position.copy(mouth).add(new THREE.Vector3(0, 9, 0)).addScaledVector(outward, -0.3);
+  group.add(face);
   return {
     mouth,
     outward,
@@ -44,7 +51,8 @@ function fakeCave(outX: number) {
     exitPath,
     ledge,
     floorHeightAt: () => 50,
-    group: new THREE.Group(),
+    clearanceAt: () => 5,
+    group,
   };
 }
 
@@ -69,13 +77,16 @@ describe('Fjord sea cave: props keep out of the cave-cinematic cameras', () => {
       const props = d.group.userData['props'] as Array<{ p: THREE.Vector3; r: number; kind: string }>;
       expect(props.length).toBeGreaterThan(20);
       expect(props.some((p) => p.kind === 'column')).toBe(true);
+      // the portal's lintel of column ends is built on the face, and the gulls have brow perches
+      expect(props.filter((p) => p.kind === 'lintel').length).toBeGreaterThan(8);
+      expect((d.group.userData['perches'] as Array<{ brow?: boolean }>).some((q) => q.brow)).toBe(true);
       const lines = caveCameraSightlines(cave.mouth, cave.outward, cave.lipTop);
       for (const p of props) expect(clearOfCaveCameras(lines, p.p, p.r), `${p.kind} at ${p.p.toArray().map((v) => v.toFixed(1))}`).toBe(true);
       // and off the Yeti's exit path / ledge (the lintel's column ends stand overhead, above the
       // mouth: they are checked for headroom instead)
       for (const p of props)
         for (const e of cave.exitPath) {
-          if (p.p.y - p.r > e.y + 5.5) continue;
+          if (p.kind === "lintel" && p.p.y - p.r > e.y + 4.5) continue;
           expect(Math.hypot(p.p.x - e.x, p.p.z - e.z)).toBeGreaterThan(p.r + 4);
         }
       d.dispose();
