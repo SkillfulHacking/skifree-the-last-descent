@@ -159,6 +159,7 @@ export class GameSession implements Stage {
     this.hud.reset();
     this.audio.setMusicMode('explore');
     this.follow.snap(this.followTarget());
+    this.listenEnvironment();
     if (!opts.skipIntro) this.buildIntro();
     else this.run.endIntro();
   }
@@ -209,7 +210,7 @@ export class GameSession implements Stage {
     const fl = new THREE.Vector3();
     this.follow.idealPose(this.followTarget(), fp, fl);
     tl.shot({ start: 0, end: 4.2, from: () => pose(P.clone().add(new THREE.Vector3(18, 9, 22)), P.clone().add(new THREE.Vector3(0, 1.2, 0)), 46), via: () => pose(P.clone().add(new THREE.Vector3(10, 4, -8)), P.clone().add(new THREE.Vector3(0, 1.4, 4)), 52), to: () => pose(fp, fl, 64), easing: ease.inOutCubic });
-    const goal = this.endless ? 'Survive as far as you can. Bank your run at the refuges.' : `Reach the resort, ${(this.world.mountain.finishZ / 1000).toFixed(0)} km down the mountain.`;
+    const goal = this.endless ? 'Survive as far as you can. Bank your run at the refuges.' : `Reach the ${this.world.finishDef.goal ?? 'resort'}, ${(this.world.mountain.finishZ / 1000).toFixed(0)} km down the mountain.`;
     tl.at(0.2, () => this.hud.title('THE LAST DESCENT', goal, 'intro', 3.4));
     tl.at(4.2, () => {});
     this.intro = tl;
@@ -386,6 +387,7 @@ export class GameSession implements Stage {
       this.telemetry.onSkierEvent(e, s);
     }
     this.telemetry.step(s, PHYS_DT);
+    this.checkLookouts();
 
     // tutorial bookkeeping
     if (this.run.phase === 'learn') {
@@ -687,6 +689,39 @@ export class GameSession implements Stage {
     this.hooks.onResults(this.stats(won), won);
   }
 
+  // --- location events (scenic viewpoints, hazards) ----------------------------------
+  /** viewpoints discovered this run (once per run per id) */
+  readonly discovered = new Set<string>();
+  private envOff: (() => void) | null = null;
+
+  /** Biome environment → gameplay events: a hazard passed safely is a HazardSurvived. */
+  private listenEnvironment() {
+    this.envOff = this.world.environment.listen((e) => {
+      if (e.type === 'hazard-passed') {
+        // a squall counts when it was gusting near you; rock when you kept off it
+        if (!e.hit && (e.kind !== 'scoured-rock' || !e.entered)) this.reportHazardSurvived(e.kind);
+      } else if (e.type === 'hazard-telegraph' || e.type === 'hazard-active' || e.type === 'hazard-hit') {
+        if (e.cue) this.audio.playCue(e.cue, new THREE.Vector3(e.hazard.x, e.hazard.y + 2, e.hazard.z));
+      } else if (e.type === 'hazard-enter' && e.kind === 'scoured-rock') this.audio.playCue('rock-scrape', null);
+    });
+  }
+
+  /** Optional viewpoints on a coast's rim: reaching one reports ScenicLocationDiscovered once per run. */
+  private checkLookouts() {
+    const c = this.world.mountain.coast;
+    if (!c) return;
+    const s = this.phys.s;
+    for (const l of c.lookouts(s.pos.z - 20, s.pos.z + 20)) {
+      if (this.discovered.has(l.id) || Math.hypot(s.pos.x - l.x, s.pos.z - l.z) > l.r || s.crashed) continue;
+      this.discovered.add(l.id);
+      this.reportScenicDiscovered(l.id);
+      const pts = 250;
+      this.style += pts;
+      this.hud.popTrick('VIEWPOINT DISCOVERED', pts);
+      this.audio.playCue('viewpoint', null);
+    }
+  }
+
   // --- gameplay events --------------------------------------------------------------
   /** Course identity carried by run-level events. */
   get runContext(): RunContext {
@@ -961,8 +996,17 @@ export class GameSession implements Stage {
       chaseIntensity: chase ? clamp(1 - (this.yetiAI.distance - 5) / 110, 0, 1) : 0,
       crowdLevel: this.world.resort ? smoothstep(this.world.mountain.finishZ - 400, this.world.mountain.finishZ, s.pos.z) : 0,
       eerie: this.run.phase === 'caveCinematic' ? 1 : this.eerie,
+      coast: this.coastLevel(),
     };
     this.audio.update(dt, st);
+  }
+
+  /** 0..1 closeness to the sea for the surf/gull beds (coastal locations) */
+  private coastLevel(): number {
+    const c = this.world.mountain.coast;
+    if (!c) return 0;
+    const p = this.camera.position;
+    return clamp(1 - (p.y - c.seaLevelAt(p.z)) / 1100, 0.18, 1);
   }
 
   /** victory cheer level for the resort */
@@ -1074,6 +1118,8 @@ export class GameSession implements Stage {
   }
 
   dispose() {
+    this.envOff?.();
+    this.envOff = null;
     this.snowView?.dispose();
     this.snowView = null;
     for (const t of this.timers) clearTimeout(t);

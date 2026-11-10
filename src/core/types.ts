@@ -102,6 +102,8 @@ export interface AudioFrameState {
   chaseIntensity: number;
   /** 0..1 resort crowd ambience level. */
   crowdLevel: number;
+  /** 0..1 closeness to the sea (coastal locations: surf/gull beds); absent/0 inland */
+  coast?: number;
   /** 0..1 how deep the player is inside the "eerie" zone before the cave (ducks wind/music). */
   eerie: number;
 }

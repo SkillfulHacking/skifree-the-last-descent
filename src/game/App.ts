@@ -17,6 +17,7 @@ import type { QualityPreset } from '../core/types';
 import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
 import { fmtDistance } from '../ui/Hud';
 import { getBiome, hasBiome, listBiomes } from '../world/biome';
+import { capabilitiesOf } from '../world/capabilities';
 import { locationNoteHtml, locationOptionLabel } from '../ui/location';
 import type { AutopilotStyle } from '../debug/autopilot';
 import { ProgressTracker } from '../progression/tracker';
@@ -203,7 +204,7 @@ export class App {
     this.world = world;
     // location: exposure and wind character follow the biome (alpine: 0.78 / unchanged)
     this.renderer.toneMappingExposure = world.biome.lighting.exposure;
-    this.audio.setAmbience(world.biome.audio);
+    this.audio.setAmbience(world.biome.audio, capabilitiesOf(world.biome).audio.ambience);
     world.particles.setPixelRatio(this.renderer.getPixelRatio(), innerHeight);
     // warm up shaders to avoid first-frame hitches
     this.placeMenuSkier();
@@ -792,6 +793,11 @@ export class App {
       this.camera.position.y = Math.max(this.camera.position.y, gy + 3.5);
       this.camera.lookAt(cx + 4, cy + 1.5, 60);
       this.camera.fov = 55;
+      if (w.scenery?.menuCamera?.(this.menuTime, this.menuCam)) {
+        this.camera.position.copy(this.menuCam.pos);
+        this.camera.lookAt(this.menuCam.look);
+        this.camera.fov = this.menuCam.fov;
+      }
       this.camera.updateProjectionMatrix();
       this.skier?.update(dt, { steer: 0, lean: 0, tuck: 0, pizza: 0.25, drift: 0, driftAngle: 0, crouch: 0, airborne: false, airTime: 0, landImpact: 0, crashed: false, crashTime: 0, recover: 0, speed: 0, lookBack: 0, celebrate: 0, wobble: 0, time: this.menuTime });
       w.update(dt, this.menuTime, this.skier?.root.position ?? this.camera.position, this.camera.position, 4);
@@ -825,6 +831,7 @@ export class App {
     });
   }
 
+  private menuCam = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 55 };
   private yetiRim: THREE.PointLight | null = null;
   private rearCam = new THREE.PerspectiveCamera(48, 2.4, 0.2, 2500);
   private rearPose = { pos: new THREE.Vector3(), look: new THREE.Vector3() };

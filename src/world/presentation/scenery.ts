@@ -38,6 +38,8 @@ export interface SceneryView {
   /** keep what is needed around course position z (called with the obstacle streaming) */
   stream(z: number): void;
   update(dt: number, time: number, f: SceneryFrame): void;
+  /** optional main-menu camera (the location's establishing view around the start); null = default */
+  menuCamera?(time: number, out: { pos: THREE.Vector3; look: THREE.Vector3; fov: number }): boolean;
   /** live object/instance counts (streaming tests, debug) */
   stats?(): Record<string, number>;
   dispose(): void;

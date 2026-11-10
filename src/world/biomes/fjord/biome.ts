@@ -101,9 +101,9 @@ export function makeFjordBiome(): Biome {
       powder: [0.9, 0.935, 0.98],
       ice: [0.55, 0.68, 0.82],
       // Scandinavian gneiss: blue-grey, dark bands, a little lichen-brown
-      rockA: [0.15, 0.163, 0.185],
-      rockB: [0.255, 0.245, 0.235],
-      rockC: [0.06, 0.066, 0.078],
+      rockA: [0.095, 0.105, 0.122],
+      rockB: [0.17, 0.163, 0.155],
+      rockC: [0.042, 0.047, 0.057],
       shadeTint: [0.84, 0.93, 1.12],
       skylightTint: [0.84, 0.97, 1.28],
     },

@@ -263,10 +263,10 @@ export class Coast {
     return smoothstep(-36, -12, this.beyondRim(x, z));
   }
 
-  /** |x| of the far shore across the fjord at z */
+  /** |x| of the far shore across the fjord at z (bays and spurs every few hundred metres) */
   farShore(z: number): number {
     const [a, b] = this.p.far;
-    return a + (b - a) * clamp(0.5 + 0.6 * fbm(z / 2300, 9.1, this.seed + 64, 2), 0, 1);
+    return a + (b - a) * clamp(0.5 + 0.6 * fbm(z / 2300, 9.1, this.seed + 64, 2), 0, 1) + 230 * gnoise(z / 640, 4.4, this.seed + 77) + 70 * gnoise(z / 170, 1.9, this.seed + 78);
   }
 
   /** cliff extent per metre of height (steepness character changes along the coast) */
@@ -411,6 +411,9 @@ export class Coast {
       const stair = (Math.floor(q) + smoothstep(0.25, 1, q - Math.floor(q))) / 7;
       f = clamp(f + (stair - f) * 0.38 * smoothstep(0.04, 0.2, u) * (1 - smoothstep(0.8, 1, u)), 0, 1);
       out = hRim + berm - (hRim - foot) * f;
+      // couloirs: grooves running down the face (snow-filled, between rock ribs)
+      const g = ridged(z / 64, 0.5 + f * 0.6, s + 84, 2);
+      out -= (10 + 0.05 * Hc) * g * 4 * f * (1 - f);
     } else {
       const tf = (u - 1) * Lc;
       const flat = 80 * hm;
@@ -419,20 +422,25 @@ export class Coast {
       // rocks and skerries at the cliff foot
       out += Math.max(0, gnoise(x / 23, z / 23, s + 69) - 0.45) * 30 * (1 - smoothstep(30, 240, tf)) * (1 - hm);
       // islands in the fjord (smooth rounded skerries and a few bigger wooded islets)
-      const n = fbm(x / 340, z / 340, s + 71, 3) + 0.35 * gnoise(x / 95, z / 95, s + 72);
-      const isl = Math.max(0, n - 0.34);
-      if (isl > 0) out = Math.max(out, lv - p.depth + isl * isl * 2600 * smoothstep(160, 420, tf));
+      const k = smoothstep(160, 420, tf);
+      if (k > 0) {
+        const isl = this.island(x, z, lv);
+        if (isl > out) out += (isl - out) * k;
+      }
     }
-    // the mountains across the fjord
+    // the mountains across the fjord: steep walls from the water, separate summits, couloirs
     const xf = this.farShore(z);
     const ef = -x - xf;
     if (ef > -700) {
       const lvS = this.blendedLevel(z, FAR_BLEND);
       const [a, b] = p.farHeight;
-      const peaks = a + (b - a) * clamp(0.25 + 0.9 * ridged(x / 1500, z / 1500, s + 73, 4), 0, 1.15);
-      const rise = smoothstep(-160, 900, ef);
-      const relief = (ridged(x / 330, z / 330, s + 74, 3) - 0.35) * 160 * rise;
-      out = Math.max(out, lvS - p.depth + (peaks + p.depth) * Math.pow(rise, 0.8) + relief);
+      const massif = clamp(0.2 + 1.0 * ridged(x / 1700, z / 1700, s + 73, 4), 0, 1.2);
+      const peaks = a + (b - a) * massif;
+      const rise = smoothstep(-160, 1100, ef);
+      // summits: a ridged field at ~900 m wavelength sharpened near the top of the wall
+      const summit = (ridged(x / 760, z / 760, s + 79, 4) - 0.32) * 520 * smoothstep(250, 1300, ef);
+      const couloir = (ridged(x / 210, z / 95, s + 74, 2) - 0.4) * 90 * smoothstep(80, 600, ef);
+      out = Math.max(out, lvS - p.depth + (peaks + p.depth) * Math.pow(rise, 0.7) + summit + couloir);
     }
     // the headland ridge between two arms (and the fjord head): hides where the levels change
     if (ridge.bell > 0.002) {
@@ -441,6 +449,20 @@ export class Coast {
       out = Math.max(out, base + (top - base) * ridge.bell * smoothstep(0, 22, t));
     }
     return out;
+  }
+
+  /**
+   * Islands and skerries in the fjord / sea: low rounded domes of rock (8–45 m) with steep shores,
+   * a few broad enough to carry pines; returns the island's surface height (or far below the bed).
+   */
+  private island(x: number, z: number, lv: number): number {
+    const s = this.seed;
+    const n = fbm(x / 380, z / 380, s + 71, 3) + 0.25 * gnoise(x / 120, z / 120, s + 72);
+    const isl = n - 0.36;
+    if (isl <= -0.02) return -1e9;
+    const shore = smoothstep(-0.02, 0.05, isl);
+    const top = 6 + 42 * smoothstep(0.03, 0.3, isl) + 9 * gnoise(x / 60, z / 60, s + 83);
+    return lv - this.p.depth + (this.p.depth + top) * shore;
   }
 
   /** finite courses: beyond the harbour shoreline the land slopes away into the open sea */
@@ -452,9 +474,12 @@ export class Coast {
     const s = this.seed;
     let bed = W - 4 - (this.p.depth - 4) * smoothstep(sz, sz + 700, z);
     // islands and skerries out to sea
-    const n = fbm(x / 420, z / 420, s + 81, 3) + 0.3 * gnoise(x / 120, z / 120, s + 82);
-    const isl = Math.max(0, n - 0.33);
-    if (isl > 0) bed = Math.max(bed, W - this.p.depth + isl * isl * 2400 * smoothstep(sz + 150, sz + 500, z));
+    void s;
+    const ki = smoothstep(sz + 150, sz + 500, z);
+    if (ki > 0) {
+      const isl = this.island(x, z, W);
+      if (isl > bed) bed += (isl - bed) * ki;
+    }
     return h + (bed - h) * k;
   }
 
