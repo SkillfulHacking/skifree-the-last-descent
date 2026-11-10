@@ -1,21 +1,25 @@
 /**
- * "fjord-harbour" victory (round 2: the Fjord's own script, not the Alpine beat sheet with swaps).
+ * "fjord-harbour" victory: the Fjord's own script, not the Alpine beat sheet with swaps.
+ * Round 3 (C2–C6, A8/A9/A11, F5): every beat on the quay is framed with the harbour and the sea
+ * behind it.
  *
- *  0.0  Onto the quay: a low tracking shot at ski height as the skier glides off the snow onto the
- *       granite setts of the harbour street, painted houses sliding past, and sprays to a stop.
- *  3.4  The fish racks: up at the snow line the Yeti stops at the big stockfish rack ("hjell"),
- *       sniffs, yanks a dried cod off the rail, takes a hopeful bite… gags, flings it away and
- *       stomps back up the mountain. Staged at the rack, the hanging fish framing him.
- *  7.6  The presentation: the harbourmaster in yellow oilskins, standing on the fish crates, lifts
- *       the gilded lighthouse (over the skier's shoulder, his face to camera) and tosses it across;
- *       reverse angle on the skier catching it and holding it up, the descent behind them.
- * 12.0  Après on the quay: from the water side of the bathing pier — the steaming tub with its
- *       bathers, the bonfire basket and the sauna smoking behind — a bather in a red robe runs off
- *       the pier end and cannonballs (tucked) into the fjord; cut low to the water for the splash.
- * 15.6  The reveal: from low over the sea beyond the lighthouse the camera rises and pulls back over
- *       the open fjord until it is looking up at the summit you started from, the harbour tiny at
- *       the foot of the wall. The title lands only once the move has settled (20.8 s) and the last
- *       frame holds before the results (24.4 s).
+ *  0.0  Onto the quay: a low tracking shot from behind and beside the skier, down the village
+ *       street to the quay, the boats and the fjord, as the skier glides onto the setts and stops.
+ *  3.4  The fish rack on the quay: the Yeti (who has followed down the street) arrives at the
+ *       stockfish rack by the water, sniffs, yanks a dried cod off the rail, turns to us and takes a
+ *       hopeful bite… gags, flings it into the harbour and stomps off. Filmed from up the street,
+ *       facing him: his face, the cod at his mouth, the rack, the boats and the islands behind.
+ *  7.6  The presentation: the harbourmaster steps up face to face with the skier, holding the gilded
+ *       lighthouse in both hands by its plinth (over the skier's shoulder, his face to camera, the
+ *       quay and the sea behind him), lifts it, and tosses it; reverse angle on the skier catching it
+ *       and holding it up, the descent behind them (the skis clear of the letterbox).
+ * 12.0  Après on the pier: the steaming tub, the bonfire and the sauna; a bather in a red robe
+ *       sprints across the deck, springs off the edge, balls up in a cannonball that hangs at the top
+ *       of its arc and hits the fjord in a crown of spray (cut low over the water at 14.0 s).
+ * 17.2  The reveal: from low over the sea beyond the lighthouse the camera rises and pulls back over
+ *       the open fjord until it rests on the whole descent, the start marked by a burning beacon on
+ *       its shoulder and the harbour tiny at the foot of the wall. The title lands only once the
+ *       camera has settled (24.0 s) and holds 2.6 s before the results (26.6 s).
  */
 import * as THREE from 'three';
 import { ease, pose } from '../../../../cinematic/Timeline';
@@ -23,15 +27,15 @@ import type { Stage } from '../../../../game/Stage';
 import { damp, wrapAngle } from '../../../../core/rng';
 import type { FinishEnvironment, VictoryDirector, VictoryScript } from '../../../presentation/finish';
 import { TrophyHandoff } from '../../../../cinematic/victory/trophy';
-import type { Harbour } from './harbour';
+import { PLUNGE_TIMES, type Harbour } from './harbour';
 
 /** the beat times (exported for tests / evidence) */
-export const HARBOUR_BEATS = { quay: 0, racks: 3.4, present: 7.6, toss: 9.3, apres: 12.0, plunge: 13.0, splashCut: 13.9, reveal: 15.6, title: 20.8, revealEnd: 23.9, results: 24.4 } as const;
+export const HARBOUR_BEATS = { quay: 0, racks: 3.4, present: 7.6, toss: 9.3, apres: 12.0, plunge: 13.1, splashCut: 14.0, reveal: 17.2, revealEnd: 23.8, title: 24.0, results: 26.6 } as const;
 
 export class HarbourVictory implements VictoryScript {
   private trophy: TrophyHandoff;
   private yetiStop = new THREE.Vector3();
-  private yetiState: 'approach' | 'sniff' | 'grab' | 'bite' | 'disgust' | 'leave' = 'approach';
+  private yetiState: 'wait' | 'approach' | 'sniff' | 'grab' | 'bite' | 'disgust' | 'leave' = 'wait';
   private yetiT = 0;
   private stopPoint: THREE.Vector3;
   private plungeT = -1;
@@ -41,6 +45,10 @@ export class HarbourVictory implements VictoryScript {
   private presentT = -1;
   private trophyFrom = new THREE.Vector3();
   private hand = new THREE.Vector3();
+  private hand2 = new THREE.Vector3();
+  private beacon: THREE.Sprite | null = null;
+  private beaconTex: THREE.Texture | null = null;
+  private faceYeti = new THREE.Vector3();
 
   constructor(
     private st: Stage,
@@ -72,11 +80,7 @@ export class HarbourVictory implements VictoryScript {
     }
 
     const ya = st.yetiAI;
-    if (ya.pos.distanceTo(this.yetiStop) > 70) {
-      const p = this.yetiStop.clone().add(new THREE.Vector3(-26, 0, -38));
-      ya.pos.set(p.x, m.heightAt(p.x, p.z), p.z);
-    }
-    const rack = h.rack ? h.rack.clone() : this.yetiStop.clone().add(new THREE.Vector3(3, 0, 2));
+    // he stays out of shot (behind the skier) until he is brought down the street at 3.3 s
     // where the harbourmaster stands for the presentation: on his crates by default; at the beat he
     // steps up face to face with the skier wherever (and however turned) the skier came to rest
     const presentAt = h.presentAt ? h.presentAt.clone() : F.clone().add(new THREE.Vector3(-5.5, 0, 38.5));
@@ -84,27 +88,35 @@ export class HarbourVictory implements VictoryScript {
     const presHead = () => (h.presenter ? h.presenter.position.clone().add(new THREE.Vector3(0, 1.75, 0)) : presentAt.clone().add(new THREE.Vector3(0, presTop + 1.75, 0)));
     const yetiHead = () => st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.5, 0));
 
-    // 1) onto the quay: low tracking at ski height, houses sliding past, to the stop
+    // 1) onto the quay: low, behind and beside the skier, looking down the street to the water
     tl.shot({
       start: B.quay,
       end: B.racks,
-      from: () => pose(sk().add(new THREE.Vector3(-3.4, 0.55, 2.2)), sk().add(new THREE.Vector3(0.4, 0.8, 9)), 52),
-      to: () => pose(sk().add(new THREE.Vector3(-4.6, 1.3, 3.6)), sk().add(new THREE.Vector3(0, 1.0, 0)), 46),
+      from: () => pose(sk().add(new THREE.Vector3(-3.0, 0.7, -3.2)), sk().add(new THREE.Vector3(0.6, 0.6, 14)), 50),
+      to: () => pose(sk().add(new THREE.Vector3(-3.6, 1.4, -2.0)), sk().add(new THREE.Vector3(0.8, 1.0, 8)), 48),
       easing: ease.inOut,
     });
-    // 2) the fish racks: the Yeti arrives past the end of the rack, hanging fish in the foreground
+    // the gag is staged at the quay rack: the Yeti comes down the street off camera during shot 1
+    tl.at(3.3, () => {
+      const p = this.yetiStop.clone().add(new THREE.Vector3(-9, 0, -12));
+      ya.pos.set(p.x, m.heightAt(p.x, p.z), p.z);
+      ya.heading = Math.atan2(this.yetiStop.x - p.x, this.yetiStop.z - p.z);
+      this.yetiState = 'approach';
+      st.yeti.setVisible(true);
+    });
+    // 2) the Yeti arrives at the rack on the quay: from up the street, the harbour behind him
     tl.shot({
       start: B.racks,
       end: 5.3,
-      from: () => pose(rack.clone().add(new THREE.Vector3(8.5, 2.5, -15.5)), yetiHead().add(new THREE.Vector3(0, -0.3, 2.0)), 42),
-      to: () => pose(rack.clone().add(new THREE.Vector3(7.6, 2.3, -14.2)), yetiHead().add(new THREE.Vector3(0, -0.3, 1.5)), 38),
+      from: () => pose(this.yetiStop.clone().add(new THREE.Vector3(7.5, 4.2, -13.5)), this.yetiStop.clone().add(new THREE.Vector3(-1.0, 1.6, 3.0)), 44),
+      to: () => pose(this.yetiStop.clone().add(new THREE.Vector3(6.4, 3.4, -11.5)), this.yetiStop.clone().add(new THREE.Vector3(-0.6, 1.8, 2.5)), 42),
     });
-    // 2b) closer: grab, bite, gag, fling
+    // 2b) closer, facing him: he turns from the rack to us to bite, gags, flings the cod
     tl.shot({
       start: 5.3,
       end: B.present,
-      from: () => pose(this.yetiStop.clone().add(new THREE.Vector3(4.6, 2.0, -4.4)), yetiHead().add(new THREE.Vector3(0, -0.2, 0.6)), 38),
-      to: () => pose(this.yetiStop.clone().add(new THREE.Vector3(5.0, 1.9, -5.0)), yetiHead().add(new THREE.Vector3(0, -0.3, 0.6)), 40),
+      from: () => pose(this.yetiStop.clone().add(new THREE.Vector3(2.6, 2.0, -5.6)), yetiHead().add(new THREE.Vector3(-0.2, -0.35, 0)), 40),
+      to: () => pose(this.yetiStop.clone().add(new THREE.Vector3(2.9, 2.1, -6.0)), yetiHead().add(new THREE.Vector3(-0.2, -0.3, 0)), 42),
       handheld: 0.02,
     });
     // 3) the presentation: over the skier's shoulder onto the harbourmaster's face and the trophy
@@ -117,10 +129,11 @@ export class HarbourVictory implements VictoryScript {
       dir.normalize();
       const right = new THREE.Vector3(dir.z, 0, -dir.x);
       const cam = s.clone().addScaledVector(dir, -back).addScaledVector(right, side).add(new THREE.Vector3(0, 1.75 + lift, 0));
-      const fov = THREE.MathUtils.clamp(26 + 70 / dist, 24, 40);
-      return pose(cam, ph.clone().add(new THREE.Vector3(0, -0.15, 0)), fov);
+      const fov = THREE.MathUtils.clamp(30 + 70 / dist, 28, 46);
+      // aim a little above his face: the lighthouse he holds up stays inside the letterbox
+      return pose(cam, ph.clone().add(new THREE.Vector3(0, 0.15, 0)), fov);
     };
-    tl.shot({ start: B.present, end: B.toss + 0.4, from: ots(1.6, 0.75, 0.15), to: ots(1.3, 0.65, 0.1) });
+    tl.shot({ start: B.present, end: B.toss + 0.4, from: ots(1.9, 1.05, 0.1), to: ots(1.6, 0.95, 0.05) });
     // 3b) reverse: the skier's face as the lighthouse lands in their hand; the descent behind
     const toPres = () => presentAt.clone().sub(sk()).setY(0).normalize();
     tl.shot({
@@ -129,51 +142,72 @@ export class HarbourVictory implements VictoryScript {
       from: () => {
         const d2 = toPres();
         const right = new THREE.Vector3(d2.z, 0, -d2.x);
-        return pose(sk().addScaledVector(d2, 4.6).addScaledVector(right, -1.4).add(new THREE.Vector3(0, 1.45, 0)), sk().add(new THREE.Vector3(0, 1.5, 0)), 46);
+        return pose(sk().addScaledVector(d2, 5.6).addScaledVector(right, -1.4).add(new THREE.Vector3(0, 1.45, 0)), sk().add(new THREE.Vector3(0, 1.3, 0)), 46);
       },
       to: () => {
         const d2 = toPres();
         const right = new THREE.Vector3(d2.z, 0, -d2.x);
-        return pose(sk().addScaledVector(d2, 4.0).addScaledVector(right, -1.8).add(new THREE.Vector3(0, 1.3, 0)), sk().add(new THREE.Vector3(0, 1.7, 0)), 46);
+        return pose(sk().addScaledVector(d2, 5.2).addScaledVector(right, -1.8).add(new THREE.Vector3(0, 1.4, 0)), sk().add(new THREE.Vector3(0, 1.45, 0)), 46);
       },
       easing: ease.inOut,
     });
-    // 4) après: from the water side of the bathing pier (tub near, bonfire and sauna behind)
+    // 4) après: from the water side of the bathing pier (tub near, bonfire and sauna behind); the
+    //    camera drifts to keep the bather's run across the deck in frame
     const hb = r as Harbour;
     const from = hb.plungeFrom ?? tub;
+    const edge = hb.plungeEdge ?? from;
     const to = hb.plungeTo ?? tub;
     tl.shot({
       start: B.apres,
       end: B.splashCut,
       from: () => pose(tub.clone().add(new THREE.Vector3(2.5, 3.0, 12.5)), tub.clone().add(new THREE.Vector3(-1.8, 0.8, -2.5)), 50),
-      to: () => pose(tub.clone().add(new THREE.Vector3(3.3, 2.7, 12.0)), tub.clone().add(new THREE.Vector3(0.2, 0.9, -1.5)).lerp(from, 0.3), 50),
+      to: () => pose(tub.clone().add(new THREE.Vector3(4.6, 2.8, 12.4)), tub.clone().add(new THREE.Vector3(0.6, 0.9, -1.0)).lerp(edge, 0.45), 52),
     });
-    // 4b) low over the water for the cannonball and the splash
+    // 4b) low over the water, side-on to the jump: the spring, the cannonball, the crown splash
+    const mid = edge.clone().lerp(to, 0.5);
     tl.shot({
       start: B.splashCut,
       end: B.reveal,
-      from: () => pose(to.clone().add(new THREE.Vector3(-4.5, 2.8, 8.0)), to.clone().add(new THREE.Vector3(-0.5, 0.9, 0)), 46),
-      to: () => pose(to.clone().add(new THREE.Vector3(-5.0, 2.6, 8.6)), to.clone().add(new THREE.Vector3(-0.3, 0.5, 0)), 48),
+      from: () => pose(mid.clone().add(new THREE.Vector3(-1.5, -0.6, 9.5)), mid.clone().add(new THREE.Vector3(0, 0.6, 0)), 50),
+      to: () => pose(mid.clone().add(new THREE.Vector3(-2.2, -0.8, 10.4)), to.clone().add(new THREE.Vector3(-0.4, 1.0, 0)), 50),
     });
     // 5) the reveal: from low over the sea past the lighthouse, rise and pull back over the open
-    //    fjord (the headland frames the right edge) until the camera looks up at the summit
+    //    fjord (the headland frames the right edge) and come to rest on the whole descent: the start,
+    //    marked by a beacon on its shoulder, in the upper third; the harbour at the foot
     const sea = hb.seaward ? hb.seaward.clone() : F.clone().add(new THREE.Vector3(60, 5, 300));
     const xs = m.routeX(0);
     const summit = new THREE.Vector3(xs, m.heightAt(xs, 0) + 30, 0);
     const harbourLook = F.clone().add(new THREE.Vector3(0, 8, 150));
-    // the camera stays out over the open fjord (−x of the harbour mouth) so the headland on +x
-    // only frames the right edge of the picture (round 2: C5/A 11c)
-    const endPos = sea.clone().add(new THREE.Vector3(-700, 360, 1500));
+    const endPos = sea.clone().add(new THREE.Vector3(-760, 430, 1650));
+    const endLook = summit.clone().lerp(harbourLook, 0.3);
     tl.shot({
       start: B.reveal,
       end: B.revealEnd,
       from: () => pose(sea.clone().add(new THREE.Vector3(-110, -2, 40)), harbourLook.clone(), 40),
-      via: () => pose(sea.clone().add(new THREE.Vector3(-430, 100, 620)), harbourLook.clone().lerp(summit, 0.5), 44),
-      to: () => pose(endPos, summit.clone().lerp(harbourLook, 0.18), 46),
+      via: () => pose(sea.clone().add(new THREE.Vector3(-460, 120, 700)), harbourLook.clone().lerp(summit, 0.5), 44),
+      to: () => pose(endPos, endLook, 46),
       easing: ease.inOutCubic,
     });
-    // hold the final frame until the results
-    tl.shot({ start: B.revealEnd, end: B.results + 0.2, from: () => pose(endPos, summit.clone().lerp(harbourLook, 0.18), 46), to: () => pose(endPos.clone().add(new THREE.Vector3(0, 6, 20)), summit.clone().lerp(harbourLook, 0.18), 46) });
+    // settled: hold the final frame (a slow drift, no move) through the title until the results
+    tl.shot({ start: B.revealEnd, end: B.results + 0.2, from: () => pose(endPos, endLook, 46), to: () => pose(endPos.clone().add(new THREE.Vector3(0, 1.5, 4)), endLook, 46) });
+    // the beacon on the start's shoulder: lit as the reveal begins, so the eye finds the summit
+    {
+      const c = document.createElement('canvas');
+      c.width = c.height = 64;
+      const g = c.getContext('2d')!;
+      const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grd.addColorStop(0, 'rgba(255,240,200,1)');
+      grd.addColorStop(0.25, 'rgba(255,170,70,0.85)');
+      grd.addColorStop(1, 'rgba(255,120,40,0)');
+      g.fillStyle = grd;
+      g.fillRect(0, 0, 64, 64);
+      this.beaconTex = new THREE.CanvasTexture(c);
+      this.beacon = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.beaconTex, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, sizeAttenuation: false, toneMapped: false }));
+      this.beacon.position.set(xs, m.heightAt(xs, 0) + 12, 0);
+      this.beacon.scale.setScalar(0);
+      this.beacon.renderOrder = 10;
+      st.world.scene.add(this.beacon);
+    }
 
     tl.at(0, () => {
       st.hud.gameplayWidgets(false);
@@ -193,6 +227,7 @@ export class HarbourVictory implements VictoryScript {
       this.fishState = 'held';
       this.fish.visible = true;
     });
+    this.faceYeti.copy(this.yetiStop).add(new THREE.Vector3(2.6, 0, -5.6));
     tl.at(5.7, () => ((this.yetiState = 'bite'), (this.yetiT = 0), st.setYetiMode('eat')));
     tl.at(6.45, () => {
       this.yetiState = 'disgust';
@@ -204,8 +239,8 @@ export class HarbourVictory implements VictoryScript {
     tl.at(6.9, () => {
       // fling the fish away down the slope
       this.fishState = 'flying';
-      const away = this.stopPoint.clone().sub(st.yetiAI.pos).setY(0).normalize();
-      this.fishVel.set(-away.z * 3 - away.x * 2, 5.5, away.x * 3 - away.z * 2);
+      // over his shoulder, into the harbour behind him
+      this.fishVel.set(-1.2, 6.0, 5.2);
     });
     tl.at(7.3, () => ((this.yetiState = 'leave'), (this.yetiT = 0), st.setYetiMode('turnAway')));
     // the presentation
@@ -218,7 +253,10 @@ export class HarbourVictory implements VictoryScript {
         h.presenter.place(at.x, at.z, Math.atan2(s0.x - at.x, s0.z - at.z), null);
         presTop = 0;
         presentAt.copy(h.presenter.position);
-        // he already holds the lighthouse as the shot opens
+        // he holds the lighthouse in both hands by its plinth as the shot opens
+        h.presenter.hold = 1;
+        h.presenter.holdLift = 0;
+        h.presenter.update(0, 0, 0, null, 0);
         h.presenter.handWorld('R', this.trophyFrom);
       } else r.trophy.getWorldPosition(this.trophyFrom);
       this.presentT = 0;
@@ -227,13 +265,14 @@ export class HarbourVictory implements VictoryScript {
     });
     tl.at(B.toss, () => {
       this.presentT = -1;
+      if (h.presenter) h.presenter.hold = 0;
       this.trophy.start();
       st.audio.playCrowdCheer(1);
     });
     tl.at(B.toss + 1.4, () => (d.welcome = 1));
     tl.at(B.plunge, () => (this.plungeT = 0));
     tl.at(14.3, () => st.audio.playCrowdCheer(1));
-    tl.at(B.title, () => st.hud.title('YOU REACHED THE SEA', 'Fjord Coast — from the summit to the harbour', 'victory scrim', 3.6));
+    tl.at(B.title, () => st.hud.title('YOU REACHED THE SEA', 'Fjord Coast — from the summit to the harbour', 'victory scrim', B.results - B.title + 0.4));
     tl.at(B.results, () => {
       st.hud.letterbox(false);
       d.results();
@@ -245,39 +284,71 @@ export class HarbourVictory implements VictoryScript {
     const t = this.d.tl.time;
     this.d.cheer = damp(this.d.cheer, t < 0.4 ? 0.3 : 1, 2, dt);
     const h = this.r as Harbour;
-    // the presentation: the trophy rises from the crates into the harbourmaster's raised hand
+    // the presentation: the lighthouse in his two hands, by the plinth; he lifts it toward the skier
     if (this.presentT >= 0 && h.presenter) {
       this.presentT += dt;
+      h.presenter.holdLift = Math.min(1, Math.max(0, (this.presentT - 0.6) / 0.6)) * 0.55;
       h.presenter.handWorld('R', this.hand);
-      const k = Math.min(1, this.presentT / 0.7);
-      this.r.trophy.position.copy(this.trophyFrom).lerp(this.hand.add(new THREE.Vector3(0, 0.12, 0)), ease.inOut(k));
-      this.r.trophy.rotation.set(0, Math.PI + this.presentT * 0.6, 0);
+      h.presenter.handWorld('L', this.hand2);
+      const grip = this.hand.add(this.hand2).multiplyScalar(0.5);
+      // the plinth sits in the hands (grip ≈ 0.12 m above its base)
+      this.r.trophy.position.copy(grip).add(new THREE.Vector3(0, -0.14, 0));
+      this.r.trophy.rotation.set(0, h.presenter.group.rotation.y + Math.PI, 0);
     }
-    // the plunge (Harbour.plunge drives the guest's arc, tuck and the splash)
+    // the plunge (Harbour.plunge drives the run-up, the cannonball and the splash)
     if (this.plungeT >= 0) {
       this.plungeT += dt;
-      h.plunge = Math.min(1, this.plungeT / 1.25);
+      h.plunge = Math.min(1, this.plungeT / PLUNGE_TIMES.total);
+      if (h.splashNow) {
+        h.splashNow = false;
+        const p = h.plungeTo;
+        // droplets thrown up and out of the crown
+        st.world.particles.emit({ x: p.x, y: h.sea + 0.3, z: p.z, vx: 0, vy: 5.5, vz: 0, spread: 1.8, size: 0.16, life: 1.5, count: 110, gravity: 1, drag: 0.25, grow: 0.1, alpha: 1, color: 1 });
+        st.world.particles.emit({ x: p.x, y: h.sea + 0.6, z: p.z, vx: 0, vy: 1.2, vz: 0, spread: 1.4, size: 0.9, life: 1.6, count: 14, gravity: 0.3, drag: 1.4, grow: 1.4, alpha: 0.5, color: 0.98 });
+        st.audio.playCrowdCheer(1);
+      }
     }
-    // the fish prop
+    // the beacon on the start, during the reveal
+    if (this.beacon) {
+      const tb = t - HARBOUR_BEATS.reveal;
+      const on = Math.min(1, Math.max(0, tb / 1.5)) * (t < HARBOUR_BEATS.results ? 1 : 0);
+      const flick = 0.85 + 0.15 * Math.sin(t * 9.1) * Math.sin(t * 5.3 + 1);
+      this.beacon.scale.setScalar(0.05 * on * flick);
+    }
+    // the fish prop: in his fist; at his mouth for the bite
     if (this.fishState === 'held') {
       st.yeti.getHandWorldPosition('right', this.hand);
+      if (this.yetiState === 'bite') {
+        const mouth = new THREE.Vector3();
+        st.yeti.getMouthWorldPosition(mouth);
+        const k = Math.min(1, this.yetiT / 0.25);
+        this.hand.lerp(mouth.add(new THREE.Vector3(0, -0.12, 0)), k);
+      }
       this.fish.position.copy(this.hand);
-      this.fish.rotation.set(Math.PI, st.yetiAI.heading, 0.3);
+      this.fish.rotation.set(Math.PI * 0.85, st.yetiAI.heading + 1.2, 0.4);
     } else if (this.fishState === 'flying') {
       this.fishVel.y -= 9.81 * dt;
       this.fish.position.addScaledVector(this.fishVel, dt);
       this.fish.rotation.x += dt * 9;
-      const g = st.world.mountain.heightAt(this.fish.position.x, this.fish.position.z);
+      const g = Math.max(st.world.mountain.heightAt(this.fish.position.x, this.fish.position.z), h.sea ?? -Infinity);
       if (this.fish.position.y < g + 0.05) {
         this.fish.position.y = g + 0.05;
         this.fish.rotation.set(Math.PI / 2, 0, 0.4);
         this.fishState = 'down';
+        if (h.sea !== undefined && Math.abs(g - h.sea) < 0.01) {
+          this.fish.visible = false;
+          const fp = this.fish.position;
+          st.world.particles.emit({ x: fp.x, y: h.sea + 0.1, z: fp.z, vx: 0, vy: 2.5, vz: 0, spread: 0.5, size: 0.1, life: 0.8, count: 24, gravity: 1, drag: 0.3, grow: 0, alpha: 1, color: 1 });
+        }
       }
     }
     const ya = st.yetiAI;
     this.yetiT += dt;
     const target = this.yetiStop;
-    if (this.yetiState === 'approach') {
+    if (this.yetiState === 'wait') {
+      st.yetiAnim.speed = 0;
+      st.yeti.setVisible(false);
+    } else if (this.yetiState === 'approach') {
       const dd = Math.hypot(target.x - ya.pos.x, target.z - ya.pos.z);
       const hdg = Math.atan2(target.x - ya.pos.x, target.z - ya.pos.z);
       ya.heading = wrapAngle(ya.heading + wrapAngle(hdg - ya.heading) * Math.min(1, dt * 4));
@@ -292,14 +363,16 @@ export class HarbourVictory implements VictoryScript {
         st.setYetiMode('stand');
       }
     } else if (this.yetiState !== 'leave') {
-      // face the rack (the hanging fish) while he sniffs, grabs, bites and gags
+      // face the rack (the hanging fish) while he sniffs and grabs; then turn to us (the camera up
+      // the street) for the bite and the gag, so the joke plays on his face
       st.yetiAnim.speed = 0;
-      const rack = h.rack ?? this.stopPoint;
-      const hdg = Math.atan2(rack.x - ya.pos.x, rack.z - ya.pos.z);
-      ya.heading = wrapAngle(ya.heading + wrapAngle(hdg - ya.heading) * Math.min(1, dt * 5));
+      const rk = h.quayRack && h.quayRack.lengthSq() > 0 ? h.quayRack : (h.rack ?? this.stopPoint);
+      const tgt = this.yetiState === 'bite' || this.yetiState === 'disgust' ? this.faceYeti : rk;
+      const hdg = Math.atan2(tgt.x - ya.pos.x, tgt.z - ya.pos.z);
+      ya.heading = wrapAngle(ya.heading + wrapAngle(hdg - ya.heading) * Math.min(1, dt * 6));
     } else {
       // back up the mountain
-      const away = Math.PI + 0.3;
+      const away = Math.PI + 0.15;
       ya.heading = wrapAngle(ya.heading + wrapAngle(away - ya.heading) * Math.min(1, dt * 2));
       const sp = Math.min(2.6, this.yetiT * 1.5);
       ya.pos.x += Math.sin(ya.heading) * sp * dt;
@@ -311,6 +384,12 @@ export class HarbourVictory implements VictoryScript {
     st.yeti.root.position.copy(ya.pos);
     st.yeti.root.rotation.set(0, ya.heading, 0);
     this.trophy.update(dt);
+    if (t >= HARBOUR_BEATS.results && this.beacon) {
+      this.beacon.removeFromParent();
+      this.beacon.material.dispose();
+      this.beaconTex?.dispose();
+      this.beacon = null;
+    }
     if (t >= HARBOUR_BEATS.results && this.fish.parent) {
       this.fish.removeFromParent();
       this.fish.geometry.dispose();

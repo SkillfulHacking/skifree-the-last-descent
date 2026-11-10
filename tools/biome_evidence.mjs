@@ -302,15 +302,17 @@ if (G.finite && (want('finish') || want('victory'))) {
     const beats =
       biome === 'fjord'
         ? [
-            [2.2, '11d_victory_quay', 'Victory: onto the quay (low tracking shot)'],
-            [4.7, '11e_victory_racks', 'Victory: the Yeti arrives at the stockfish rack'],
-            [6.6, '11f_victory_gag', 'Victory: the Yeti gags on a dried cod'],
-            [8.7, '11g_victory_present', 'Victory: the harbourmaster presents the trophy (over the shoulder)'],
+            [2.2, '11d_victory_quay', 'Victory: onto the quay (low tracking shot down the street to the water)'],
+            [4.7, '11e_victory_racks', 'Victory: the Yeti arrives at the stockfish rack on the quay'],
+            [6.05, '11f_victory_gag', 'Victory: the Yeti turns to us and bites the dried cod'],
+            [6.75, '11f2_victory_gag_face', 'Victory: the gag (his face), the harbour behind'],
+            [8.9, '11g_victory_present', 'Victory: the harbourmaster presents the trophy in both hands (over the shoulder)'],
             [10.9, '11_victory_trophy', 'Victory: the trophy caught and held up (reverse angle)'],
-            [12.9, '11b_victory_celebration', 'Victory: apres on the quay (tub, bonfire, sauna, the plunge)'],
-            [14.5, '11h_victory_splash', 'Victory: the cannonball splash'],
-            [18.6, '11i_victory_reveal_mid', 'Victory: the reveal, mid-move'],
-            [22.6, '11c_victory_reveal', 'Victory: the closing reveal (summit), title'],
+            [13.5, '11b_victory_celebration', 'Victory: apres on the pier (tub, bonfire, sauna), the bather sprinting for the edge'],
+            [14.4, '11j_victory_plunge', 'Victory: the cannonball (tucked, at the top of its arc)'],
+            [15.05, '11h_victory_splash', 'Victory: the crown splash'],
+            [20.0, '11i_victory_reveal_mid', 'Victory: the reveal, mid-move'],
+            [24.8, '11c_victory_reveal', 'Victory: the closing reveal, settled (the start beacon, the title)'],
           ]
         : [
             [9.6, '11_victory_trophy', 'Victory: trophy hand-off'],

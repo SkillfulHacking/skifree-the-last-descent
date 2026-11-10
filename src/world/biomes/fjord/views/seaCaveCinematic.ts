@@ -181,8 +181,8 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
   // 14.6 s: the leap, from the ledge behind him, down onto the skier (and the sea beyond)
   const P = st.phys.s.pos.clone();
   const ledgeCam = cave.ledge.clone().addScaledVector(O, -2.6).addScaledVector(T, 1.4).add(new THREE.Vector3(0, 2.7, 0));
-  const leapLook = () => yetiAt().add(new THREE.Vector3(0, 1.2, 0)).lerp(P.clone().add(new THREE.Vector3(0, 1.0, 0)), 0.55);
-  tl.shot({ start: 14.6, end: 16.95, from: () => pose(ledgeCam, leapLook(), 50), to: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), 54) });
+  const leapLook = () => yetiAt().add(new THREE.Vector3(0, 1.6, 0)).lerp(P.clone().add(new THREE.Vector3(0, 1.0, 0)), 0.42);
+  tl.shot({ start: 14.6, end: 16.95, from: () => pose(ledgeCam, leapLook(), 56), to: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), 60) });
   const followPos = new THREE.Vector3();
   const followLook = new THREE.Vector3();
   const followPose = () => {
@@ -190,7 +190,7 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
     st.follow.idealPose({ pos: s.pos, vel: s.vel, heading: s.heading, grounded: s.grounded, crashed: false, speed: s.speed }, followPos, followLook);
     return pose(followPos, followLook, 64);
   };
-  tl.shot({ start: 16.95, end: 18.0, from: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), 54), via: () => pose(P.clone().add(new THREE.Vector3(0, 3.2, -5)), P.clone().add(new THREE.Vector3(0, 1.2, 4)), 58), to: followPose, easing: ease.inOutCubic });
+  tl.shot({ start: 16.95, end: 18.0, from: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), 60), via: () => pose(P.clone().add(new THREE.Vector3(0, 3.2, -5)), P.clone().add(new THREE.Vector3(0, 1.2, 4)), 58), to: followPose, easing: ease.inOutCubic });
 
   tl.at(2.5, () => {
     st.audio.playCue('gull', M.clone().add(new THREE.Vector3(0, 8, 0)));
@@ -204,11 +204,11 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
     st.audio.playImpact('rock-light', 0.35);
   });
   tl.at(11.05, () => {
-    // freezing spray and sea smoke blown out of the mouth: it billows up the portal and rolls over
-    // the ledge (kept short of the lens: round 2's plume filled the roar shot with white)
-    for (let k = 0; k < 7; k++)
-      st.world.particles.emit({ x: M.x + O.x * 0.3 + T.x * (k - 3) * 0.7, y: M.y + 0.6 + k * 0.55, z: M.z + O.z * 0.3 + T.z * (k - 3) * 0.7, vx: O.x * (1.8 + k * 0.25), vy: 1.4 + k * 0.25, vz: O.z * (1.8 + k * 0.25), spread: 1.6, size: 1.3, life: 2.4, count: 12, gravity: -0.05, drag: 1.4, grow: 1.6, alpha: 0.38, color: 0.98 });
-    st.world.particles.emit({ x: M.x + O.x * 0.5, y: M.y + 1.6, z: M.z + O.z * 0.5, vx: O.x * 4.5, vy: 4.2, vz: O.z * 4.5, spread: 2.6, size: 0.12, life: 1.3, count: 90, gravity: 1, drag: 0.5, grow: 0.1, alpha: 1, color: 1 });
+    // freezing spray and sea smoke blown out of the mouth: a low cloud rolling out over the ledge
+    // and a burst of droplets (round 2's tall plume read as a shaft of light, or filled the lens)
+    for (let k = 0; k < 4; k++)
+      st.world.particles.emit({ x: M.x + O.x * 0.6 + T.x * (k - 1.5) * 1.2, y: M.y + 0.5 + k * 0.25, z: M.z + O.z * 0.6 + T.z * (k - 1.5) * 1.2, vx: O.x * 2.6, vy: 0.35, vz: O.z * 2.6, spread: 1.4, size: 1.5, life: 2.6, count: 10, gravity: 0.05, drag: 1.2, grow: 2.2, alpha: 0.26, color: 0.97 });
+    st.world.particles.emit({ x: M.x + O.x * 0.5, y: M.y + 1.8, z: M.z + O.z * 0.5, vx: O.x * 4.5, vy: 3.6, vz: O.z * 4.5, spread: 2.4, size: 0.1, life: 1.3, count: 90, gravity: 1, drag: 0.5, grow: 0.1, alpha: 1, color: 1 });
   });
   // the icicles under the lintel let go one after another on the roar and shatter below
   const ice = icicles as THREE.InstancedMesh | null;

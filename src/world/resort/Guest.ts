@@ -372,6 +372,8 @@ export class Guest {
   hold = 0;
   holdLift = 0;
   tuck = 0;
+  /** forced run cycle (stride phase, radians) for a scripted dash; null = off */
+  run: number | null = null;
 
   constructor(look: GuestLook, beh: GuestBehaviour, material: THREE.Material, groundAt: (x: number, z: number) => number) {
     this.look = look;
@@ -1067,6 +1069,10 @@ export class Guest {
     }
     this.walkAmt += (clamp01(speed / 0.9) - this.walkAmt) * damp(6, dt);
     this.walkPhase += speed * dt * 4.6;
+    if (this.run !== null) {
+      this.walkAmt = 1.25;
+      this.walkPhase = this.run;
+    }
 
     // ---------- facing ----------
     let wantYaw = this.homeYaw;

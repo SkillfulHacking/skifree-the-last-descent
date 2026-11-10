@@ -100,6 +100,70 @@ function settTexture(): THREE.CanvasTexture {
   return t;
 }
 
+/** the plunge: run-up and flight, s (the victory script drives `plunge` 0 → 1 over `total`) */
+export const PLUNGE_TIMES = { run: 0.8, air: 0.95, total: 1.75 } as const;
+
+/** torn spray sheet: white streaks thinning to ragged tips, soft sides */
+function sprayTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 256;
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, 128, 256);
+  const r = new Rand(515);
+  for (let i = 0; i < 60; i++) {
+    const x = r.range(10, 118);
+    const top = r.range(10, 160);
+    const w = r.range(3, 12);
+    const grd = g.createLinearGradient(0, 256, 0, top);
+    grd.addColorStop(0, 'rgba(255,255,255,0.9)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd;
+    g.fillRect(x - w / 2, top, w, 256 - top);
+  }
+  for (let i = 0; i < 70; i++) {
+    g.fillStyle = `rgba(255,255,255,${r.range(0.4, 0.9)})`;
+    g.beginPath();
+    g.arc(r.range(8, 120), r.range(4, 120), r.range(1.2, 3.5), 0, Math.PI * 2);
+    g.fill();
+  }
+  // soft sides
+  g.globalCompositeOperation = 'destination-in';
+  const side = g.createLinearGradient(0, 0, 128, 0);
+  side.addColorStop(0, 'rgba(0,0,0,0)');
+  side.addColorStop(0.25, 'rgba(0,0,0,1)');
+  side.addColorStop(0.75, 'rgba(0,0,0,1)');
+  side.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = side;
+  g.fillRect(0, 0, 128, 256);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** foam patch: lacy, broken white with a soft, irregular edge */
+function foamTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, 256, 256);
+  const r = new Rand(616);
+  for (let i = 0; i < 420; i++) {
+    const a = r.range(0, Math.PI * 2);
+    const d = Math.pow(r.next(), 0.6) * 118;
+    const x = 128 + Math.cos(a) * d;
+    const y = 128 + Math.sin(a) * d;
+    const rr = r.range(2, 9) * (1 - d / 160);
+    g.fillStyle = `rgba(255,255,255,${r.range(0.15, 0.5) * (1 - d / 140)})`;
+    g.beginPath();
+    g.arc(x, y, rr, 0, Math.PI * 2);
+    g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
 const LOOKS: Array<{ look: GuestLook; beh: GuestBehaviour }> = (() => {
   const base = { hatColor: 0xffffff, hatColor2: 0xffffff, scarf: null, fur: null, gloves: null, mug: null, mugColor: 0xffffff, beard: false } as const;
   return [
@@ -125,7 +189,10 @@ export class Harbour implements FinishEnvironment {
   readonly sea: number;
   /** the pier end the plunger jumps from, and the splash point */
   readonly plungeFrom = new THREE.Vector3();
+  readonly plungeEdge = new THREE.Vector3();
   readonly plungeTo = new THREE.Vector3();
+  /** set on the frame the bather hits the water (the victory script adds the droplets) */
+  splashNow = false;
   /** a camera position out on the water (harbour mouth) used by the victory reveal */
   readonly seaward = new THREE.Vector3();
   /** quay front z */
@@ -154,6 +221,7 @@ export class Harbour implements FinishEnvironment {
   plunge = 0;
   private splash: Particles;
   private ring: THREE.Mesh;
+  private crown: THREE.Mesh;
   private splashT = -1;
   private plungerScale = 1;
   private splashed = false;
@@ -166,6 +234,8 @@ export class Harbour implements FinishEnvironment {
   readonly presenter: Guest;
   /** where the Yeti's fish-rack gag happens: the rack's centre and its long axis */
   readonly rack = new THREE.Vector3();
+  /** the rack on the quay where the victory gag is staged (round 3) */
+  readonly quayRack = new THREE.Vector3();
   readonly rackAxis = new THREE.Vector3(0, 0, 1);
   /** the presentation spot (presenter stands here, facing the skier's stop point) */
   readonly presentAt = new THREE.Vector3();
@@ -392,9 +462,11 @@ export class Harbour implements FinishEnvironment {
     this.fireLight.position.set(fire.x, fire.y + 2, fire.z);
     this.group.add(this.fireLight);
     this.cols.push({ x: fire.x, z: fire.z, r: 1 });
-    // a ladder down into the sea at the pier end (the plunge)
-    this.plungeFrom.set(sp.x + 12.2, deckY + 0.05, sp.z + 4.2);
-    this.plungeTo.set(sp.x + 17.5, sea, sp.z + 6.5);
+    // the plunge (round 3, C3): a run-up of ~4.5 m across the open side of the platform (clear of
+    // the ladder, the tub, the stove and the sauna), off the edge and into the fjord ~3 m out
+    this.plungeFrom.set(sp.x + 7.6, deckY + 0.05, sp.z + 5.4);
+    this.plungeEdge.set(sp.x + 12.45, deckY + 0.05, sp.z + 5.4);
+    this.plungeTo.set(sp.x + 15.6, sea, sp.z + 5.9);
 
     // ---------------- the waterfront (round 2, art review D6 / critic 4) ----------------
     // Not one gable box in a row: tall warehouses ("sjøhus") on piles at the water's edge with
@@ -581,7 +653,8 @@ export class Harbour implements FinishEnvironment {
 
     // fish crates, barrels and a hand cart along the quay edge
     for (let i = 0; i < 9; i++) {
-      const dx = rnd.range(-30, 30);
+      let dx = rnd.range(-30, 30);
+      if (dx < -12 && dx > -36) dx += 24; // keep the quay rack (the Yeti's gag) clear
       const p = W(dx, zq - F.z - rnd.range(2.5, 6));
       const y0 = Math.max(p.y, deckY);
       const c = [0x2d4c78, 0xc8281e, 0xd59f3a, 0xece7dc][i % 4]!;
@@ -596,6 +669,15 @@ export class Harbour implements FinishEnvironment {
       this.rack.set(rp.x, rp.y, rp.z);
       this.rackAxis.set(0, 0, 1);
       for (const dz of [-5.5, 0, 5.5]) for (const s of [-0.75, 0.75]) this.cols.push({ x: rp.x + s, z: rp.z + dz, r: 0.3 });
+      // round 3 (C4/A11): the gag rack stands on the quay by the water — the Yeti is filmed in
+      // front of it with the boats, the fjord and the islands behind him
+      {
+        const q = W(-24, zq - F.z - 12);
+        const qy = Math.max(q.y, deckY);
+        fishRack(b, q.x, qy - 0.1, q.z, 0, 10, rnd);
+        this.quayRack.set(q.x, qy, q.z);
+        for (const dx of [-4.5, 0, 4.5]) for (const s2 of [-0.75, 0.75]) this.cols.push({ x: q.x + dx, z: q.z + s2, r: 0.3 });
+      }
       for (const [dx, dz, ry] of [
         [58, 18, 0.3],
         [-64, 64, Math.PI / 2],
@@ -691,14 +773,58 @@ export class Harbour implements FinishEnvironment {
       new Particles({ count: hi ? 22 : 10, origin: fire.clone().setY(fire.y + 1.2), radius: 0.3, life: [0.8, 2.0], rise: [0.9, 1.7], drift: new THREE.Vector3(0.2, 0, 0.05), size: [0.08, 0.04], alpha: 1, color: 0xffc050, colorEnd: 0xff3000, additive: true, swirl: 0.5 }, soft),
     );
     this.particles.push(new Particles({ count: hi ? 26 : 10, origin: this.saunaChimney.clone(), radius: 0.08, life: [3, 6], rise: [0.7, 1.1], drift: new THREE.Vector3(0.9, 0, 0.2), size: [0.5, 2.8], alpha: 0.3, color: 0xdde2e8, colorEnd: 0xa8b0bc, swirl: 0.3 }, soft));
-    this.splash = new Particles({ count: 60, origin: this.plungeTo.clone(), radius: 0.6, life: [0.6, 1.4], rise: [3.5, 6], drift: new THREE.Vector3(0, 0, 0), size: [0.25, 0.6], alpha: 0.85, color: 0xffffff, swirl: 0.1 }, soft);
+    this.splash = new Particles({ count: hi ? 70 : 30, origin: this.plungeTo.clone(), radius: 0.7, life: [0.6, 1.4], rise: [3.5, 6], drift: new THREE.Vector3(0, 0, 0), size: [0.25, 0.7], alpha: 0.85, color: 0xffffff, swirl: 0.1 }, soft);
     this.splash.points.visible = false;
     this.particles.push(this.splash);
-    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 1.0, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf4f8fb, transparent: true, opacity: 0, depthWrite: false }));
-    this.ring.position.copy(this.plungeTo).setY(this.sea + 0.06);
-    this.ring.visible = false;
-    this.materials.push(this.ring.material as THREE.Material);
-    this.group.add(this.ring);
+    // round 3 (A8/C3): a crown splash — a ring of torn spray sheets thrown up and out, a central
+    // jet, and a feathered foam patch that spreads and breaks up (no flat opaque ring)
+    {
+      const sprayT = sprayTexture();
+      const foamT = foamTexture();
+      this.textures.push(sprayT, foamT);
+      const sprayM = new THREE.MeshBasicMaterial({ map: sprayT, transparent: true, depthWrite: false, side: THREE.DoubleSide, color: 0xf4f9fc, opacity: 0 });
+      const foamM = new THREE.MeshBasicMaterial({ map: foamT, transparent: true, depthWrite: false, color: 0xeef6fa, opacity: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      this.materials.push(sprayM, foamM);
+      const pos: number[] = [];
+      const uv: number[] = [];
+      const N = 16;
+      for (let i = 0; i < N; i++) {
+        const a = (i / N) * Math.PI * 2 + Math.sin(i * 2.7) * 0.12;
+        const w = 0.55 + 0.25 * Math.abs(Math.sin(i * 1.9));
+        const hgt = 0.75 + 0.5 * Math.abs(Math.sin(i * 3.3));
+        // a sheet leaning outward: bottom on a unit ring, top further out (scaled per frame)
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        const tx = -sn;
+        const tz = c;
+        const b0 = [c - tx * w * 0.5, 0, sn - tz * w * 0.5];
+        const b1 = [c + tx * w * 0.5, 0, sn + tz * w * 0.5];
+        const t0 = [c * 1.45 - tx * w * 0.7, hgt, sn * 1.45 - tz * w * 0.7];
+        const t1 = [c * 1.45 + tx * w * 0.7, hgt, sn * 1.45 + tz * w * 0.7];
+        pos.push(...b0, ...b1, ...t1, ...b0, ...t1, ...t0);
+        uv.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1);
+      }
+      // the central jet: two crossed tall cards
+      for (const a of [0, Math.PI / 2]) {
+        const c = Math.cos(a) * 0.35;
+        const sn = Math.sin(a) * 0.35;
+        pos.push(-c, 0, -sn, c, 0, sn, c * 0.5, 2.2, sn * 0.5, -c, 0, -sn, c * 0.5, 2.2, sn * 0.5, -c * 0.5, 2.2, -sn * 0.5);
+        uv.push(0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      this.crown = new THREE.Mesh(g, sprayM);
+      this.crown.position.copy(this.plungeTo).setY(this.sea);
+      this.crown.visible = false;
+      this.crown.renderOrder = 5;
+      this.group.add(this.crown);
+      this.ring = new THREE.Mesh(new THREE.CircleGeometry(1, 40).rotateX(-Math.PI / 2), foamM);
+      this.ring.position.copy(this.plungeTo).setY(this.sea + 0.05);
+      this.ring.visible = false;
+      this.ring.renderOrder = 4;
+      this.group.add(this.ring);
+    }
     for (const p of this.particles) this.group.add(p.points);
     const gl = bulbs.map((q) => ({ p: q.p, c: q.c, size: 0.55, a: 0.5 }));
     gl.push({ p: fire.clone().setY(fire.y + 1.4), c: 0xff7a20, size: 2.6, a: 0.35 });
@@ -711,7 +837,9 @@ export class Harbour implements FinishEnvironment {
     this.materials.push(guestMat);
     this.stop.copy(W(0, 38));
     // the Yeti stops at the stockfish rack (round 2: C7 — the gag is staged at the rack)
-    this.yetiPt.copy(W(-46.6, 1.6));
+    // round 3: by the quay rack, on its landward side (filmed from up the street, the sea behind)
+    this.yetiPt.copy(this.quayRack).add(new THREE.Vector3(0.6, 0, -2.3));
+    this.yetiPt.y = Math.max(H(this.yetiPt.x, this.yetiPt.z), deckY);
     const ground = (x: number, z: number) => Math.max(H(x, z), x > F.x - quayW && x < F.x + quayW && z > zq ? deckY + 0.1 : -Infinity);
     const seat = () => this.stamp.y - 0.42;
     const pierY = () => deckY + 0.1;
@@ -751,7 +879,7 @@ export class Harbour implements FinishEnvironment {
       const pTop = this.presentAt.y + 0.55;
       const pa = this.presentAt.clone();
       // on his crates, or on the ground when the victory script brings him to the skier
-      const g = new Guest(look, { cheerStyle: 'armsUp', canWalk: false, seed: 263, waveArm: 'R', energy: 0.6 }, guestMat, (x, z) => (Math.hypot(x - pa.x, z - pa.z) < 1.4 ? pTop : ground(x, z)));
+      const g = new Guest(look, { cheerStyle: 'clap', canWalk: false, seed: 263, waveArm: 'R', energy: 0.6 }, guestMat, (x, z) => (Math.hypot(x - pa.x, z - pa.z) < 1.4 ? pTop : ground(x, z)));
       g.place(this.presentAt.x, this.presentAt.z, Math.atan2(this.stop.x - this.presentAt.x, this.stop.z - this.presentAt.z), null);
       this.presenter = g;
       this.guests.push(g);
@@ -825,34 +953,46 @@ export class Harbour implements FinishEnvironment {
     const cheer = Math.min(1, Math.max(0, s.cheer));
     const welcome = Math.min(1, Math.max(0, s.welcome));
     for (const g of this.guests) if (g !== this.plunger || this.plunge <= 0) g.update(dt, time, cheer, s.lookAt, welcome);
-    // the cold plunge: a run off the pier end, an arc, a splash
+    // the cold plunge (round 3, C3): a real run-up across the deck (a stride cycle, leaning in),
+    // a spring off the edge, a tucked cannonball that hangs at the apex, the crown splash
     if (this.plunge > 0) {
-      // round 2 (C4): a run-up to the pier edge, a spring, a tucked cannonball, the splash
-      const k = Math.min(1, this.plunge);
-      const edge = this.plungerHome.clone().lerp(this.plungeTo, 0.18);
-      edge.y = this.plungerHome.y;
+      const T = PLUNGE_TIMES;
+      const tt = Math.min(1, this.plunge) * T.total;
       const g = this.plunger.group;
-      // the guest's own update places it at home: run it first, then override the root
-      this.plunger.update(dt, time, k < 0.22 ? 1 : 0, null, 0);
-      const yaw = g.rotation.y;
-      if (k < 0.22) {
-        const u = k / 0.22;
-        g.position.lerpVectors(this.plungerHome, edge, u);
-        g.position.y = this.plungerHome.y + Math.abs(Math.sin(u * Math.PI * 3)) * 0.12;
-        g.rotation.set(0.25 * u, yaw, 0);
+      const home = this.plungerHome;
+      const edge = this.plungeEdge;
+      const yaw = Math.atan2(edge.x - home.x, edge.z - home.z);
+      if (tt < T.run) {
+        const u = tt / T.run;
+        // accelerate from a standing start
+        this.plunger.run = time * 14;
+        this.plunger.tuck = 0;
+        this.plunger.update(dt, time, 0, null, 0);
+        g.position.lerpVectors(home, edge, u * u * (3 - 2 * u) * 0.35 + u * u * 0.65);
+        g.position.y = home.y;
+        g.rotation.set(0.12 + 0.12 * u, yaw, 0);
         g.scale.setScalar(this.plungerScale);
       } else {
-        const u = (k - 0.22) / 0.78;
-        const p = edge.clone().lerp(this.plungeTo, u);
-        p.y = edge.y + (this.plungeTo.y - 0.9 - edge.y) * u * u + Math.sin(u * Math.PI) * 2.4;
+        const u = Math.min(1, (tt - T.run) / T.air);
+        this.plunger.run = null;
+        // tuck: knees up within the first fifth of the flight, held to the water
+        this.plunger.tuck = Math.min(1, u / 0.2);
+        this.plunger.update(dt, time, 0, null, 0);
+        // a hang at the apex: time runs slower over the top of the arc
+        const w = u + 0.12 * Math.sin(u * Math.PI * 2) * (1 - u);
+        const p = edge.clone().lerp(this.plungeTo, w);
+        const apex = 1.05;
+        const y0 = edge.y;
+        const y1 = this.sea - 0.4;
+        p.y = y0 + (y1 - y0) * w * w + 4 * apex * w * (1 - w);
         g.position.copy(p);
-        // tuck: knees to chest (squashed into a ball), a slow forward roll
-        const tuck = Math.min(1, u / 0.25);
-        g.scale.set(this.plungerScale * (1 + 0.15 * tuck), this.plungerScale * (1 - 0.42 * tuck), this.plungerScale * (1 + 0.15 * tuck));
-        g.rotation.set(0.25 + u * 1.3, yaw, 0);
+        g.scale.setScalar(this.plungerScale);
+        // a slow forward roll, the body balled up
+        g.rotation.set(0.25 + w * 1.6, yaw, 0);
       }
-      if (k >= 1 && !this.splashed) {
+      if (tt >= T.run + T.air && !this.splashed) {
         this.splashed = true;
+        this.splashNow = true;
         this.splash.points.visible = true;
         this.plunger.group.visible = false;
         this.splashT = 0;
@@ -860,10 +1000,18 @@ export class Harbour implements FinishEnvironment {
     }
     if (this.splashT >= 0) {
       this.splashT += dt;
-      const u = Math.min(1, this.splashT / 2.2);
+      const t = this.splashT;
+      // crown: thrown up and out fast, hangs, then collapses back into the water
+      const up = t < 0.35 ? t / 0.35 : Math.max(0, 1 - (t - 0.35) / 1.1);
+      this.crown.visible = t < 1.5;
+      this.crown.scale.set(0.8 + 1.1 * Math.sqrt(Math.min(1, t / 0.6)), 0.15 + 2.2 * up, 0.8 + 1.1 * Math.sqrt(Math.min(1, t / 0.6)));
+      (this.crown.material as THREE.MeshBasicMaterial).opacity = 0.95 * Math.min(1, t / 0.08) * (t < 0.9 ? 1 : Math.max(0, 1 - (t - 0.9) / 0.6));
+      // foam: spreads and thins out over a few seconds
+      const u = Math.min(1, t / 3.2);
       this.ring.visible = u < 1;
-      this.ring.scale.setScalar(0.6 + 5.5 * Math.sqrt(u));
-      (this.ring.material as THREE.MeshBasicMaterial).opacity = 0.75 * (1 - u);
+      this.ring.scale.setScalar(1.0 + 3.2 * Math.sqrt(u));
+      this.ring.rotation.y = t * 0.1;
+      (this.ring.material as THREE.MeshBasicMaterial).opacity = 0.9 * (1 - u * u);
     }
   }
 
@@ -893,8 +1041,14 @@ export class Harbour implements FinishEnvironment {
     this.plunger.group.rotation.x = 0;
     this.plunger.group.scale.setScalar(this.plungerScale);
     this.plunger.group.position.copy(this.plungerHome);
+    this.plunger.tuck = 0;
+    this.plunger.run = null;
     this.splashT = -1;
+    this.splashNow = false;
     this.ring.visible = false;
+    this.crown.visible = false;
+    this.presenter.hold = 0;
+    this.presenter.holdLift = 0;
     this.presenter.place(this.presentAt.x, this.presentAt.z, Math.atan2(this.stop.x - this.presentAt.x, this.stop.z - this.presentAt.z), null);
   }
 

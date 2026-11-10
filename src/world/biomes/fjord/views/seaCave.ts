@@ -102,7 +102,7 @@ function basaltMaterial(): THREE.MeshStandardMaterial {
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.4, 1.0 - smoothstep(0.0, 1.2, vJ.y));')
       // the Fjord sky light (irradiance ≈ 5) lifts even a 0.02 albedo to mid grey: basalt takes a
       // third of it (it reads black in sun, as the reference photos of wet basalt do)
-      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.indirectDiffuse *= 0.32;\nreflectedLight.directDiffuse *= 0.5;');
+      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.indirectDiffuse *= 0.32;\nreflectedLight.directDiffuse *= 0.5;\nreflectedLight.directSpecular *= 0.25;\nreflectedLight.indirectSpecular *= 0.3;');
   };
   m.customProgramCacheKey = () => 'fjord-basalt-v3';
   return m;
@@ -154,7 +154,8 @@ function basaltCaveRock(cave: CaveDressingContext['cave']): void {
 // basalt: the bright sky's reflection would lift the black rock to mid grey (round 2: RGB ≈ 95)
 reflectedLight.indirectSpecular *= 1.0 - 0.75 * fj_bas * (1.0 - cv_snow);
 reflectedLight.indirectDiffuse *= 1.0 - 0.68 * fj_bas * (1.0 - cv_snow);
-reflectedLight.directDiffuse *= 1.0 - 0.45 * fj_bas * (1.0 - cv_snow);`,
+reflectedLight.directDiffuse *= 1.0 - 0.45 * fj_bas * (1.0 - cv_snow);
+reflectedLight.directSpecular *= 1.0 - 0.7 * fj_bas * (1.0 - cv_snow);`,
       );
   };
   const key = m.customProgramCacheKey?.bind(m);

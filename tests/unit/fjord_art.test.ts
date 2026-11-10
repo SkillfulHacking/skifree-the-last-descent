@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { caveCameraSightlines, CAVE_CAMS } from '../../src/cinematic/CaveCinematic';
 import { clearOfCaveCameras, dressSeaCave } from '../../src/world/biomes/fjord/views/seaCave';
 import { HARBOUR_BEATS } from '../../src/world/biomes/fjord/views/harbourVictory';
+import { PLUNGE_TIMES } from '../../src/world/biomes/fjord/views/harbour';
 import '../../src/world/biomes';
 import { Coast } from '../../src/world/coast';
 import { buildMountain, makeCourse } from '../../src/game/CourseConfig';
@@ -83,13 +84,25 @@ describe('Fjord sea cave: props keep out of the cave-cinematic cameras', () => {
 });
 
 describe('Fjord victory: the beat sheet', () => {
-  it('the reveal ends on its own, the title lands after it settles, results come after a hold', () => {
+  it('the beats run in order', () => {
     const B = HARBOUR_BEATS;
-    const order = [B.quay, B.racks, B.present, B.toss, B.apres, B.plunge, B.splashCut, B.reveal, B.title, B.revealEnd, B.results];
+    const order = [B.quay, B.racks, B.present, B.toss, B.apres, B.plunge, B.splashCut, B.reveal, B.revealEnd, B.title, B.results];
     for (let i = 1; i < order.length; i++) expect(order[i]!).toBeGreaterThan(order[i - 1]!);
-    expect(B.title - B.reveal).toBeGreaterThan(4.5);
-    expect(B.results - B.revealEnd).toBeGreaterThanOrEqual(0.5);
-    expect(B.results - B.title).toBeGreaterThanOrEqual(3);
+  });
+  it('the title lands only after the reveal move has settled, and holds ≥ 1.5 s before the results', () => {
+    const B = HARBOUR_BEATS;
+    // round 2 named this test "the title lands after it settles" but checked title < revealEnd
+    expect(B.title).toBeGreaterThanOrEqual(B.revealEnd);
+    expect(B.results - B.title).toBeGreaterThanOrEqual(1.5);
+    expect(B.revealEnd - B.reveal).toBeGreaterThan(4.5);
+  });
+  it('the plunge (run-up and flight) splashes down inside the low water shot, before the reveal', () => {
+    const B = HARBOUR_BEATS;
+    const splash = B.plunge + PLUNGE_TIMES.total;
+    expect(B.plunge + PLUNGE_TIMES.run).toBeLessThanOrEqual(B.splashCut + 0.2);
+    expect(splash).toBeGreaterThan(B.splashCut);
+    expect(B.reveal - splash).toBeGreaterThan(1.2);
+    expect(PLUNGE_TIMES.run).toBeGreaterThanOrEqual(0.6);
   });
 });
 
