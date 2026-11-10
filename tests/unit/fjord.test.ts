@@ -408,6 +408,7 @@ describe('Fjord Coast: optional viewpoints', () => {
     const c = m.coast!;
     const f = new ObstacleField(m, worldSeed(course('standard')));
     let reached = 0;
+    const miss: string[] = [];
     const list = c.lookouts(0, m.finishZ).slice(0, 4);
     for (const l of list) {
       f.ensure(l.z - 400, l.z + 200);
@@ -417,7 +418,12 @@ describe('Fjord Coast: optional viewpoints', () => {
       let best = Infinity;
       for (let i = 0; i < 40 / PHYS_DT; i++) {
         const s = p.s;
-        let desired = Math.atan2(l.x - s.pos.x, Math.max(4, l.z - s.pos.z));
+        // follow the line, easing out toward the platform over the last ~150 m (a beeline from far
+        // up can cut across the cornice where the line bends)
+        const tz = Math.min(l.z, s.pos.z + 10);
+        const u = Math.max(0, Math.min(1, (tz - (l.z - 150)) / 130));
+        const tx = m.routeX(tz) + (l.x - m.routeX(l.z)) * u * u * (3 - 2 * u);
+        let desired = Math.atan2(tx - s.pos.x, Math.max(4, tz - s.pos.z));
         // like a player: look ~10 m ahead and steer round rocks and trees in the way
         for (const o of f.inRange(s.pos.z, s.pos.z + 14)) {
           if (o.kind === 'stump' || !o.collidable) continue;
@@ -431,14 +437,16 @@ describe('Fjord Coast: optional viewpoints', () => {
         }
         let err = desired - s.heading;
         err = Math.atan2(Math.sin(err), Math.cos(err));
-        const inp: SkierInput = { ...NO_INPUT, steer: Math.max(-1, Math.min(1, -err * 3)), brake: s.speed > 16 ? 0.5 : 0, recover: true };
+        // (and skates on with the tuck input where the ground goes flat, like a player)
+        const inp: SkierInput = { ...NO_INPUT, steer: Math.max(-1, Math.min(1, -err * 3)), brake: s.speed > 16 ? 0.5 : 0, tuck: s.speed < 6 ? 1 : 0, recover: true };
         p.step(inp);
         best = Math.min(best, Math.hypot(s.pos.x - l.x, s.pos.z - l.z));
         if (s.pos.z > l.z + 30) break;
       }
       if (best < l.r) reached++;
+      else miss.push(`${l.id} best ${best.toFixed(1)} crashes ${p.s.crashes} z ${p.s.pos.z.toFixed(0)}`);
     }
-    expect(reached).toBe(list.length);
+    expect(reached, miss.join('; ')).toBe(list.length);
   });
 
   it('discoveries become ScenicLocationDiscovered (biome "fjord") on the gameplay bus, once per id', () => {

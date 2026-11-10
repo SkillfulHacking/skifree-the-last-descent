@@ -60,8 +60,8 @@ export const SQUALL = {
 export const SQUALL_TIMING = { dormant: 2.8, telegraph: 1.3, active: 2.0, recovery: 0.9 } as const;
 /** share of kickers (and gap take-offs) with a squall over them */
 const JUMP_SQUALL_CHANCE = 0.7;
-/** peak onshore push on an airborne skier over a squall jump, m/s² (~3 m drift over a 1 s jump) */
-export const JUMP_PUSH = 6.5;
+/** peak onshore push on an airborne skier over a squall jump, m/s² (~1.5–5 m of drift, by airtime) */
+export const JUMP_PUSH = 5;
 /** the landing rock past a squall jump starts this far onshore of the lip's centre */
 export const JUMP_ROCK_INSET = 2.5;
 /** chance per band of a rock patch across the racing line (1 on a ridgeline with a spine) */
