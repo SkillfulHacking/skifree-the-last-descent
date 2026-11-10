@@ -67,7 +67,7 @@ for (const [w, h] of [
       const l = await layout(page);
       expect(l, `${mode} @ ${w}x${h}`).toMatchObject({ panelScroll: 0, overflowX: 0, overflowY: 0, titleClipped: false, rowsOutside: 0 });
     }
-    await page.screenshot({ path: `docs/reviews/pass2/menu/e2e_menu_${w}x${h}.png` });
+    await page.screenshot({ path: `docs/reviews/pass2/menu/e2e_menu_${w}x${h}.png`, timeout: 600_000 }); // software rendering is slow at 2560x1440
   });
 }
 
