@@ -28,6 +28,8 @@ registries, and it avoids every licensing question.
 | Yeti model, shell fur and animation | `src/yeti/**` |
 | Cave, warning sign, footprints | `src/world/Cave.ts` (canvas-drawn texture, original wording) |
 | Resort, lodge, trophy, guests | `src/world/Resort.ts`, `src/world/resort/**` (canvas-drawn textures, original branding: "THE LAST LODGE", "THE LAST DESCENT") |
+| Fjord Coast: coastal terrain, water, sea mist, hamlets, boats, ferry, cairns, viewpoints, harbour, lighthouse trophy, shelters, sea-cave dressing, windsocks | `src/world/coast.ts`, `src/world/biomes/fjord/**` (procedural geometry and shaders; canvas-drawn boards with original wording: "MÅL · FINISH", "UTSIKT", "VARMESTUE"); guests reuse `src/world/resort/Guest.ts` |
+| Fjord Coast surf, gulls, squall and viewpoint sounds | `src/audio/coastal.ts` (synthesized with Web Audio, no samples) |
 | All sound effects and music | `src/audio/**` (Web Audio synthesis, original compositions) |
 | UI typography | System font stack (no web fonts) |
 

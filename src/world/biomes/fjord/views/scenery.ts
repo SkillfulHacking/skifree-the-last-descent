@@ -184,14 +184,16 @@ export class FjordScenery implements SceneryView {
 
   /** menu: a slow drift behind the skier at the start gate, the fjord opening below on the right */
   menuCamera(time: number, out: { pos: THREE.Vector3; look: THREE.Vector3; fov: number }): boolean {
+    // above the cliff rim beside the start: the start gate and skier to the left, the fjord far
+    // below on the right (the menu panel covers the left of the screen)
     const m = this.m;
-    const x0 = m.routeX(0);
-    const y0 = m.heightAt(x0, 0);
-    const a = Math.sin(time * 0.05) * 0.12;
-    out.pos.set(x0 + 26 + Math.sin(a) * 12, y0 + 30 + Math.sin(time * 0.1) * 2, -58 + Math.cos(a) * 5);
-    out.pos.y = Math.max(out.pos.y, m.heightAt(out.pos.x, out.pos.z) + 3.5);
-    out.look.set(x0 - 260, y0 - 190, 430);
-    out.fov = 56;
+    const c = this.coast;
+    const z = 30 + Math.sin(time * 0.05) * 12;
+    const xr = c.rimX(z);
+    const y = m.heightAt(xr + 20, z);
+    out.pos.set(xr + 34 + Math.sin(time * 0.04) * 6, y + 46 + Math.sin(time * 0.1) * 2, z - 70);
+    out.look.set(xr - 700, c.seaLevelAt(z) + 260, z + 900);
+    out.fov = 58;
     return true;
   }
 

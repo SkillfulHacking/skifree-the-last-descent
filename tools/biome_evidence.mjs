@@ -95,7 +95,8 @@ const P = (fnSrc) => ev(new Function(`const w = window.__skifree.world(); const 
 // 2) summit: the start gate, the run ahead and the view beyond
 if (want('summit')) {
   await ev(() => { window.__skifree.hold(true); window.__skifree.hud(false); });
-  await P(`(w, m) => { const x = m.routeX(0), y = m.heightAt(x, 0); window.__skifree.freeCam([x + 34, y + 30, -96], [x - 230, y - 150, 520], 55); }`);
+  // high above the start gate, looking down the run; on a coast, over the rim into the fjord
+  await P(`(w, m, c) => { const x = m.routeX(0), y = m.heightAt(x, 0); const xr = c ? c.rimX(200) : x - 160; window.__skifree.freeCam([x + 40, y + 62, -70], [xr - 260, y - 330, 1050], 56); }`);
   await settle(3500);
   await shot('02_summit', 'Summit: start gate and the descent ahead');
 }
