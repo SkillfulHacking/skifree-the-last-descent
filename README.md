@@ -82,6 +82,12 @@ there is no CDN, no API key and no telemetry.
 - **Course codes:** every course has a code, such as `DAILY-2026-11-07-STD` or `SEED-777-END-H`.
   Type a friend's code into the menu to ski the same mountain. Records are kept per code on this
   device only; there is no online leaderboard.
+- **Achievements** (main menu): 12 achievements for skill, Yeti escapes, journeys, Daily runs and
+  (coming with the new locations) exploration. Cards show progress where it applies, and hidden ones
+  read ??? until earned. A small toast announces each unlock during play. Progress is saved in this
+  browser only. Runs driven by the `?debug` test harness never count.
+- **Locker** (Achievements → Locker): two alternate jacket colourways, Glacier Blue (*Not Today,
+  Yeti*) and Pesto Green (*Pizza Party*). Cosmetic only: no effect on how the skier handles.
 - **Chase helpers:** a "BEHIND YOU" rear-view window appears when the Yeti is within about 110 m. You can turn it off in Settings.
 - **Accessibility:** sound captions, interface text size, camera shake, reduce camera motion, reduce flashes, and tutorial on/off.
 
@@ -127,7 +133,9 @@ src/
   yeti/        Yeti model (skinned, shell fur) + pursuit AI + spawn
   camera/      third-person follow camera
   cinematic/   timeline/shot system, cave reveal, defeat and victory sequences
-  game/        App shell, World, GameSession (one run), RunState machine, headless simulate()
+  game/        App shell, World, GameSession (one run), RunState machine, headless simulate(),
+               gameplay event bus (events.ts) + physics telemetry (telemetry.ts)
+  progression/ achievements, persistent stats, versioned progress save, cosmetics
   fx/          particles, ski tracks
   audio/       Web Audio synthesis: SFX, ambience, adaptive music
   input/       keyboard / gamepad abstraction
@@ -135,7 +143,8 @@ src/
   debug/       autopilot used by tests
 preview/       standalone model/audio test benches (skier, yeti, resort, audio)
 tests/unit/    Vitest: physics, game state, input, persistence, world fairness, pursuit balance, audio
-tests/e2e/     Playwright: menu, full loop (cave → caught → retry → victory), pause, gamepad hot-plug
+tests/e2e/     Playwright: menu, full loop (cave → caught → retry → victory), pause, gamepad hot-plug,
+               achievements/locker screens and the no-persistence rule for test runs
 docs/          design notes, asset/licence register, reviews, screenshots, changelog, known issues
 ```
 
@@ -148,7 +157,8 @@ npm run build && npm run test:e2e   # browser tests (Playwright)
 
 - The e2e tests use a local Chrome at `/usr/bin/google-chrome` by default. Set `PW_CHROME=` to point
   at another browser, or leave it empty to use Playwright's bundled Chromium
-  (`npx playwright install chromium`).
+  (`npx playwright install chromium`). Set `PW_PORT` to serve the build on another port than 4173,
+  for example to run two checkouts' suites side by side.
 - They force software WebGL (SwiftShader) so they can run on machines without a GPU, so frame rates
   during the tests mean nothing.
 - They drive the game through a hidden debug harness, which is enabled only when `?debug` is in the URL:
@@ -168,6 +178,8 @@ npm run build && npm run test:e2e   # browser tests (Playwright)
 ## Documentation
 
 - `docs/DESIGN.md` covers the architecture, the physics model and the pursuit balance.
+- `docs/PROGRESSION.md` covers gameplay events, achievements, the progress save and migrations,
+  cosmetics, and the progression plan.
 - `docs/ASSETS_AND_LICENSES.md` is the asset register: everything is procedural, and it lists the
   third-party code.
 - `docs/reviews/` holds the critical review reports.

@@ -8,6 +8,8 @@ import { defineConfig } from '@playwright/test';
  * frame rates there are NOT representative of real hardware.
  */
 const chrome = process.env.PW_CHROME ?? '/usr/bin/google-chrome';
+/** PW_PORT: preview port (lets several worktrees run their e2e suites side by side) */
+const port = Number(process.env.PW_PORT ?? 4173);
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -17,7 +19,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: `http://127.0.0.1:${port}`,
     viewport: { width: 960, height: 540 },
     launchOptions: {
       executablePath: chrome || undefined,
@@ -26,8 +28,8 @@ export default defineConfig({
     actionTimeout: 120_000,
   },
   webServer: {
-    command: 'npx vite preview --port 4173 --strictPort',
-    url: 'http://127.0.0.1:4173',
+    command: `npx vite preview --port ${port} --strictPort`,
+    url: `http://127.0.0.1:${port}`,
     reuseExistingServer: true,
     timeout: 60_000,
   },
