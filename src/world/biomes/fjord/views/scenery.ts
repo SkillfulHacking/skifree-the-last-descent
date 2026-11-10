@@ -6,7 +6,8 @@
  * Endless included).
  */
 import * as THREE from 'three';
-import { registerScenery, type SceneryContext, type SceneryFrame, type SceneryView } from '../../../presentation/scenery';
+import { SCENERY_BUDGET_MS, registerScenery, type SceneryContext, type SceneryFrame, type SceneryView } from '../../../presentation/scenery';
+import { NEVER, makeTick, type Tick } from '../../../cave/budget';
 import { Batch, Rand, mat } from '../../../resort/util';
 import type { Coast, Lookout } from '../../../coast';
 import type { Mountain } from '../../../course';
@@ -19,6 +20,8 @@ const CHUNK = 512;
 /** chunks kept behind / ahead of the skier (hamlets far below must show from far away) */
 const BEHIND = 2;
 const AHEAD = 8;
+/** the low preset keeps 2.5 km ahead (the far terrain is coarser and fogged there anyway) */
+const AHEAD_LOW = 5;
 
 interface ChunkView {
   group: THREE.Group;
@@ -58,10 +61,21 @@ export class FjordScenery implements SceneryView {
   }
 
   // --- streaming ------------------------------------------------------------------------------
+  /** queued chunk builds (time-sliced by pump(), nearest to the skier first) */
+  private jobs: Array<{ c: number; job: Generator<void, void, void> }> = [];
+  private tick = makeTick(SCENERY_BUDGET_MS);
+
   stream(z: number): void {
-    const c0 = Math.floor(z / CHUNK) - BEHIND;
-    const c1 = Math.floor(z / CHUNK) + AHEAD;
-    for (let c = c0; c <= c1; c++) if (!this.chunks.has(c) && c * CHUNK > -800 && (!this.coast.finite || c * CHUNK < this.coast.finishZ + 200)) this.buildChunk(c);
+    const cz = Math.floor(z / CHUNK);
+    const c0 = cz - BEHIND;
+    const c1 = cz + (this.ctx.quality === 'low' ? AHEAD_LOW : AHEAD);
+    for (let c = c0; c <= c1; c++) {
+      if (this.chunks.has(c) || this.jobs.some((j) => j.c === c) || c * CHUNK <= -800 || (this.coast.finite && c * CHUNK >= this.coast.finishZ + 200)) continue;
+      this.jobs.push({ c, job: this.chunkSteps(c, this.tick) });
+    }
+    // nearest first (the one under the skier, then ahead), drop jobs that left the window
+    this.jobs = this.jobs.filter((j) => j.c >= c0 - 1 && j.c <= c1 + 1);
+    this.jobs.sort((a, b) => Math.abs(a.c - cz - 0.25) - Math.abs(b.c - cz - 0.25));
     for (const [c, v] of this.chunks) {
       if (c >= c0 - 1 && c <= c1 + 1) continue;
       this.dropChunk(v);
@@ -71,12 +85,44 @@ export class FjordScenery implements SceneryView {
     this.syncShips(z);
   }
 
+  /** Advance queued chunk builds for about `budgetMs` (one slice is ≤ ~budget; see chunkSteps). */
+  pump(budgetMs: number): void {
+    if (!this.jobs.length) return;
+    const t0 = performance.now();
+    while (this.jobs.length && performance.now() - t0 < budgetMs) {
+      this.tick.reset();
+      if (this.jobs[0]!.job.next().done) this.jobs.shift();
+    }
+  }
+
+  flush(): void {
+    while (this.jobs.length) {
+      const j = this.jobs.shift()!;
+      while (!j.job.next().done);
+    }
+  }
+
+  /** pending chunk builds (tests) */
+  get pending(): number {
+    return this.jobs.length;
+  }
+
   private dropChunk(v: ChunkView) {
     v.group.removeFromParent();
     for (const g of v.geos) g.dispose();
   }
 
-  private buildChunk(c: number) {
+  /** build one chunk synchronously (tests, diagnostics) */
+  buildChunk(c: number) {
+    const job = this.chunkSteps(c, NEVER);
+    while (!job.next().done);
+  }
+
+  /**
+   * One chunk, in slices: the cairns, each viewpoint and each hamlet are built between yields
+   * (when `tk` says the frame's budget is used), then the merged meshes are added at once.
+   */
+  private *chunkSteps(c: number, tk: Tick): Generator<void, void, void> {
     const z0 = c * CHUNK;
     const z1 = z0 + CHUNK;
     const m = this.m;
@@ -91,9 +137,17 @@ export class FjordScenery implements SceneryView {
       if (m.profile.checkpoints(z - 160, z + 160).some((q) => Math.abs(q - z) < 120)) continue;
       const x = coast.rimX(z) + 7;
       cairn(b, x, m.heightAt(x, z), z, rnd.range(1.4, 2.0), rnd);
+      if (tk.over()) yield;
     }
-    for (const l of looks) if (l.z >= z0 && l.z < z1) this.viewpoint(b, l, rnd);
-    for (const h of coast.hamlets(z0, z1 - 1)) this.hamlet(b, h.z, h.seed);
+    for (const l of looks) {
+      if (l.z < z0 || l.z >= z1) continue;
+      this.viewpoint(b, l, rnd);
+      if (tk.over()) yield;
+    }
+    for (const h of coast.hamlets(z0, z1 - 1)) {
+      yield* this.hamlet(b, h.z, h.seed, tk);
+      if (tk.over()) yield;
+    }
     const meshes = b.build(this.mats, { cast: this.hi, receive: true });
     const group = new THREE.Group();
     group.name = `fjord-chunk-${c}`;
@@ -107,16 +161,14 @@ export class FjordScenery implements SceneryView {
   }
 
   /** a fishing hamlet on the strand flat at the foot of the wall: houses, boathouses, a jetty, boats */
-  private hamlet(b: Batch, z: number, seed: number) {
+  private *hamlet(b: Batch, z: number, seed: number, tk: Tick): Generator<void, void, void> {
     const m = this.m;
     const level = this.coast.seaLevelAt(z);
     const rnd = new Rand(seed);
     // find the strand flat: march out from the rim until the ground reaches the flat's height
-    let xf = this.coast.rimX(z);
-    for (let i = 0; i < 400; i++) {
-      if (m.heightAt(xf, z) < level + 9) break;
-      xf -= 6;
-    }
+    // (6 m steps; coarse 48 m strides first, then the 6 m steps inside the stride that crossed)
+    let xf = marchOut(this.coast.rimX(z), 6, 400, (x) => m.heightAt(x, z) < level + 9);
+    if (tk.over()) yield;
     const n = 5 + rnd.int(0, 5);
     for (let i = 0; i < n; i++) {
       const hz = z + rnd.range(-110, 110);
@@ -125,13 +177,10 @@ export class FjordScenery implements SceneryView {
       if (gy < level + 1.5 || gy > level + 14) continue;
       house(b, hx, gy + 0.2, hz, Math.PI / 2 + rnd.range(-0.12, 0.12), { w: rnd.range(8, 12), d: rnd.range(5.5, 7), h: rnd.range(4.2, 6.2), color: PAINT[rnd.int(0, PAINT.length - 1)]!, door: 'side', chimney: rnd.next() < 0.6 }, rnd);
       hx += 0;
+      if (tk.over()) yield;
     }
     // red boathouses on stilts at the water's edge
-    let xw = xf;
-    for (let i = 0; i < 200; i++) {
-      if (m.heightAt(xw, z) < level - 0.5) break;
-      xw -= 2;
-    }
+    const xw = marchOut(xf, 2, 200, (x) => m.heightAt(x, z) < level - 0.5);
     for (let k = 0; k < 3; k++) {
       const bz = z - 50 + k * rnd.range(14, 22);
       house(b, xw + 2, level + 1.6, bz, Math.PI / 2, { w: rnd.range(6, 8), d: rnd.range(4.5, 5.5), h: 3.6, color: k === 1 ? PAINT[1] : PAINT[0], stilts: 6, door: 'boat', windows: k !== 2 }, rnd);
@@ -202,10 +251,11 @@ export class FjordScenery implements SceneryView {
   }
 
   stats() {
-    return { water: this.water.active.length, chunks: this.chunks.size, ships: this.ships.length, mist: this.mist.count };
+    return { water: this.water.active.length, chunks: this.chunks.size, pending: this.jobs.length, ships: this.ships.length, mist: this.mist.count };
   }
 
   dispose(): void {
+    this.jobs.length = 0;
     for (const v of this.chunks.values()) this.dropChunk(v);
     this.chunks.clear();
     for (const s of this.ships) s.obj.removeFromParent();
@@ -217,6 +267,19 @@ export class FjordScenery implements SceneryView {
     void mat;
     void this.ctx;
   }
+}
+
+/**
+ * x after stepping `step` m toward −X (seaward) from x0 until `hit(x)`, at most `n` steps — the
+ * same answer as the plain loop (`for i < n: if hit(x) break; x -= step`) when the ground falls
+ * monotonically, with ~8× fewer height samples: strides of 8 steps, then single steps.
+ */
+function marchOut(x0: number, step: number, n: number, hit: (x: number) => boolean): number {
+  if (hit(x0)) return x0;
+  let i = 0;
+  while (i + 8 < n && !hit(x0 - (i + 8) * step)) i += 8;
+  for (let k = i + 1; k < n; k++) if (hit(x0 - k * step)) return x0 - k * step;
+  return x0 - n * step;
 }
 
 export const FJORD_SCENERY = registerScenery({ id: 'fjord-coast', build: (ctx) => new FjordScenery(ctx) });

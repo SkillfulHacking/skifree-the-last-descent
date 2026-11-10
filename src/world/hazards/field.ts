@@ -170,6 +170,20 @@ export class HazardField {
     return out;
   }
 
+  /**
+   * Instances that [z0, z1] would hold, without streaming anything in (loaded bands are reused;
+   * others are generated and dropped). For load-time warm-up and tests.
+   */
+  peek(z0: number, z1: number): HazardInstance[] {
+    const out: HazardInstance[] = [];
+    if (this.empty) return out;
+    for (let b = Math.floor(z0 / BAND); b <= Math.floor(z1 / BAND); b++) {
+      const list = this.bands.get(b) ?? generateHazardBand(this.mountain, this.seed, this.kinds, this.density, b);
+      for (const h of list) if (h.z >= z0 && h.z <= z1) out.push(h);
+    }
+    return out;
+  }
+
   private addBand(b: number) {
     const list = generateHazardBand(this.mountain, this.seed, this.kinds, this.density, b);
     this.bands.set(b, list);

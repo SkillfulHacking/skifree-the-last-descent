@@ -47,6 +47,9 @@ export function hasHazardView(id: string): boolean {
   return views.has(id);
 }
 
+/** hazard views this far (m) behind the skier are hidden and no longer animated */
+export const HAZARD_VIEW_BEHIND = 150;
+
 export class HazardLayer {
   readonly group = new THREE.Group();
   readonly stats = { created: 0, disposed: 0 };
@@ -89,14 +92,53 @@ export class HazardLayer {
     }
   }
 
-  /** Animate views on the physics clock (BiomeEnvironment.clock). */
-  update(dt: number): void {
+  private warm: HazardView[] = [];
+  /**
+   * Shader warm-up (World.showAllForWarmup, before renderer.compile at load): one view of every
+   * hazard kind of this course, shown in its active phase, so its materials are compiled with the
+   * rest of the scene instead of at first sight mid-run. They are disposed on the next update().
+   */
+  warmup(): void {
+    const seen = new Set<string>();
+    for (const k of this.env.kinds) {
+      if (!k.view || seen.has(k.view)) continue;
+      const f = views.get(k.view);
+      if (!f) continue;
+      // the first real instance of the kind down the course (pure placement; nothing is kept)
+      let h: HazardInstance | undefined;
+      for (let z = 0; z < 12000 && !h; z += 1024) h = this.env.hazards.peek(z, z + 1024).find((q) => q.kind === k.id);
+      if (!h) continue;
+      seen.add(k.view);
+      const v = f(h, this.ctx);
+      v.update?.({ phase: 'active', u: 0.5 }, 0, 1 / 60);
+      this.group.add(v.object);
+      this.warm.push(v);
+    }
+  }
+
+  /**
+   * Animate views on the physics clock (BiomeEnvironment.clock). With `focusZ`, views more than
+   * HAZARD_VIEW_BEHIND m behind it are hidden and not animated (bands are kept until z − 900).
+   */
+  update(dt: number, focusZ?: number): void {
+    if (this.warm.length) {
+      for (const v of this.warm) {
+        this.group.remove(v.object);
+        v.dispose();
+      }
+      this.warm.length = 0;
+    }
     if (!this.live.size) return;
     const t = this.env.clock;
-    for (const { h, v } of this.live.values()) v.update?.(hazardPhase(getHazardKind(h.kind), h, t), t, dt);
+    for (const { h, v } of this.live.values()) {
+      const behind = focusZ !== undefined && h.z + h.r < focusZ - HAZARD_VIEW_BEHIND;
+      if (v.object.visible === behind) v.object.visible = !behind;
+      if (!behind) v.update?.(hazardPhase(getHazardKind(h.kind), h, t), t, dt);
+    }
   }
 
   dispose(): void {
+    this.update(0);
     this.off();
     this.remove([...this.live.values()].map((e) => e.h));
     this.group.removeFromParent();

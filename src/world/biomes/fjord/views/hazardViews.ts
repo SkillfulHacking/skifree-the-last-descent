@@ -85,6 +85,28 @@ function gustView(h: HazardInstance, m: Mountain): HazardView {
     const z = h.z - h.r + seeds[i * 3 + 1]! * h.r * 2;
     ground[i] = z;
   }
+  // the ground under the streamers, sampled once on a small grid (bilinear between samples)
+  // instead of 120 terrain evaluations per frame
+  const span = h.r * 2.6;
+  const GX = 10;
+  const GZ = 6;
+  const gx0 = h.x - span / 2;
+  const gz0 = h.z - h.r;
+  const dx = span / (GX - 1);
+  const dz = (2 * h.r) / (GZ - 1);
+  const grid = new Float32Array(GX * GZ);
+  for (let j = 0; j < GZ; j++) for (let i = 0; i < GX; i++) grid[j * GX + i] = m.heightAt(gx0 + i * dx, gz0 + j * dz);
+  const groundAt = (x: number, z: number) => {
+    const fx = Math.min(GX - 1.001, Math.max(0, (x - gx0) / dx));
+    const fz = Math.min(GZ - 1.001, Math.max(0, (z - gz0) / dz));
+    const i = Math.floor(fx);
+    const j = Math.floor(fz);
+    const u = fx - i;
+    const w = fz - j;
+    const a = grid[j * GX + i]! + (grid[j * GX + i + 1]! - grid[j * GX + i]!) * u;
+    const b = grid[(j + 1) * GX + i]! + (grid[(j + 1) * GX + i + 1]! - grid[(j + 1) * GX + i]!) * u;
+    return a + (b - a) * w;
+  };
   let lift = 0;
   return {
     object: obj,
@@ -99,13 +121,12 @@ function gustView(h: HazardInstance, m: Mountain): HazardView {
       mat.opacity = 0.75 * density;
       pts.visible = density > 0.01;
       if (!pts.visible) return;
-      const span = h.r * 2.6;
       for (let i = 0; i < N; i++) {
         const s0 = seeds[i * 3]!;
         const s2 = seeds[i * 3 + 2]!;
         const x = h.x - span / 2 + (((s0 * span + t * (11 + 7 * s2)) % span) + span) % span;
         const z = ground[i]!;
-        const y = m.heightAt(x, z) + 0.3 + s2 * s2 * 4.5 + Math.sin(t * 3 + i) * 0.3;
+        const y = groundAt(x, z) + 0.3 + s2 * s2 * 4.5 + Math.sin(t * 3 + i) * 0.3;
         pos[i * 3] = x;
         pos[i * 3 + 1] = y;
         pos[i * 3 + 2] = z;

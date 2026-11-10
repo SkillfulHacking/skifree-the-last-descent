@@ -33,7 +33,7 @@ import { buildMountain, courseId, worldSeed, type CourseConfig } from './CourseC
 import type { Biome } from '../world/biome';
 import { BiomeEnvironment } from '../world/capabilities/environment';
 import { makeWeatherSample } from '../world/capabilities/weather';
-import { HazardLayer, presentationOf, type BiomePresentation, type CaveDressing, type FinishDefinition, type FinishEnvironment, type RefugeView, type SceneryView } from '../world/presentation';
+import { HazardLayer, SCENERY_BUDGET_MS, presentationOf, type BiomePresentation, type CaveDressing, type FinishDefinition, type FinishEnvironment, type RefugeView, type SceneryView } from '../world/presentation';
 
 export interface CaveSlot {
   enc: Encounter;
@@ -44,6 +44,9 @@ export interface CaveSlot {
 }
 
 const ORIGIN_STEP = 1024;
+
+/** hazard bands (and their views) are streamed this far ahead of the skier, m */
+export const HAZARD_VIEW_AHEAD = 1100;
 
 export class World {
   readonly scene = new THREE.Scene();
@@ -156,6 +159,17 @@ export class World {
     // physics-critical window: always complete
     this.obstacles.ensure(z - 80, z + 400);
     this.environment.stream(z);
+    // hazard views further out (a windsock or a rock patch should not pop in 400 m ahead): one
+    // more band per call, out to HAZARD_VIEW_AHEAD
+    if (!this.environment.hazards.empty) {
+      if (all) this.environment.hazards.ensure(z - 80, z + HAZARD_VIEW_AHEAD);
+      else
+        for (let d = 400; d <= HAZARD_VIEW_AHEAD; d += BAND) {
+          const before = this.environment.hazards.bandCount;
+          this.environment.hazards.ensure(z + d, z + d);
+          if (this.environment.hazards.bandCount !== before) break;
+        }
+    }
     // visual window: nearest missing band first, one per frame
     if (all) this.obstacles.ensure(z - 600, z + ahead);
     else {
@@ -170,6 +184,7 @@ export class World {
       this.obstacles.release(z - 900, z + ahead + 400);
       this.environment.release(z - 900, z + ahead + 400);
       this.scenery?.stream(z);
+      if (all) this.scenery?.flush?.();
       this.syncCaves(z);
       if (all) for (const j of [...this.caveJobs.values()]) this.buildCave(j.enc);
       this.syncLodges(z);
@@ -326,11 +341,14 @@ export class World {
   /** Make everything visible for shader pre-compilation (call update() afterwards to restore). */
   showAllForWarmup() {
     this.vegetation.group.traverse((o) => (o.visible = true));
+    // one view of every hazard kind (disposed again on the next update)
+    this.hazardViews.warmup();
   }
 
   update(dt: number, time: number, focus: THREE.Vector3, camPos: THREE.Vector3, terrainBudgetMs: number) {
     this.stream(focus.z);
     this.stepCaves();
+    this.scenery?.pump?.(SCENERY_BUDGET_MS);
     this.terrain.update(focus.x, focus.z, terrainBudgetMs, time);
     this.vegetation.update(camPos, time);
     // weather on the physics clock (Alpine: constant; fog, flakes exactly as before)
@@ -338,7 +356,7 @@ export class World {
     env.weatherAt(focus.x, focus.z, env.clock, this.weather);
     this.env.applyWeather(this.weather.visibility * env.hazardVisibility(focus.x, focus.z, env.clock), this.weather.snowfall);
     this.env.update(dt, focus, camPos, time, this.weather.windX);
-    this.hazardViews.update(dt);
+    this.hazardViews.update(dt, focus.z);
     this.scenery?.update(dt, time, { focus, camPos, origin: this.origin });
     for (const s of this.caves.values()) s.dressing?.update?.(dt, time);
     this.particles.update(dt);

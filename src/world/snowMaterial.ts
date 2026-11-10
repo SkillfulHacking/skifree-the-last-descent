@@ -83,8 +83,11 @@ const coastRockGlsl = (T: Biome['terrainLook']) => /* glsl */ `
   }
 `;
 
-/** water reaches the terrain shader knows about at once (the scenery keeps the nearest ones) */
-export const SEA_SLOTS = 4;
+/**
+ * Water reaches the terrain shader (and FjordWater) know about at once: the arm under the camera
+ * and those ahead first. 6 covers the 12 km far plane even on Expedition's shortest arms (~2.7 km).
+ */
+export const SEA_SLOTS = 6;
 
 /**
  * Shore band for coastal locations (appended to the colour block): no snow in the wave-washed

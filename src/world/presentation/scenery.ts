@@ -5,7 +5,8 @@
  * (optional; Alpine has none).
  *
  * World builds it once per course, calls `stream(z)` with the obstacle window (bounded memory on
- * any course length: build what is near, dispose what is far), `update(...)` every frame (in
+ * any course length: build what is near, dispose what is far), `pump(ms)` every frame to advance
+ * queued builds within a main-thread budget (SCENERY_BUDGET_MS), `update(...)` every frame (in
  * absolute world coordinates; the floating origin is applied by World.renderShifted) and
  * `dispose()` with the world.
  */
@@ -35,8 +36,15 @@ export interface SceneryFrame {
 
 export interface SceneryView {
   readonly group: THREE.Group;
-  /** keep what is needed around course position z (called with the obstacle streaming) */
+  /**
+   * Keep what is needed around course position z (called with the obstacle streaming). Heavy
+   * builds should only be queued here and done in `pump` (time-sliced), like terrain and caves.
+   */
   stream(z: number): void;
+  /** advance queued builds for about `budgetMs` of main-thread time (World calls it every frame) */
+  pump?(budgetMs: number): void;
+  /** finish every queued build now (loading, teleports) */
+  flush?(): void;
   update(dt: number, time: number, f: SceneryFrame): void;
   /** optional main-menu camera (the location's establishing view around the start); null = default */
   menuCamera?(time: number, out: { pos: THREE.Vector3; look: THREE.Vector3; fov: number }): boolean;
@@ -44,6 +52,9 @@ export interface SceneryView {
   stats?(): Record<string, number>;
   dispose(): void;
 }
+
+/** main-thread time per frame for streamed scenery builds (World.update → SceneryView.pump) */
+export const SCENERY_BUDGET_MS = 3;
 
 export interface SceneryDefinition {
   readonly id: string;

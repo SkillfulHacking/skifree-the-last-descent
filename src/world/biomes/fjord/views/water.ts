@@ -2,10 +2,11 @@
  * Fjord water: one level surface per fjord arm (Coast reaches) near the camera, plus the open sea
  * beyond a finite course's harbour.
  *
- * Each surface is a large camera-following quad at its arm's level; fragments outside the arm's
- * [z0, z1) are discarded (the headland ridges between arms always stand above both levels, so the
- * cut edges are hidden under rock). At most SEA_SLOTS arms are drawn: 1–4 draw calls, 2 triangles
- * each. The same reaches are handed to the terrain shader (uSea) for its wet shore band and surf.
+ * Each surface is a camera-following quad at its arm's level, clipped to the arm's [z0, z1) (the
+ * shader also discards outside it; the headland ridges between arms always stand above both levels,
+ * so the cut edges are hidden under rock). At most SEA_SLOTS arms are drawn — the one under the
+ * camera and those ahead first (waterReaches): 1–4 draw calls, 2 triangles each, drawn after the
+ * terrain. The same reaches are handed to the terrain shader (uSea) for its wet shore band and surf.
  *
  * Shading: cold, dark fjord water; Fresnel reflection of an analytic sky (zenith → the fog colour
  * at the horizon); wind-driven ripples (four scrolling noise octaves → normal); a low-sun glitter
@@ -117,7 +118,9 @@ export class FjordWater {
       const mesh = new THREE.Mesh(this.geo, mat);
       mesh.frustumCulled = false;
       mesh.visible = false;
-      mesh.renderOrder = -1;
+      // after the opaque terrain (default order 0, sorted near-to-far): the depth test then
+      // rejects the water hidden behind the mountain instead of shading it first
+      mesh.renderOrder = 1;
       this.group.add(mesh);
       this.slots.push({ mesh, mat, reach: null });
     }
@@ -129,9 +132,7 @@ export class FjordWater {
   }
 
   update(time: number, camPos: THREE.Vector3, origin: THREE.Vector3) {
-    // arms in view: behind the camera a little, far ahead (the terrain far field reaches ~10–14 km)
-    const list = this.coast.reaches(camPos.z - 4500, camPos.z + 14000);
-    list.sort((a, b) => dist(a, camPos.z) - dist(b, camPos.z));
+    const list = waterReaches(this.coast, camPos.z, this.slots.length);
     const sea = this.terrain.uSea?.value;
     for (let i = 0; i < this.slots.length; i++) {
       const s = this.slots[i]!;
@@ -140,7 +141,13 @@ export class FjordWater {
       s.mesh.visible = !!r;
       if (sea) sea[i]!.set(r ? r.z0 : 1, r ? (Number.isFinite(r.z1) ? r.z1 : 1e9) : 0, r ? r.level : -1e9);
       if (!r) continue;
-      s.mesh.position.set(camPos.x, r.level, camPos.z);
+      // the quad covers only the arm's own [z0, z1) (clipped to the camera window): no fragments
+      // are shaded and discarded outside it
+      const za = Math.max(r.z0, camPos.z - HALF);
+      const zb = Math.min(Number.isFinite(r.z1) ? r.z1 : Infinity, camPos.z + HALF);
+      s.mesh.visible = zb > za;
+      s.mesh.position.set(camPos.x, r.level, (za + zb) / 2);
+      s.mesh.scale.set(1, 1, Math.max(1e-3, (zb - za) / (2 * HALF)));
       s.mesh.updateMatrix();
       const u = s.mat.uniforms;
       u['uZ0']!.value = r.z0;
@@ -157,6 +164,18 @@ export class FjordWater {
   }
 }
 
-function dist(r: Reach, z: number): number {
-  return z < r.z0 ? r.z0 - z : z > r.z1 ? z - r.z1 : 0;
+/** how far ahead (down the course) and behind the camera fjord arms can be in view, m */
+export const WATER_AHEAD = 14000;
+export const WATER_BEHIND = 4500;
+
+/**
+ * The arms that get a water surface: the one under the camera and the ones ahead of it first (the
+ * camera looks down the course; the far plane is ~12 km), then the nearest ones behind (menu,
+ * victory reveal) while slots remain.
+ */
+export function waterReaches(coast: Coast, camZ: number, slots: number): Reach[] {
+  const list = coast.reaches(camZ - WATER_BEHIND, camZ + WATER_AHEAD);
+  const ahead = list.filter((r) => r.z1 > camZ).sort((a, b) => a.z0 - b.z0);
+  const behind = list.filter((r) => r.z1 <= camZ).sort((a, b) => b.z1 - a.z1);
+  return ahead.concat(behind).slice(0, slots);
 }

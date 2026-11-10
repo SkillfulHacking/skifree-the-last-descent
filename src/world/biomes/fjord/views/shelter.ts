@@ -44,7 +44,7 @@ export class CoastalShelter implements RefugeView {
     const K = kitMaterials();
     this.tex = boardTexture(index);
     const board = new THREE.MeshStandardMaterial({ map: this.tex, roughness: 0.75 });
-    const lamp = new THREE.MeshStandardMaterial({ color: 0xffc070, emissive: 0xff9a3c, emissiveIntensity: 1.8 });
+    const lamp = new THREE.MeshStandardMaterial({ color: 0xffc070, emissive: 0xff9a3c, emissiveIntensity: 2.6 });
     const M: Record<string, THREE.Material> = { ...K, board, lamp };
     this.mats.push(...Object.values(M));
     const b = new Batch();
@@ -87,9 +87,9 @@ export class CoastalShelter implements RefugeView {
     pen.computeVertexNormals();
     b.add('paint', pen, mat(fx, fy, hz - 4, 0, 0.5, 0), 0xc81e1e);
     for (const me of b.build(M, { cast: true, receive: true })) this.group.add(me);
-    const light = new THREE.PointLight(0xffb060, 8, 16, 2);
-    light.position.set(x - span * 0.5, gy + 6.6, z);
-    this.group.add(light);
+    // no PointLight: shelters stream in and out mid-run, and a change in the scene's light count
+    // recompiles every lit material (three.js keys programs by light counts). The lamp glows by
+    // its emissive material alone.
   }
 
   dispose() {
