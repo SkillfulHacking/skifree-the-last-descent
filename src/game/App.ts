@@ -17,6 +17,7 @@ import type { QualityPreset } from '../core/types';
 import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
 import { fmtDistance } from '../ui/Hud';
 import { getBiome, listBiomes } from '../world/biome';
+import { locationNoteHtml, locationOptionLabel } from '../ui/location';
 import type { AutopilotStyle } from '../debug/autopilot';
 
 type Mode = 'loading' | 'menu' | 'playing' | 'paused' | 'results';
@@ -274,8 +275,8 @@ export class App {
             {
               kind: 'select' as const,
               label: 'Location',
-              note: getBiome(st.biome).description,
-              options: listBiomes().map((b) => ({ value: b.id, label: b.name })),
+              note: locationNoteHtml(getBiome(c.biome)),
+              options: listBiomes().map((b) => ({ value: b.id, label: locationOptionLabel(b) })),
               get: () => c.biome,
               set: (v: string) => {
                 st.biome = v;
