@@ -18,6 +18,10 @@ import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, course
 import { fmtDistance } from '../ui/Hud';
 import { getBiome, listBiomes } from '../world/biome';
 import type { AutopilotStyle } from '../debug/autopilot';
+import { ProgressTracker } from '../progression/tracker';
+import { reconcileProgress, viewAchievements } from '../progression/achievements';
+import { browserStorage, loadProgress, writeProgress } from '../progression/save';
+import { AchievementToast, achievementsGrid, achievementsSummary } from '../ui/achievementsView';
 
 type Mode = 'loading' | 'menu' | 'playing' | 'paused' | 'results';
 
@@ -49,6 +53,13 @@ export class App {
   private ui: HTMLElement;
   private contextLost = false;
   private errorStreak = 0;
+  // --- progression (achievements; see docs/PROGRESSION.md) ---
+  /** automated test harness (?debug): runs never persist progress */
+  readonly debugHarness = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+  progress!: ProgressTracker;
+  private progressNote: string | null = null;
+  private toast!: AchievementToast;
+  private detachProgress: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
     this.settings = loadSettings();
@@ -82,6 +93,7 @@ export class App {
     this.hud.reduceFlashes = this.settings.reduceFlashes;
     this.hud.showFps(this.settings.showFps);
     this.menu = new MenuSystem(this.ui);
+    this.initProgress();
     this.menu.onSound = (k) => (k === 'move' ? this.audio.playUiMove() : this.audio.playUiClick());
 
     this.loadingEl = document.createElement('div');
@@ -217,10 +229,50 @@ export class App {
     this.skier.setVisible(true);
   }
 
+  // --- progression ---------------------------------------------------------------
+  private initProgress() {
+    const kv = browserStorage();
+    const loaded = loadProgress(kv);
+    const store = loaded.readOnly ? null : { write: (sv: typeof loaded.save) => void writeProgress(kv, sv) };
+    this.progressNote = loaded.readOnly ? 'saved by a newer version: read-only here' : this.debugHarness ? 'test mode (?debug): progress is not saved' : null;
+    // goals already met by stored statistics (achievements added in an update) are earned now
+    if (reconcileProgress(loaded.save.stats, loaded.save.achievements, Date.now()).length && store && !this.debugHarness) store.write(loaded.save);
+    this.progress = new ProgressTracker(loaded.save, store);
+    this.toast = new AchievementToast(this.ui);
+    this.progress.onUnlock = (def, persisted) => this.toast.show(def.name, def.icon, persisted ? null : 'Test run: not saved');
+  }
+
+  /** Start evaluating achievements for the session's events (persist policy: a real, unassisted run). */
+  private trackSession(s: GameSession) {
+    this.untrackSession();
+    this.detachProgress = this.progress.attach(s.events, () => !this.debugHarness && !s.debugUsed);
+  }
+
+  private untrackSession() {
+    this.detachProgress?.();
+    this.detachProgress = null;
+  }
+
+  private achievementsScreen(): Screen {
+    const views = viewAchievements(this.progress.saved.stats, this.progress.saved.achievements, this.progress.defs);
+    return {
+      id: 'achievements',
+      title: 'ACHIEVEMENTS',
+      subtitle: achievementsSummary(views, this.progressNote),
+      cls: 'wide achievements',
+      onBack: () => this.menu.pop(),
+      items: [
+        { kind: 'info', html: achievementsGrid(views) },
+        { kind: 'button', label: 'Back', action: () => this.menu.pop() },
+      ],
+    };
+  }
+
   // --- screens -------------------------------------------------------------------
   toMenu() {
     this.session?.dispose();
     this.session = null;
+    this.untrackSession();
     this.mode = 'menu';
     this.hud.show(false);
     this.placeMenuSkier();
@@ -364,6 +416,7 @@ export class App {
           changed();
         },
       },
+      { kind: 'button', label: 'Achievements', hint: `${Object.keys(this.progress.saved.achievements).filter((id) => this.progress.defs.some((d) => d.id === id)).length} / ${this.progress.defs.length}`, action: () => this.menu.push(this.achievementsScreen()) },
       { kind: 'button', label: 'Controls', action: () => this.menu.push(this.controlsScreen()) },
       { kind: 'button', label: 'Settings', action: () => this.menu.push(this.settingsScreen()) },
       { kind: 'button', label: 'Credits & Licences', action: () => this.menu.push(this.creditsScreen()) },
@@ -401,6 +454,7 @@ export class App {
       onResults: (stats, won) => this.showResults(stats, won),
       onPauseRequest: () => this.pause(),
     }, { skipIntro: retry });
+    this.trackSession(this.session);
     this.session.recordsSeenCave = this.book.seenCaveCinematic;
     this.session.onCaveSeen = () => {
       this.book.seenCaveCinematic = true;
@@ -856,6 +910,7 @@ export class App {
       },
       pause: () => this.pause(),
       menuId: () => this.menu.current?.id ?? null,
+      progress: () => ({ saved: structuredClone(this.progress.saved), persisting: this.progress.persisting, attached: this.progress.attached, toast: this.toast.text, events: this.session ? this.session.events.history.map((e) => e.type) : [] }),
       pressMenu: (label: string) => {
         const it = this.menu.current?.items.find((i) => i.kind === 'button' && i.label === label);
         if (it && it.kind === 'button') it.action();
