@@ -69,6 +69,21 @@ async function framesUntil(pred, max = 900) {
   );
 }
 const freeCam = (pos, look, fov = 50) => ev(([p, l, f]) => window.__skifree.freeCam(p, l, f), [pos, look, fov]);
+/** never put a camera under the snow: keep it ≥ 2.5 m above the terrain around it */
+await page.evaluate(() => {
+  const api = window.__skifree;
+  const raw = api.freeCam;
+  api.freeCam = (p, l, f) => {
+    const w = api.world?.();
+    if (p && w) {
+      const m = w.mountain;
+      let g = -Infinity;
+      for (const [dx, dz] of [[0, 0], [3, 0], [-3, 0], [0, 3], [0, -3]]) g = Math.max(g, m.heightAt(p[0] + dx, p[2] + dz));
+      p = [p[0], Math.max(p[1], g + 2.5), p[2]];
+    }
+    return raw(p, l, f);
+  };
+});
 const settle = (ms = 2500) => page.waitForTimeout(ms);
 /** terrain/vegetation around z built at full detail (teleport flushes them) */
 const goTo = (z, speed = 0) => ev(([z, v]) => window.__skifree.teleport(z, v), [z, speed]);
@@ -109,7 +124,7 @@ if (want('mid')) {
   const z = Math.round(G.finite ? Math.min(G.L * 0.5, G.L - 900) : 3000);
   await goTo(z, 0);
   await ev(() => { window.__skifree.hold(true); window.__skifree.hud(false); });
-  await P(`(w, m) => { const z = ${z}; const x = m.routeX(z), y = m.heightAt(x, z); window.__skifree.freeCam([x + 70, y + 34, z - 150], [x - 160, y - 70, z + 240], 52); }`);
+  await P(`(w, m) => { const z = ${z}; const x = m.routeX(z), y = m.heightAt(x, z); window.__skifree.freeCam([x + 60, m.heightAt(x + 60, z - 150) + 30, z - 150], [x - 170, y - 80, z + 240], 52); }`);
   await settle(3500);
   await shot('03_mid_mountain', `Mid-mountain at z=${z}`);
 }
@@ -127,7 +142,7 @@ if (want('hazard')) {
     await framesUntil(`(s) => false`, 18);
     log('hazard', sig.kind, JSON.stringify(r.ok));
     await ev(() => window.__skifree.hud(false));
-    await freeCam([sig.x + 24, sig.y + 7.5, sig.z - 30], [sig.x - 6, sig.y + 2.5, sig.z + 6], 48);
+    await P(`(w, m) => { const h = { x: ${sig.x}, y: ${sig.y}, z: ${sig.z} }; const cx = h.x + 26, cz = h.z - 34; window.__skifree.freeCam([cx, m.heightAt(cx, cz) + 6, cz], [h.x - 6, h.y + 2.5, h.z + 6], 48); }`);
     await settle(3000);
     await shot('04_signature_hazard', `${sig.kind} (id ${sig.id}) in its active phase; kinds near: ${kinds.join(',')}`);
     const rock = all.find((h) => h.kind === 'scoured-rock');
@@ -135,7 +150,7 @@ if (want('hazard')) {
       await ev(() => window.__skifree.freeCam(null));
       await goTo(rock.z - 120, 0);
       await ev(() => window.__skifree.hold(true));
-      await freeCam([rock.x + 14, rock.y + 9, rock.z - 24], [rock.x, rock.y, rock.z + 2], 50);
+      await P(`(w, m) => { const cx = ${rock.x} + 14, cz = ${rock.z} - 26; window.__skifree.freeCam([cx, m.heightAt(cx, cz) + 7, cz], [${rock.x}, ${rock.y}, ${rock.z} + 2], 50); }`);
       await settle(3000);
       await shot('04b_hazard_rock', 'scoured-rock: exposed rock beside the racing line');
     }
