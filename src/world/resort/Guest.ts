@@ -404,6 +404,13 @@ export class Guest {
     return this.group.position;
   }
 
+  /** world position of a hand (props held by a scripted guest, e.g. a trophy presenter) */
+  handWorld(side: 'L' | 'R', out: THREE.Vector3): THREE.Vector3 {
+    const b = this.bones[side === 'L' ? Bn.HAND_L : Bn.HAND_R]!;
+    b.updateWorldMatrix(true, false);
+    return out.setFromMatrixPosition(b.matrixWorld);
+  }
+
   private buildRig(): void {
     const sw = this.sw;
     const mk = (name: string, x: number, y: number, z: number, parent: number | null): THREE.Bone => {

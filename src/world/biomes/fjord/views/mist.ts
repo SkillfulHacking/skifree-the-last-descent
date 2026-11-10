@@ -95,18 +95,33 @@ void main() {
     let n = 0;
     for (const r of reaches) {
       const rng = new Rng((this.m.seed ^ Math.imul(r.index + 7, 0x51ed270b)) >>> 0);
-      // "occasional": some arms are clear
-      if (rng.float() < 0.3) continue;
+      // "occasional": some arms are clear (round 2, art review D13: never the first arm or the
+      // open sea, so every course shows mist lying on the water somewhere)
+      if (rng.float() < 0.3 && r.index > 0 && !r.ocean) continue;
       const z0 = Math.max(r.z0 + 300, -1800);
       const z1 = Number.isFinite(r.z1) ? r.z1 - 300 : z0 + 5000;
-      const banks = 2 + rng.int(0, 2);
+      const banks = 3 + rng.int(0, 2);
       for (let b = 0; b < banks && n < MAX; b++) {
         const bz = z0 + rng.float() * Math.max(1, z1 - z0);
-        const bx = this.coast.rimX(bz) - rng.range(700, 1900);
+        // some banks hug the foot of the wall (seen over the rim and from the cliff-top views)
+        const hug = b % 2 === 0;
+        const bx = this.coast.rimX(bz) - (hug ? rng.range(260, 520) : rng.range(700, 1900));
         for (let k = 0; k < 4 && n < MAX; k++) {
-          M.makeTranslation(bx + rng.range(-260, 260), r.level + rng.range(10, 45), bz + rng.range(-300, 300));
+          M.makeTranslation(bx + rng.range(-220, 220), r.level + rng.range(8, 40), bz + rng.range(-300, 300));
           this.mesh.setMatrixAt(n, M);
-          attr.setXYZW(n, rng.range(140, 320), rng.range(0.12, 0.26), rng.float(), rng.range(1.6, 3.0));
+          attr.setXYZW(n, rng.range(140, 320), rng.range(0.22, 0.4), rng.float(), rng.range(1.6, 3.0));
+          n++;
+        }
+      }
+      // the open sea: a bank drifting across the harbour mouth beyond the lighthouse
+      if (r.ocean && this.coast.finite) {
+        const L = this.coast.finishZ;
+        const cx = this.m.centerX(L);
+        const sz = this.coast.shoreZ(cx);
+        for (let k = 0; k < 5 && n < MAX; k++) {
+          M.makeTranslation(cx + rng.range(-420, 380), r.level + rng.range(6, 22), sz + rng.range(420, 1100));
+          this.mesh.setMatrixAt(n, M);
+          attr.setXYZW(n, rng.range(160, 280), rng.range(0.22, 0.34), rng.float(), rng.range(2.0, 3.2));
           n++;
         }
       }

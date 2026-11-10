@@ -19,7 +19,7 @@ import { lampPost, stringLights, bench } from '../../../resort/props';
 import { Banner, Glows, Particles, flameMaterial, waterMaterial } from '../../../resort/fx';
 import { envCube, softParticle } from '../../../resort/textures';
 import { Guest, type GuestBehaviour, type GuestLook } from '../../../resort/Guest';
-import { PAINT, fishingBoat, house, jetty, kitMaterials } from './buildings';
+import { PAINT, ferry, fishRack, fishingBoat, house, kitMaterials, plankDeck, sparkSled, warehouse } from './buildings';
 
 export interface HarbourOptions {
   quality: QualityPreset;
@@ -50,6 +50,53 @@ function bannerTexture(): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
+  return t;
+}
+
+/** granite setts: rows of slightly irregular grey stones with snow in the joints (tiles 3 × 3 m) */
+function settTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 512;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#d9dfe6';
+  g.fillRect(0, 0, 512, 512);
+  const r = new Rand(911);
+  const rows = 16;
+  const h = 512 / rows;
+  for (let j = 0; j < rows; j++) {
+    let x = j % 2 ? -h * 0.5 : 0;
+    while (x < 512) {
+      const w = h * r.range(0.9, 1.5);
+      const t = Math.round(88 + r.range(-22, 22));
+      const warm = r.range(-6, 6);
+      g.fillStyle = `rgb(${t + warm},${t + 2},${t + 6 - warm})`;
+      const m = r.range(2, 4);
+      g.beginPath();
+      if (g.roundRect) g.roundRect(x + m, j * h + m, w - 2 * m, h - 2 * m, 4);
+      else g.rect(x + m, j * h + m, w - 2 * m, h - 2 * m);
+      g.fill();
+      // wear and a little frost on the stone
+      g.fillStyle = `rgba(255,255,255,${r.range(0.0, 0.18)})`;
+      g.fillRect(x + m + 2, j * h + m + 2, (w - 2 * m) * r.range(0.2, 0.7), (h - 2 * m) * 0.3);
+      x += w;
+    }
+  }
+  // swept snow patches lying in drifts
+  for (let i = 0; i < 26; i++) {
+    const grd = g.createRadialGradient(0, 0, 0, 0, 0, 1);
+    grd.addColorStop(0, 'rgba(236,241,247,0.85)');
+    grd.addColorStop(1, 'rgba(236,241,247,0)');
+    g.save();
+    g.translate(r.range(0, 512), r.range(0, 512));
+    g.scale(r.range(20, 70), r.range(8, 22));
+    g.fillStyle = grd;
+    g.beginPath();
+    g.arc(0, 0, 1, 0, Math.PI * 2);
+    g.fill();
+    g.restore();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 
@@ -104,10 +151,22 @@ export class Harbour implements FinishEnvironment {
   /** 0 = standing on the pier … 1 = in the water (driven by the victory script) */
   plunge = 0;
   private splash: Particles;
+  private ring: THREE.Mesh;
+  private splashT = -1;
+  private plungerScale = 1;
   private splashed = false;
   private materials: THREE.Material[] = [];
   private textures: THREE.Texture[] = [];
   private boats: THREE.Group;
+  /** top of the sauna's stovepipe (smoke) */
+  private saunaChimney = new THREE.Vector3();
+  /** the harbourmaster who presents the trophy (victory) */
+  readonly presenter: Guest;
+  /** where the Yeti's fish-rack gag happens: the rack's centre and its long axis */
+  readonly rack = new THREE.Vector3();
+  readonly rackAxis = new THREE.Vector3(0, 0, 1);
+  /** the presentation spot (presenter stands here, facing the skier's stop point) */
+  readonly presentAt = new THREE.Vector3();
   private boatsBob: Array<{ o: THREE.Object3D; y: number; ph: number }> = [];
 
   constructor(o: HarbourOptions) {
@@ -196,30 +255,53 @@ export class Harbour implements FinishEnvironment {
     }
 
     // ---------------- quay, boardwalk and piers ----------------
+    // round 2 (art review D6, critic 4): a real boardwalk of individual planks on piles, finger
+    // piers of planks, a granite quay wall with a capping course and bollards
     const quayW = 150;
-    // granite quay wall along the shore
     for (let x = -quayW; x < quayW; x += 4) {
       const px = F.x + x + 2;
       const t = 0.33 + 0.05 * Math.sin(x * 1.7);
       b.add('stone', new THREE.BoxGeometry(4.05, 6, 2.4), mat(px, deckY - 3.15, zq + 1.2), new THREE.Color(t, t * 1.01, t * 1.05));
+      b.add('stone', new THREE.BoxGeometry(4.0, 0.3, 2.6), mat(px, deckY - 0.02, zq + 1.2), new THREE.Color(t * 1.25, t * 1.25, t * 1.28));
+      if (((x + quayW) / 4) % 5 === 2) b.add('metal', new THREE.CylinderGeometry(0.22, 0.28, 0.6, 10), mat(px, deckY + 0.4, zq + 1.8), 0x1e2226);
     }
-    // timber boardwalk on piles over the water along the quay
     const bwz0 = zq + 2.2;
     const bwz1 = zq + 10;
-    b.add('planks', new THREE.BoxGeometry(quayW * 2, 0.28, bwz1 - bwz0), mat(F.x, deckY - 0.1, (bwz0 + bwz1) / 2), (p) => new THREE.Color(0x6b4e36).multiplyScalar(0.85 + 0.15 * Math.sin(p.x * 3.3)));
-    nb.add('snow', new THREE.BoxGeometry(quayW * 2 - 2, 0.05, (bwz1 - bwz0) * 0.6), mat(F.x, deckY + 0.07, bwz0 + 2.5), 0xffffff);
+    plankDeck(b, F.x, deckY + 0.03, (bwz0 + bwz1) / 2, Math.PI / 2, quayW * 2, bwz1 - bwz0, rnd);
+    // snow swept to the landward edge of the boardwalk (a strip, not a sheet)
+    nb.add('snow', new THREE.BoxGeometry(quayW * 2 - 2, 0.05, 1.2), mat(F.x, deckY + 0.07, bwz0 + 0.8), 0xffffff);
     for (let x = -quayW + 2; x < quayW; x += 4)
       for (const pz of [bwz0 + 0.4, bwz1 - 0.4]) b.add('planks', new THREE.CylinderGeometry(0.18, 0.2, 7, 6), mat(F.x + x, deckY - 3.6, pz), 0x2e231a);
     // railing posts with rope along the outer edge
     for (let x = -quayW + 1; x < quayW; x += 3) b.add('planks', new THREE.CylinderGeometry(0.06, 0.07, 1.0, 5), mat(F.x + x, deckY + 0.5, bwz1 - 0.2), 0x3b2c22);
     b.add('metal', new THREE.BoxGeometry(quayW * 2, 0.05, 0.05), mat(F.x, deckY + 0.95, bwz1 - 0.2), 0xd8c8a0);
-    // finger piers
+    // finger piers (planks on piles), with bollards and tyres
     const piers = [-58, 22, 92];
-    for (const px of piers) jetty(b, new THREE.Vector3(F.x + px, deckY - 0.05, bwz1), new THREE.Vector3(F.x + px + 4, deckY - 0.05, bwz1 + 62), 3.2, 9);
-    // the bathing pier platform (stamp + bonfire)
+    for (const px of piers) {
+      const a0 = new THREE.Vector3(F.x + px, deckY - 0.05, bwz1);
+      const a1 = new THREE.Vector3(F.x + px + 4, deckY - 0.05, bwz1 + 62);
+      const len = Math.hypot(a1.x - a0.x, a1.z - a0.z);
+      const yaw = Math.atan2(a1.x - a0.x, a1.z - a0.z);
+      plankDeck(b, (a0.x + a1.x) / 2, deckY - 0.02, (a0.z + a1.z) / 2, yaw, len, 3.2, rnd);
+      for (let sAl = -len / 2 + 0.4; sAl <= len / 2; sAl += 3)
+        for (const sx of [-1, 1]) b.add('planks', new THREE.CylinderGeometry(0.15, 0.17, 10, 6).translate((sx * 3.2) / 2, -5 + 0.3, sAl), mat((a0.x + a1.x) / 2, deckY - 0.05, (a0.z + a1.z) / 2, 0, yaw, 0), 0x2e231a);
+      for (let sAl = -len / 2 + 6; sAl < len / 2; sAl += 12)
+        for (const sx of [-1, 1]) b.add('paint', new THREE.TorusGeometry(0.32, 0.12, 6, 12).rotateY(Math.PI / 2).translate(sx * 1.72, -0.35, sAl), mat((a0.x + a1.x) / 2, deckY - 0.05, (a0.z + a1.z) / 2, 0, yaw, 0), 0x1a1a1a);
+    }
+    // the bathing pier platform (stamp, bonfire, sauna): planks with an edge trim and a ladder
     const sp = new THREE.Vector3(F.x + 22 + 2, deckY, bwz1 + 40);
-    b.add('planks', new THREE.BoxGeometry(12, 0.28, 12), mat(sp.x + 6.5, deckY - 0.1, sp.z), 0x6b4e36);
+    plankDeck(b, sp.x + 6.5, deckY + 0.02, sp.z, 0, 12, 13, rnd);
     for (const dx of [1, 6.5, 12]) for (const dz of [-5.6, 0, 5.6]) b.add('planks', new THREE.CylinderGeometry(0.18, 0.2, 9, 6), mat(sp.x + dx, deckY - 4.6, sp.z + dz), 0x2e231a);
+    for (let k = 0; k < 6; k++) b.add('metal', new THREE.BoxGeometry(0.5, 0.04, 0.04), mat(sp.x + 13.1, deckY - 0.4 - k * 0.35, sp.z + 4.2), 0x9aa0a8);
+    for (const dz of [3.95, 4.45]) b.add('metal', new THREE.CylinderGeometry(0.025, 0.025, 2.4, 5), mat(sp.x + 13.1, deckY - 0.6, sp.z + dz), 0x9aa0a8);
+    // a little wood-fired sauna hut on the platform (red, turf roof, smoking chimney)
+    {
+      const sx0 = sp.x + 3.2;
+      const sz0 = sp.z + 3.4;
+      house(b, sx0, deckY + 0.06, sz0, 0, { w: 3.6, d: 2.8, h: 2.3, color: 0x8e2c1d, roofH: 0.9, windows: false, door: 'side', roof: 0x4a4a2c, chimney: true }, rnd);
+      this.saunaChimney.set(sx0 + 0.9, deckY + 4.6, sz0 - 0.42);
+      this.cols.push({ x: sx0, z: sz0, r: 2.2 });
+    }
 
     // ---------------- the bathing tub ("badestamp") ----------------
     const tub = new THREE.Vector3(sp.x + 8, deckY, sp.z + 1.5);
@@ -248,8 +330,10 @@ export class Harbour implements FinishEnvironment {
     {
       const pos: number[] = [];
       const uv: number[] = [];
-      for (let i = 0; i < 3; i++) {
-        const g = new THREE.PlaneGeometry(1.0, 1.6).translate(0, 0.8, 0).rotateY((i * Math.PI) / 3).toNonIndexed();
+      // layered tongues: three outer cards and three smaller, brighter inner ones (round 2: C4)
+      for (let i = 0; i < 6; i++) {
+        const big = i < 3;
+        const g = new THREE.PlaneGeometry(big ? 1.0 : 0.6, big ? 1.6 : 1.05).translate(big ? 0 : 0.08 * Math.cos(i), big ? 0.8 : 0.55, 0).rotateY((i * Math.PI) / 3 + (big ? 0 : 0.5)).toNonIndexed();
         pos.push(...(g.attributes.position as THREE.BufferAttribute).array);
         uv.push(...(g.attributes.uv as THREE.BufferAttribute).array);
         g.dispose();
@@ -270,68 +354,142 @@ export class Harbour implements FinishEnvironment {
     this.plungeFrom.set(sp.x + 12.2, deckY + 0.05, sp.z + 4.2);
     this.plungeTo.set(sp.x + 17.5, sea, sp.z + 6.5);
 
-    // ---------------- sea houses along the quay ----------------
-    const fronts: Array<[number, number]> = [];
-    for (let x = -142; x <= -34; x += 0) {
-      const w = rnd.range(9, 13);
-      fronts.push([x + w / 2, w]);
-      x += w + rnd.range(0.6, 3);
-    }
-    for (let x = 34; x <= 146; x += 0) {
-      const w = rnd.range(9, 13);
-      fronts.push([x + w / 2, w]);
-      x += w + rnd.range(0.6, 3);
-    }
-    fronts.forEach(([dx, w], i) => {
-      const d = rnd.range(12, 16);
-      const hz = zq - 2 - d / 2;
-      const x = F.x + dx;
-      let gy = Infinity;
-      for (const ex of [-w / 2, w / 2]) for (const ez of [-d / 2, d / 2]) gy = Math.min(gy, H(x + ex, hz + ez));
-      gy = Math.max(gy, deckY);
-      const col = PAINT[(i * 3 + rnd.int(0, 1)) % PAINT.length]!;
-      house(b, x, gy, hz, Math.PI / 2, { w: d, d: w, h: rnd.range(6.5, 9.5), roofH: w * 0.55, color: col, door: 'side', chimney: rnd.next() < 0.3 }, rnd);
-      // warehouse loading door + hoist beam on the gable facing the water
-      b.add('paint', new THREE.BoxGeometry(w * 0.32, 2.4, 0.12), mat(x, gy + 5.2, hz + d / 2 + 0.05), 0xf2efe7);
-      b.add('planks', new THREE.BoxGeometry(0.25, 0.25, 1.4), mat(x, gy + 7.4, hz + d / 2 + 0.6), 0x3a2a1e);
-      for (let cx = -w / 2 + 1.6; cx < w / 2; cx += 3.2) this.cols.push({ x: x + cx, z: hz - d / 2 + 1.6, r: 2.0 }, { x: x + cx, z: hz, r: 2.2 }, { x: x + cx, z: hz + d / 2 - 1.6, r: 2.0 });
-    });
-    // a second row of homes up the slope behind, on both sides of the run-out
-    for (let i = 0; i < 9; i++) {
-      const side = i % 2 ? 1 : -1;
-      const dx = side * rnd.range(48, 120);
-      const dz = rnd.range(-40, 60);
-      const p = W(dx, dz);
-      house(b, p.x, p.y, p.z, rnd.range(0, 1) < 0.5 ? 0 : Math.PI / 2, { w: rnd.range(8, 11), d: rnd.range(6, 7.5), h: rnd.range(5, 6.4), color: PAINT[rnd.int(0, PAINT.length - 1)]!, door: 'side', chimney: true }, rnd);
-      this.cols.push({ x: p.x, z: p.z, r: 5.5 });
+    // ---------------- the waterfront (round 2, art review D6 / critic 4) ----------------
+    // Not one gable box in a row: tall warehouses ("sjøhus") on piles at the water's edge with
+    // their loading gables to the sea, low red boathouses between them, and behind the quay a
+    // street of homes of several types (two-storey with porch, cottage with dormer, eaves-on
+    // houses, a long low net loft) lining the run-out, so the view from the finish runs down a
+    // village street onto the quay and the water.
+    const sideRow = (x0: number, x1: number, dir: 1 | -1) => {
+      let x = x0;
+      let i = 0;
+      while ((dir > 0 && x < x1) || (dir < 0 && x > x1)) {
+        const kind = i % 3 === 1 ? 'home' : 'warehouse';
+        const w = kind === 'warehouse' ? rnd.range(8, 10.5) : rnd.range(9, 12);
+        const cx = x + (dir * w) / 2;
+        const px = F.x + cx;
+        const d = kind === 'warehouse' ? rnd.range(13, 17) : rnd.range(11, 14);
+        const hz = zq + 0.6 - d / 2;
+        let gy = Infinity;
+        for (const ex of [-w / 2, w / 2]) for (const ez of [-d / 2, d / 2]) gy = Math.min(gy, H(px + ex, hz + ez));
+        gy = Math.max(gy, deckY);
+        const col = PAINT[(i * 3 + (dir > 0 ? 1 : 0)) % PAINT.length]!;
+        if (kind === 'warehouse') warehouse(b, px, gy + 0.05, hz, -Math.PI / 2, { w: d, d: w, h: rnd.range(8.5, 11), color: col }, rnd);
+        else house(b, px, gy + 0.05, hz, -Math.PI / 2, { w: d, d: w, h: rnd.range(6.8, 8), roofH: w * 0.5, color: col, door: 'side', chimney: true, dormer: i % 2 === 0 }, rnd);
+        for (let cxx = -w / 2 + 1.6; cxx < w / 2; cxx += 3.2) this.cols.push({ x: px + cxx, z: hz - d / 2 + 1.6, r: 2.0 }, { x: px + cxx, z: hz, r: 2.2 }, { x: px + cxx, z: hz + d / 2 - 1.6, r: 2.0 });
+        x += dir * (w + rnd.range(1.2, 3.5));
+        i++;
+      }
+      // red boathouses on stilts over the water beyond the end of the boardwalk
+      for (let k = 0; k < 2; k++) {
+        const px = F.x + dir * (156 + k * 9);
+        house(b, px, deckY - 0.3, zq + 6, -Math.PI / 2, { w: 9, d: 7, h: 3.4, color: k ? 0x9b3524 : 0x8e2c1d, roofH: 2.6, stilts: 7, door: 'boat', windows: false }, rnd);
+      }
+    };
+    sideRow(-34, -146, -1);
+    sideRow(34, 146, 1);
+    // the street of homes either side of the run-out, gables or eaves to the street
+    const homeTypes = [
+      { w: 10, d: 7.5, h: 7.4, porch: true, dormer: false, roofK: 0.5 },
+      { w: 8, d: 6.5, h: 4.4, porch: false, dormer: true, roofK: 0.62 },
+      { w: 12, d: 6, h: 4.8, porch: true, dormer: true, roofK: 0.45 },
+      { w: 7, d: 7, h: 6.2, porch: false, dormer: false, roofK: 0.75 },
+      { w: 15, d: 6, h: 4.0, porch: false, dormer: false, roofK: 0.4 },
+    ];
+    for (const side of [-1, 1] as const) {
+      let dz = 40 + rnd.range(0, 8);
+      let j = side > 0 ? 1 : 0;
+      while (dz < zq - F.z - 26) {
+        const T = homeTypes[j % homeTypes.length]!;
+        const eavesToStreet = j % 3 !== 2;
+        const dx = side * (40 + rnd.range(0, 6) + (eavesToStreet ? T.d / 2 : T.w / 2));
+        const p = W(dx, dz + (eavesToStreet ? T.w / 2 : T.d / 2));
+        let gy = Infinity;
+        for (const ex of [-T.w / 2, T.w / 2]) for (const ez of [-T.d / 2, T.d / 2]) gy = Math.min(gy, H(p.x + ex, p.z + ez));
+        const yaw = eavesToStreet ? (side > 0 ? -Math.PI / 2 : Math.PI / 2) : side > 0 ? Math.PI : 0;
+        const col = PAINT[(j * 3 + (side > 0 ? 1 : 4)) % PAINT.length]!;
+        const trim = j % 5 === 3 ? 0x2d4c78 : 0xf2efe7;
+        house(b, p.x, gy + 0.05, p.z, yaw, { w: T.w, d: T.d, h: T.h, color: col, roofH: T.d * T.roofK, door: 'side', porch: T.porch, dormer: T.dormer, chimney: j % 2 === 0, trim }, rnd);
+        this.cols.push({ x: p.x, z: p.z, r: Math.max(T.w, T.d) * 0.55 });
+        // a picket fence and a parked kick-sled by every other door
+        if (j % 2 === 1) {
+          const q = W(dx - side * (T.d / 2 + 2.4), dz + 1.5);
+          sparkSled(b, q.x, q.y, q.z, side > 0 ? 0.3 : -0.3, j % 4 === 1 ? 0xc8281e : 0x2d4c78);
+        }
+        dz += (eavesToStreet ? T.w : T.d) + rnd.range(3, 8);
+        j++;
+      }
     }
 
-    // ---------------- plaza: podium of fish crates, lamp posts, string lights, benches ----------------
-    const pod = W(-12, 70);
+    // ---------------- the quay plaza: paving, podium, lamps, lights, benches, crates ----------------
+    {
+      // granite setts with snow in the joints, from the end of the chute to the quay edge,
+      // between the house rows; a ragged snow edge (vertex alpha) blends it into the run-out
+      const x0 = -34;
+      const x1 = 34;
+      const z0 = 24;
+      const z1 = zq - F.z;
+      const nx = 34;
+      const nz = Math.max(8, Math.round((z1 - z0) / 2));
+      const pos: number[] = [];
+      const uv: number[] = [];
+      const col: number[] = [];
+      const idx: number[] = [];
+      for (let j = 0; j <= nz; j++)
+        for (let i = 0; i <= nx; i++) {
+          const dx = x0 + ((x1 - x0) * i) / nx;
+          const dz = z0 + ((z1 - z0) * j) / nz;
+          const x = F.x + dx;
+          const z = F.z + dz;
+          pos.push(x, Math.max(H(x, z), j === nz ? deckY : -Infinity) + 0.03, z);
+          uv.push(dx / 3, dz / 3);
+          const edge = Math.min(1, (dz - z0) / 10, (x1 - Math.abs(dx)) / 6);
+          const a = Math.max(0, Math.min(1, edge + 0.25 * Math.sin(dx * 0.7 + dz * 0.3)));
+          col.push(1, 1, 1, a);
+        }
+      for (let j = 0; j < nz; j++)
+        for (let i = 0; i < nx; i++) {
+          const q = j * (nx + 1) + i;
+          idx.push(q, q + nx + 1, q + 1, q + 1, q + nx + 1, q + nx + 2);
+        }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));
+      g.setIndex(idx);
+      g.computeVertexNormals();
+      const tex = settTexture();
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.anisotropy = 8;
+      const pm = new THREE.MeshStandardMaterial({ map: tex, vertexColors: true, transparent: true, roughness: 0.82, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
+      this.textures.push(tex);
+      this.materials.push(pm);
+      const paving = new THREE.Mesh(g, pm);
+      paving.receiveShadow = true;
+      paving.renderOrder = 1;
+      paving.name = 'harbour-paving';
+      this.group.add(paving);
+    }
+    // the presentation spot: a low stack of fish crates the harbourmaster stands on, 5 m beyond
+    // the stop point, facing back up the run-out
+    const pod = W(-1.5, 44);
+    this.presentAt.copy(pod);
     {
       const crate = (x: number, y: number, z: number, c: number, ry: number) => {
         b.add('planks', new THREE.BoxGeometry(1.2, 0.55, 0.8), mat(x, y + 0.275, z, 0, ry, 0), new THREE.Color(c));
         for (const sx of [-0.62, 0.62]) b.add('planks', new THREE.BoxGeometry(0.04, 0.5, 0.82), mat(x + sx * Math.cos(ry), y + 0.28, z - sx * Math.sin(ry), 0, ry, 0), 0x3a2a1e);
       };
-      const stack: Array<[number, number, number]> = [
-        // dx, levels, colour
-        [0, 3, 0x2d4c78],
-        [1.3, 2, 0xc8281e],
-        [-1.3, 1, 0xd59f3a],
-      ];
-      for (const [dx, levels, c] of stack)
-        for (let l = 0; l < levels; l++) {
-          crate(pod.x + dx, pod.y + l * 0.55, pod.z, c, 0);
-          crate(pod.x + dx, pod.y + l * 0.55, pod.z + 0.82, c, 0);
-        }
-      this.podiumTop.set(pod.x, pod.y + 3 * 0.55, pod.z + 0.4);
-      this.cols.push({ x: pod.x, z: pod.z + 0.4, r: 1.0 }, { x: pod.x + 1.3, z: pod.z + 0.4, r: 1.0 }, { x: pod.x - 1.3, z: pod.z + 0.4, r: 1.0 });
-      // a coil of rope and a buoy beside it
-      b.add('metal', new THREE.TorusGeometry(0.45, 0.09, 6, 16).rotateX(Math.PI / 2), mat(pod.x + 2.6, pod.y + 0.1, pod.z + 0.2), 0xc9b48a);
-      b.add('paint', new THREE.SphereGeometry(0.35, 10, 8), mat(pod.x - 2.6, pod.y + 0.35, pod.z + 0.6), 0xe86a1e);
+      for (const dx of [-0.62, 0.62]) for (const dz of [-0.42, 0.42]) crate(pod.x + dx, pod.y, pod.z + dz, 0x2d4c78, 0);
+      // stacks beside it: red and ochre crates, the trophy waits on the tallest
+      for (let l = 0; l < 2; l++) crate(pod.x + 2.2, pod.y + l * 0.55, pod.z, 0xc8281e, 0.1);
+      crate(pod.x - 2.1, pod.y, pod.z + 0.2, 0xd59f3a, -0.15);
+      this.podiumTop.set(pod.x + 2.2, pod.y + 2 * 0.55, pod.z);
+      this.cols.push({ x: pod.x, z: pod.z, r: 1.4 }, { x: pod.x + 2.2, z: pod.z, r: 0.9 }, { x: pod.x - 2.1, z: pod.z, r: 0.9 });
+      b.add('metal', new THREE.TorusGeometry(0.45, 0.09, 6, 16).rotateX(Math.PI / 2), mat(pod.x + 3.6, pod.y + 0.1, pod.z + 0.4), 0xc9b48a);
+      b.add('paint', new THREE.SphereGeometry(0.35, 10, 8), mat(pod.x - 3.4, pod.y + 0.35, pod.z + 0.9), 0xe86a1e);
     }
     const bulbs: Array<{ p: THREE.Vector3; c: number }> = [];
-    const poles = [W(-22, 52), W(20, 50), W(24, 100), W(-26, 104), W(0, 128)];
+    const poles = [W(-24, 56), W(22, 54), W(26, 112), W(-28, 116), W(0, 150)];
     const tops = poles.map((p) => {
       const t = lampPost(b, p.x, p.y, p.z);
       bulbs.push({ p: t, c: 0xffc070 });
@@ -340,24 +498,39 @@ export class Harbour implements FinishEnvironment {
     });
     for (let i = 0; i < tops.length; i++) stringLights(b, tops[i]!, tops[(i + 1) % tops.length]!, 0.7, hi ? 0.6 : 0.9, bulbs, rnd);
     for (const [dx, dz, ry] of [
-      [-8, 112, 0],
-      [10, 116, 0.2],
-      [-30, 80, 1.4],
+      [-10, 120, 0],
+      [12, 124, 0.2],
+      [-30, 86, 1.4],
     ] as const) {
       const p = W(dx, dz);
       bench(b, p.x, p.y, p.z, ry);
       this.cols.push({ x: p.x, z: p.z, r: 0.9 });
     }
-    // drying racks for stockfish ("hjell"): a timber frame hung with fish
-    for (const [dx, dz] of [
-      [-70, 30],
-      [62, 20],
-    ] as const) {
-      const p = W(dx, dz);
-      for (const s of [-1, 1]) b.add('planks', new THREE.CylinderGeometry(0.1, 0.12, 3.4, 5), mat(p.x + s * 4, p.y + 1.7, p.z), 0x5a4030);
-      b.add('planks', new THREE.BoxGeometry(8.4, 0.16, 0.16), mat(p.x, p.y + 3.2, p.z), 0x5a4030);
-      for (let k = -3.7; k < 3.8; k += 0.45) b.add('paint', new THREE.ConeGeometry(0.12, 1.0, 4), mat(p.x + k, p.y + 2.55, p.z, Math.PI, 0, 0), new THREE.Color(0xb59a6a).multiplyScalar(0.8 + 0.2 * Math.sin(k * 7)));
-      this.cols.push({ x: p.x - 4, z: p.z, r: 0.4 }, { x: p.x + 4, z: p.z, r: 0.4 });
+    // fish crates, barrels and a hand cart along the quay edge
+    for (let i = 0; i < 9; i++) {
+      const dx = rnd.range(-30, 30);
+      const p = W(dx, zq - F.z - rnd.range(2.5, 6));
+      const y0 = Math.max(p.y, deckY);
+      const c = [0x2d4c78, 0xc8281e, 0xd59f3a, 0xece7dc][i % 4]!;
+      for (let l = 0; l < 1 + (i % 3); l++) b.add('planks', new THREE.BoxGeometry(1.2, 0.5, 0.8), mat(p.x, y0 + 0.25 + l * 0.5, p.z, 0, rnd.range(-0.2, 0.2), 0), c);
+      this.cols.push({ x: p.x, z: p.z, r: 0.8 });
+    }
+    // stockfish racks ("hjell"): the big one up at the snow line where the Yeti stops, two more
+    // along the edge of the village
+    {
+      const rp = W(-46, 10);
+      fishRack(b, rp.x, rp.y - 0.1, rp.z, Math.PI / 2, 12, rnd);
+      this.rack.set(rp.x, rp.y, rp.z);
+      this.rackAxis.set(0, 0, 1);
+      for (const dz of [-5.5, 0, 5.5]) for (const s of [-0.75, 0.75]) this.cols.push({ x: rp.x + s, z: rp.z + dz, r: 0.3 });
+      for (const [dx, dz, ry] of [
+        [58, 18, 0.3],
+        [-64, 64, Math.PI / 2],
+      ] as const) {
+        const q = W(dx, dz);
+        fishRack(b, q.x, q.y - 0.1, q.z, ry, 9, rnd);
+        this.cols.push({ x: q.x, z: q.z, r: 1.2 });
+      }
     }
 
     // ---------------- lighthouse on a skerry at the harbour mouth ----------------
@@ -384,20 +557,27 @@ export class Harbour implements FinishEnvironment {
 
     // ---------------- moored boats (bob gently) ----------------
     this.boats = new THREE.Group();
-    const boatB = new Batch();
+    // round 2 (art review D6): boats where the finish cameras and the player see them — moored
+    // stern-to along the central boardwalk, alongside the finger piers, a bigger trawler at the
+    // end of the east pier, two boats underway further out
     const moor: Array<[number, number, number, number]> = [
-      [-52, 20, 0.1, 0],
-      [-66, 44, -0.08, 1],
-      [28, 26, 0.05, 2],
+      [-22, 5.5, 1.5, 0],
+      [-8, 5.0, 1.62, 1],
+      [9, 5.5, 1.48, 2],
+      [-52, 20, 0.1, 3],
+      [-64, 42, -0.08, 4],
+      [28, 24, 0.05, 5],
       [100, 30, -0.1, 3],
       [84, 56, 0.12, 4],
-      [-20, 46, 0.3, 5],
+      [-20, 46, 0.3, 0],
+      [-150, 160, 0.9, 1],
+      [120, 230, -0.6, 2],
     ];
     const hulls = [0x2d4c78, 0xc8281e, 0xf2efe7, 0x1d4a3a, 0xd59f3a, 0x15171b];
     const boatMeshes: THREE.Group[] = [];
     for (const [dx, dz, yaw, k] of moor) {
       const one = new Batch();
-      fishingBoat(one, 0, 0, 0, 0, { len: k === 3 ? 16 : rnd.range(9, 13), hull: hulls[k]!, stripe: k === 2 ? 0x2d4c78 : 0xf2efe7, cabin: k === 2 ? 0x2d4c78 : 0xf2efe7 });
+      fishingBoat(one, 0, 0, 0, 0, { len: dx === 100 ? 18 : rnd.range(9, 13), hull: hulls[k]!, stripe: k === 2 ? 0x2d4c78 : 0xf2efe7, cabin: k === 2 ? 0x2d4c78 : 0xf2efe7 });
       const g = new THREE.Group();
       for (const me of one.build(M, { cast: hi, receive: true })) g.add(me);
       g.position.set(F.x + dx, sea, bwz1 + dz);
@@ -406,7 +586,19 @@ export class Harbour implements FinishEnvironment {
       boatMeshes.push(g);
       this.boatsBob.push({ o: g, y: sea, ph: rnd.range(0, 6) });
     }
-    void boatB;
+    // distant ships on the horizon: a coastal freighter and a ferry heading out (static silhouettes)
+    for (const [dx, dz, L, yaw] of [
+      [-900, 2600, 110, 0.4],
+      [700, 3600, 140, -1.2],
+    ] as const) {
+      const sb = new Batch();
+      ferry(sb, L);
+      const g = new THREE.Group();
+      for (const me of sb.build(M, { cast: false, receive: false })) g.add(me);
+      g.position.set(F.x + dx, sea, zq + dz);
+      g.rotation.y = yaw;
+      this.boats.add(g);
+    }
     this.group.add(this.boats);
 
     // ---------------- build ----------------
@@ -425,9 +617,15 @@ export class Harbour implements FinishEnvironment {
       new Particles({ count: hi ? 24 : 10, origin: new THREE.Vector3(tub.x + tubR + 0.5, tub.y + 2.5, tub.z), radius: 0.1, life: [3, 6], rise: [0.6, 1.0], drift: new THREE.Vector3(0.8, 0, 0.2), size: [0.5, 2.6], alpha: 0.25, color: 0xd8dde4, colorEnd: 0xa8b0bc, swirl: 0.3 }, soft),
       new Particles({ count: hi ? 22 : 10, origin: fire.clone().setY(fire.y + 1.2), radius: 0.3, life: [0.8, 2.0], rise: [0.9, 1.7], drift: new THREE.Vector3(0.2, 0, 0.05), size: [0.08, 0.04], alpha: 1, color: 0xffc050, colorEnd: 0xff3000, additive: true, swirl: 0.5 }, soft),
     );
+    this.particles.push(new Particles({ count: hi ? 26 : 10, origin: this.saunaChimney.clone(), radius: 0.08, life: [3, 6], rise: [0.7, 1.1], drift: new THREE.Vector3(0.9, 0, 0.2), size: [0.5, 2.8], alpha: 0.3, color: 0xdde2e8, colorEnd: 0xa8b0bc, swirl: 0.3 }, soft));
     this.splash = new Particles({ count: 60, origin: this.plungeTo.clone(), radius: 0.6, life: [0.6, 1.4], rise: [3.5, 6], drift: new THREE.Vector3(0, 0, 0), size: [0.25, 0.6], alpha: 0.85, color: 0xffffff, swirl: 0.1 }, soft);
     this.splash.points.visible = false;
     this.particles.push(this.splash);
+    this.ring = new THREE.Mesh(new THREE.RingGeometry(0.7, 1.0, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xf4f8fb, transparent: true, opacity: 0, depthWrite: false }));
+    this.ring.position.copy(this.plungeTo).setY(this.sea + 0.06);
+    this.ring.visible = false;
+    this.materials.push(this.ring.material as THREE.Material);
+    this.group.add(this.ring);
     for (const p of this.particles) this.group.add(p.points);
     const gl = bulbs.map((q) => ({ p: q.p, c: q.c, size: 0.55, a: 0.5 }));
     gl.push({ p: fire.clone().setY(fire.y + 1.4), c: 0xff7a20, size: 2.6, a: 0.35 });
@@ -439,9 +637,10 @@ export class Harbour implements FinishEnvironment {
     const guestMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, side: THREE.DoubleSide });
     this.materials.push(guestMat);
     this.stop.copy(W(0, 38));
-    this.yetiPt.copy(W(-62, -16));
+    // the Yeti stops at the stockfish rack (round 2: C7 — the gag is staged at the rack)
+    this.yetiPt.copy(W(-49.5, 7.5));
     const ground = (x: number, z: number) => Math.max(H(x, z), x > F.x - quayW && x < F.x + quayW && z > zq ? deckY + 0.1 : -Infinity);
-    const seat = () => this.stamp.y - 0.25;
+    const seat = () => this.stamp.y - 0.42;
     const pierY = () => deckY + 0.1;
     LOOKS.forEach((s, i) => {
       if (!hi && (i === 3 || i === 4)) return;
@@ -458,8 +657,9 @@ export class Harbour implements FinishEnvironment {
         const p = W(dx, dz);
         g.place(p.x, p.z, Math.atan2(this.stop.x - p.x, this.stop.z - p.z), null);
       } else if (s.beh.seated) {
-        const a = (i === 5 ? -0.7 : 0.9) + Math.PI;
-        g.place(tub.x + Math.sin(a) * (tubR - 0.1), tub.z + Math.cos(a) * (tubR - 0.1), a + Math.PI, null);
+        // inside the staves (round 2: C4), facing the middle of the tub
+        const a = (i === 5 ? -0.7 : 1.3) + Math.PI;
+        g.place(tub.x + Math.sin(a) * (tubR - 0.62), tub.z + Math.cos(a) * (tubR - 0.62), a + Math.PI, null);
       } else {
         g.place(this.plungeFrom.x, this.plungeFrom.z, Math.atan2(this.plungeTo.x - this.plungeFrom.x, this.plungeTo.z - this.plungeFrom.z), null);
       }
@@ -468,6 +668,18 @@ export class Harbour implements FinishEnvironment {
     });
     this.plunger = this.guests[this.guests.length - 1]!;
     this.plungerHome.copy(this.plunger.group.position);
+    this.plungerScale = this.plunger.group.scale.x;
+    // the harbourmaster in yellow oilskins, standing on the crates, who presents the trophy
+    {
+      const base = { hatColor: 0xffffff, hatColor2: 0xffffff, scarf: null, fur: null, gloves: null, mug: null, mugColor: 0xffffff, beard: false } as const;
+      const look: GuestLook = { ...base, male: true, height: 1.86, skin: 0xe8b898, hair: 0xb8b0a0, hairStyle: 'short', headwear: 'beanie', hatColor: 0x1f3554, hatColor2: 0x1f3554, top: 'parka', topColor: 0xe8b21e, accent: 0x6b4a10, pants: 'ski', pantsColor: 0x1d2838, boots: 'snow', bootColor: 0x1a1a1a, gloves: 0x2a2a2a, lips: 0xa0605a, eyes: 0x4a6a8a, beard: true };
+      const pTop = this.presentAt.y + 0.55;
+      const g = new Guest(look, { cheerStyle: 'armsUp', canWalk: false, seed: 263, waveArm: 'R', energy: 0.6 }, guestMat, () => pTop);
+      g.place(this.presentAt.x, this.presentAt.z, Math.atan2(this.stop.x - this.presentAt.x, this.stop.z - this.presentAt.z), null);
+      this.presenter = g;
+      this.guests.push(g);
+      this.group.add(g.group);
+    }
     this.update(0.016, 0, { cheer: 0, lookAt: null, welcome: 0 });
   }
 
@@ -538,17 +750,42 @@ export class Harbour implements FinishEnvironment {
     for (const g of this.guests) if (g !== this.plunger || this.plunge <= 0) g.update(dt, time, cheer, s.lookAt, welcome);
     // the cold plunge: a run off the pier end, an arc, a splash
     if (this.plunge > 0) {
+      // round 2 (C4): a run-up to the pier edge, a spring, a tucked cannonball, the splash
       const k = Math.min(1, this.plunge);
-      const p = this.plungerHome.clone().lerp(this.plungeTo, k);
-      p.y = this.plungerHome.y + (this.plungeTo.y - 1.4 - this.plungerHome.y) * k * k + Math.sin(k * Math.PI) * 2.2;
-      this.plunger.group.position.copy(p);
-      this.plunger.group.rotation.x = k * 2.6;
-      this.plunger.update(dt, time, 1, null, 0);
+      const edge = this.plungerHome.clone().lerp(this.plungeTo, 0.18);
+      edge.y = this.plungerHome.y;
+      const g = this.plunger.group;
+      if (k < 0.22) {
+        const u = k / 0.22;
+        g.position.lerpVectors(this.plungerHome, edge, u);
+        g.position.y = this.plungerHome.y + Math.abs(Math.sin(u * Math.PI * 3)) * 0.12;
+        g.rotation.x = 0.25 * u;
+        g.scale.setScalar(this.plungerScale);
+        this.plunger.update(dt, time, 1, null, 0);
+      } else {
+        const u = (k - 0.22) / 0.78;
+        const p = edge.clone().lerp(this.plungeTo, u);
+        p.y = edge.y + (this.plungeTo.y - 0.9 - edge.y) * u * u + Math.sin(u * Math.PI) * 2.4;
+        g.position.copy(p);
+        // tuck: knees to chest (squashed into a ball), a slow forward roll
+        const tuck = Math.min(1, u / 0.25);
+        g.scale.set(this.plungerScale * (1 + 0.15 * tuck), this.plungerScale * (1 - 0.42 * tuck), this.plungerScale * (1 + 0.15 * tuck));
+        g.rotation.x = 0.25 + u * 1.3;
+        this.plunger.update(dt, time, 0, null, 0);
+      }
       if (k >= 1 && !this.splashed) {
         this.splashed = true;
         this.splash.points.visible = true;
         this.plunger.group.visible = false;
+        this.splashT = 0;
       }
+    }
+    if (this.splashT >= 0) {
+      this.splashT += dt;
+      const u = Math.min(1, this.splashT / 2.2);
+      this.ring.visible = u < 1;
+      this.ring.scale.setScalar(0.6 + 5.5 * Math.sqrt(u));
+      (this.ring.material as THREE.MeshBasicMaterial).opacity = 0.75 * (1 - u);
     }
   }
 
@@ -576,7 +813,10 @@ export class Harbour implements FinishEnvironment {
     this.splash.points.visible = false;
     this.plunger.group.visible = true;
     this.plunger.group.rotation.x = 0;
+    this.plunger.group.scale.setScalar(this.plungerScale);
     this.plunger.group.position.copy(this.plungerHome);
+    this.splashT = -1;
+    this.ring.visible = false;
   }
 
   dispose(): void {

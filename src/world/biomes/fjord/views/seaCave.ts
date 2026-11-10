@@ -240,6 +240,9 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     for (let k = 0; k < 6; k++) gy = Math.min(gy, m.heightAt(p.x + Math.cos(k) * R, p.z + Math.sin(k) * R));
     const base = gy - 0.6;
     const topY = Math.max(p.y, gy) + h;
+    const centre = new THREE.Vector3(p.x, (base + topY) / 2, p.z);
+    const rad = Math.max(R, (topY - base) / 2);
+    if (!ok(centre, rad)) return;
     const g = new THREE.CylinderGeometry(R * 0.97, R, topY - base, 6, 1);
     // chamfer the top rim slightly (a bevel ring)
     const P = g.attributes.position as THREE.BufferAttribute;
@@ -263,7 +266,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     b.add('snow', cap, mat(p.x, topY + 0.1, p.z), 0xffffff);
     b.add('snow', new THREE.SphereGeometry(R * 0.78, 10, 4, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.22, 1), mat(p.x, topY + 0.19, p.z), 0xffffff);
     perches.push({ p: new THREE.Vector3(p.x, topY + 0.3, p.z) });
-    props.push({ p: new THREE.Vector3(p.x, (base + topY) / 2, p.z), r: Math.max(R, (topY - base) / 2), kind: 'column' });
+    props.push({ p: centre, r: rad, kind: 'column' });
   };
   for (const s of [-1, 1]) {
     const rows = hi ? 5 : 4;
@@ -277,8 +280,6 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
         const h = Math.max(0.6, (10.5 - k * 1.15 - (rows - 1 - r) * 1.1) * rnd.range(0.7, 1.05));
         const seed = rnd.next() * 100;
         if (rnd.next() < 0.1) continue;
-        const centre = p.clone().setY(p.y + h / 2);
-        if (!ok(centre, Math.max(R, h / 2))) continue;
         addColumn(p, R, h, seed);
       }
   }

@@ -500,11 +500,11 @@ export class Coast {
           const shore = 1 - smoothstep(0.92, 1.25, q);
           // steep shore (the first ~18 % inside the waterline rises fast: bare rock), then a
           // flatter rounded top where snow lies; clefts and ridges follow the grain (along u)
-          const rise = smoothstep(1.0, 0.82, q);
+          const rise = smoothstep(1.0, 0.78, q);
           const dome = Math.pow(Math.max(0, 1 - q * q), 0.55);
           const grain = ridged(u * 2.4 + b.k, v * 0.9, this.seed + 98, 2) - 0.45;
           const cleft = 1 - 0.35 * smoothstep(0.82, 1.0, 1 - Math.abs(gnoise(u * 1.7 + b.k, 0.5, this.seed + 99)));
-          const top = (2.5 + b.h * (0.35 * rise + 0.65 * dome) * cleft + b.h * 0.18 * grain * dome) * shore;
+          const top = (2.5 + b.h * (0.5 * rise + 0.5 * dome) * cleft + b.h * 0.22 * grain * dome) * shore;
           const hgt = lv - this.p.depth + (this.p.depth + top) * smoothstep(1.25, 0.98, q);
           if (hgt > best) best = hgt;
         }
@@ -528,7 +528,7 @@ export class Coast {
       // drawn by them): nothing smaller than ~150 m across
       const big = r.float() < 0.6;
       const a = big ? r.range(260, 480) : r.range(140, 240);
-      const main = { x: cx, z: cz, a, b: a * r.range(0.4, 0.62), c: Math.cos(ang), s: Math.sin(ang), h: big ? r.range(70, 150) : r.range(30, 65), k: r.range(0, 50) };
+      const main = { x: cx, z: cz, a, b: a * r.range(0.4, 0.62), c: Math.cos(ang), s: Math.sin(ang), h: big ? r.range(95, 185) : r.range(40, 80), k: r.range(0, 50) };
       out.push(main);
       // satellite islets and skerries along the grain, off the ends and one side
       const n = r.int(1, 4);
