@@ -17,6 +17,9 @@ import { ProgressTracker } from '../../src/progression/tracker';
 import { simulateRun } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
 import { worldFor } from '../../src/game/simulate';
+import { SkierPhysics, PHYS_DT } from '../../src/physics/SkierPhysics';
+import { RunTelemetry } from '../../src/game/telemetry';
+import type { Kicker } from '../../src/world/profile';
 
 const DAY = '2026-11-09';
 const NOW = Date.parse(`${DAY}T12:00:00Z`);
@@ -144,6 +147,41 @@ describe('working achievements unlock from event sequences', () => {
     expect(play([started(), finished('victory')], NOW, stats, earned)).toEqual(['first-descent']);
     expect(play([started(), finished('victory')], NOW + 5000, stats, earned)).toEqual([]);
     expect(earned['first-descent']).toEqual({ earnedAt: NOW });
+  });
+});
+
+describe('Airborne is a skill threshold the real physics can reach', () => {
+  /** classic course, skilled line; with `pop`: tuck into each kicker and pop off the lip */
+  function ride(pop: boolean): string[] {
+    const { m, f } = worldFor();
+    const phys = new SkierPhysics(m, f);
+    phys.reset(m.routeX(0), 0, 0, 0);
+    const bus = new EventBus();
+    const tel = new RunTelemetry(bus);
+    const stats = emptyStats();
+    const earned: EarnedMap = {};
+    const got: string[] = [];
+    bus.onAny((e) => got.push(...evaluateEvent(stats, earned, e, { run: null, now: NOW }).map((d) => d.id)));
+    const ks: Kicker[] = [];
+    let t = 0;
+    while (t < 300 && phys.s.pos.z < m.finishZ) {
+      const inp = autopilotInput(m, phys.s, 'skilled', t);
+      if (pop) {
+        ks.length = 0;
+        m.profile.kickersNear(phys.s.pos.z, phys.s.pos.z + 12, ks);
+        inp.tuck = 1;
+        if (ks[0] && phys.s.grounded) inp.pop = ks[0].z - phys.s.pos.z > 0.6;
+      }
+      phys.step(inp, PHYS_DT);
+      t += PHYS_DT;
+      for (const e of phys.drainEvents()) tel.onSkierEvent(e, phys.s);
+      tel.step(phys.s, PHYS_DT);
+    }
+    return got;
+  }
+  it('rolling over the kickers is not enough (longest ~1.45 s); popping off the lip earns it', () => {
+    expect(ride(false)).not.toContain('airborne');
+    expect(ride(true)).toContain('airborne');
   });
 });
 
