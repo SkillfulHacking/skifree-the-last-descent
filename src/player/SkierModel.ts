@@ -272,6 +272,11 @@ export class SkierModel {
     setJacketColor(this.mats, color);
   }
 
+  /** current jacket colour (sRGB hex; tests) */
+  get jacketColor(): number {
+    return this.mats.jacket.color.getHex();
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;

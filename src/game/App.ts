@@ -269,7 +269,8 @@ export class App {
       id: 'locker',
       title: 'LOCKER',
       subtitle: 'Cosmetic only: nothing here changes how the skier handles.',
-      cls: 'wide locker',
+      // no backdrop blur: the menu skier on the right shows the jacket live
+      cls: 'locker',
       onBack: () => this.menu.pop(),
       items: [
         {
@@ -285,7 +286,7 @@ export class App {
           },
         },
         { kind: 'info', html: lockedHtml },
-        { kind: 'info', html: '<p class="menu-note">More gear (helmets, goggles, skis, outfits, Yeti cosmetics, victory poses) will arrive with the biome and Daily rewards. See docs/PROGRESSION.md.</p>' },
+        { kind: 'info', html: '<p class="menu-note">More gear (helmets, goggles, skis, outfits, Yeti cosmetics, victory poses) will come as rewards for mastering the new locations and Daily runs.</p>' },
         { kind: 'button', label: 'Back', action: () => this.menu.pop() },
       ],
     };
@@ -960,7 +961,7 @@ export class App {
       },
       pause: () => this.pause(),
       menuId: () => this.menu.current?.id ?? null,
-      progress: () => ({ saved: structuredClone(this.progress.saved), persisting: this.progress.persisting, attached: this.progress.attached, toast: this.toast.text, events: this.session ? this.session.events.history.map((e) => e.type) : [] }),
+      progress: () => ({ saved: structuredClone(this.progress.saved), persisting: this.progress.persisting, attached: this.progress.attached, toast: this.toast.text, jacket: this.skier?.jacketColor ?? null, events: this.session ? this.session.events.history.map((e) => e.type) : [] }),
       pressMenu: (label: string) => {
         const it = this.menu.current?.items.find((i) => i.kind === 'button' && i.label === label);
         if (it && it.kind === 'button') it.action();
