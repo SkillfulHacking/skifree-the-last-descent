@@ -186,6 +186,10 @@ export interface BiomeTerrain {
   segmentWeights?: Partial<Record<SegmentType, number>>;
   /** segment types that may get an alternate line; omit for the original set */
   altTypes?: readonly SegmentType[];
+  /** floor (degrees) on regular segments' slope; omit for none (see profile.ts ProfileKnobs) */
+  minSlope?: number;
+  /** ridgeline spines with gap jumps; omit for none (see profile.ts ProfileKnobs) */
+  spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
   /** valley wall height (m) */
   wallHeight: number;
   /** ridged/fbm relief on the valley walls (m) */

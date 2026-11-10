@@ -131,8 +131,14 @@ export function makeFjordBiome(): Biome {
       slopeScale: 1,
       widthScale: 1.08,
       swingScale: 0.8,
-      segmentWeights: { alpine: 3, highspeed: 2.2, powder: 1.6, basin: 1.2, ridgeline: 2, cliffside: 1.3, beginner: 0.6, forest: 0.35, chute: 0.3, moguls: 0.5 },
+      // large open downhill runs: fast open segments and exposed ridgelines; few gentle ones, and
+      // none flatter than 14° (a flat run-in costs a non-expert the chase, not the environment)
+      segmentWeights: { alpine: 3, highspeed: 2.6, powder: 0.8, basin: 0.6, ridgeline: 2.2, cliffside: 1.4, beginner: 0.3, forest: 0.35, chute: 0.4, moguls: 0.5 },
+      minSlope: 14,
       altTypes: ['alpine', 'highspeed', 'powder', 'basin', 'ridgeline', 'forest'],
+      // ridgeline shortcuts: every ridgeline gets a wind-packed spine bowed out toward the sea
+      // cliff, with a gully to jump from a take-off halfway along (fast, exposed, optional)
+      spine: { types: ['ridgeline'], bow: 0.55, side: -1, gap: true },
       wallHeight: 380,
       wallRelief: 170,
       rangeHeight: 1150,

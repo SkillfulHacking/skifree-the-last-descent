@@ -103,9 +103,18 @@ export interface HazardEffect {
   knock?: { keep: number; wobble: number };
   /** crash the skier. Fired once per contact. */
   crash?: { reason: string; intensity: number };
-  /** extra wind (m/s) at the skier, e.g. a vent's updraft or a funnelled gust */
+  /** extra wind (m/s) at the skier, e.g. a vent's updraft or a funnelled gust (airborne coupling) */
   windX?: number;
   windZ?: number;
+  /**
+   * Side-slip a gust forces on a GROUNDED skier (m/s, world axes; +X is the skier's left when
+   * facing downhill): the snow surface is blown out from under the skis, so the skier slides that
+   * way without gaining or losing speed. How much of it takes hold depends on the edge (more when
+   * tucked or drifting, less when the skis bite: SkierPhysics). Counter it by steering against it.
+   * Keep |slip| ≤ 4.
+   */
+  slipX?: number;
+  slipZ?: number;
   /** × fog density for the renderer (steam, fog bank) */
   visibility?: number;
 }

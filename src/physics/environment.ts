@@ -6,6 +6,8 @@
  *  - out.surface   → grip, friction, steering (carve radius), pizza braking, drift threshold,
  *                    recovery rate, extra drag (see SurfaceModifiers);
  *  - out.airAccel* → horizontal acceleration while airborne (crosswind);
+ *  - out.groundSlip* → side-slip while grounded (a squall across the piste): moves the skier
+ *                    without changing their speed; edging (braking) resists it, tuck/drift add to it;
  *  - out.balance   → minimum wobble while grounded (gusts, rough ground);
  *  - out.knock     → speed loss + stagger (once, like a snowball hit);
  *  - out.crash     → a crash with that reason.
@@ -36,6 +38,9 @@ export interface EnvSample {
   surface: SurfaceModifiers;
   airAccelX: number;
   airAccelZ: number;
+  /** side-slip of a grounded skier, m/s (0 unless a hazard blows the skier sideways) */
+  groundSlipX: number;
+  groundSlipZ: number;
   balance: number;
   knock: { keep: number; wobble: number } | null;
   crash: { reason: string; intensity: number } | null;
@@ -48,7 +53,7 @@ export interface PhysicsEnvironment {
 }
 
 export function makeEnvSample(): EnvSample {
-  return { surface: { ...IDENTITY_SURFACE }, airAccelX: 0, airAccelZ: 0, balance: 0, knock: null, crash: null };
+  return { surface: { ...IDENTITY_SURFACE }, airAccelX: 0, airAccelZ: 0, groundSlipX: 0, groundSlipZ: 0, balance: 0, knock: null, crash: null };
 }
 
 export function makeEnvQuery(): EnvQuery {

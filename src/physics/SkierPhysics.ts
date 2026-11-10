@@ -52,6 +52,9 @@ export const TUNING = {
   landCrash: 11.5,
 };
 
+/** How a grounded side-slip (EnvSample.groundSlip*) takes hold, by what the skier is doing. */
+export const SLIP_EDGE = { base: 1, tuck: 0.6, brake: 0.45, drift: 0.6 } as const;
+
 export interface SkierInput {
   steer: number; // -1..1 (+ = right)
   tuck: number; // 0..1
@@ -304,6 +307,13 @@ export class SkierPhysics {
     // smoothed normal right on a crest would bend the velocity down before the lip.
     const prevY = s.pos.y;
     tmpA.copy(s.pos).addScaledVector(s.vel, dt);
+    // a location's side-slip (a squall blowing the snow out from under the skis): moves the skier
+    // without changing their speed. Biting edges (pizza) resist it; a tuck or a drift gives it more.
+    if (E.groundSlipX !== 0 || E.groundSlipZ !== 0) {
+      const k = SLIP_EDGE.base * (1 + SLIP_EDGE.tuck * s.tuck) * (1 - SLIP_EDGE.brake * s.brake) * (1 + SLIP_EDGE.drift * s.driftAmount);
+      tmpA.x += E.groundSlipX * k * dt;
+      tmpA.z += E.groundSlipZ * k * dt;
+    }
     const hNew = this.mountain.heightAt(tmpA.x, tmpA.z);
     const hd = Math.hypot(tmpA.x - s.pos.x, tmpA.z - s.pos.z);
     const yBallistic = prevY + s.pathSlope * hd - 0.5 * GRAVITY * dt * dt;

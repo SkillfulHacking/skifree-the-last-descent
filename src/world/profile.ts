@@ -134,6 +134,24 @@ export interface Kicker {
   run: number; // approach length
 }
 
+/**
+ * A gap: a gully cut across an alternate line just past a kicker (Fjord: meltwater gullies running
+ * to the sea cliff, jumped from a take-off on the ridgeline spine). Heights are cut by the location
+ * (Coast.shape); obstacles keep clear of it through the kicker exclusion.
+ */
+export interface GapCut {
+  /** upstream edge of the gully (m) and its length along z */
+  z: number;
+  len: number;
+  /** centre x of the gully where it crosses the line, and its half-width across the slope */
+  x: number;
+  hw: number;
+  /** depth below the surrounding snow (m) */
+  depth: number;
+  /** the take-off kicker's lip z */
+  lipZ: number;
+}
+
 export interface CliffBand {
   z: number; // drop edge
   dMin: number;
@@ -230,6 +248,8 @@ export interface CourseProfile {
   flatten(z: number): number;
   kickersNear(z0: number, z1: number, out: Kicker[]): Kicker[];
   cliffsNear(z0: number, z1: number, out: CliffBand[]): CliffBand[];
+  /** gap jumps (gullies past a take-off) overlapping [z0, z1]; optional (none by default) */
+  gapsNear?(z0: number, z1: number, out: GapCut[]): GapCut[];
   encounters(z0: number, z1: number): Encounter[];
   sightings(z0: number, z1: number): Sighting[];
   checkpoints(z0: number, z1: number): number[];
@@ -252,6 +272,11 @@ export interface AltRoute {
   z1: number;
   /** segment type it belongs to */
   type: SegmentType;
+  /**
+   * A spine: the line bows out by this many metres (signed, +X/−X) at its middle instead of running
+   * as a straight chord (Fjord: the exposed sea-side ridge, see ProfileKnobs.spine).
+   */
+  bow?: number;
 }
 
 function between<T extends { z: number }>(arr: readonly T[], z0: number, z1: number, out: T[]): T[] {
@@ -486,6 +511,18 @@ export interface ProfileKnobs {
    * highspeed). A location can add e.g. 'ridgeline' for shortcuts along exposed ridges.
    */
   altTypes?: readonly SegmentType[];
+  /**
+   * Floor (degrees, after slopeScale) on the slope of regular segments: a location of "large open
+   * downhill runs" can keep its gentle segment types (basin, powder) from becoming flat run-ins
+   * where a skier who does not tuck loses ground to the Yeti. Omit for none (original courses).
+   */
+  minSlope?: number;
+  /**
+   * Ridgeline spines (Fjord): alternate lines of these segment types are always laid, bowed out by
+   * `bow` × half-width toward `side` (the exposed ridge above the sea cliff), and with `gap` a gully
+   * to jump from a take-off kicker halfway along. Omit for none (original courses).
+   */
+  spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
 }
 export const DEFAULT_KNOBS: ProfileKnobs = { slopeScale: 1, widthScale: 1, swingScale: 1 };
 
@@ -581,6 +618,7 @@ export class GeneratedProfile implements CourseProfile {
   private steepN = new KeyTrack();
   private kick: Kicker[] = [];
   private cliffs: CliffBand[] = [];
+  private gaps: GapCut[] = [];
   private segs: Segment[] = [];
   private enc: Encounter[] = [];
   private sight: Sighting[] = [];
@@ -735,8 +773,12 @@ export class GeneratedProfile implements CourseProfile {
       if (room < len + 250) len = room; // fill exactly up to the special zone
     }
     const z1 = z0 + len;
-    const sA = rng.range(spec.slope[0], spec.slope[1]) * K.slopeScale;
-    const sB = rng.range(spec.slope[0], spec.slope[1]) * K.slopeScale;
+    let sA = rng.range(spec.slope[0], spec.slope[1]) * K.slopeScale;
+    let sB = rng.range(spec.slope[0], spec.slope[1]) * K.slopeScale;
+    if (K.minSlope !== undefined) {
+      sA = Math.max(K.minSlope, sA);
+      sB = Math.max(K.minSlope, sB);
+    }
     const w = rng.range(spec.width[0], spec.width[1]) * K.widthScale;
     const a = rng.range(spec.amp[0], spec.amp[1]) * K.swingScale;
     const steepSide = rng.chance(0.5) ? 1 : -1;
@@ -784,11 +826,31 @@ export class GeneratedProfile implements CourseProfile {
     // an alternate line on wide, flowing segments (decided from this segment's own rng, so the
     // plan does not depend on generation order)
     const altOk = K.altTypes ? K.altTypes.includes(type) : type === 'forest' || type === 'powder' || type === 'basin' || type === 'alpine' || type === 'highspeed';
-    if (altOk && len > 380 && rng.chance(0.65)) {
-      this.alts.push({ z0: z0 + edge + 10, z1: z1 - edge - 10, type });
+    if (altOk && len > 380) {
+      const roll = rng.chance(0.65);
+      const sp = K.spine && K.spine.types.includes(type) ? K.spine : null;
+      if (roll || sp) {
+        const a: AltRoute = { z0: z0 + edge + 10, z1: z1 - edge - 10, type };
+        if (sp) {
+          a.bow = sp.side * sp.bow * Math.min(this.halfWidth(z0 + len / 2), w);
+          if (sp.gap) this.addGap(a, rng);
+        }
+        this.alts.push(a);
+      }
     }
     this.kick.sort((p, q) => p.z - q.z);
     this.cliffs.sort((p, q) => p.z - q.z);
+  }
+
+  /** a take-off kicker on a spine and the gully past it, where the spine is furthest from the route */
+  private addGap(a: AltRoute, rng: Rng) {
+    const lip = a.z0 + (a.z1 - a.z0) * rng.range(0.42, 0.58);
+    const x = this.altX(a, lip);
+    if (Math.abs(x - this.routeX(lip)) < 18) return; // too close to the main line to be a separate branch
+    const height = rng.range(1.3, 1.6);
+    this.kick.push({ z: lip, d: x - this.centerX(lip), width: 8, height, run: 14 });
+    this.gaps.push({ z: lip + 3, len: rng.range(8, 10), x: this.altX(a, lip + 7), hw: 10, depth: rng.range(2.2, 2.7), lipZ: lip });
+    this.gaps.sort((p, q) => p.z - q.z);
   }
 
   private buildSpecial(kind: 'encounter' | 'checkpoint' | 'finish', ref: number, z0: number, z1: number, rng: Rng, idx: number) {
@@ -907,6 +969,10 @@ export class GeneratedProfile implements CourseProfile {
     this.ensure(z1);
     return between(this.cliffs, z0, z1, out);
   }
+  gapsNear(z0: number, z1: number, out: GapCut[]) {
+    this.ensure(z1);
+    return between(this.gaps, z0 - 12, z1, out);
+  }
   encounters(z0: number, z1: number) {
     this.ensure(z1);
     return this.enc.filter((e) => e.chaseEndZ + 50 >= z0 && e.foreshadowZ - 600 <= z1);
@@ -942,7 +1008,8 @@ export class GeneratedProfile implements CourseProfile {
     const x0 = this.routeX(a.z0);
     const x1 = this.routeX(a.z1);
     const t = (z - a.z0) / (a.z1 - a.z0);
-    const chord = x0 + (x1 - x0) * t;
+    let chord = x0 + (x1 - x0) * t;
+    if (a.bow) chord += a.bow * Math.sin(Math.PI * clamp(t, 0, 1));
     const c = this.centerX(z);
     const hw = this.halfWidth(z) - 9;
     return Math.min(c + hw, Math.max(c - hw, chord));

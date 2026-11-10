@@ -23,7 +23,7 @@
  * the piste edge; the far shore and islands are placed in absolute x.
  */
 import { Rng, clamp, fbm, gnoise, ridged, smoothstep } from '../core/rng';
-import type { CourseProfile } from './profile';
+import type { CourseProfile, GapCut } from './profile';
 
 /** Coast tuning (data, part of a biome's terrain). Ranges are [min, max]. */
 export interface CoastParams {
@@ -365,6 +365,35 @@ export class Coast {
     return this.lookoutList.filter((l) => l.z >= z0 && l.z <= z1);
   }
 
+  // --- gap jumps ------------------------------------------------------------------------------
+  private gapCache: { z0: number; z1: number; list: GapCut[] } = { z0: 1, z1: 0, list: [] };
+  /** Gullies overlapping [z0, z1] (the profile's gap jumps; none on profiles without them). */
+  gaps(z0: number, z1: number): GapCut[] {
+    const c = this.gapCache;
+    if (z0 >= c.z0 && z1 <= c.z1) return c.list.filter((g) => g.z + g.len >= z0 && g.z <= z1);
+    if (!this.profile.gapsNear) return [];
+    const w0 = Math.floor(z0 / 256) * 256 - 256;
+    const w1 = Math.ceil(z1 / 256) * 256 + 256;
+    this.gapCache = { z0: w0, z1: w1, list: this.profile.gapsNear(w0, w1, []).slice() };
+    return this.gapCache.list.filter((g) => g.z + g.len >= z0 && g.z <= z1);
+  }
+
+  /** depth of a gap gully at (x, z): steep-sided, flat-floored, fading out across the slope */
+  gapDepth(x: number, z: number): number {
+    const c = this.gapCache;
+    if (!(z >= c.z0 && z <= c.z1)) this.gaps(z, z);
+    let d = 0;
+    for (const g of this.gapCache.list) {
+      if (z < g.z || z > g.z + g.len) continue;
+      const ax = Math.abs(x - g.x);
+      if (ax > g.hw) continue;
+      const along = smoothstep(g.z, g.z + 2.2, z) * (1 - smoothstep(g.z + g.len - 2.2, g.z + g.len, z));
+      const across = 1 - smoothstep(g.hw - 5, g.hw, ax);
+      d = Math.max(d, g.depth * along * across);
+    }
+    return d;
+  }
+
   // --- the heightfield ----------------------------------------------------------------------
   /**
    * Coast-shaped height at (x, z). `h` is the land height there (Mountain without the coast) and
@@ -372,6 +401,9 @@ export class Coast {
    */
   shape(x: number, z: number, h: number, land: (x: number, z: number) => number): number {
     const P = this.profile;
+    // gap jumps: meltwater gullies cut across the ridgeline spines, running toward the cliff
+    const gd = this.gapDepth(x, z);
+    if (gd > 0) h -= gd;
     const cx = P.centerX(z);
     const w = P.halfWidth(z);
     const rimE = this.rimOffset(z);

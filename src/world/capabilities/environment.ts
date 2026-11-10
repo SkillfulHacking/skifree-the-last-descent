@@ -160,22 +160,31 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       gust = w.gust;
     }
     // 3) hazards
+    let px = 0;
+    let pz = 0;
     if (!this.hazards.empty) {
       const hw = this.sampleHazards(q, out);
       wx += hw[0];
       wz += hw[1];
+      px = hw[2];
+      pz = hw[3];
     }
     out.airAccelX = q.grounded ? 0 : cpl.airborne * wx;
     out.airAccelZ = q.grounded ? 0 : cpl.airborne * wz;
+    out.groundSlipX = q.grounded && !q.crashed ? px : 0;
+    out.groundSlipZ = q.grounded && !q.crashed ? pz : 0;
     out.balance = q.grounded ? cpl.balance * gust : 0;
   }
 
-  private hw: [number, number] = [0, 0];
+  /** wind x/z (m/s, airborne coupling) and grounded side-slip x/z (m/s) from hazards this step */
+  private hw: [number, number, number, number] = [0, 0, 0, 0];
 
-  private sampleHazards(q: EnvQuery, out: EnvSample): [number, number] {
+  private sampleHazards(q: EnvQuery, out: EnvSample): [number, number, number, number] {
     const hw = this.hw;
     hw[0] = 0;
     hw[1] = 0;
+    hw[2] = 0;
+    hw[3] = 0;
     // physics-critical band must exist even if the caller did not stream (simulations)
     this.hazards.ensure(q.z - 1, q.z + 1);
     const near = this.hazards.near(q.x, q.z + HAZARD_ALERT_RANGE * 0.5, HAZARD_ALERT_RANGE * 0.5 + HAZARD_PASS_RANGE, this.near);
@@ -220,6 +229,8 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       if (e.surface) combineSurface(out.surface, e.surface);
       if (e.windX) hw[0] += e.windX;
       if (e.windZ) hw[1] += e.windZ;
+      if (e.slipX) hw[2] += e.slipX;
+      if (e.slipZ) hw[3] += e.slipZ;
       if (!tr.struck && (e.crash || e.knock)) {
         tr.struck = true;
         tr.hit = true;
