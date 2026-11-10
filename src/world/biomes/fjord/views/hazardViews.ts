@@ -143,7 +143,7 @@ function h01(a: number, b: number): number {
  * chamfered rock ribs breaking through along the wind grain (+x), half-buried, never more than
  * ~0.35 m proud (skis pass over them: the hazard only adds friction), with snow tails in their lee.
  */
-function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardView {
+export function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardView {
   const M = mats();
   const obj = new THREE.Group();
   obj.name = 'scoured-rock';
@@ -227,11 +227,14 @@ function rockView(h: HazardInstance<{ v: number }>, m: Mountain): HazardView {
     box.computeVertexNormals();
     const yaw = 0.25 * (h01(i + 17, v) - 0.5); // along the wind (+x) with a little scatter
     box.rotateY(yaw);
-    box.rotateZ(0.08 * (h01(i + 19, v) - 0.5));
-    // seat: the lowest terrain point under the rib, minus the buried part (~60 %)
-    let gy = Infinity;
-    for (const sx of [-L / 2, 0, L / 2]) for (const sz of [-W / 2, W / 2]) gy = Math.min(gy, m.heightAt(x + sx * Math.cos(yaw), z - sx * Math.sin(yaw) + sz));
-    box.translate(x, gy - T * 0.05, z);
+    box.translate(x, 0, z);
+    // seat: every vertex follows the snow surface under it (the rib drapes over the slope), with
+    // ~45 % of its height buried
+    {
+      const BP = box.attributes.position as THREE.BufferAttribute;
+      for (let k = 0; k < BP.count; k++) BP.setY(k, m.heightAt(BP.getX(k), BP.getZ(k)) + BP.getY(k) + T * 0.15);
+      box.computeVertexNormals();
+    }
     ribs.push(box);
     // a snow tail in the rib's lee (downwind, +x)
     const tail = new THREE.SphereGeometry(1, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2);

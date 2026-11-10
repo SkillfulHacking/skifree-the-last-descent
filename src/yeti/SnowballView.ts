@@ -63,7 +63,9 @@ export class SnowballView {
   private fillMat = new THREE.MeshBasicMaterial({ color: 0xff5a2a, transparent: true, opacity: 0.32, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide });
   private p: Vec3 = { x: 0, y: 0, z: 0 };
   private glintTex = glintTexture();
-  private glintMat = new THREE.SpriteMaterial({ map: this.glintTex, color: 0xffd9b0, transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, sizeAttenuation: false, fog: false });
+  // the threat colour of the landing marker (orange-red), alpha-blended so it also reads against
+  // bright snow and sky (an additive white glint vanished there)
+  private glintMat = new THREE.SpriteMaterial({ map: this.glintTex, color: 0xff5a1f, transparent: true, depthWrite: false, depthTest: true, sizeAttenuation: false, fog: false });
   private heldGlint: THREE.Sprite | null = null;
   private q: Vec3 = { x: 0, y: 0, z: 0 };
   private n = new THREE.Vector3();

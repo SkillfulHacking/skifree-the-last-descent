@@ -511,6 +511,32 @@ export class Harbour implements FinishEnvironment {
       bench(b, p.x, p.y, p.z, ry);
       this.cols.push({ x: p.x, z: p.z, r: 0.9 });
     }
+    // mid-ground life on the street: a fish kiosk with a striped awning, a flag mast, parked
+    // kick-sleds and stacked lobster pots (round 2: the 10b eye-level view was an empty plain)
+    {
+      const k = W(15, 82);
+      const ky = k.y;
+      b.add('planks', new THREE.BoxGeometry(3.2, 1.1, 1.6), mat(k.x, ky + 0.55, k.z, 0, -0.35, 0), 0x6b4e36);
+      for (const [sx, sz] of [[-1.5, -0.7], [1.5, -0.7], [-1.5, 0.7], [1.5, 0.7]] as const) b.add('planks', new THREE.BoxGeometry(0.1, 2.4, 0.1), mat(k.x, ky, k.z, 0, -0.35, 0).multiply(new THREE.Matrix4().makeTranslation(sx, 1.2, sz)), 0x4a3424);
+      for (let i = 0; i < 8; i++) b.add('paint', new THREE.BoxGeometry(0.42, 0.06, 2.0), mat(k.x, ky, k.z, 0, -0.35, 0).multiply(new THREE.Matrix4().makeTranslation(-1.47 + i * 0.42, 2.45, 0)).multiply(new THREE.Matrix4().makeRotationX(0.25)), i % 2 ? 0xf2efe7 : 0xc8281e);
+      for (let i = 0; i < 5; i++) b.add('paint', new THREE.BoxGeometry(0.45, 0.14, 0.3), mat(k.x, ky, k.z, 0, -0.35, 0).multiply(new THREE.Matrix4().makeTranslation(-1.0 + i * 0.5, 1.18, 0.3)), [0xb9a172, 0xd8c8a0, 0xc76b4c][i % 3]!);
+      this.cols.push({ x: k.x, z: k.z, r: 2 });
+      const fm = W(-17, 30);
+      b.add('paint', new THREE.CylinderGeometry(0.07, 0.12, 10, 8), mat(fm.x, fm.y + 5, fm.z), 0xf2efe7);
+      b.add('metal', new THREE.SphereGeometry(0.14, 8, 6), mat(fm.x, fm.y + 10.05, fm.z), 0xd9b24a);
+      nb.add('paint', new THREE.PlaneGeometry(3.4, 0.4, 8, 1).translate(1.7, 0, 0), mat(fm.x + 0.05, fm.y + 9.5, fm.z, 0, 0, -0.08), (q) => new THREE.Color(q.x - fm.x < 0.6 ? 0xf2efe7 : 0xc8281e));
+      this.cols.push({ x: fm.x, z: fm.z, r: 0.3 });
+      for (let i = 0; i < 3; i++) {
+        const q = W(9 + i * 0.9, 54 + i * 0.3);
+        sparkSled(b, q.x, q.y, q.z, 0.2 + i * 0.1, [0xc8281e, 0x2d4c78, 0x4e6f4b][i]!);
+      }
+      for (let i = 0; i < 4; i++) {
+        const q = W(-14 + (i % 2) * 1.1, 66 + Math.floor(i / 2) * 0.1);
+        b.add('planks', new THREE.BoxGeometry(1.0, 0.55, 0.7), mat(q.x, q.y + 0.28 + Math.floor(i / 2) * 0.56, q.z, 0, 0.1, 0), 0x6a5444);
+      }
+      this.cols.push({ x: F.x - 13.5, z: F.z + 66, r: 1.2 });
+    }
+
     // fish crates, barrels and a hand cart along the quay edge
     for (let i = 0; i < 9; i++) {
       const dx = rnd.range(-30, 30);

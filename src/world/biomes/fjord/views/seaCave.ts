@@ -59,7 +59,7 @@ export function clearOfCaveCameras(lines: Array<{ cam: THREE.Vector3; look: THRE
 
 /** basalt column material: per-column tone (vertex colour), cross-joints and weathering by height */
 function basaltMaterial(): THREE.MeshStandardMaterial {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.02 });
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.0 });
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec3 aJ;\nvarying vec3 vJ;\nvarying vec3 vBN;')
@@ -82,19 +82,13 @@ function basaltMaterial(): THREE.MeshStandardMaterial {
   float d = abs(fract(q) - 0.5);
   float joint = smoothstep(0.5 - 0.06 - fq, 0.5 - fq * 0.5, d) * (1.0 - smoothstep(0.15, 0.4, fq));
   diffuseColor.rgb *= 1.0 - 0.6 * joint * side;
-  // per-drum tone (each section between joints a little different), wet near-black low down
-  float drum = bs_h(floor(q) * 1.31 + seed);
-  diffuseColor.rgb *= mix(1.0, 0.82 + 0.36 * drum, 1.0 - smoothstep(0.15, 0.4, fq));
+  // wet, near-black low down; a faint cold sheen higher up (no per-pixel hash detail: it sparkled)
   float wet = 1.0 - smoothstep(0.0, 1.8, y);
-  diffuseColor.rgb *= 1.0 - 0.4 * wet;
-  // salt rime streaks on a few drums, ochre lichen on a few higher ones
-  float rime = step(0.82, drum) * smoothstep(1.0, 2.5, y) * side;
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.42, 0.46, 0.5), rime * 0.3);
-  float lichen = step(0.9, bs_h(floor(q) * 1.7 + floor(seed * 13.0))) * smoothstep(2.0, 4.0, y);
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.36, 0.27, 0.08), lichen * 0.45);
+  diffuseColor.rgb *= 1.0 - 0.35 * wet;
+  diffuseColor.rgb *= 0.9 + 0.2 * smoothstep(0.0, vJ.z, y);
 }`,
       )
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.28, 1.0 - smoothstep(0.0, 1.4, vJ.y));');
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.45, 1.0 - smoothstep(0.0, 1.4, vJ.y));');
   };
   m.customProgramCacheKey = () => 'fjord-basalt-v1';
   return m;
@@ -122,15 +116,14 @@ function basaltCaveRock(cave: CaveDressingContext['cave']): void {
     vec2 ha = abs(hc.xy);
     float he = 0.5 - max(dot(ha, hs * 0.5), ha.x);
     float hid = fract(sin(dot(hc.zw, vec2(12.9898, 78.233))) * 43758.5453);
-    vec3 bas = vec3(0.04, 0.043, 0.05) * (0.8 + 0.4 * hid);
-    float cj = abs(fract(ap.y / (0.55 + 0.5 * hid) + hid) - 0.5);
-    // column joints read as vertical seams on steep faces only (on gentler surfaces a plan-view
-    // hexagon grid would read as tiles)
-    float colFace = smoothstep(0.55, 0.85, steep) * (1.0 - smoothstep(14.0, 45.0, cv_dist));
-    bas *= 1.0 - 0.45 * (1.0 - smoothstep(0.0, 0.045, he)) * colFace - 0.3 * (1.0 - smoothstep(0.44, 0.5, 0.5 - cj)) * colFace;
+    vec3 bas = vec3(0.026, 0.028, 0.033) * (0.8 + 0.4 * hid);
+    // column joints read as vertical seams on steep faces only, and not every seam is open (a
+    // plan-view hexagon grid on gentler surfaces, or a full grid of seams, read as tiles)
+    float colFace = smoothstep(0.6, 0.9, steep) * (1.0 - smoothstep(14.0, 45.0, cv_dist)) * step(0.35, hid);
+    bas *= 1.0 - 0.4 * (1.0 - smoothstep(0.0, 0.04, he)) * colFace;
     float salt = smoothstep(0.6, 0.85, cv_n3(vec3(ap.x * 0.6, ap.y * 1.4, ap.z * 0.6) + 11.0)) * steep;
-    bas = mix(bas, vec3(0.5, 0.53, 0.56), salt * 0.3);
-    rock = mix(rock, bas, 0.88);
+    bas = mix(bas, vec3(0.3, 0.32, 0.34), salt * 0.15);
+    rock = mix(rock, bas, 0.92);
   }
   // --- floor: compacted rubble and grit`,
     );
@@ -261,7 +254,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     g.dispose();
     ng.computeVertexNormals();
     const NP = ng.attributes.position as THREE.BufferAttribute;
-    const tone = 0.03 + 0.022 * ((seed * 7.31) % 1);
+    const tone = 0.017 + 0.014 * ((seed * 7.31) % 1);
     for (let k = 0; k < NP.count; k++) {
       colPos.push(NP.getX(k), NP.getY(k), NP.getZ(k));
       colCol.push(tone, tone * 1.04, tone * 1.13);

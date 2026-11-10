@@ -440,7 +440,7 @@ export class Coast {
       // rocks and skerries at the cliff foot
       out += Math.max(0, gnoise(x / 23, z / 23, s + 69) - 0.45) * 30 * smoothstep(0, 25, tf) * (1 - smoothstep(30, 240, tf)) * (1 - hm);
       // islands in the fjord (smooth rounded skerries and a few bigger wooded islets)
-      const k = smoothstep(160, 420, tf);
+      const k = smoothstep(380, 720, tf);
       if (k > 0) {
         const isl = this.island(x, z, lv);
         if (isl > out) out += (isl - out) * k;
@@ -501,10 +501,12 @@ export class Coast {
           // steep shore (the first ~18 % inside the waterline rises fast: bare rock), then a
           // flatter rounded top where snow lies; clefts and ridges follow the grain (along u)
           const rise = smoothstep(1.0, 0.78, q);
-          const dome = Math.pow(Math.max(0, 1 - q * q), 0.55);
+          const dome = Math.pow(Math.max(0, 1 - q * q), 0.75);
           const grain = ridged(u * 2.4 + b.k, v * 0.9, this.seed + 98, 2) - 0.45;
           const cleft = 1 - 0.35 * smoothstep(0.82, 1.0, 1 - Math.abs(gnoise(u * 1.7 + b.k, 0.5, this.seed + 99)));
-          const top = (2.5 + b.h * (0.5 * rise + 0.5 * dome) * cleft + b.h * 0.22 * grain * dome) * shore;
+          // mostly a rounded dome (it must stay rounded when the 64 m far-field tiles sample it),
+          // with a steeper rocky rim near the waterline
+          const top = (2.5 + b.h * (0.28 * rise + 0.72 * Math.pow(dome, 1.25)) * cleft + b.h * 0.2 * grain * dome) * shore;
           const hgt = lv - this.p.depth + (this.p.depth + top) * smoothstep(1.25, 0.98, q);
           if (hgt > best) best = hgt;
         }

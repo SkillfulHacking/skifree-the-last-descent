@@ -206,8 +206,8 @@ export class FjordScenery implements SceneryView {
     const y = m.heightAt(xr + 20, z);
     // round 2 (art review D12): a little further out over the rim and looking further down, so
     // the top of the wall drops away below the cornice (the height of the cliffs reads)
-    out.pos.set(xr + 16 + Math.sin(time * 0.04) * 5, y + 52 + Math.sin(time * 0.1) * 2, z - 80);
-    out.look.set(xr - 620, c.seaLevelAt(z) + 150, z + 820);
+    out.pos.set(xr + 24 + Math.sin(time * 0.04) * 5, y + 48 + Math.sin(time * 0.1) * 2, z - 76);
+    out.look.set(xr - 700, c.seaLevelAt(z) + 215, z + 900);
     out.fov = 58;
     return true;
   }
