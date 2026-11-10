@@ -59,10 +59,15 @@ export interface BiomeCapabilities {
   readonly cave: PresentationRef;
   readonly audio: AudioProfile;
   readonly rating: DifficultyRating;
+  /**
+   * Optional location scenery (three.js, presentation/scenery.ts): streamed set dressing that
+   * follows the course — a coast's water surfaces, sea mist, hamlets, boats, viewpoints. Alpine: none.
+   */
+  readonly scenery?: PresentationRef;
 }
 
 /** Ambience beds the audio engine can play (src/audio/ambience.ts). */
-export const KNOWN_AMBIENCE: readonly string[] = ['wind'];
+export const KNOWN_AMBIENCE: readonly string[] = ['wind', 'surf', 'gulls'];
 
 /** Alpine: the original game, module by module. */
 export const ALPINE_CAPABILITIES: BiomeCapabilities = Object.freeze({
@@ -110,7 +115,7 @@ export function validateCapabilities(b: HasCapabilities): string[] {
   if (new Set(c.hazards.kinds).size !== c.hazards.kinds.length) out.push('hazard kinds must be unique');
   for (const a of c.audio.ambience) if (!KNOWN_AMBIENCE.includes(a)) out.push(`unknown ambience "${a}"`);
   if (!c.audio.ambience.length) out.push('audio.ambience needs at least one bed');
-  for (const [k, ref] of [['finish', c.finish], ['refuge', c.refuge], ['cave', c.cave]] as const) if (!ref.id || !/^[a-z0-9][a-z0-9-]*$/.test(ref.id)) out.push(`${k}.id "${ref.id}" must be lowercase [a-z0-9-]`);
+  for (const [k, ref] of [['finish', c.finish], ['refuge', c.refuge], ['cave', c.cave], ...(c.scenery ? [['scenery', c.scenery] as const] : [])] as const) if (!ref.id || !/^[a-z0-9][a-z0-9-]*$/.test(ref.id)) out.push(`${k}.id "${ref.id}" must be lowercase [a-z0-9-]`);
   if (!c.refuge.name) out.push('refuge.name is required');
   if (!c.surface.id || typeof c.surface.modifiers !== 'function') out.push('surface model needs an id and modifiers()');
   if (!c.weather.id || typeof c.weather.sample !== 'function') out.push('weather model needs an id and sample()');

@@ -31,6 +31,7 @@
  * Alpine default. Read them with `capabilitiesOf(biome)`.
  */
 import type { SegmentType } from './profile';
+import type { CoastParams } from './coast';
 import { validateCapabilities, type BiomeCapabilities } from './capabilities';
 
 /** Linear RGB, 0..1 (values > 1 allowed for tints/multipliers). */
@@ -107,6 +108,12 @@ export interface BiomeRangesLook {
   stoneDark: RGB;
   stoneLight: RGB;
   lowland: RGB;
+  /**
+   * Optional open horizon (e.g. the sea): a sector of the skyline where the distant ridges sink to
+   * `floor` × their height. `center` is the world direction angle atan2(z, x) in radians (+Z, the
+   * way down the course, is π/2; −X is π); `halfWidth` in radians. Omitted: ridges all around.
+   */
+  openSector?: { center: number; halfWidth: number; floor: number };
 }
 
 /** One conifer species (shape + needle colour). See props.ts pineGeometry. */
@@ -177,6 +184,8 @@ export interface BiomeTerrain {
   swingScale: number;
   /** relative weights of regular segment types; omit for the original uniform mix */
   segmentWeights?: Partial<Record<SegmentType, number>>;
+  /** segment types that may get an alternate line; omit for the original set */
+  altTypes?: readonly SegmentType[];
   /** valley wall height (m) */
   wallHeight: number;
   /** ridged/fbm relief on the valley walls (m) */
@@ -194,6 +203,11 @@ export interface BiomeTerrain {
   driftsPowder: number;
   /** roller amplitude (m) */
   rollers: number;
+  /**
+   * Optional sea coast on the −X side (cliffs, fjord arms, islands, harbour shore; see coast.ts).
+   * Omitted (Alpine): an inland valley, heights unchanged.
+   */
+  coast?: CoastParams;
 }
 
 export interface BiomeAudio {

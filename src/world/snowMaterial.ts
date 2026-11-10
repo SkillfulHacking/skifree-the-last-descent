@@ -61,11 +61,58 @@ export interface TerrainUniforms {
   uOrigin: { value: THREE.Vector3 };
   /** multiplier on the sparse sun-glint sparkles (0 = off; the cave cinematic dims them) */
   uGlint: { value: number };
+  /**
+   * Coastal locations only: up to SEA_SLOTS water reaches near the camera, (z0, z1, level) in
+   * absolute world coordinates, for the wet shore band and surf line (see coast.ts). Absent inland.
+   */
+  uSea?: { value: THREE.Vector3[] };
 }
+
+/** water reaches the terrain shader knows about at once (the scenery keeps the nearest ones) */
+export const SEA_SLOTS = 4;
+
+/**
+ * Shore band for coastal locations (appended to the colour block): no snow in the wave-washed
+ * zone, wet dark rock and a weed line just above the water, an animated surf line at the water's
+ * edge, and dark wet ground below it (where the water surface meets the land at a grazing angle,
+ * both sides of the line are dark, so depth-precision shimmer far away stays invisible).
+ */
+const SHORE_GLSL = /* glsl */ `
+{
+  float W = -1e9;
+  for (int i = 0; i < ${SEA_SLOTS}; i++) {
+    vec3 r = uSea[i];
+    if (vNPos.z >= r.x && vNPos.z < r.y) W = r.z;
+  }
+  float dh = vNPos.y - W;
+  if (dh < 12.0) {
+    float sn = sf_vnBL(vNPos.xz * 0.35, sf_fp(sf_fY, vec2(0.35)));
+    float sn2 = sf_vn(vNPos.xz * 0.06 + 4.0);
+    float wash = 1.0 - smoothstep(1.2 + 2.2 * sn2, 3.4 + 3.0 * sn2, dh);
+    vec3 wet = mix(vec3(0.045, 0.05, 0.055), vec3(0.09, 0.085, 0.075), sn);
+    vec3 weed = vec3(0.075, 0.07, 0.035);
+    vec3 shore = mix(wet, weed, (1.0 - smoothstep(0.2, 1.4, dh)) * smoothstep(-0.2, 0.3, dh) * (0.5 + 0.5 * sn));
+    // a sprinkle of snow survives on the rocks just above the spray
+    shore = mix(shore, col * 0.85, smoothstep(0.62, 0.8, sn) * smoothstep(1.5, 3.0, dh) * 0.7);
+    col = mix(col, shore, wash);
+    sf_rock = max(sf_rock, wash);
+    // surf: a bright, breaking line at the water's edge (animated)
+    float ph = uTime * 0.55 + sf_vn(vNPos.xz * 0.02) * 6.0;
+    float swell = 0.35 + 0.35 * sin(ph);
+    float surf = smoothstep(-0.35, 0.0, dh - swell * 0.4) * (1.0 - smoothstep(0.1, 0.9 + 0.5 * sn, dh - swell * 0.4));
+    surf *= 0.55 + 0.45 * smoothstep(0.35, 0.7, sf_vnBL(vNPos.xz * 0.9 + vec2(uTime * 0.3, 0.0), sf_fp(sf_fY, vec2(0.9))));
+    col = mix(col, vec3(0.86, 0.9, 0.93), surf * (1.0 - smoothstep(1500.0, 4000.0, sf_dist)));
+    // below the water line: dark, cold
+    col = mix(col, vec3(0.02, 0.05, 0.065), smoothstep(0.0, -1.5, dh));
+  }
+  diffuseColor.rgb = col;
+}
+`;
 
 /** The terrain material; its palette (snow, piste, ice, rock strata, tints) comes from the biome. */
 export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra', biome: Biome = getBiome()): { material: THREE.MeshStandardMaterial; uniforms: TerrainUniforms } {
   const T = biome.terrainLook;
+  const coastal = !!biome.terrain.coast;
   const uniforms: TerrainUniforms = {
     uTime: { value: 0 },
     uCloudShadow: { value: 1 },
@@ -74,6 +121,7 @@ export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra',
     uOrigin: { value: new THREE.Vector3() },
     uGlint: { value: 1 },
   };
+  if (coastal) uniforms.uSea = { value: Array.from({ length: SEA_SLOTS }, () => new THREE.Vector3(1, 0, -1e9)) };
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, metalness: 0 });
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = uniforms.uTime;
@@ -82,6 +130,7 @@ export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra',
     shader.uniforms.uSunDir = uniforms.uSunDir;
     shader.uniforms.uOrigin = uniforms.uOrigin;
     shader.uniforms.uGlint = uniforms.uGlint;
+    if (uniforms.uSea) shader.uniforms.uSea = uniforms.uSea;
     addAtmosphereUniforms(shader.uniforms);
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -110,7 +159,7 @@ uniform float uTime;
 uniform float uCloudShadow;
 uniform float uDetail;
 uniform vec3 uSunDir;
-uniform float uGlint;
+uniform float uGlint;${coastal ? `\nuniform vec3 uSea[${SEA_SLOTS}];` : ''}
 varying vec3 vNPos;
 varying vec3 vWPos;
 varying vec3 vWNormal;
@@ -256,7 +305,7 @@ float sf_sideN(vec2 sc, float off){
   // cold, slightly blue-shifted albedo on faces turned away from the sun (reads as crisp winter light)
   float away = 1.0 - clamp(dot(gn, uSunDir), 0.0, 1.0);
   col *= mix(vec3(1.0), ${v3(T.shadeTint)}, 0.25 * away * (1.0 - sf_rock));
-  diffuseColor.rgb = col;
+  diffuseColor.rgb = col;${coastal ? SHORE_GLSL : ''}
 
   // relief: one height field (macro + mid + band-limited micro), applied as a screen-derivative bump
   float Hm = (M - 0.5) * 7.0 * (0.3 + 0.7 * sf_rock) + (n1 - 0.5) * 1.8 * (0.35 + 0.65 * sf_rock);

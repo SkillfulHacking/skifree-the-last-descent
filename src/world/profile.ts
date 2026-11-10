@@ -481,6 +481,11 @@ export interface ProfileKnobs {
   widthScale: number;
   swingScale: number;
   segmentWeights?: Partial<Record<SegmentType, number>>;
+  /**
+   * Segment types that may get an alternate line (default: forest, powder, basin, alpine,
+   * highspeed). A location can add e.g. 'ridgeline' for shortcuts along exposed ridges.
+   */
+  altTypes?: readonly SegmentType[];
 }
 export const DEFAULT_KNOBS: ProfileKnobs = { slopeScale: 1, widthScale: 1, swingScale: 1 };
 
@@ -778,7 +783,8 @@ export class GeneratedProfile implements CourseProfile {
     }
     // an alternate line on wide, flowing segments (decided from this segment's own rng, so the
     // plan does not depend on generation order)
-    if ((type === 'forest' || type === 'powder' || type === 'basin' || type === 'alpine' || type === 'highspeed') && len > 380 && rng.chance(0.65)) {
+    const altOk = K.altTypes ? K.altTypes.includes(type) : type === 'forest' || type === 'powder' || type === 'basin' || type === 'alpine' || type === 'highspeed';
+    if (altOk && len > 380 && rng.chance(0.65)) {
       this.alts.push({ z0: z0 + edge + 10, z1: z1 - edge - 10, type });
     }
     this.kick.sort((p, q) => p.z - q.z);

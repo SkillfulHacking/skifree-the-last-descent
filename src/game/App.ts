@@ -16,7 +16,7 @@ import { applyRun, loadRecordBook, loadSettings, recordsFor, saveRecordBook, sav
 import type { QualityPreset } from '../core/types';
 import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
 import { fmtDistance } from '../ui/Hud';
-import { getBiome, listBiomes } from '../world/biome';
+import { getBiome, hasBiome, listBiomes } from '../world/biome';
 import { locationNoteHtml, locationOptionLabel } from '../ui/location';
 import type { AutopilotStyle } from '../debug/autopilot';
 import { ProgressTracker } from '../progression/tracker';
@@ -923,12 +923,13 @@ export class App {
     const api = {
       state: () => ({ mode: this.mode, menu: this.menu.current?.id ?? null, session: this.session?.debugState() ?? null, records: this.records, course: this.world ? { id: this.world.id, label: courseLabel(this.world.course), seed: this.world.seed, finishZ: this.world.mountain.finishZ } : null }),
       /** select a course like the menu does (persists to settings), e.g. setCourse('daily','sprint',{date}) */
-      setCourse: (mode: CourseMode, length: LengthMode, opts: { date?: string | null; custom?: string; difficulty?: Difficulty } = {}) => {
+      setCourse: (mode: CourseMode, length: LengthMode, opts: { date?: string | null; custom?: string; difficulty?: Difficulty; biome?: string } = {}) => {
         this.settings.course = mode;
         this.settings.courseLength = length;
         if (opts.date !== undefined) this.settings.dailyDate = opts.date;
         if (opts.custom) this.settings.customSeed = opts.custom;
         if (opts.difficulty) this.settings.difficulty = opts.difficulty;
+        if (opts.biome && hasBiome(opts.biome)) this.settings.biome = opts.biome;
         this.saveAll();
         if (this.mode === 'menu') this.menu.replace(this.mainScreen());
         return courseId(this.currentCourse());

@@ -10,6 +10,7 @@ import type { SurfaceType } from '../core/types';
 import { caveTerrainHeight, CAVE_INFLUENCE_Z, type CaveAnchor } from './caveTerrain';
 import { CLASSIC, foreshadowFor, ClassicProfile, GeneratedProfile, type CliffBand, type CourseProfile, type Kicker } from './profile';
 import { getBiome, type Biome } from './biome';
+import { Coast } from './coast';
 
 export type { Kicker, CliffBand, CourseProfile, Encounter, Sighting, SegmentType, AltRoute } from './profile';
 import type { AltRoute } from './profile';
@@ -45,6 +46,12 @@ export class Mountain {
   private kTmp: Kicker[] = [];
   private cTmp: CliffBand[] = [];
   private caveCache: { z0: number; z1: number; list: CaveAnchor[] } = { z0: 1, z1: 0, list: [] };
+  /**
+   * The sea coast beside the course (biomes with `terrain.coast`, e.g. Fjord Coast): cliffs, fjord
+   * water levels, islands, the harbour shore. null for inland locations (Alpine): heights unchanged.
+   */
+  readonly coast: Coast | null;
+  private readonly landAt = (x: number, z: number) => this.landHeight(x, z);
 
   /**
    * `new Mountain()` / `new Mountain(seed)` → the classic course; pass a profile for any other.
@@ -69,6 +76,8 @@ export class Mountain {
       this.profile = seedOrProfile;
       this.seed = seed ?? SEED_DEFAULT;
     }
+    this.coast = t.coast ? new Coast(this.profile, this.seed, t.coast) : null;
+    if (this.coast) this.coast.terrain = (x, z) => this.heightAt(x, z);
   }
 
   static generated(seed: number, length: number, biome: Biome = getBiome()): Mountain {
@@ -145,6 +154,12 @@ export class Mountain {
 
   /** Terrain height at world (x, z). */
   heightAt(x: number, z: number): number {
+    const h = this.landHeight(x, z);
+    return this.coast ? this.coast.shape(x, z, h, this.landAt) : h;
+  }
+
+  /** Height of the land (everything but a coast's cliffs and sea), at world (x, z). */
+  private landHeight(x: number, z: number): number {
     const P = this.profile;
     const s = this.seed;
     const cx = P.centerX(z);

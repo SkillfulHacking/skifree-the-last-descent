@@ -33,7 +33,7 @@ import { buildMountain, courseId, worldSeed, type CourseConfig } from './CourseC
 import type { Biome } from '../world/biome';
 import { BiomeEnvironment } from '../world/capabilities/environment';
 import { makeWeatherSample } from '../world/capabilities/weather';
-import { HazardLayer, presentationOf, type BiomePresentation, type CaveDressing, type FinishDefinition, type FinishEnvironment, type RefugeView } from '../world/presentation';
+import { HazardLayer, presentationOf, type BiomePresentation, type CaveDressing, type FinishDefinition, type FinishEnvironment, type RefugeView, type SceneryView } from '../world/presentation';
 
 export interface CaveSlot {
   enc: Encounter;
@@ -66,6 +66,8 @@ export class World {
   readonly hazardViews: HazardLayer;
   /** finish / refuge / cave presentation of this location */
   readonly presentation: BiomePresentation;
+  /** the location's streamed set dressing (Fjord: water, mist, hamlets, boats …); null for Alpine */
+  readonly scenery: SceneryView | null;
   /** weather at the focus this frame (physics clock) */
   readonly weather = makeWeatherSample();
   readonly particles: Particles;
@@ -116,6 +118,8 @@ export class World {
     } else this.finish = null;
     this.hazardViews = new HazardLayer(this.environment, { mountain: this.mountain, quality, biome: this.biome });
     this.scene.add(this.hazardViews.group);
+    this.scenery = this.presentation.scenery?.build({ mountain: this.mountain, quality, biome: this.biome, terrain: this.terrain.uniforms, sunDir: this.env.sunDir }) ?? null;
+    if (this.scenery) this.scene.add(this.scenery.group);
     this.start = new StartArea(this.mountain);
     this.scene.add(this.start.group);
     const cap = { low: 2500, medium: 4500, high: 7000, ultra: 10000 }[quality];
@@ -165,6 +169,7 @@ export class World {
       this.streamZ = z;
       this.obstacles.release(z - 900, z + ahead + 400);
       this.environment.release(z - 900, z + ahead + 400);
+      this.scenery?.stream(z);
       this.syncCaves(z);
       if (all) for (const j of [...this.caveJobs.values()]) this.buildCave(j.enc);
       this.syncLodges(z);
@@ -334,6 +339,7 @@ export class World {
     this.env.applyWeather(this.weather.visibility * env.hazardVisibility(focus.x, focus.z, env.clock), this.weather.snowfall);
     this.env.update(dt, focus, camPos, time, this.weather.windX);
     this.hazardViews.update(dt);
+    this.scenery?.update(dt, time, { focus, camPos, origin: this.origin });
     for (const s of this.caves.values()) s.dressing?.update?.(dt, time);
     this.particles.update(dt);
   }
@@ -396,6 +402,7 @@ export class World {
     this.yetiPrints.dispose();
     this.finish?.dispose();
     this.hazardViews.dispose();
+    this.scenery?.dispose();
     this.environment.dispose();
     this.particles.dispose();
     this.tracks.dispose();

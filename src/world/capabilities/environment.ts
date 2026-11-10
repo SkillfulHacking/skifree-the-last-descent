@@ -81,6 +81,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     const m = mountain;
     const sq = {
       biomeId: m.biome.id,
+      mountain: m,
       x: 0,
       z: 0,
       kind: 'snow' as SurfaceType,

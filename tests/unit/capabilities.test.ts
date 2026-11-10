@@ -334,7 +334,7 @@ describe('registries and validation', () => {
     const make = (caps: Biome['capabilities'], id = 'test-caps') => deriveBiome(ALPINE, { id, code: 'TCAP', name: 'Caps', capabilities: caps });
     expect(() => registerBiome(make({ hazards: { kinds: ['no-such-hazard'], density: 1 } }))).toThrow(/not registered/);
     expect(() => registerBiome(make({ rating: { level: 7 as 1, label: 'x' } }))).toThrow(/rating/);
-    expect(() => registerBiome(make({ audio: { ambience: ['surf'] } }))).toThrow(/ambience/);
+    expect(() => registerBiome(make({ audio: { ambience: ['no-such-bed'] } }))).toThrow(/ambience/);
     expect(() => registerBiome(make({ weather: { ...ALPINE_WEATHER, id: 'w', coupling: { airborne: 5, balance: 0 } } }))).toThrow(/airborne/);
     expect(listBiomes().map((b) => b.id)).not.toContain('test-caps');
     // the hazard test biome is valid; its presentation needs the hazard view
@@ -579,8 +579,8 @@ describe('course rules and codes', () => {
 
 // ------------------------------------------------------------------------------------------------
 describe('Location menu', () => {
-  it('only Alpine ships: the game registers no placeholder locations', () => {
-    expect(listBiomes().filter((b) => b.id.startsWith('test-') === false).map((b) => b.id)).toEqual(['alpine']);
+  it('Alpine and Fjord Coast ship: the game registers no placeholder locations', () => {
+    expect(listBiomes().filter((b) => b.id.startsWith('test-') === false).map((b) => b.id)).toEqual(['alpine', 'fjord']);
     expect(getBiome(DEBUG_TEST_BIOME_ID)).toBe(ALPINE);
   });
 

@@ -7,7 +7,7 @@
  * Cost: 3 ridge rings (~2.3k triangles each) + 1 band = 4 draw calls.
  */
 import * as THREE from 'three';
-import { Rng, gnoise, ridged } from '../../core/rng';
+import { Rng, gnoise, ridged, smoothstep } from '../../core/rng';
 import { GLSL_NOISE } from '../snowMaterial';
 import { ATMOSPHERE_GLSL, addAtmosphereUniforms } from './atmosphere';
 import { getBiome, glslVec3, type BiomeRangesLook } from '../biome';
@@ -49,7 +49,14 @@ function ridgeHeight(a: number, L: Layer): number {
   return L.h0 + (L.h1 - L.h0) * t;
 }
 
-function ringGeometry(L: Layer): THREE.BufferGeometry {
+/** angular distance (radians, 0..π) */
+function angDist(a: number, b: number): number {
+  let d = Math.abs(a - b) % (Math.PI * 2);
+  if (d > Math.PI) d = Math.PI * 2 - d;
+  return d;
+}
+
+function ringGeometry(L: Layer, open?: BiomeRangesLook['openSector'], rot = 0): THREE.BufferGeometry {
   const rng = new Rng(L.seed * 977);
   const nR = ROWS.length;
   const pos = new Float32Array((SEG + 1) * nR * 3);
@@ -58,7 +65,12 @@ function ringGeometry(L: Layer): THREE.BufferGeometry {
   for (let i = 0; i <= SEG; i++) jit.push(i === SEG ? jit[0]! : rng.range(-0.25, 0.25));
   for (let i = 0; i <= SEG; i++) {
     const a = ((i + jit[i]! * 0.5) / SEG) * Math.PI * 2;
-    const h = ridgeHeight(a, L);
+    let h = ridgeHeight(a, L);
+    if (open) {
+      // the mesh is rotated by `rot` about Y: local angle a points at world angle a − rot
+      const m = 1 - smoothstep(open.halfWidth * 0.55, open.halfWidth, angDist(a - rot, open.center));
+      h *= 1 - m * (1 - open.floor);
+    }
     // sub-ridges: spurs running down the face
     for (let r = 0; r < nR; r++) {
       const [f, back] = ROWS[r]!;
@@ -246,7 +258,7 @@ export class DistantRanges {
   constructor(sunDir: THREE.Vector3, sunColor: THREE.Color, skyColor: THREE.Color, look: BiomeRangesLook = getBiome().ranges) {
     this.group.name = 'DistantRanges';
     for (const L of LAYERS) {
-      const g = ringGeometry(L);
+      const g = look.openSector ? ringGeometry(L, look.openSector, L.seed * 0.71) : ringGeometry(L);
       const m = ridgeMaterial(L, sunDir, sunColor, skyColor, look);
       const mesh = new THREE.Mesh(g, m);
       mesh.frustumCulled = false;
