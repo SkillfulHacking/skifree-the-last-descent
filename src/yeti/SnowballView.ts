@@ -26,6 +26,30 @@ interface Slot {
 const UP = new THREE.Vector3(0, 1, 0);
 /** trail sprites per ball */
 const TRAIL = 6;
+/** how much bigger the glints are drawn in the small rear-view inset than in the main view */
+const INSET_MUL = 3.2;
+const _vp = new THREE.Vector4();
+const _db = new THREE.Vector2();
+
+/**
+ * A constant-screen-size glint that is drawn larger when the renderer is drawing into a small
+ * viewport (the rear-view inset): the scale set by the view (`userData.base`) is multiplied there,
+ * so the ball reads in the inset without a huge star in the main view.
+ */
+function glintSprite(mat: THREE.SpriteMaterial): THREE.Sprite {
+  const s = new THREE.Sprite(mat);
+  s.renderOrder = 7;
+  s.frustumCulled = false;
+  s.userData['base'] = 0.05;
+  s.onBeforeRender = (renderer) => {
+    renderer.getCurrentViewport(_vp);
+    renderer.getDrawingBufferSize(_db);
+    const inset = _vp.w < _db.y * 0.6;
+    s.scale.setScalar((s.userData['base'] as number) * (inset ? INSET_MUL : 1));
+    s.updateMatrixWorld();
+  };
+  return s;
+}
 
 /** a soft four-point star (additive), drawn once */
 function glintTexture(): THREE.Texture {
@@ -36,7 +60,7 @@ function glintTexture(): THREE.Texture {
       const x = (i + 0.5) / n * 2 - 1;
       const y = (j + 0.5) / n * 2 - 1;
       const r = Math.hypot(x, y);
-      const core = Math.exp(-r * r * 14);
+      const core = Math.exp(-r * r * 6);
       const rays = Math.exp(-Math.abs(x) * 26) * Math.exp(-y * y * 3) + Math.exp(-Math.abs(y) * 26) * Math.exp(-x * x * 3);
       const v = Math.min(1, core + 0.55 * rays * (1 - Math.min(1, r)));
       data.set([255, 255, 255, Math.round(255 * v)], (j * n + i) * 4);
@@ -86,14 +110,9 @@ export class SnowballView {
     beam.renderOrder = 6;
     const marker = new THREE.Group();
     marker.add(ring, fill);
-    const glint = new THREE.Sprite(this.glintMat.clone());
-    glint.renderOrder = 7;
+    const glint = glintSprite(this.glintMat.clone());
     const trail: THREE.Sprite[] = [];
-    for (let k = 0; k < TRAIL; k++) {
-      const t = new THREE.Sprite(this.glintMat.clone());
-      t.renderOrder = 7;
-      trail.push(t);
-    }
+    for (let k = 0; k < TRAIL; k++) trail.push(glintSprite(this.glintMat.clone()));
     this.group.add(ball, marker, beam, glint, ...trail);
     const s: Slot = { ball, glint, trail, marker, ring, fill, beam, used: false };
     this.slots.push(s);
@@ -118,8 +137,7 @@ export class SnowballView {
     }
     // the wind-up reads from the rear view: the ball in his raised fist flashes and swells
     if (held && !this.heldGlint) {
-      this.heldGlint = new THREE.Sprite(this.glintMat.clone());
-      this.heldGlint.renderOrder = 7;
+      this.heldGlint = glintSprite(this.glintMat.clone());
       this.group.add(this.heldGlint);
     }
     if (this.heldGlint) {
@@ -127,7 +145,7 @@ export class SnowballView {
       if (held) {
         const pulse = 0.5 + 0.5 * Math.sin(time * 26);
         this.heldGlint.position.copy(held);
-        this.heldGlint.scale.setScalar(0.05 + 0.035 * pulse);
+        this.heldGlint.userData['base'] = 0.05 + 0.035 * pulse;
         (this.heldGlint.material as THREE.SpriteMaterial).opacity = 0.75 + 0.25 * pulse;
         if (this.heldBall) this.heldBall.scale.setScalar(1.25 + 0.15 * pulse);
       }
@@ -151,7 +169,7 @@ export class SnowballView {
     s.ball.rotation.set(time * 7, time * 5, 0);
     // glint on the ball (constant on-screen size) and a comet trail of its last ~0.2 s
     s.glint.position.copy(s.ball.position);
-    s.glint.scale.setScalar(0.042 + 0.01 * Math.sin(time * 30));
+    s.glint.userData['base'] = 0.042 + 0.01 * Math.sin(time * 30);
     (s.glint.material as THREE.SpriteMaterial).opacity = 0.95;
     for (let k = 0; k < TRAIL; k++) {
       const tk = b.t - (k + 1) * 0.035;
@@ -162,7 +180,7 @@ export class SnowballView {
       }
       ballPosition({ ...b, t: tk }, this.q);
       tr.position.set(this.q.x, this.q.y, this.q.z);
-      tr.scale.setScalar(0.03 * (1 - k / TRAIL));
+      tr.userData['base'] = 0.03 * (1 - k / TRAIL);
       (tr.material as THREE.SpriteMaterial).opacity = 0.6 * (1 - k / TRAIL);
     }
     // marker: flat on the slope at the landing point

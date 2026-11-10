@@ -90,7 +90,7 @@ const coastRockGlsl = (T: Biome['terrainLook']) => /* glsl */ `
     gneiss = mix(gneiss, gneiss * vec3(1.25, 1.12, 0.92), smoothstep(0.55, 0.8, blk2) * 0.6);
     // darker overall than the inland rock: wet, dark gneiss walls read as rock (not an ice shelf)
     // even when the low sun lights them square-on
-    rock = mix(rock, gneiss, 0.82) * 0.68;
+    rock = mix(rock, gneiss, 0.82) * 0.56;
     float mj = abs(sf_sideN(vec2(0.045, 0.012), 47.0) - 0.5);
     rock *= 1.0 - 0.3 * sf_aa(0.46, 0.5, mj) * (1.0 - farA) * smoothstep(0.6, 0.85, slope);
     float seep = smoothstep(0.92, 0.965, sf_sideN(vec2(0.03, 0.003), 21.0)) * smoothstep(0.7, 0.95, slope);

@@ -116,7 +116,7 @@ function basaltCaveRock(cave: CaveDressingContext['cave']): void {
     vec2 ha = abs(hc.xy);
     float he = 0.5 - max(dot(ha, hs * 0.5), ha.x);
     float hid = fract(sin(dot(hc.zw, vec2(12.9898, 78.233))) * 43758.5453);
-    vec3 bas = vec3(0.026, 0.028, 0.033) * (0.8 + 0.4 * hid);
+    vec3 bas = vec3(0.011, 0.012, 0.014) * (0.8 + 0.4 * hid);
     // column joints read as vertical seams on steep faces only, and not every seam is open (a
     // plan-view hexagon grid on gentler surfaces, or a full grid of seams, read as tiles)
     float colFace = smoothstep(0.6, 0.9, steep) * (1.0 - smoothstep(14.0, 45.0, cv_dist)) * step(0.35, hid);
@@ -254,7 +254,8 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
     g.dispose();
     ng.computeVertexNormals();
     const NP = ng.attributes.position as THREE.BufferAttribute;
-    const tone = 0.017 + 0.014 * ((seed * 7.31) % 1);
+    // (the Fjord sky environment lights dark surfaces strongly: basalt needs a very low albedo to read black)
+    const tone = 0.006 + 0.006 * ((seed * 7.31) % 1);
     for (let k = 0; k < NP.count; k++) {
       colPos.push(NP.getX(k), NP.getY(k), NP.getZ(k));
       colCol.push(tone, tone * 1.04, tone * 1.13);
