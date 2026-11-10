@@ -93,6 +93,8 @@ export interface HazardContact {
   heightAbove: number;
   /** physics time (s) */
   t: number;
+  /** × effect strength for the game difficulty (HazardSetup.intensity; 1 when not set) */
+  intensity?: number;
 }
 
 /** What touching a hazard does this step (everything optional; null = nothing). */

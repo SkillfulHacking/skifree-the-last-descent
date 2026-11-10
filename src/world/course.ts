@@ -19,6 +19,8 @@ export { CAVE_D, CAVE_FLOOR_RAISE } from './caveTerrain';
 export const SEED_DEFAULT = 20261106;
 /** coastal locations: share of the valley-wall rise kept on the sea side (a low bank to the rim) */
 const SEA_BANK = 0.22;
+/** coastal locations: share of the valley cross-section's rise kept on the sea side of the piste */
+const SEA_CROSS = 0.4;
 
 /** Classic-course constants (the original 3 km mountain). New code should ask the profile. */
 export const COURSE = {
@@ -176,8 +178,10 @@ export class Mountain {
       h += 0.00022 * b * b + 0.18 * b;
     }
 
-    // valley cross-section
-    h += 0.0016 * d * d * (ad < w ? 1 : w / ad);
+    // valley cross-section (a coast: the sea side is flatter, so the rim and the sea beyond it sit
+    // low in the gameplay view instead of behind a rising bank — art request R1)
+    const cross = 0.0016 * d * d * (ad < w ? 1 : w / ad);
+    h += this.coast && d < 0 ? cross * SEA_CROSS : cross;
     // each side of the valley has its own character: banks set back further or closer, steeper or gentler
     const side: 1 | -1 = d >= 0 ? 1 : -1;
     const sideW = w * P.sideSetback(z, side);

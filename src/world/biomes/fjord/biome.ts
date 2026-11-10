@@ -33,13 +33,18 @@ export const FJORD_COAST: CoastParams = {
   far: [2600, 4300],
   farHeight: [700, 1500],
   depth: 180,
-  berm: [3.5, 6.5],
+  // a low cornice lip (the cornice's heavy snow, the updraft and the out-of-bounds recovery are
+  // what keep skiers off the edge): the sea stays in view from the piste (art request R1)
+  berm: [2.5, 4.5],
   quay: 2.4,
-  quayZ: 190,
+  // the waterfront in the mid-ground of the run-out and the finish frames (art request R5)
+  quayZ: 120,
+  // on open stretches the cliff rim runs 46–72 m from the racing line (art request R1)
+  nearRim: [46, 72],
 };
 
 /** Cornice guard: extra drag / friction at full guard strength (over the last ~20 m to the edge). */
-export const CORNICE = { dragAdd: 0.05, friction: 6, grip: 0.7 } as const;
+export const CORNICE = { dragAdd: 0.12, friction: 10, grip: 0.7 } as const;
 
 /**
  * Ridgeline spines (profile spine lines): wind-packed hard snow on the crest — the fastest snow on

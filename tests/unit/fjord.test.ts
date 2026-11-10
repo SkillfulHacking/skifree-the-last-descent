@@ -164,8 +164,9 @@ describe('Fjord Coast: deterministic, continuous coastal terrain at every length
       expect(c.reachAt(L).ocean).toBe(true);
       expect(c.reachAt(L + 5000).level).toBe(sea);
       const shore = c.shoreZ(x);
-      expect(shore - L).toBeGreaterThan(150);
-      expect(shore - L).toBeLessThan(260);
+      // round 3 (art request R5): the quay front is 120 m past the finish line
+      expect(shore - L).toBeGreaterThan(100);
+      expect(shore - L).toBeLessThan(190);
       for (let z = L - 50; z < shore - 15; z += 10) {
         const h = m.heightAt(x, z) - sea;
         expect(h).toBeGreaterThan(1);
@@ -386,7 +387,8 @@ describe('Fjord Coast: optional viewpoints', () => {
       const seed = worldSeed(course(len));
       for (const l of list.slice(0, 6)) {
         const lane = Math.abs(l.x - m.routeX(l.z));
-        expect(lane).toBeGreaterThan(LANE_HALF + LOOKOUT_RADIUS); // the racing line never passes through one
+        // the racing line never passes through one (a chase viewpoint is a short swerve away)
+        expect(lane).toBeGreaterThan(l.chase ? LOOKOUT_RADIUS + 1.5 : LANE_HALF + LOOKOUT_RADIUS);
         expect(m.heightAt(l.x, l.z) - m.heightAt(m.routeX(l.z), l.z)).toBeLessThan(9);
         expect(c.guard(l.x, l.z)).toBe(0); // outside the cornice
         const band = generateBand(m, seed, Math.floor(l.z / BAND));

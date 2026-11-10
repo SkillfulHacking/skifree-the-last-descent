@@ -21,6 +21,7 @@ import { BiomeEnvironment, RIM_GUARD } from '../../src/world/capabilities/enviro
 import { getHazardKind, hazardPhase, type HazardInstance } from '../../src/world/hazards/hazard';
 import { collectPlacements, probe } from '../../src/world/hazards/testkit';
 import { LEE_ROCK_INSET, SQUALL } from '../../src/world/biomes/fjord/hazards';
+import { LOOKOUT_CHASE_MAX, LOOKOUT_CHASE_MIN } from '../../src/world/coast';
 import { simulateCourse } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
 import { readerDriver } from '../sim/readerDriver';
@@ -252,26 +253,116 @@ describe('Fjord: no way off the playable area over the cornice', () => {
 });
 
 describe('Fjord: viewpoints are free to explore', () => {
-  it('none inside a chase at any length; ids unique per course and location; off the line, gentle, clear of trees', () => {
+  const LENS = ['sprint', 'standard', 'endurance', 'expedition', 'endless'] as LengthMode[];
+  const endOf = (m: Mountain) => (Number.isFinite(m.finishZ) ? m.finishZ : 30000);
+
+  it('free-stretch ones outside chases; chase ones 16–30 m beside the line on clean, flat snow; several per Sprint and Standard; ids unique', () => {
     const ids = new Map<string, string>();
-    for (const len of ['sprint', 'standard', 'endurance', 'expedition', 'endless'] as LengthMode[])
-      for (const sd of ['RB1', 'FJ2']) {
+    for (const len of LENS)
+      for (const sd of ['RB1', 'FJ2', 'V3X']) {
         const m = mtn(len, sd);
-        const end = Number.isFinite(m.finishZ) ? m.finishZ : 30000;
+        const end = endOf(m);
         const list = m.coast!.lookouts(0, end);
         const enc = m.profile.encounters(-Infinity, end);
-        expect(list.length, `${len} ${sd}`).toBeGreaterThanOrEqual(Math.min(enc.length, len === 'endless' ? 5 : 99));
+        expect(list.length, `${len} ${sd}`).toBeGreaterThanOrEqual(len === 'sprint' ? 2 : len === 'standard' ? 4 : enc.length + 2);
         for (const l of list) {
-          expect(enc.some((e) => l.z >= e.triggerZ - 20 && l.z <= e.chaseEndZ), `${len} ${sd} ${l.id}`).toBe(false);
+          const inChase = enc.some((e) => l.z >= e.triggerZ - 20 && l.z <= e.chaseEndZ);
+          expect(inChase, `${len} ${sd} ${l.id}`).toBe(!!l.chase);
           const key = `${len}:${sd}`;
           expect(ids.get(l.id) ?? key, `${l.id} on two courses`).toBe(key);
           ids.set(l.id, key);
-          expect(Math.abs(l.x - m.routeX(l.z))).toBeGreaterThan(20);
-          expect(m.heightAt(l.x, l.z) - m.heightAt(m.routeX(l.z), l.z)).toBeLessThan(9);
+          const lane = m.routeX(l.z) - l.x;
+          if (l.chase) {
+            expect(lane).toBeGreaterThanOrEqual(LOOKOUT_CHASE_MIN - 1e-6);
+            expect(lane).toBeLessThanOrEqual(LOOKOUT_CHASE_MAX + 1e-6);
+            expect(Math.abs(m.heightAt(l.x, l.z) - m.heightAt(m.routeX(l.z), l.z))).toBeLessThan(3);
+          } else {
+            expect(Math.abs(lane)).toBeGreaterThan(20);
+            expect(m.heightAt(l.x, l.z) - m.heightAt(m.routeX(l.z), l.z)).toBeLessThan(9);
+          }
+          expect(m.coast!.guard(l.x, l.z)).toBe(0);
         }
         const seed = worldSeed(course(len, sd));
-        for (const l of list.slice(0, 2)) for (const o of generateBand(m, seed, Math.floor(l.z / BAND))) if (o.kind === 'tree' || o.kind === 'boulder') expect(Math.hypot(o.x - l.x, o.z - l.z)).toBeGreaterThan(10);
+        for (const l of list.slice(0, 4))
+          for (const o of generateBand(m, seed, Math.floor(l.z / BAND))) {
+            if (o.kind === 'tree' || o.kind === 'boulder') expect(Math.hypot(o.x - l.x, o.z - l.z)).toBeGreaterThan(10);
+            // the swerve from the line to a chase viewpoint is clear of anything solid
+            if (l.chase && o.collidable && o.kind !== 'stump') expect(o.z > l.z - 60 && o.z < l.z + 30 && o.x > l.x - 5 && o.x < m.routeX(o.z) - LANE_HALF, `${len} ${sd} ${o.kind}`).toBe(false);
+          }
       }
+  });
+
+  it('the same viewpoints whatever the query pattern (round 2, E1): 40 m windows down the course, bands in reverse, one big query', () => {
+    for (const len of LENS)
+      for (const sd of ['RB1', 'V3X']) {
+        const end = Math.min(endOf(mtn(len, sd)), 30000);
+        const ref = buildMountain(course(len, sd)).coast!.lookouts(-1000, end).map((l) => l.id);
+        // the game's pattern: small windows around the skier, walking down
+        const walk = buildMountain(course(len, sd)).coast!;
+        const seen = new Set<string>();
+        for (let z = -60; z < end; z += 40) for (const l of walk.lookouts(z - 20, z + 20)) seen.add(l.id);
+        expect([...seen].sort(), `${len} ${sd} walk`).toEqual([...ref].sort());
+        // obstacle bands generated far end first
+        const rev = buildMountain(course(len, sd));
+        const seed = worldSeed(course(len, sd));
+        for (let b = Math.floor(end / BAND); b >= 0; b -= 7) generateBand(rev, seed, b);
+        expect(rev.coast!.lookouts(-1000, end).map((l) => l.id), `${len} ${sd} reverse`).toEqual(ref);
+      }
+  });
+
+  it('the obstacle layout does not depend on the order its bands are generated in', () => {
+    for (const len of ['sprint', 'endurance'] as LengthMode[]) {
+      const sd = 'V3X';
+      const seed = worldSeed(course(len, sd));
+      const end = endOf(mtn(len, sd));
+      const nb = Math.ceil(end / BAND);
+      const fwd = buildMountain(course(len, sd));
+      const a = Array.from({ length: nb }, (_, b) => generateBand(fwd, seed, b));
+      const back = buildMountain(course(len, sd));
+      const b2: ReturnType<typeof generateBand>[] = [];
+      for (let b = nb - 1; b >= 0; b--) b2[b] = generateBand(back, seed, b);
+      for (let b = 0; b < nb; b++) expect(b2[b]!.map((o) => `${o.kind}:${o.x.toFixed(3)}:${o.z.toFixed(3)}`), `${len} band ${b}`).toEqual(a[b]!.map((o) => `${o.kind}:${o.x.toFixed(3)}:${o.z.toFixed(3)}`));
+    }
+  });
+
+  it('a chase viewpoint costs at most ~0.3 s: swerving into its radius and back, against holding the line', () => {
+    let n = 0;
+    let worst = -Infinity;
+    for (const sd of ['RB1', 'FJ2', 'V3X'])
+      for (const len of ['sprint', 'standard'] as LengthMode[]) {
+        const m = mtn(len, sd);
+        const f = new ObstacleField(m, worldSeed(course(len, sd)));
+        for (const l of m.coast!.lookouts(0, m.finishZ).filter((q) => q.chase)) {
+          const z0 = l.z - 260;
+          const z1 = l.z + 160;
+          f.ensure(z0 - 50, z1 + 50);
+          const run = (detour: boolean) => {
+            const p = new SkierPhysics(m, f, () => [], null);
+            p.reset(m.routeX(z0), z0, 0, 24);
+            // aim to pass 4 m inside the discovery radius edge, eased in and out over ~120 m
+            const reach = m.routeX(l.z) - l.x - (l.r - 4);
+            const off = (z: number) => (detour ? -Math.max(0, reach) * Math.exp(-(((z - l.z) / 70) ** 2)) : 0);
+            const drive = follow(m, off);
+            let t = 0;
+            let close = Infinity;
+            while (p.s.pos.z < z1 && t < 60) {
+              p.step(drive(p.s, t));
+              t += PHYS_DT;
+              close = Math.min(close, Math.hypot(p.s.pos.x - l.x, p.s.pos.z - l.z));
+            }
+            return { t, close, crashes: p.s.crashes };
+          };
+          const a = run(false);
+          const b = run(true);
+          expect(b.close, l.id).toBeLessThan(l.r);
+          expect(b.crashes, l.id).toBe(0);
+          worst = Math.max(worst, b.t - a.t);
+          if ((globalThis as unknown as { process?: { env: Record<string, string> } }).process?.env.VPLOG) console.log("VP", l.id, (m.routeX(l.z) - l.x).toFixed(1), (b.t - a.t).toFixed(2), a.t.toFixed(2), b.close.toFixed(1), b.crashes);
+          n++;
+        }
+      }
+    expect(n).toBeGreaterThanOrEqual(6);
+    expect(worst).toBeLessThan(0.33);
   });
 });
 

@@ -12,7 +12,7 @@ import { smoothstep } from '../../core/rng';
 import type { SurfaceType } from '../../core/types';
 import type { Mountain } from '../course';
 import type { EnvQuery, EnvSample, PhysicsEnvironment } from '../../physics/environment';
-import { capabilitiesOf, type BiomeCapabilities } from './index';
+import { capabilitiesOf, type BiomeCapabilities, type GameDifficulty } from './index';
 import { combineSurface, resetSurface, type SurfaceQuery, type SurfaceWeights } from './surface';
 import { makeWeatherSample, type WeatherSample } from './weather';
 import { HazardField } from '../hazards/field';
@@ -77,11 +77,16 @@ export class BiomeEnvironment implements PhysicsEnvironment {
   private w = makeWeatherSample();
   private sq: SurfaceQuery & { kind: SurfaceType; x: number; z: number; cached: SurfaceWeights | null };
 
+  /** × hazard effect strength for the game difficulty (HazardSetup.intensity) */
+  readonly intensity: number;
+
   constructor(
     readonly mountain: Mountain,
     readonly seed: number,
+    opts: { difficulty?: GameDifficulty } = {},
   ) {
     this.caps = capabilitiesOf(mountain.biome);
+    this.intensity = this.caps.hazards.intensity?.[opts.difficulty ?? 'normal'] ?? 1;
     this.kinds = this.caps.hazards.kinds.map(getHazardKind);
     this.hazards = new HazardField(mountain, seed, this.kinds, this.caps.hazards.density);
     const cpl = this.caps.weather.coupling;
@@ -209,7 +214,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     // physics-critical band must exist even if the caller did not stream (simulations)
     this.hazards.ensure(q.z - 1, q.z + 1);
     const near = this.hazards.near(q.x, q.z + HAZARD_ALERT_RANGE * 0.5, HAZARD_ALERT_RANGE * 0.5 + HAZARD_PASS_RANGE, this.near);
-    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t };
+    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity };
     for (const h of near) {
       let tr = this.tracks.get(h.id);
       const k = tr?.k ?? getHazardKind(h.kind);
@@ -274,7 +279,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
   hazardVisibility(x: number, z: number, t: number): number {
     if (this.hazards.empty) return 1;
     let v = 1;
-    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: 0, grounded: true, heightAbove: 0, t };
+    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: 0, grounded: true, heightAbove: 0, t, intensity: this.intensity };
     for (const h of this.hazards.near(x, z, 60, [])) {
       const k = getHazardKind(h.kind);
       contact.dx = x - h.x;

@@ -26,7 +26,17 @@ export interface HazardSetup {
   readonly kinds: readonly string[];
   /** × every kind's default amount (biome hazard tuning; 0 = none) */
   readonly density: number;
+  /**
+   * × the strength of hazard effects by game difficulty (the layout is the same on every
+   * difficulty, so a course code always describes the same course; only how hard a squall pushes or
+   * rock drags changes). Omitted entries are 1. Lets a harder location stay approachable on Relaxed
+   * without touching the Yeti (brief §2).
+   */
+  readonly intensity?: Readonly<Partial<Record<GameDifficulty, number>>>;
 }
+
+/** The player's game difficulty setting (mirrors game/CourseConfig Difficulty; world code may not import game). */
+export type GameDifficulty = 'relaxed' | 'normal' | 'hard';
 
 export interface PresentationRef {
   /** id of a registered presentation (finish / refuge / cave registries) */
