@@ -103,7 +103,7 @@ export function buildBasaltPortal(m: Mountain, cave: Cave, opts: { quality?: str
 
   // 1) the cave's own rock: triplanar basalt, physically lit (no multipliers)
   const rock = cave.group.getObjectByName('cave-rock') as THREE.Mesh | undefined;
-  const rockMat = createRockMaterial({ kind: 'basalt', snow: 1, strata: 0.25, macro: 6, wet: 0, water: cave.mouth.y - 1.2 });
+  const rockMat = createRockMaterial({ kind: 'basalt', snow: 1, strata: 0.25, macro: 6, wet: 0, caveAttr: !!rock?.geometry.getAttribute('aCave') });
   let prevRockMat: THREE.Material | THREE.Material[] | null = null;
   if (rock) {
     prevRockMat = rock.material;
@@ -169,7 +169,7 @@ export function buildBasaltPortal(m: Mountain, cave: Cave, opts: { quality?: str
     return (3.4 * (1 - fa) + 1.4 * noise3(a * 0.3, b * 0.3, 3, 29)) * (noise3(a * 0.22, b * 0.22, 4, 31) > -0.25 ? 1 : 0);
   }, 9);
   const colGeo = P.geometry();
-  const colMat = createRockMaterial({ kind: 'basalt', vertexColors: true, snow: 1, strata: 0, macro: 5, water: cave.mouth.y - 1.2 });
+  const colMat = createRockMaterial({ kind: 'basalt', vertexColors: true, snow: 1, strata: 0, macro: 5 });
   const cols = new THREE.Mesh(colGeo, colMat);
   cols.castShadow = true;
   cols.receiveShadow = true;

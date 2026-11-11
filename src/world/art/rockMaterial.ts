@@ -125,6 +125,8 @@ export interface RockMaterialOptions {
   fill?: number;
   /** two triplanar scales (true) or one (low quality) */
   hq?: boolean;
+  /** the mesh carries the shared cave's baked `aCave` (sky visibility, AO): darken the chamber */
+  caveAttr?: boolean;
 }
 
 export interface RockUniforms {
@@ -152,18 +154,23 @@ export function createRockMaterial(o: RockMaterialOptions = {}): THREE.MeshStand
   };
   const macro = o.macro ?? 7.3;
   const hq = o.hq !== false;
+  const lumRef = kind === 'basalt' ? 0.045 : 0.075;
+  if (o.caveAttr) m.defines = { ...(m.defines ?? {}), RK_CAVE: '' };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U, { tAlb: { value: set.albedo }, tNhr: { value: set.nhr } });
     addAtmosphereUniforms(sh.uniforms);
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vRkW;\nvarying vec3 vRkN;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRkW = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvRkN = normalize(mat3(modelMatrix) * objectNormal);');
+      .replace('#include <common>', '#include <common>\nvarying vec3 vRkW;\nvarying vec3 vRkN;\n#ifdef RK_CAVE\nattribute vec4 aCave;\nvarying vec4 vRkCave;\n#endif')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRkW = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvRkN = normalize(mat3(modelMatrix) * objectNormal);\n#ifdef RK_CAVE\nvRkCave = aCave;\n#endif');
     sh.fragmentShader = sh.fragmentShader
       .replace(
         '#include <common>',
         /* glsl */ `#include <common>
 varying vec3 vRkW;
 varying vec3 vRkN;
+#ifdef RK_CAVE
+varying vec4 vRkCave;
+#endif
 uniform sampler2D tAlb;
 uniform sampler2D tNhr;
 uniform float uWater;
@@ -210,7 +217,8 @@ ${
   hq
     ? `RkS rkB = rk_tri(rkP + vec3(17.3, 5.1, 9.7), rkBw, ${(1 / (tile * macro)).toFixed(5)}, 0.9);
 float rkFar = smoothstep(60.0, 600.0, length(vRkW - cameraPosition));
-vec4 rkAlb = mix(rkA.alb * (0.55 + 0.9 * rkB.alb / max(vec4(0.08), vec4(vec3(dot(rkB.alb.rgb, vec3(0.333))), 1.0))), rkB.alb, 0.25 + 0.5 * rkFar);
+float rkLumB = dot(rkB.alb.rgb, vec3(0.333));
+vec4 rkAlb = mix(rkA.alb * vec4(vec3(clamp(0.45 + 0.55 * rkLumB / ${lumRef.toFixed(3)}, 0.5, 1.8)), 1.0), rkB.alb, 0.25 + 0.5 * rkFar);
 vec4 rkNhr = mix(rkA.nhr, rkB.nhr, 0.35 + 0.4 * rkFar);
 rkDN = mix(rkDN, rk_dN, 0.35 + 0.4 * rkFar);`
     : `vec4 rkAlb = rkA.alb; vec4 rkNhr = rkA.nhr;`
@@ -233,6 +241,10 @@ float rkIce = smoothstep(0.0, 0.35, rkAbove) * (1.0 - smoothstep(0.9, 1.6 + rk_n
 // snow: flat-ish surfaces only, cavities first (height-blended edge), patchy at its limit
 float rkSnowT = rkN.y + 0.3 * (0.5 - rkH) + 0.16 * (rk_fbm(rkP.xz * 0.06 + rkP.y * 0.03) - 0.5);
 float rkSnow = smoothstep(0.6, 0.74, rkSnowT) * uSnow * (1.0 - rkWetK);
+#ifdef RK_CAVE
+// no snow in the chamber; the floor (kind 1) is grit
+rkSnow *= smoothstep(0.55, 0.85, vRkCave.x) * (1.0 - step(0.5, vRkCave.z));
+#endif
 rkSnow = max(rkSnow, rkIce * 0.85);
 vec3 rkSnowCol = vec3(0.86, 0.9, 0.955) * (0.94 + 0.06 * rk_n(rkP.xz * 1.7));
 diffuseColor.rgb *= mix(rkCol, rkSnowCol, rkSnow);
@@ -255,11 +267,20 @@ diffuseColor.rgb *= mix(rkCol, rkSnowCol, rkSnow);
 reflectedLight.indirectDiffuse *= mix(rkAO, 1.0, rkSnow);
 reflectedLight.indirectSpecular *= mix(rkAO, 1.0, rkSnow);
 // optional skylight floor for faces in shadow (stylistic fill, kept small)
-reflectedLight.indirectDiffuse += uFill * diffuseColor.rgb * vec3(0.55, 0.68, 0.9);`,
+reflectedLight.indirectDiffuse += uFill * diffuseColor.rgb * vec3(0.55, 0.68, 0.9);
+#ifdef RK_CAVE
+{
+  float vis = clamp(vRkCave.x, 0.0, 1.0) * mix(1.0, clamp(vRkCave.y, 0.0, 1.0), 0.7);
+  reflectedLight.indirectDiffuse *= vis;
+  reflectedLight.indirectSpecular *= vis;
+  // a faint cold bounce deep inside: depth cues, not a void
+  reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.03, 0.04, 0.055) * (1.0 - vis);
+}
+#endif`,
       )
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vRkW);');
   };
-  m.customProgramCacheKey = () => `art-rock-${kind}-${hq ? 2 : 1}-${macro}-${o.vertexColors ? 1 : 0}`;
+  m.customProgramCacheKey = () => `art-rock-${kind}-${hq ? 2 : 1}-${macro}-${o.vertexColors ? 1 : 0}-${o.caveAttr ? 1 : 0}`;
   m.userData = { rock: U, kind };
   return m as THREE.MeshStandardMaterial & { userData: { rock: RockUniforms; kind: RockKind } };
 }

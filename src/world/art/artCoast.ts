@@ -17,6 +17,7 @@ import { smoothstep } from './noise3';
 import { buildIsland, layoutIslands, type IslandSpec } from './islands';
 import { createRockMaterial, disposeRockMaterial } from './rockMaterial';
 import { createFoliageMaterial, pineGeometry } from '../props';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export class ArtCoastMountain extends Mountain {
   readonly cliff: CliffModel;
@@ -93,24 +94,29 @@ export class IslandSet {
   constructor(m: ArtCoastMountain, region: { x0: number; x1: number; z0: number; z1: number }, opts: { max?: number; seed?: number } = {}) {
     this.group.name = 'art-islands';
     this.specs = islandSpecs(m, region, opts.seed ?? m.seed).slice(0, opts.max ?? 40);
-    const byWater = new Map<number, THREE.MeshStandardMaterial>();
+    // one merged mesh per water level (one draw call per fjord arm)
+    const byWater = new Map<number, THREE.BufferGeometry[]>();
     const trees: THREE.Vector3[] = [];
     for (const sp of this.specs) {
       const { geometry, trees: tr } = buildIsland(sp);
-      let mat = byWater.get(sp.water);
-      if (!mat) {
-        mat = createRockMaterial({ kind: 'gneiss', vertexColors: true, water: sp.water, snow: 1, strata: 0.45 });
-        byWater.set(sp.water, mat);
-        this.mats.push(mat);
-      }
-      const mesh = new THREE.Mesh(geometry, mat);
+      const list = byWater.get(sp.water) ?? [];
+      list.push(geometry);
+      byWater.set(sp.water, list);
+      trees.push(...tr);
+    }
+    for (const [water, list] of byWater) {
+      const geo = mergeGeometries(list, false)!;
+      for (const g of list) g.dispose();
+      geo.computeBoundingSphere();
+      const mat = createRockMaterial({ kind: 'gneiss', vertexColors: true, water, snow: 1, strata: 0.45 });
+      this.mats.push(mat);
+      const mesh = new THREE.Mesh(geo, mat);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      mesh.name = `island-${sp.kind}`;
+      mesh.name = 'islands';
       this.group.add(mesh);
-      this.geos.push(geometry);
-      this.triangles += (geometry.index?.count ?? 0) / 3;
-      trees.push(...tr);
+      this.geos.push(geo);
+      this.triangles += (geo.index?.count ?? 0) / 3;
     }
     if (trees.length) {
       const geo = pineGeometry(1, false, m.biome);
