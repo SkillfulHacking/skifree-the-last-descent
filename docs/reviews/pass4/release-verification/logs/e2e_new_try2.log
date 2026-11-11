@@ -1,0 +1,40 @@
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+Running 5 tests using 1 worker
+
+  ✓  1 tests/e2e/migration.spec.ts:102:1 › a Pass 3 save (settings + per-course records, no progress key) loads unchanged in the pass-4 build and stays playable (9.9m)
+  ✓  2 tests/e2e/migration.spec.ts:182:1 › a v1 progress save migrates to v2 without ?debug: reward granted, unknown data kept, written back as v2 (3.5m)
+  ✓  3 tests/e2e/release.spec.ts:43:1 › all 12 achievements display at 1366x768, 1920x1080 and 2560x1440 (6.9m)
+  ✓  4 tests/e2e/release.spec.ts:81:1 › an equipped jacket persists across reloads (no ?debug) (8.9m)
+  ✘  5 tests/e2e/release.spec.ts:110:1 › a real unlock through keyboard play (Pizza Party) persists, grants its jacket and survives a reload (no ?debug) (27.0m)
+
+
+  1) tests/e2e/release.spec.ts:110:1 › a real unlock through keyboard play (Pizza Party) persists, grants its jacket and survives a reload (no ?debug) 
+
+    Error: Pizza Party committed by real play
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      132 |     unlocked = !!(await progress(page))?.achievements?.['pizza-party'];
+      133 |   }
+    > 134 |   expect(unlocked, 'Pizza Party committed by real play').toBe(true);
+          |                                                          ^
+      135 |   await expect(page.locator('.ach-toast-name')).toHaveText('Pizza Party');
+      136 |   await expect(page.locator('.ach-toast-sub')).toHaveText('New jacket: Pesto Green (Locker)');
+      137 |   await page.screenshot({ path: `${OUT}/unlock_toast_pizza_party.png` });
+        at /home/claude/skifree/tests/e2e/release.spec.ts:134:58
+
+    Error Context: test-results/release-a-real-unlock-thro-43f32-survives-a-reload-no-debug-/error-context.md
+
+  Slow test file: tests/e2e/release.spec.ts (42.8m)
+  Slow test file: tests/e2e/migration.spec.ts (13.4m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 failed
+    tests/e2e/release.spec.ts:110:1 › a real unlock through keyboard play (Pizza Party) persists, grants its jacket and survives a reload (no ?debug) 
+  4 passed (56.2m)
+exit 1

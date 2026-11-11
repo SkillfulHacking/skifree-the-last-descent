@@ -1,0 +1,10 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/e2e/menu.spec.ts:62:3 › main menu fits 2560x1440 without scrolling, title intact (3.5m)
+
+  1 passed (3.5m)
+
+real	3m33.229s
+user	0m3.484s
+sys	0m0.720s

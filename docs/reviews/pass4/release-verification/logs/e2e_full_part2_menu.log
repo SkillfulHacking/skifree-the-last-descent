@@ -1,0 +1,19 @@
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+Running 8 tests using 1 worker
+
+  ✓  1 tests/e2e/menu.spec.ts:62:3 › main menu fits 1920x1080 without scrolling, title intact (4.9m)
+  ✓  2 tests/e2e/menu.spec.ts:62:3 › main menu fits 1920x900 without scrolling, title intact (4.5m)
+  ✓  3 tests/e2e/menu.spec.ts:62:3 › main menu fits 1366x768 without scrolling, title intact (3.1m)
+  ✓  4 tests/e2e/menu.spec.ts:62:3 › main menu fits 2560x1440 without scrolling, title intact (7.8m)
+  ✓  5 tests/e2e/menu.spec.ts:75:1 › browser zoom 125% and UI scale 150% keep the menu usable (scroll only if needed) (3.2m)
+  ✓  6 tests/e2e/menu.spec.ts:101:1 › keyboard, mouse and gamepad drive the course controls; the choice persists (9.0m)
+  ✓  7 tests/e2e/menu.spec.ts:137:1 › a course code typed into the menu selects that course (22.1m)
+  ✓  8 tests/e2e/menu.spec.ts:178:1 › with a second location (debug-only test location) the Location row shows name, rating and description and the menu still fits (10.3m)
+
+  Slow test file: tests/e2e/menu.spec.ts (1.1h)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  8 passed (1.1h)
+exit 0
