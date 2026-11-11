@@ -168,6 +168,40 @@ Estimated cost in the game (Sprint, high): +1.5 MB download (WebP) or ~1 MB (KTX
 +1 (cave portal); +60–110k triangles in view; CPU ~0.2 s per LOD0 segment, sliced over frames.
 
 ## 7. Test scene and captures
-`/artscene.html?mode=current|proposed&shot=…` (dev server: `npx vite --config
-tools/artscene/vite.config.mts --port 4480`; capture: `node tools/artscene/capture.mjs`).
-Results and the critical look at them: see §8.
+`/artscene.html?mode=current|proposed&shot=long|cliff|cave|cave_near|islands|island` (dev server:
+`npx vite --config tools/artscene/vite.config.mts --port 4480`; capture: `node
+tools/artscene/capture.mjs`). Both modes: Fjord Coast Classic Sprint (the final-round evidence
+course), the game's `Environment` (sun, sky IBL, hemisphere, fog, aerial perspective), the game's
+`TerrainRenderer` for the land and the game's `FjordWater`; identical cameras (`long` and `islands`
+are the final-round `06_long_distance` and `03_mid_mountain` framings; `cave` is the `07_yeti_cave`
+framing). No hamlets, ships, mist, vegetation or obstacles in either mode.
+
+Captures (1920×1080), `docs/reviews/biomes/fjord/round-4/artscene/`:
+`{long,cliff,cave,cave_near,islands,island}_{current,proposed}.png`, `manifest.json` (render
+counts per shot; the one 404 logged on the first page is the missing favicon).
+
+## 8. Critical look at the captures (self-assessment; the independent reviewer decides)
+
+**Clearly better**
+- *Sea cave* (`cave`, `cave_near`): the regression is gone. Round-3 dressing in this scene: shell
+  median luminance 0/255 (89 % of pixels < 10), columns 1/255. Proposed: legible dark basalt
+  (shell and columns in the 35–60/255 band after the snow-bounce fill; before the fill the shell
+  measured 16/255 median), real surface detail, the chamber stays dark (baked visibility), and the
+  packed columns read as columnar basalt framing the mouth rather than a crowd of bollards.
+- *Vertical smearing*: gone on the sea cliffs. Strata benches carry horizontal snow bands that
+  read at a kilometre (`long`), spurs and gullies break the wall, no slits or fall-line striation.
+- *Loaf islands*: replaced by distinct archetypes (cliff-girt plateau, whaleback, wooded islet with
+  pines, skerry chains along a grain).
+
+**Still not 9/10 (honest)**
+- The cliff face is too smooth and uniform in colour at mid-distance (reads a little like cast
+  concrete): the procedural gneiss bake is the weak link. This is exactly where a photo-scanned
+  CC0 set (§3.2) would make the largest difference; the material takes it unchanged.
+- The inland skyline *needles* above the rim are the land heightfield (ridged noise beyond the
+  piste), not the coast: untouched here (gameplay land). Fix separately (crest softening off-piste).
+- Islands: the cliff-girt archetype is still a little "cake-like" from far; low skerries are
+  mostly snow. Distant domes on the horizon in both modes are beyond the replaced area
+  (far-shore/ocean islands) — the proposed build would replace them too.
+- Columns are uniform in girth and perfectly upright; vary girth (5–7 sides), lean and break more.
+- No surf/foam line where meshes meet the water yet (§6.5).
+
