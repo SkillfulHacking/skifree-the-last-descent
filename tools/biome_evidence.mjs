@@ -369,7 +369,7 @@ if (biome === 'fjord' && (want('gate') || want('gap') || want('viewpoint') || wa
       const g = gt.g;
       await goTo(g.z - 150, 0);
       await ev(() => { window.__skifree.hold(true); window.__skifree.hud(false); });
-      const pose = `(w, m) => { const g = ${JSON.stringify(g)}; const cz = g.z - 40, cx = m.routeX(cz) + 6; window.__skifree.freeCam([cx, m.heightAt(cx, cz) + 8.5, cz], [g.x - 2, m.heightAt(g.x, g.z + 8) - 0.5, g.z + 8], 56); }`;
+      const pose = `(w, m) => { const g = ${JSON.stringify(g)}; const cz = g.z - 32, cx = m.routeX(cz) + 7; window.__skifree.freeCam([cx, m.heightAt(cx, cz) + 14, cz], [g.x - 3, m.heightAt(g.x, g.z + 6) - 1, g.z + 6], 56); }`;
       const r1 = await framesUntil(`(s) => (window.__skifree.hazards('sea-gust').find((h) => h.id === ${gt.id}) || {}).phase === 'active'`, 900);
       await framesUntil(`(s) => false`, 20);
       await P(pose);
@@ -402,7 +402,7 @@ if (biome === 'fjord' && (want('gate') || want('gap') || want('viewpoint') || wa
     if (lk) {
       await goTo(lk.z - 100, 0);
       await ev(() => { window.__skifree.hold(true); window.__skifree.hud(false); });
-      await P(`(w, m, c) => { const l = ${JSON.stringify(lk)}; const y = m.heightAt(l.x, l.z); const cx = l.x + 16, cz = l.z - 14; window.__skifree.freeCam([cx, Math.max(m.heightAt(cx, cz), y) + 5, cz], [l.x - 420, c.seaLevelAt(l.z) + 120, l.z + 260], 58); }`);
+      await P(`(w, m, c) => { const l = ${JSON.stringify(lk)}; const y = m.heightAt(l.x, l.z); const cx = l.x + 16, cz = l.z - 14; window.__skifree.freeCam([cx, Math.max(m.heightAt(cx, cz), y) + 6, cz], [l.x - 500, y - 70, l.z + 220], 58); }`);
       await settle(3000);
       await shot('14_viewpoint', `Scenic viewpoint at z≈${Math.round(lk.z)} (${lk.chase ? 'chase stretch' : 'free stretch'}): the platform and the view over the fjord`);
     }

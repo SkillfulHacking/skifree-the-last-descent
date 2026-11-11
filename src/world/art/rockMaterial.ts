@@ -305,6 +305,11 @@ reflectedLight.indirectDiffuse += uFill * diffuseColor.rgb * vec3(0.55, 0.68, 0.
   reflectedLight.indirectSpecular *= vis;
   // a faint cold bounce deep inside: depth cues, not a void
   reflectedLight.indirectDiffuse += diffuseColor.rgb * vec3(0.03, 0.04, 0.055) * (1.0 - vis);
+  // safety net against shadow-map leaks inside (round 4: the shared cave material gates the sun
+  // there too; without it an inner wall read as a sunlit tan slab in the mouth)
+  float deep = smoothstep(0.03, 0.2, vRkCave.x);
+  reflectedLight.directDiffuse *= deep;
+  reflectedLight.directSpecular *= deep;
 }
 #endif`,
       )

@@ -397,13 +397,13 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     const lowY = 6.1;
     // (round 4: lit, the dense 4-row grid of column ends read as a pile of hex nuts — fewer, longer,
     // broken ends in three ragged rows)
-    for (let row = 0; row < 3; row++) {
+    for (let row = 0; row < 2; row++) {
       const yUp = lowY + row * 0.95;
       for (let al = -hw - 0.6 + (row % 2) * 0.55; al <= hw + 0.6; al += 1.1) {
-        if (rnd.next() < 0.42) continue;
+        if (rnd.next() < 0.5) continue;
         const f = face(al, yUp);
         if (f === null) continue;
-        const r = rnd.range(0.48, 0.6);
+        const r = rnd.range(0.55, 0.75);
         // protrusion: an irregular, mostly shallow relief; the lowest row overhangs the opening
         const len = rnd.next() < 0.4 ? rnd.range(0.6, 1.5) * (row === 0 ? 1.3 : 1) : rnd.range(0.15, 0.6);
         const tilt = 0.18 + Math.abs(al) * 0.05 + rnd.range(-0.06, 0.06);

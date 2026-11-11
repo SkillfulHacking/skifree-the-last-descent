@@ -154,7 +154,7 @@ export class CliffStream {
     const key = Math.round(water * 10) / 10;
     let mt = this.mats.get(key);
     if (!mt) {
-      mt = createRockMaterial({ kind: 'gneiss', vertexColors: true, water: key, snow: 1, strata: 1, tint: 0xc2cad4, hq: this.quality !== 'low', snowFrom: 0.7 });
+      mt = createRockMaterial({ kind: 'gneiss', vertexColors: true, water: key, snow: 1, strata: 1, tint: 0xc2cad4, hq: this.quality !== 'low', snowFrom: 0.8 });
       this.mats.set(key, mt);
     }
     return mt;

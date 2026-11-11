@@ -92,6 +92,7 @@ export function clearShot(m: Mountain, cam: THREE.Vector3, subject: THREE.Vector
  */
 export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THREE.Vector3[], props: Array<{ p: THREE.Vector3; r: number }>, fov: number, minWater = 0.05): Generator<void, SeaPose | null, void> {
   let best: SeaPose | null = null;
+  let bestScore = -Infinity;
   // the subject in the centre, or a third of the way in from either side (the frame turned toward the sea)
   const hfov = Math.atan(Math.tan(THREE.MathUtils.degToRad(fov) / 2) * (16 / 9));
   for (const cam of stations) {
@@ -100,7 +101,12 @@ export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THRE
     for (const yaw of [0, 0.42 * hfov, -0.42 * hfov]) {
       const look = turnedLook(cam, subject, yaw);
       const w = yield* waterFractionSteps(m, cam, look, fov);
-      if (w >= minWater && (!best || w > best.water + 1e-9)) best = { cam: cam.clone(), look, fov, water: w, yaw };
+      // (closer stations win a near tie: the Yeti must stay large in frame)
+      const score = w - 0.0025 * cam.distanceTo(subject);
+      if (w >= minWater && (!best || score > bestScore + 1e-9)) {
+        best = { cam: cam.clone(), look, fov, water: w, yaw };
+        bestScore = score;
+      }
     }
   }
   return best;

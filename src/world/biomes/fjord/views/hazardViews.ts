@@ -99,9 +99,10 @@ function gateSkins(G: { x: number; z: number; r: number }, m: Mountain, seed: nu
     const behind = Math.exp(-((u - 0.25) * (u - 0.25)) / 0.08);
     const rip = 0.5 + 0.5 * Math.sin(x * 1.9 + Math.sin(z * 0.21 + seed) * 2.2 + 0.4 * Math.sin(z * 0.9));
     const e = Math.max(0, edge(u, v, 0.22));
-    const lift = (0.07 + 0.13 * behind + 0.05 * rip) * e;
-    const shade = 0.86 + 0.12 * rip;
-    return { lift, c: [0.86 * shade, 0.92 * shade, 1.0 * shade, 0.9 * Math.pow(e, 0.6)] };
+    const lift = (0.07 + 0.13 * behind + 0.13 * rip) * e;
+    // blue shadow in the ripple troughs, bright crests: the drift reads as soft, deep snow
+    const shade = 0.72 + 0.28 * rip;
+    return { lift, c: [0.8 * shade, 0.88 * shade, 1.0 * shade, 0.95 * Math.pow(e, 0.6)] };
   });
   // the notch: scoured streaks along the wind, glazed and gravelly toward the rib
   skin(G.x - G.r - 11, G.x - 0.25 * G.r, G.z - GATE_BEFORE, G.z + G.r + GATE_AFTER, 20, 36, (x, z, u, v) => {
@@ -109,7 +110,7 @@ function gateSkins(G: { x: number; z: number; r: number }, m: Mountain, seed: nu
     const nearRib = Math.pow(u, 1.5);
     const e = Math.max(0, edge(u, v, 0.25));
     const glaze = 0.35 + 0.65 * streak;
-    const c: [number, number, number, number] = [0.5 - 0.12 * nearRib, 0.6 - 0.1 * nearRib, 0.7 - 0.06 * nearRib, (0.15 + 0.6 * glaze * (0.5 + 0.5 * nearRib)) * e];
+    const c: [number, number, number, number] = [0.3 - 0.1 * nearRib, 0.38 - 0.1 * nearRib, 0.48 - 0.08 * nearRib, (0.3 + 0.6 * glaze * (0.6 + 0.4 * nearRib)) * e];
     return { lift: 0.01, c };
   });
   const g = new THREE.BufferGeometry();

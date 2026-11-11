@@ -206,7 +206,10 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
   // (mouth facing inland: the dressing's sea-framing station, out on the slope looking back up at him)
   const ledgeCam = !mouthToSea && sea?.leap ? sea.leap.cam.clone() : cave.ledge.clone().addScaledVector(O, -2.6).addScaledVector(T, 1.4).add(new THREE.Vector3(0, 2.7, 0));
   const leapYaw = !mouthToSea && sea?.leap ? sea.leap.yaw : 0;
-  const leapLook = () => turnedLook(ledgeCam, yetiAt().add(new THREE.Vector3(0, 1.6, 0)).lerp(P.clone().add(new THREE.Vector3(0, 1.0, 0)), 0.42), leapYaw);
+  // (from the sea-framing station out on the slope the camera faces the cave: it holds the Yeti
+  // leaping toward it — the skier is behind the lens — instead of a point between the two)
+  const leapK = !mouthToSea && sea?.leap ? 0 : 0.42;
+  const leapLook = () => turnedLook(ledgeCam, yetiAt().add(new THREE.Vector3(0, 1.6, 0)).lerp(P.clone().add(new THREE.Vector3(0, 1.0, 0)), leapK), leapYaw);
   tl.shot({ start: 14.6, end: 16.95, from: () => pose(ledgeCam, leapLook(), 56), to: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), 60) });
   const followPos = new THREE.Vector3();
   const followLook = new THREE.Vector3();
