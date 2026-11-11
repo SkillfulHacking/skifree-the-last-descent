@@ -104,8 +104,8 @@ export function buildBasaltPortal(m: Mountain, cave: Cave, opts: { quality?: str
   // 1) the cave's own rock: triplanar basalt, physically lit (no multipliers)
   const rock = cave.group.getObjectByName('cave-rock') as THREE.Mesh | undefined;
   // fill: the bounce from the sunlit snowfield in front of the mouth (the IBL's ground is far darker
-  // than real snow); without it a back-lit face lands at ~16/255, with it at the 35–60/255 target
-  const FILL = 1.3;
+  // than real snow); without it a back-lit face lands at ~16/255, 1.3 overshoots to ~62–71/255 (reads mid-grey), 0.55 aims at the 35–60/255 target
+  const FILL = 0.55;
   const rockMat = createRockMaterial({ kind: 'basalt', snow: 1, strata: 0.25, macro: 6, wet: 0, fill: FILL, caveAttr: !!rock?.geometry.getAttribute('aCave') });
   let prevRockMat: THREE.Material | THREE.Material[] | null = null;
   if (rock) {

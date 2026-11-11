@@ -31,45 +31,6 @@
       ]
     },
     {
-      "name": "long_proposed",
-      "mode": "proposed",
-      "shot": "long",
-      "stats": {
-        "mode": "proposed",
-        "shot": "long",
-        "cliffSegments": 16,
-        "cliffTriangles": 53184,
-        "islands": 33,
-        "islandKinds": {
-          "whaleback": 3,
-          "wooded": 6,
-          "skerry": 22,
-          "cliffed": 2
-        },
-        "islandTriangles": 204876,
-        "islandDrawCalls": 2,
-        "buildMs": 14561,
-        "drawCalls": 372,
-        "triangles": 1407398,
-        "textures": 7,
-        "geometries": 357,
-        "camera": {
-          "pos": [
-            -1454.6,
-            -447.1,
-            -400
-          ],
-          "look": [
-            195.4,
-            -537.7,
-            2200
-          ],
-          "fov": 55
-        }
-      },
-      "errors": []
-    },
-    {
       "name": "cliff_current",
       "mode": "current",
       "shot": "cliff",
@@ -81,45 +42,6 @@
         "triangles": 972046,
         "textures": 5,
         "geometries": 301,
-        "camera": {
-          "pos": [
-            -645.9,
-            -747.1,
-            630
-          ],
-          "look": [
-            -145.9,
-            -557.1,
-            1410
-          ],
-          "fov": 50
-        }
-      },
-      "errors": []
-    },
-    {
-      "name": "cliff_proposed",
-      "mode": "proposed",
-      "shot": "cliff",
-      "stats": {
-        "mode": "proposed",
-        "shot": "cliff",
-        "cliffSegments": 10,
-        "cliffTriangles": 56864,
-        "islands": 18,
-        "islandKinds": {
-          "whaleback": 1,
-          "skerry": 12,
-          "wooded": 3,
-          "cliffed": 2
-        },
-        "islandTriangles": 102402,
-        "islandDrawCalls": 2,
-        "buildMs": 16100,
-        "drawCalls": 321,
-        "triangles": 1074604,
-        "textures": 7,
-        "geometries": 312,
         "camera": {
           "pos": [
             -645.9,
@@ -165,47 +87,6 @@
       "errors": []
     },
     {
-      "name": "cave_proposed",
-      "mode": "proposed",
-      "shot": "cave",
-      "stats": {
-        "mode": "proposed",
-        "shot": "cave",
-        "portalColumns": 207,
-        "portalTriangles": 6210,
-        "cliffSegments": 10,
-        "cliffTriangles": 194976,
-        "islands": 20,
-        "islandKinds": {
-          "whaleback": 2,
-          "wooded": 5,
-          "skerry": 12,
-          "cliffed": 1
-        },
-        "islandTriangles": 122781,
-        "islandDrawCalls": 2,
-        "buildMs": 15341,
-        "drawCalls": 80,
-        "triangles": 1260946,
-        "textures": 9,
-        "geometries": 66,
-        "camera": {
-          "pos": [
-            -29.8,
-            -27.2,
-            243
-          ],
-          "look": [
-            -55.8,
-            -31.2,
-            260
-          ],
-          "fov": 50
-        }
-      },
-      "errors": []
-    },
-    {
       "name": "cave_near_current",
       "mode": "current",
       "shot": "cave_near",
@@ -217,47 +98,6 @@
         "triangles": 624697,
         "textures": 6,
         "geometries": 55,
-        "camera": {
-          "pos": [
-            -40.8,
-            -31.6,
-            267
-          ],
-          "look": [
-            -55.8,
-            -31,
-            261.5
-          ],
-          "fov": 58
-        }
-      },
-      "errors": []
-    },
-    {
-      "name": "cave_near_proposed",
-      "mode": "proposed",
-      "shot": "cave_near",
-      "stats": {
-        "mode": "proposed",
-        "shot": "cave_near",
-        "portalColumns": 207,
-        "portalTriangles": 6210,
-        "cliffSegments": 10,
-        "cliffTriangles": 199008,
-        "islands": 20,
-        "islandKinds": {
-          "whaleback": 2,
-          "wooded": 5,
-          "skerry": 12,
-          "cliffed": 1
-        },
-        "islandTriangles": 122781,
-        "islandDrawCalls": 2,
-        "buildMs": 19070,
-        "drawCalls": 70,
-        "triangles": 1208274,
-        "textures": 9,
-        "geometries": 54,
         "camera": {
           "pos": [
             -40.8,
@@ -303,45 +143,6 @@
       "errors": []
     },
     {
-      "name": "islands_proposed",
-      "mode": "proposed",
-      "shot": "islands",
-      "stats": {
-        "mode": "proposed",
-        "shot": "islands",
-        "cliffSegments": 15,
-        "cliffTriangles": 121600,
-        "islands": 27,
-        "islandKinds": {
-          "whaleback": 2,
-          "skerry": 19,
-          "wooded": 4,
-          "cliffed": 2
-        },
-        "islandTriangles": 163344,
-        "islandDrawCalls": 2,
-        "buildMs": 11597,
-        "drawCalls": 283,
-        "triangles": 1251574,
-        "textures": 7,
-        "geometries": 271,
-        "camera": {
-          "pos": [
-            90.6,
-            -356.1,
-            1350
-          ],
-          "look": [
-            -139.4,
-            -501.2,
-            1740
-          ],
-          "fov": 52
-        }
-      },
-      "errors": []
-    },
-    {
       "name": "island_current",
       "mode": "current",
       "shot": "island",
@@ -370,6 +171,90 @@
       "errors": []
     },
     {
+      "name": "cave_proposed",
+      "mode": "proposed",
+      "shot": "cave",
+      "stats": {
+        "mode": "proposed",
+        "shot": "cave",
+        "portalColumns": 207,
+        "portalTriangles": 6210,
+        "cliffSegments": 10,
+        "cliffTriangles": 194976,
+        "islands": 20,
+        "islandKinds": {
+          "whaleback": 2,
+          "wooded": 5,
+          "skerry": 12,
+          "cliffed": 1
+        },
+        "islandTriangles": 122781,
+        "islandDrawCalls": 2,
+        "buildMs": 17370,
+        "drawCalls": 80,
+        "triangles": 1260946,
+        "textures": 9,
+        "geometries": 66,
+        "camera": {
+          "pos": [
+            -29.8,
+            -27.2,
+            243
+          ],
+          "look": [
+            -55.8,
+            -31.2,
+            260
+          ],
+          "fov": 50
+        }
+      },
+      "errors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ]
+    },
+    {
+      "name": "cave_near_proposed",
+      "mode": "proposed",
+      "shot": "cave_near",
+      "stats": {
+        "mode": "proposed",
+        "shot": "cave_near",
+        "portalColumns": 207,
+        "portalTriangles": 6210,
+        "cliffSegments": 10,
+        "cliffTriangles": 199008,
+        "islands": 20,
+        "islandKinds": {
+          "whaleback": 2,
+          "wooded": 5,
+          "skerry": 12,
+          "cliffed": 1
+        },
+        "islandTriangles": 122781,
+        "islandDrawCalls": 2,
+        "buildMs": 22413,
+        "drawCalls": 70,
+        "triangles": 1208274,
+        "textures": 9,
+        "geometries": 54,
+        "camera": {
+          "pos": [
+            -40.8,
+            -31.6,
+            267
+          ],
+          "look": [
+            -55.8,
+            -31,
+            261.5
+          ],
+          "fov": 58
+        }
+      },
+      "errors": []
+    },
+    {
       "name": "island_proposed",
       "mode": "proposed",
       "shot": "island",
@@ -387,7 +272,7 @@
         },
         "islandTriangles": 227928,
         "islandDrawCalls": 2,
-        "buildMs": 10638,
+        "buildMs": 10262,
         "drawCalls": 38,
         "triangles": 590398,
         "textures": 7,
@@ -407,9 +292,126 @@
         }
       },
       "errors": []
+    },
+    {
+      "name": "islands_proposed",
+      "mode": "proposed",
+      "shot": "islands",
+      "stats": {
+        "mode": "proposed",
+        "shot": "islands",
+        "cliffSegments": 15,
+        "cliffTriangles": 121600,
+        "islands": 27,
+        "islandKinds": {
+          "whaleback": 2,
+          "skerry": 19,
+          "wooded": 4,
+          "cliffed": 2
+        },
+        "islandTriangles": 163344,
+        "islandDrawCalls": 2,
+        "buildMs": 17291,
+        "drawCalls": 283,
+        "triangles": 1251574,
+        "textures": 7,
+        "geometries": 271,
+        "camera": {
+          "pos": [
+            90.6,
+            -356.1,
+            1350
+          ],
+          "look": [
+            -139.4,
+            -501.2,
+            1740
+          ],
+          "fov": 52
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "long_proposed",
+      "mode": "proposed",
+      "shot": "long",
+      "stats": {
+        "mode": "proposed",
+        "shot": "long",
+        "cliffSegments": 16,
+        "cliffTriangles": 53184,
+        "islands": 33,
+        "islandKinds": {
+          "whaleback": 3,
+          "wooded": 6,
+          "skerry": 22,
+          "cliffed": 2
+        },
+        "islandTriangles": 204876,
+        "islandDrawCalls": 2,
+        "buildMs": 18373,
+        "drawCalls": 372,
+        "triangles": 1407398,
+        "textures": 7,
+        "geometries": 357,
+        "camera": {
+          "pos": [
+            -1454.6,
+            -447.1,
+            -400
+          ],
+          "look": [
+            195.4,
+            -537.7,
+            2200
+          ],
+          "fov": 55
+        }
+      },
+      "errors": []
+    },
+    {
+      "name": "cliff_proposed",
+      "mode": "proposed",
+      "shot": "cliff",
+      "stats": {
+        "mode": "proposed",
+        "shot": "cliff",
+        "cliffSegments": 10,
+        "cliffTriangles": 56864,
+        "islands": 18,
+        "islandKinds": {
+          "whaleback": 1,
+          "skerry": 12,
+          "wooded": 3,
+          "cliffed": 2
+        },
+        "islandTriangles": 102402,
+        "islandDrawCalls": 2,
+        "buildMs": 12729,
+        "drawCalls": 321,
+        "triangles": 1074604,
+        "textures": 7,
+        "geometries": 312,
+        "camera": {
+          "pos": [
+            -645.9,
+            -747.1,
+            630
+          ],
+          "look": [
+            -145.9,
+            -557.1,
+            1410
+          ],
+          "fov": 50
+        }
+      },
+      "errors": []
     }
   ],
-  "sha": "467a239",
+  "sha": "4dd637c",
   "viewport": "1920x1080",
-  "date": "2026-11-11T18:45:25.551Z"
+  "date": "2026-11-11T19:52:04.966Z"
 }
