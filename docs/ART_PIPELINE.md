@@ -184,9 +184,13 @@ counts per shot; the one 404 logged on the first page is the missing favicon).
 
 **Clearly better**
 - *Sea cave* (`cave`, `cave_near`): the regression is gone. Round-3 dressing in this scene: shell
-  median luminance 0/255 (89 % of pixels < 10), columns 1/255. Proposed: legible dark basalt
-  (shell and columns in the 35–60/255 band after the snow-bounce fill; before the fill the shell
-  measured 16/255 median), real surface detail, the chamber stays dark (baked visibility), and the
+  median luminance 0/255 (89 % of pixels < 10), columns 1/255. Proposed, without any fill: shell
+  16/255 median; with the snow-bounce fill 1.3 (the committed `cave*_proposed.png`, identical to
+  `*_fill1.3.png`): shell 62/255, columns 71/255, 0–4 % of pixels < 10. That overshoots: the basalt
+  reads mid-grey. The code now uses fill 0.55, which should land at about 35–45/255. **Not
+  re-captured**: the release Playwright suite kept the browser busy. Re-run
+  `node tools/artscene/capture.mjs <dir> 1920x1080 cave,cave_near proposed` before review. The
+  proposed cave also has real surface detail, the chamber stays dark (baked visibility), and the
   packed columns read as columnar basalt framing the mouth rather than a crowd of bollards.
 - *Vertical smearing*: gone on the sea cliffs. Strata benches carry horizontal snow bands that
   read at a kilometre (`long`), spurs and gullies break the wall, no slits or fall-line striation.
