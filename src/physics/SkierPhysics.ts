@@ -84,8 +84,28 @@ export const TERRAIN_CONTACT = {
    * (normal-run max 0.094; a one-step 20 cm ledge at a cave mouth is ≈ 1.2)
    */
   maxSlopeStep: 0.25,
+  wallCos: Math.cos((50 * Math.PI) / 180),
+  /**
+   * an oblique contact with a wall-steep face counts once the skier would climb it faster than
+   * wallClimbMax m/s, or heads into it at more than wallIntoFrac of the speed (sliding along its foot,
+   * on a contour, does not count)
+   */
+  wallClimbMax: 0.3,
+  wallIntoFrac: 0.03,
+  /** stencil (m) for the face's own slope and orientation (wall test and wall response) */
+  faceProbe: 0.1,
+  /** a wall must rise at least this far (m) above the skier within wallProbe m: lower steps are bumps */
+  wallMinRise: 0.5,
+  wallProbe: 0.5,
   wallCrash: 9,
   wallHeavy: 3.5,
+  /** the terrain-normal stencil half-width (m), as Mountain.normalAt; see sampleNormal */
+  normalEps: 0.35,
+  /**
+   * concavity (m, sum of both side rises over ±normalEps) that marks the foot of a wall rather than
+   * a curve; normal Alpine runs peak at 0.064 (kicker transitions)
+   */
+  kinkRise: 0.15,
 };
 
 export interface SkierInput {
@@ -188,9 +208,76 @@ export class SkierPhysics {
     s.pathSlope = hs > 1e-3 ? s.vel.y / hs : -Math.hypot(s.normal.x, s.normal.z) / s.normal.y;
   }
 
+  /**
+   * Terrain normal under the skier: central differences ±normalEps (the same stencil and arithmetic as
+   * Mountain.normalAt), except beside the foot of a wall. There the stencil would blend the face into
+   * the floor and turn horizontal speed into vertical; on an axis with a sharp concave kink (see
+   * kinkRise) the one-sided difference on the lower (floor) side is used instead. Skiable terrain never
+   * has such kinks, so everywhere else the result is bit-identical to Mountain.normalAt.
+   */
   private sampleNormal() {
-    this.mountain.normalAt(this.s.pos.x, this.s.pos.z, _n);
-    this.s.normal.set(_n.x, _n.y, _n.z);
+    const m = this.mountain;
+    const s = this.s;
+    const x = s.pos.x;
+    const z = s.pos.z;
+    const e = TERRAIN_CONTACT.normalEps;
+    const hl = m.heightAt(x - e, z);
+    const hr = m.heightAt(x + e, z);
+    const hd = m.heightAt(x, z - e);
+    const hu = m.heightAt(x, z + e);
+    let nx = hl - hr;
+    let nz = hd - hu;
+    const ny = 2 * e;
+    // a sharp concave kink on an axis (both sides together rise more than kinkRise above the skier,
+    // the steep one too): take the slope on the lower side only, i.e. the floor's
+    const K = TERRAIN_CONTACT.kinkRise;
+    const y = s.pos.y;
+    const dl = hl - y;
+    const dr = hr - y;
+    if (dl + dr > K && Math.max(dl, dr) > K) nx = dr > dl ? 2 * dl : -2 * dr;
+    const dd = hd - y;
+    const du = hu - y;
+    if (dd + du > K && Math.max(dd, du) > K) nz = du > dd ? 2 * dd : -2 * du;
+    const l = Math.hypot(nx, ny, nz);
+    s.normal.set(nx / l, ny / l, nz / l);
+  }
+
+  /**
+   * Is the terrain at (x1, z1) — one step from (x0, z0), where the skier was at height y0, moving with
+   * horizontal velocity (vx, vz) — a wall? Either the step itself climbs more steeply than wallSlope
+   * (head-on), or it climbs onto a face steeper than wallDeg while moving into it (oblique: a face
+   * that steep cannot be traversed or edged up either). And the face must rise more than wallMinRise
+   * above the skier within wallProbe (a low step is a bump to ride over). Only climbing steps pay for
+   * the closer look; on skiable terrain it always answers no.
+   */
+  private isWall(y0: number, x0: number, z0: number, x1: number, z1: number, h1: number, ref: boolean, vx: number, vz: number): boolean {
+    const T = TERRAIN_CONTACT;
+    const hd = Math.hypot(x1 - x0, z1 - z0);
+    if (h1 - y0 <= 1e-4) return false; // only a step that climbs can meet a wall
+    const base = ref ? this.groundRef(y0, x0, z0) : y0;
+    if (h1 - base <= 1e-4) return false;
+    this.mountain.normalAt(x1, z1, _n, T.faceProbe); // a tight stencil: the face's own orientation
+    let steep = h1 - base > T.wallSlope * hd + 1e-4;
+    const gl = Math.hypot(_n.x, _n.z);
+    if (!steep && gl > 1e-6) {
+      // oblique: the face's slope at and just uphill of (x1, z1)
+      const ux = -_n.x / gl;
+      const uz = -_n.z / gl;
+      const d = T.faceProbe;
+      const face = Math.max(gl / _n.y, (this.mountain.heightAt(x1 + ux * d, z1 + uz * d) - h1) / d);
+      if (face > T.wallSlope) {
+        // really moving into it: fast enough to climb it (rate = into · face slope), or at a real angle
+        // (sliding along its foot, on a contour, is fine)
+        const into = vx * ux + vz * uz;
+        steep = into * face > T.wallClimbMax || into > T.wallIntoFrac * Math.hypot(vx, vz);
+      }
+    }
+    if (!steep) return false;
+    if (h1 - base > T.wallMinRise) return true;
+    // tall enough? probe up the face (its gradient) and straight on
+    if (gl > 1e-6 && this.mountain.heightAt(x1 - (_n.x / gl) * T.wallProbe, z1 - (_n.z / gl) * T.wallProbe) - base > T.wallMinRise) return true;
+    const k = hd > 1e-9 ? T.wallProbe / hd : 0;
+    return this.mountain.heightAt(x1 + (x1 - x0) * k, z1 + (z1 - z0) * k) - base > T.wallMinRise;
   }
 
   private emit(e: SkierEvent) {
@@ -283,7 +370,9 @@ export class SkierPhysics {
     let vl = s.vel.dot(l);
     const pizzaGrip = 1 + 0.25 * s.brake;
     const wobbleGrip = 1 - 0.35 * s.wobble;
-    const grip = THREE.MathUtils.lerp(TUNING.gripCarve, TUNING.gripDrift, s.driftAmount) * TUNING.gripMul[surf] * pizzaGrip * wobbleGrip * M.grip;
+    // no edge holds on a face steeper than a wall: the skier slides down it (never on skiable terrain)
+    const faceGrip = n.y < TERRAIN_CONTACT.wallCos ? 0 : 1;
+    const grip = THREE.MathUtils.lerp(TUNING.gripCarve, TUNING.gripDrift, s.driftAmount) * TUNING.gripMul[surf] * pizzaGrip * wobbleGrip * M.grip * faceGrip;
     const removed = vl * (1 - Math.exp(-grip * dt));
     const vlNew = vl - removed;
     const eff = THREE.MathUtils.lerp(TUNING.carveEfficiency, TUNING.driftEfficiency, s.driftAmount) * (surf === 'ice' ? 0.85 : 1);
@@ -367,8 +456,11 @@ export class SkierPhysics {
       const hNew = this.mountain.heightAt(tmpA.x, tmpA.z);
       const hd = Math.hypot(tmpA.x - s.pos.x, tmpA.z - s.pos.z);
       // a face too steep to ski up: collide with it instead of climbing it (one retry along the face)
-      if (hNew - prevY > T.wallSlope * hd + 1e-4 && hNew - this.groundRef(prevY, s.pos.x, s.pos.z) > T.wallSlope * hd + 1e-4) {
+      if (this.isWall(prevY, s.pos.x, s.pos.z, tmpA.x, tmpA.z, hNew, true, s.vel.x, s.vel.z)) {
         if (!this.wallHit(tmpA.x, tmpA.z, true)) return false;
+        // the path now runs along the floor in the new direction (not up the face it never climbed)
+        const hs = Math.hypot(s.vel.x, s.vel.z);
+        s.pathSlope = hs > 1e-3 ? s.vel.y / hs : 0;
         if (attempt === 0) continue;
         return true; // still against the face: stay put this step
       }
@@ -440,20 +532,13 @@ export class SkierPhysics {
   private wallHit(x: number, z: number, grounded: boolean): boolean {
     const s = this.s;
     const T = TERRAIN_CONTACT;
-    // face normal (horizontal, pointing out of the face) from the terrain gradient there
-    this.mountain.normalAt(x, z, _n);
-    let nx = _n.x;
-    let nz = _n.z;
-    let nl = Math.hypot(nx, nz);
-    if (nl < 1e-6 || s.vel.x * nx + s.vel.z * nz >= 0) {
-      // degenerate / ambiguous gradient: push straight back along the travel direction
-      nx = s.pos.x - x;
-      nz = s.pos.z - z;
-      nl = Math.hypot(nx, nz);
-      if (nl < 1e-9) return true;
-    }
-    nx /= nl;
-    nz /= nl;
+    // face normal (horizontal, pointing out of the face) from the terrain gradient there, on the same
+    // tight stencil as the wall test (the ±0.35 m one would blend in the floor's own fall line)
+    this.mountain.normalAt(x, z, _n, TERRAIN_CONTACT.faceProbe);
+    const nl = Math.hypot(_n.x, _n.z);
+    if (nl < 1e-6) return true;
+    const nx = _n.x / nl;
+    const nz = _n.z / nl;
     const vn = -(s.vel.x * nx + s.vel.z * nz); // speed into the face
     if (vn <= 0) return true;
     if (s.crashed) {
@@ -538,7 +623,7 @@ export class SkierPhysics {
     if (s.pos.y <= h) {
       // flew into a face too steep to land on (it rises above where the skier just was): a wall hit,
       // not a landing on top of it — the step into the face is cancelled and the skier falls beside it
-      if (h - py > TERRAIN_CONTACT.wallSlope * Math.hypot(s.pos.x - px, s.pos.z - pz) + 1e-4) {
+      if (this.isWall(py, px, pz, s.pos.x, s.pos.z, h, false, s.vel.x, s.vel.z)) {
         const ok = this.wallHit(s.pos.x, s.pos.z, false);
         s.pos.x = px;
         s.pos.z = pz;
@@ -631,7 +716,7 @@ export class SkierPhysics {
       const pz = s.pos.z;
       s.pos.addScaledVector(s.vel, dt);
       let h = this.mountain.heightAt(s.pos.x, s.pos.z);
-      if (s.pos.y <= h && h - py > TERRAIN_CONTACT.wallSlope * Math.hypot(s.pos.x - px, s.pos.z - pz) + 1e-4) {
+      if (s.pos.y <= h && this.isWall(py, px, pz, s.pos.x, s.pos.z, h, false, s.vel.x, s.vel.z)) {
         this.wallHit(s.pos.x, s.pos.z, false);
         s.pos.x = px;
         s.pos.z = pz;
@@ -664,8 +749,7 @@ export class SkierPhysics {
     const pz = s.pos.z;
     s.pos.addScaledVector(s.vel, dt);
     const h = this.mountain.heightAt(s.pos.x, s.pos.z);
-    const run = TERRAIN_CONTACT.wallSlope * Math.hypot(s.pos.x - px, s.pos.z - pz) + 1e-4;
-    if (h - py > run && h - this.groundRef(py, px, pz) > run) {
+    if (this.isWall(py, px, pz, s.pos.x, s.pos.z, h, true, s.vel.x, s.vel.z)) {
       // a tumbling body stops against a wall instead of climbing it
       this.wallHit(s.pos.x, s.pos.z, false);
       s.pos.x = px;
