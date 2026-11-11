@@ -30,9 +30,9 @@ describe('art r4: proposed coast', () => {
     const a = art();
     const b = art();
     // warm b's column cache in a different order
-    for (let z = 1300; z > 1000; z -= 7) b.cliff.column(z);
-    const ga = buildCliffSegment(a.cliff, { z0: 1024, z1: 1280, ds: 4, dr: 3 });
-    const gb = buildCliffSegment(b.cliff, { z0: 1024, z1: 1280, ds: 4, dr: 3 });
+    for (let z = 1300; z > 1000; z -= 7) b.cliff!.column(z);
+    const ga = buildCliffSegment(a.cliff!, { z0: 1024, z1: 1280, ds: 4, dr: 3 });
+    const gb = buildCliffSegment(b.cliff!, { z0: 1024, z1: 1280, ds: 4, dr: 3 });
     const pa = ga.getAttribute('position').array as Float32Array;
     const pb = gb.getAttribute('position').array as Float32Array;
     expect(pa.length).toBe(pb.length);
@@ -43,7 +43,7 @@ describe('art r4: proposed coast', () => {
 
   it('keeps the heightfield backing behind the cliff face', () => {
     const a = art();
-    const m: CliffModel = a.cliff;
+    const m: CliffModel = a.cliff!;
     let worst = -Infinity;
     for (let z = 300; z < 2600; z += 53) {
       const col = m.column(z);

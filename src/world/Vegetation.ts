@@ -219,6 +219,9 @@ export class Vegetation {
         const y = mountain.heightAt(x, z);
         // coast: no trees in or at the water, nor on the cornice
         if (coast && (y < coast.seaLevelAt(z) + 5 || (coast.beyondRim(x, z) > -5 && coast.beyondRim(x, z) < 60))) continue;
+        // cliff kit (round 4): the heightfield under the authored cliffs is a hidden backing, behind
+        // and below the rock mesh: nothing grows on it
+        if (coast && mountain.cliff && coast.beyondRim(x, z) > 0 && mountain.cliffKitWeight(z) > 0 && coast.beyondRim(x, z) < mountain.cliff.footOffset(mountain.cliff.column(z)) + 40) continue;
         // tree line by altitude relative to the local valley floor
         const rel = y - mountain.heightAt(cx, z);
         const dens = smoothstep(260, 120, rel) * (0.5 + 0.5 * smoothstep(-0.3, 0.3, fbm(x / 140, z / 140, seed + 3, 2))) * (0.35 + 0.65 * mountain.profile.treeLine(z)) * decorK;

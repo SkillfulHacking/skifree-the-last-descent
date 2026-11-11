@@ -15,6 +15,7 @@ import { FjordWater } from './water';
 import { SeaMist } from './mist';
 import { PAINT, cairn, ferry, fishingBoat, house, jetty, kitMaterials, rimOutcrop } from './buildings';
 import { viewpointProps } from './viewpoint';
+import { CliffStream } from '../../../art/cliffStream';
 
 const CHUNK = 512;
 /** chunks kept behind / ahead of the skier (hamlets far below must show from far away) */
@@ -41,6 +42,8 @@ export class FjordScenery implements SceneryView {
   private hi: boolean;
   private terrainU: SceneryContext['terrain'];
   private time = 0;
+  /** round 4: the authored sea cliffs (null without the cliff kit) */
+  readonly cliffs: CliffStream | null;
 
   constructor(private ctx: SceneryContext) {
     const coast = ctx.mountain.coast;
@@ -58,6 +61,8 @@ export class FjordScenery implements SceneryView {
     const b = new Batch();
     ferry(b, 92);
     this.shipGeo = b.build(this.mats, { cast: false, receive: false });
+    this.cliffs = ctx.mountain.cliff ? new CliffStream(ctx.mountain, ctx.quality) : null;
+    if (this.cliffs) this.group.add(this.cliffs.group);
   }
 
   // --- streaming ------------------------------------------------------------------------------
@@ -83,16 +88,20 @@ export class FjordScenery implements SceneryView {
     }
     this.mist.stream(z);
     this.syncShips(z);
+    // the cliffs: 1 km behind to the end of the scenery window ahead
+    this.cliffs?.want(z - 1000, (c1 + 1) * CHUNK, this.m.routeX(z), z);
   }
 
   /** Advance queued chunk builds for about `budgetMs` (one slice is ≤ ~budget; see chunkSteps). */
   pump(budgetMs: number): void {
-    if (!this.jobs.length) return;
     const t0 = performance.now();
     while (this.jobs.length && performance.now() - t0 < budgetMs) {
       this.tick.reset();
       if (this.jobs[0]!.job.next().done) this.jobs.shift();
     }
+    // the cliff segments take what is left of this consumer's slice (at least a sliver per frame,
+    // so a stalled chunk queue never starves the cliffs)
+    if (this.cliffs?.pending) this.cliffs.pump(Math.max(performance.now() + 0.25, t0 + budgetMs));
   }
 
   flush(): void {
@@ -100,11 +109,12 @@ export class FjordScenery implements SceneryView {
       const j = this.jobs.shift()!;
       while (!j.job.next().done);
     }
+    this.cliffs?.flush();
   }
 
-  /** pending chunk builds (tests) */
+  /** pending chunk and cliff builds (tests, World's starvation guard) */
   get pending(): number {
-    return this.jobs.length;
+    return this.jobs.length + (this.cliffs?.pending ?? 0);
   }
 
   private dropChunk(v: ChunkView) {
@@ -177,12 +187,16 @@ export class FjordScenery implements SceneryView {
     const rnd = new Rand(seed);
     // find the strand flat: march out from the rim until the ground reaches the flat's height
     // (6 m steps; coarse 48 m strides first, then the 6 m steps inside the stride that crossed)
-    let xf = marchOut(this.coast.rimX(z), 6, 400, (x) => m.heightAt(x, z) < level + 9);
+    const cliff = m.cliff;
+    // with the cliff kit the flat starts at the authored face's foot (which wanders with spurs and
+    // gullies): houses stand 16–58 m out from it, clear of the rock (review P-M6, unit-tested)
+    const footX = (zz: number) => this.coast.rimX(zz) - cliff!.footOffset(cliff!.column(zz));
+    let xf = cliff ? footX(z) - 6 : marchOut(this.coast.rimX(z), 6, 400, (x) => m.heightAt(x, z) < level + 9);
     if (tk.over()) yield;
     const n = 5 + rnd.int(0, 5);
     for (let i = 0; i < n; i++) {
       const hz = z + rnd.range(-110, 110);
-      let hx = xf - rnd.range(8, 46);
+      let hx = cliff ? footX(hz) - rnd.range(16, 58) : xf - rnd.range(8, 46);
       const gy = m.heightAt(hx, hz);
       if (gy < level + 1.5 || gy > level + 14) continue;
       house(b, hx, gy + 0.2, hz, Math.PI / 2 + rnd.range(-0.12, 0.12), { w: rnd.range(8, 12), d: rnd.range(5.5, 7), h: rnd.range(4.2, 6.2), color: PAINT[rnd.int(0, PAINT.length - 1)]!, door: 'side', chimney: rnd.next() < 0.6 }, rnd);
@@ -231,6 +245,7 @@ export class FjordScenery implements SceneryView {
   update(dt: number, time: number, f: SceneryFrame): void {
     this.time += dt;
     this.water.update(time, f.camPos, f.origin);
+    this.cliffs?.setOrigin(f.origin);
     // clear skies: only thin, high cloud shadows drift over the snow (cinematics may still dim)
     if (this.terrainU.uCloudShadow.value === 1) this.terrainU.uCloudShadow.value = 0.45;
     this.mist.update(time, f.camPos);
@@ -263,11 +278,12 @@ export class FjordScenery implements SceneryView {
   }
 
   stats() {
-    return { water: this.water.active.length, chunks: this.chunks.size, pending: this.jobs.length, ships: this.ships.length, mist: this.mist.count };
+    return { water: this.water.active.length, chunks: this.chunks.size, pending: this.jobs.length, ships: this.ships.length, mist: this.mist.count, cliffSegments: this.cliffs?.segments ?? 0, cliffPending: this.cliffs?.pending ?? 0, cliffTriangles: this.cliffs?.triangles ?? 0 };
   }
 
   dispose(): void {
     this.jobs.length = 0;
+    this.cliffs?.dispose();
     for (const v of this.chunks.values()) this.dropChunk(v);
     this.chunks.clear();
     for (const s of this.ships) s.obj.removeFromParent();

@@ -42,6 +42,8 @@ export const FJORD_COAST: CoastParams = {
   quayZ: 120,
   // on open stretches the cliff rim runs 46–72 m from the racing line (art request R1)
   nearRim: [46, 72],
+  // round 4: the sea cliffs are authored meshes over a hidden backing (src/world/art/cliffKit.ts)
+  cliffKit: true,
 };
 
 /**

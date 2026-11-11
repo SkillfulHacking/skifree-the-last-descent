@@ -12,73 +12,33 @@ import * as THREE from 'three';
 import { Mountain } from '../course';
 import type { CourseProfile } from '../profile';
 import type { Biome } from '../biome';
-import { CliffModel, type CoastFrame } from './cliffKit';
-import { smoothstep } from './noise3';
 import { buildIsland, layoutIslands, type IslandSpec } from './islands';
 import { createRockMaterial, disposeRockMaterial } from './rockMaterial';
 import { createFoliageMaterial, pineGeometry } from '../props';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 export class ArtCoastMountain extends Mountain {
-  readonly cliff: CliffModel;
-  readonly frame: CoastFrame;
-
   constructor(profile: CourseProfile, seed: number, biome: Biome) {
-    super(profile, seed, biome);
-    const coast = this.coast!;
-    this.frame = {
-      seed,
-      rimX: (z) => coast.rimX(z),
-      landHeight: (x, z) => this.roundThreeHeight(x, z),
-      waterLevel: (z) => coast.seaLevelAt(z),
-    };
-    this.cliff = new CliffModel(this.frame);
+    super(profile, seed, withCliffKit(biome));
   }
 
   /** the unmodified (round-3) height */
   roundThreeHeight(x: number, z: number): number {
-    return super.heightAt(x, z);
+    return this.coastHeight(x, z);
   }
+}
 
-  /** 0..1: how much of the proposed sea side applies at z (none at the headland ridges and the harbour) */
-  private kitWeight(z: number): number {
-    const c = this.coast!;
-    let k = 1;
-    for (const cr of c.crestsIn(z - 600, z + 600)) k = Math.min(k, smoothstep(260, 520, Math.abs(z - cr)));
-    if (c.finite) k *= 1 - smoothstep(c.finishZ - 520, c.finishZ - 300, z);
-    return k;
-  }
-
-  override heightAt(x: number, z: number): number {
-    const h = super.heightAt(x, z);
-    const c = this.coast;
-    if (!c) return h;
-    const t = c.beyondRim(x, z);
-    if (t <= 0.5) return h;
-    const k = this.kitWeight(z);
-    const depth = this.biome.terrain.coast?.depth ?? 180;
-    let out = h;
-    if (k > 0) {
-      out = this.cliff.backingHeight(z, t, depth);
-      // the far shore (across the fjord) is unchanged
-      const ef = -x - c.farShore(z);
-      if (ef > -760) out = Math.max(out, h * smoothstep(-760, -620, ef) + out * (1 - smoothstep(-760, -620, ef)));
-      out = h + (out - h) * k;
-    }
-    // no heightfield islands anywhere (they are meshes now): beyond the cliff-foot strip and short
-    // of the far shore, or out at sea past the harbour shoreline, nothing rises above the bed
-    const ef = -x - c.farShore(z);
-    const lv = c.seaLevelAt(z);
-    const open = (t > 260 && ef < -900) || (c.finite && z > c.shoreZ(x) + 320 && ef < -900);
-    if (open && out > lv - 14) out = lv - 14 - 4 * Math.max(0, Math.min(1, (t - 260) / 200));
-    return out;
-  }
+/** the biome with the cliff kit switched on (Fjord has it on already since the round-4 integration) */
+function withCliffKit(biome: Biome): Biome {
+  const coast = biome.terrain.coast;
+  if (!coast || coast.cliffKit) return biome;
+  return { ...biome, terrain: { ...biome.terrain, coast: { ...coast, cliffKit: true } } };
 }
 
 /** The island layout for a region (pure, deterministic). */
 export function islandSpecs(m: ArtCoastMountain, region: { x0: number; x1: number; z0: number; z1: number }, seed = m.seed): IslandSpec[] {
   const c = m.coast!;
-  const cliff = m.cliff;
+  const cliff = m.cliff!;
   return layoutIslands({
     ...region,
     seed: seed ^ 0x15a1,

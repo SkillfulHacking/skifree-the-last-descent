@@ -55,6 +55,12 @@ export interface CoastParams {
    * pieces keep their room). min must stay above RIM_LINE_CLEAR so the cornice never reaches a line.
    */
   readonly nearRim?: readonly [number, number];
+  /**
+   * Round 4 (art pipeline): the sea cliffs are authored meshes (src/world/art/cliffKit.ts) instead
+   * of heightfield faces. The Mountain then draws only a hidden backing under the sea side
+   * (Mountain.heightAt); every land-side height (gameplay) is unchanged.
+   */
+  readonly cliffKit?: boolean;
 }
 
 /**
@@ -409,6 +415,16 @@ export class Coast {
       }
     }
     return this.hamletList.filter((h) => h.z >= z0 && h.z <= z1);
+  }
+
+  /** 0..1 strand-flat strength at z (a hamlet's terrace at the cliff foot) */
+  strandMask(z: number): number {
+    return this.hamletMask(z);
+  }
+
+  /** the islands' surface height at (x, z) (far below the bed where there is none) */
+  islandHeight(x: number, z: number): number {
+    return this.island(x, z, this.blendedLevel(z, BED_BLEND));
   }
 
   /** 0..1 strand-flat strength at z (a hamlet's terrace at the cliff foot) */

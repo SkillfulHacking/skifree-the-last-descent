@@ -11,6 +11,7 @@ import { caveTerrainHeight, CAVE_INFLUENCE_Z, type CaveAnchor } from './caveTerr
 import { CLASSIC, foreshadowFor, ClassicProfile, GeneratedProfile, type CliffBand, type CourseProfile, type Kicker } from './profile';
 import { getBiome, type Biome } from './biome';
 import { Coast } from './coast';
+import { CliffModel } from './art/cliffModel';
 
 export type { Kicker, CliffBand, CourseProfile, Encounter, Sighting, SegmentType, AltRoute } from './profile';
 import type { AltRoute } from './profile';
@@ -58,6 +59,12 @@ export class Mountain {
    * water levels, islands, the harbour shore. null for inland locations (Alpine): heights unchanged.
    */
   readonly coast: Coast | null;
+  /**
+   * Round 4 (art pipeline, `terrain.coast.cliffKit`): the authored sea-cliff model. The cliffs are
+   * meshes (art/cliffKit.ts, streamed by the location's scenery); the heightfield keeps every
+   * land-side height and draws only a hidden backing under them. null without a coast or the flag.
+   */
+  readonly cliff: CliffModel | null = null;
   private readonly landAt = (x: number, z: number) => this.landHeight(x, z);
 
   /**
@@ -85,6 +92,16 @@ export class Mountain {
     }
     this.coast = t.coast ? new Coast(this.profile, this.seed, t.coast) : null;
     if (this.coast) this.coast.terrain = (x, z) => this.heightAt(x, z);
+    if (this.coast && t.coast?.cliffKit) {
+      const coast = this.coast;
+      this.cliff = new CliffModel({
+        seed: this.seed,
+        rimX: (z) => coast.rimX(z),
+        landHeight: (x, z) => this.coastHeight(x, z),
+        waterLevel: (z) => coast.seaLevelAt(z),
+        strand: (z) => coast.strandMask(z),
+      });
+    }
   }
 
   static generated(seed: number, length: number, biome: Biome = getBiome()): Mountain {
@@ -173,7 +190,58 @@ export class Mountain {
   /** Terrain height at world (x, z). */
   heightAt(x: number, z: number): number {
     const h = this.landHeight(x, z);
+    if (!this.coast) return h;
+    const s = this.coast.shape(x, z, h, this.landAt);
+    return this.cliff ? this.kitHeight(x, z, s) : s;
+  }
+
+  /** the coast's heightfield without the cliff kit (round 3); identical to heightAt on the land side */
+  coastHeight(x: number, z: number): number {
+    const h = this.landHeight(x, z);
     return this.coast ? this.coast.shape(x, z, h, this.landAt) : h;
+  }
+
+  /**
+   * 0..1: how much of the cliff kit applies at z. None at the headland ridges between fjord arms
+   * (the levels change there; the ridge stays heightfield) nor at the finish harbour. The scenery
+   * builds cliff meshes only where this is 1.
+   */
+  cliffKitWeight(z: number): number {
+    const c = this.coast;
+    if (!c || !this.cliff) return 0;
+    let k = 1;
+    for (const cr of c.crestsIn(z - 600, z + 600)) k = Math.min(k, smoothstep(260, 520, Math.abs(z - cr)));
+    if (c.finite) k *= 1 - smoothstep(c.finishZ - 520, c.finishZ - 300, z);
+    return k;
+  }
+
+  /**
+   * The sea side under the cliff kit: beyond the rim crest the heightfield becomes the hidden
+   * backing (the face pushed inland and down, so it never pokes through the mesh), the strand flats
+   * of the hamlets, the fjord bed and the round-3 islands (one island language in every frame).
+   * The far shore, the headland ridges and the harbour are unchanged; the land side is untouched.
+   */
+  private kitHeight(x: number, z: number, h: number): number {
+    const c = this.coast!;
+    const t = c.beyondRim(x, z);
+    if (t <= 0.5) return h;
+    const k = this.cliffKitWeight(z);
+    if (k <= 0) return h;
+    const cliff = this.cliff!;
+    let out = cliff.backingHeight(z, t, c.p.depth);
+    const foot = cliff.footOffset(cliff.column(z));
+    const wI = smoothstep(foot + 260, foot + 560, t);
+    if (wI > 0) {
+      const isl = c.islandHeight(x, z);
+      if (isl > out) out += (isl - out) * wI;
+    }
+    // the far shore (across the fjord) is unchanged
+    const ef = -x - c.farShore(z);
+    if (ef > -760) {
+      const f = smoothstep(-760, -620, ef);
+      out = Math.max(out, h * f + out * (1 - f));
+    }
+    return h + (out - h) * k;
   }
 
   /** Height of the land (everything but a coast's cliffs and sea), at world (x, z). */

@@ -38,12 +38,18 @@ const sets = new Map<RockKind, SetEntry>();
 let loader: THREE.TextureLoader | null = null;
 
 function placeholder(c: number, srgb: boolean): THREE.Texture {
-  const cv = document.createElement('canvas');
-  cv.width = cv.height = 1;
-  const g = cv.getContext('2d')!;
-  g.fillStyle = `rgb(${c},${c},${c})`;
-  g.fillRect(0, 0, 1, 1);
-  const t = new THREE.Texture(cv);
+  // without a DOM (Node tests build the scenery too) a 1×1 data texture; in the browser a canvas
+  // (the loaded image is swapped into the same texture object, which must not be a DataTexture)
+  let t: THREE.Texture;
+  if (typeof document === 'undefined') t = new THREE.DataTexture(new Uint8Array([c, c, c, 255]), 1, 1);
+  else {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 1;
+    const g = cv.getContext('2d')!;
+    g.fillStyle = `rgb(${c},${c},${c})`;
+    g.fillRect(0, 0, 1, 1);
+    t = new THREE.Texture(cv);
+  }
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.needsUpdate = true;
@@ -54,7 +60,6 @@ function placeholder(c: number, srgb: boolean): THREE.Texture {
 export function acquireRockSet(kind: RockKind, maxAnisotropy = 4): SetEntry {
   let e = sets.get(kind);
   if (!e) {
-    loader ??= new THREE.TextureLoader();
     const u = URLS[kind];
     const albedo = placeholder(70, true);
     const nhr = placeholder(128, false);
@@ -66,7 +71,15 @@ export function acquireRockSet(kind: RockKind, maxAnisotropy = 4): SetEntry {
       t.minFilter = THREE.LinearMipmapLinearFilter;
     };
     const entry: SetEntry = { albedo, nhr, refs: 0, ready: Promise.resolve() };
-    entry.ready = Promise.all([loader.loadAsync(u.albedo), loader.loadAsync(u.nhr)]).then(([a, n]) => {
+    if (typeof document !== 'undefined') loader ??= new THREE.TextureLoader();
+    // no DOM (Node tests): keep the flat placeholders
+    if (typeof document === 'undefined') {
+      e = entry;
+      sets.set(kind, e);
+      e.refs++;
+      return e;
+    }
+    entry.ready = Promise.all([loader!.loadAsync(u.albedo), loader!.loadAsync(u.nhr)]).then(([a, n]) => {
       setup(a, true);
       setup(n, false);
       // swap the image into the existing texture objects: materials keep their uniform references
@@ -82,7 +95,7 @@ export function acquireRockSet(kind: RockKind, maxAnisotropy = 4): SetEntry {
         dst.needsUpdate = true;
         src.dispose();
       }
-    });
+    }).catch((err) => console.warn('rock textures failed to load', err));
     e = entry;
     sets.set(kind, e);
   }
@@ -242,15 +255,18 @@ float rkAbove = rkP.y - uWater;
 float rkWetK = max(uWet, 1.0 - smoothstep(0.6, 4.0 + 3.0 * rk_n(rkP.xz * 0.05 + rkP.y * 0.1), rkAbove));
 rkCol *= 1.0 - 0.45 * rkWetK;
 rkRough = mix(rkRough, 0.32, rkWetK);
-float rkIce = smoothstep(0.05, 0.25, rkAbove) * (1.0 - smoothstep(0.55, 0.95 + 0.4 * rk_n(rkP.xz * 0.1), rkAbove)) * step(-1e8, uWater) * (1.0 - smoothstep(0.35, 0.6, rkN.y));
+// (review p2: a thin, broken rime line ≤ ~0.35 m, not white patches clinging to vertical rock)
+float rkIce = smoothstep(0.03, 0.1, rkAbove) * (1.0 - smoothstep(0.22, 0.35, rkAbove)) * step(-1e8, uWater) * smoothstep(0.45, 0.7, rk_n(rkP.xz * 0.35 + rkP.y));
 // snow: flat-ish surfaces only, cavities first (height-blended edge), patchy at its limit
 float rkSnowT = rkN.y + 0.1 * (0.5 - rkH) + 0.2 * (rk_fbm(rkP.xz * 0.06 + rkP.y * 0.03) - 0.5) + 0.14 * (rk_fbm(rkP.xz * 0.012) - 0.5);
 float rkSnow = smoothstep(${(o.snowFrom ?? 0.6).toFixed(3)}, ${((o.snowFrom ?? 0.6) + 0.14).toFixed(3)}, rkSnowT) * uSnow * (1.0 - rkWetK);
+// spray zone: no snow lies on the wave-washed foot (the notch's lip and talus just above the sea)
+rkSnow *= mix(1.0, smoothstep(2.5, 8.0, rkAbove), step(-1e8, uWater));
 #ifdef RK_CAVE
 // no snow in the chamber; the floor (kind 1) is grit
 rkSnow *= smoothstep(0.55, 0.85, vRkCave.x) * (1.0 - step(0.5, vRkCave.z));
 #endif
-rkSnow = max(rkSnow, rkIce * 0.85);
+rkSnow = max(rkSnow, rkIce * 0.55);
 vec3 rkSnowCol = vec3(0.86, 0.9, 0.955) * (0.94 + 0.06 * rk_n(rkP.xz * 1.7));
 diffuseColor.rgb *= mix(rkCol, rkSnowCol, rkSnow);
 `,
