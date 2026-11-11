@@ -171,90 +171,6 @@
       "errors": []
     },
     {
-      "name": "cave_proposed",
-      "mode": "proposed",
-      "shot": "cave",
-      "stats": {
-        "mode": "proposed",
-        "shot": "cave",
-        "portalColumns": 207,
-        "portalTriangles": 6210,
-        "cliffSegments": 10,
-        "cliffTriangles": 194976,
-        "islands": 20,
-        "islandKinds": {
-          "whaleback": 2,
-          "wooded": 5,
-          "skerry": 12,
-          "cliffed": 1
-        },
-        "islandTriangles": 122781,
-        "islandDrawCalls": 2,
-        "buildMs": 17370,
-        "drawCalls": 80,
-        "triangles": 1260946,
-        "textures": 9,
-        "geometries": 66,
-        "camera": {
-          "pos": [
-            -29.8,
-            -27.2,
-            243
-          ],
-          "look": [
-            -55.8,
-            -31.2,
-            260
-          ],
-          "fov": 50
-        }
-      },
-      "errors": [
-        "Failed to load resource: the server responded with a status of 404 (Not Found)"
-      ]
-    },
-    {
-      "name": "cave_near_proposed",
-      "mode": "proposed",
-      "shot": "cave_near",
-      "stats": {
-        "mode": "proposed",
-        "shot": "cave_near",
-        "portalColumns": 207,
-        "portalTriangles": 6210,
-        "cliffSegments": 10,
-        "cliffTriangles": 199008,
-        "islands": 20,
-        "islandKinds": {
-          "whaleback": 2,
-          "wooded": 5,
-          "skerry": 12,
-          "cliffed": 1
-        },
-        "islandTriangles": 122781,
-        "islandDrawCalls": 2,
-        "buildMs": 22413,
-        "drawCalls": 70,
-        "triangles": 1208274,
-        "textures": 9,
-        "geometries": 54,
-        "camera": {
-          "pos": [
-            -40.8,
-            -31.6,
-            267
-          ],
-          "look": [
-            -55.8,
-            -31,
-            261.5
-          ],
-          "fov": 58
-        }
-      },
-      "errors": []
-    },
-    {
       "name": "island_proposed",
       "mode": "proposed",
       "shot": "island",
@@ -409,9 +325,93 @@
         }
       },
       "errors": []
+    },
+    {
+      "name": "cave_proposed",
+      "mode": "proposed",
+      "shot": "cave",
+      "stats": {
+        "mode": "proposed",
+        "shot": "cave",
+        "portalColumns": 207,
+        "portalTriangles": 6210,
+        "cliffSegments": 10,
+        "cliffTriangles": 194976,
+        "islands": 20,
+        "islandKinds": {
+          "whaleback": 2,
+          "wooded": 5,
+          "skerry": 12,
+          "cliffed": 1
+        },
+        "islandTriangles": 122781,
+        "islandDrawCalls": 2,
+        "buildMs": 8235,
+        "drawCalls": 80,
+        "triangles": 1260946,
+        "textures": 9,
+        "geometries": 66,
+        "camera": {
+          "pos": [
+            -29.8,
+            -27.2,
+            243
+          ],
+          "look": [
+            -55.8,
+            -31.2,
+            260
+          ],
+          "fov": 50
+        }
+      },
+      "errors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ]
+    },
+    {
+      "name": "cave_near_proposed",
+      "mode": "proposed",
+      "shot": "cave_near",
+      "stats": {
+        "mode": "proposed",
+        "shot": "cave_near",
+        "portalColumns": 207,
+        "portalTriangles": 6210,
+        "cliffSegments": 10,
+        "cliffTriangles": 199008,
+        "islands": 20,
+        "islandKinds": {
+          "whaleback": 2,
+          "wooded": 5,
+          "skerry": 12,
+          "cliffed": 1
+        },
+        "islandTriangles": 122781,
+        "islandDrawCalls": 2,
+        "buildMs": 7676,
+        "drawCalls": 70,
+        "triangles": 1208274,
+        "textures": 9,
+        "geometries": 54,
+        "camera": {
+          "pos": [
+            -40.8,
+            -31.6,
+            267
+          ],
+          "look": [
+            -55.8,
+            -31,
+            261.5
+          ],
+          "fov": 58
+        }
+      },
+      "errors": []
     }
   ],
-  "sha": "4dd637c",
+  "sha": "4b4472f",
   "viewport": "1920x1080",
-  "date": "2026-11-11T19:52:04.966Z"
+  "date": "2026-11-11T22:13:36.249Z"
 }
