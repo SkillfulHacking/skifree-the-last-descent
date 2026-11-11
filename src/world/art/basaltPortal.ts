@@ -103,7 +103,10 @@ export function buildBasaltPortal(m: Mountain, cave: Cave, opts: { quality?: str
 
   // 1) the cave's own rock: triplanar basalt, physically lit (no multipliers)
   const rock = cave.group.getObjectByName('cave-rock') as THREE.Mesh | undefined;
-  const rockMat = createRockMaterial({ kind: 'basalt', snow: 1, strata: 0.25, macro: 6, wet: 0, caveAttr: !!rock?.geometry.getAttribute('aCave') });
+  // fill: the bounce from the sunlit snowfield in front of the mouth (the IBL's ground is far darker
+  // than real snow); without it a back-lit face lands at ~16/255, with it at the 35–60/255 target
+  const FILL = 1.3;
+  const rockMat = createRockMaterial({ kind: 'basalt', snow: 1, strata: 0.25, macro: 6, wet: 0, fill: FILL, caveAttr: !!rock?.geometry.getAttribute('aCave') });
   let prevRockMat: THREE.Material | THREE.Material[] | null = null;
   if (rock) {
     prevRockMat = rock.material;
@@ -170,7 +173,7 @@ export function buildBasaltPortal(m: Mountain, cave: Cave, opts: { quality?: str
     return (3.4 * (1 - fa) + 1.4 * noise3(a * 0.3, b * 0.3, 3, 29)) * (noise3(a * 0.22, b * 0.22, 4, 31) > -0.25 ? 1 : 0);
   }, 9);
   const colGeo = P.geometry();
-  const colMat = createRockMaterial({ kind: 'basalt', vertexColors: true, snow: 1, strata: 0, macro: 5 });
+  const colMat = createRockMaterial({ kind: 'basalt', vertexColors: true, snow: 1, strata: 0, macro: 5, fill: FILL });
   const cols = new THREE.Mesh(colGeo, colMat);
   cols.castShadow = true;
   cols.receiveShadow = true;
