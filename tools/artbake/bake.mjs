@@ -265,23 +265,27 @@ function gneiss() {
 function basalt() {
   const tileM = 4;
   const R = plane(), G = plane(), B = plane(), H = plane(), rough = plane();
-  const cols = 5; // column joints across the tile (≈ 0.8 m columns)
+  // irregular column joints across the tile (3, uneven widths) — no grid
+  const colB = cuts(3, 205);
   for (let y = 0; y < N; y++)
     for (let x = 0; x < N; x++) {
       const u = x / N, v = y / N, i = y * N + x;
-      const wu = 0.025 * fbm(u, v, 2, 3, 201);
-      const cu = (u + wu) * cols;
-      const ci = Math.floor(cu);
-      const cf = cu - ci;
-      const cid = ihash(mod(ci, cols), 0, 203);
-      const joint = 1 - smooth(0.0, 0.045, Math.min(cf, 1 - cf));
-      // facets: each column face is slightly curved (hex column faces seen edge-on)
-      const facet = Math.cos((cf - 0.5) * Math.PI) * 0.03;
-      // cross joints: per column, irregular spacing
-      const sp = 3 + Math.floor(ihash(mod(ci, cols), 1, 207) * 4);
-      const cv = (v + 0.05 * fbm(u, v, 3, 2, 209) + cid) * sp;
+      const wu = 0.03 * fbm(u, v, 2, 3, 201);
+      const uu = mod(u + wu, 1);
+      let ci = 0;
+      while (ci < 2 && uu >= colB[ci + 1]) ci++;
+      const c0 = colB[ci], c1 = colB[ci + 1];
+      const cf = (uu - c0) / (c1 - c0);
+      const cid = ihash(ci, 0, 203);
+      const jd = Math.min(uu - c0, c1 - uu);
+      const joint = (1 - smooth(0.0, 0.01, jd)) * (0.55 + 0.45 * smooth(-0.3, 0.3, fbm(u, v, 3, 2, 204)));
+      const facet = Math.cos((cf - 0.5) * Math.PI) * 0.02;
+      // cross joints: sparse, irregular, some only part-way across
+      const sp = 2 + Math.floor(ihash(ci, 1, 207) * 3);
+      const cv = (v + 0.06 * fbm(u, v, 3, 2, 209) + cid) * sp;
       const cvf = cv - Math.floor(cv);
-      const cross = (1 - smooth(0.0, 0.03, Math.min(cvf, 1 - cvf))) * smooth(0.25, 0.6, ihash(mod(ci, cols), mod(Math.floor(cv), sp), 211) + 0.3);
+      const part = smooth(0.2, 0.6, ihash(ci, mod(Math.floor(cv), sp), 211) + 0.3 * fbm(u, v, 5, 2, 212));
+      const cross = (1 - smooth(0.0, 0.012, Math.min(cvf, 1 - cvf) / sp)) * part * 0.8;
       const W = worley(u, v, 38, 213, 0.9);
       const ves = 1 - smooth(0.06, 0.16, W.f1); // vesicle pits
       const grain = fbm(u, v, 32, 4, 217);
@@ -297,7 +301,7 @@ function basalt() {
       const lich = smooth(0.52, 0.66, fbm(u, v, 9, 4, 229));
       r = lerp(r, 0.14, lich * 0.5); g = lerp(g, 0.15, lich * 0.5); b = lerp(b, 0.12, lich * 0.5);
       const dk = Math.max(joint, cross * 0.8, ves * 0.5);
-      r *= 1 - 0.6 * dk; g *= 1 - 0.6 * dk; b *= 1 - 0.55 * dk;
+      r *= 1 - 0.4 * dk; g *= 1 - 0.4 * dk; b *= 1 - 0.38 * dk;
       R[i] = r; G[i] = g; B[i] = b;
       rough[i] = clamp(0.72 + 0.12 * grain + 0.15 * dk - 0.1 * rime, 0.45, 1);
     }

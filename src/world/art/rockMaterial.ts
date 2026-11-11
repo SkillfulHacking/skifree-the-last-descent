@@ -191,13 +191,14 @@ struct RkS { vec4 alb; vec4 nhr; };
 RkS rk_tri(vec3 P, vec3 bw, float sc, float rot) {
   float c = cos(rot), s = sin(rot);
   mat2 R = mat2(c, -s, s, c);
-  vec2 ux = R * P.zy * sc, uy = R * P.xz * sc, uz = R * P.xy * sc;
+  // (rot only turns the up-facing projection: on walls the bedding must stay horizontal)
+  vec2 ux = P.zy * sc, uy = R * P.xz * sc, uz = P.xy * sc;
   RkS o;
   o.alb = texture(tAlb, ux) * bw.x + texture(tAlb, uy) * bw.y + texture(tAlb, uz) * bw.z;
   vec4 nx = texture(tNhr, ux), ny = texture(tNhr, uy), nz = texture(tNhr, uz);
   o.nhr = nx * bw.x + ny * bw.y + nz * bw.z;
   // world-space normal perturbation (UDN blend): stash the three tangent XYs in a single vector
-  vec2 tx = R * (nx.xy * 2.0 - 1.0), ty = R * (ny.xy * 2.0 - 1.0), tz = R * (nz.xy * 2.0 - 1.0);
+  vec2 tx = nx.xy * 2.0 - 1.0, ty = R * (ny.xy * 2.0 - 1.0), tz = nz.xy * 2.0 - 1.0;
   o.nhr.xy = vec2(0.0);
   rk_dN = vec3(0.0, tx.y, tx.x) * bw.x + vec3(ty.x, 0.0, ty.y) * bw.y + vec3(tz.x, tz.y, 0.0) * bw.z;
   return o;
@@ -215,12 +216,13 @@ RkS rkA = rk_tri(rkP, rkBw, ${(1 / tile).toFixed(5)}, 0.0);
 vec3 rkDN = rk_dN;
 ${
   hq
-    ? `RkS rkB = rk_tri(rkP + vec3(17.3, 5.1, 9.7), rkBw, ${(1 / (tile * macro)).toFixed(5)}, 0.9);
-float rkFar = smoothstep(60.0, 600.0, length(vRkW - cameraPosition));
-float rkLumB = dot(rkB.alb.rgb, vec3(0.333));
-vec4 rkAlb = mix(rkA.alb * vec4(vec3(clamp(0.45 + 0.55 * rkLumB / ${lumRef.toFixed(3)}, 0.5, 1.8)), 1.0), rkB.alb, 0.25 + 0.5 * rkFar);
-vec4 rkNhr = mix(rkA.nhr, rkB.nhr, 0.35 + 0.4 * rkFar);
-rkDN = mix(rkDN, rk_dN, 0.35 + 0.4 * rkFar);`
+    ? `// macro: the same set ~7× larger, read only as soft luminance from a blurred mip (no second
+// pattern of lines: it modulates, it never draws), so the detail tiling breaks up at distance
+vec2 rkMx = (rkP.zy + vec2(17.3, 5.1)) * ${(1 / (tile * macro)).toFixed(5)}, rkMy = (rkP.xz + vec2(9.7, 3.3)) * ${(1 / (tile * macro)).toFixed(5)}, rkMz = (rkP.xy + vec2(4.1, 11.9)) * ${(1 / (tile * macro)).toFixed(5)};
+vec3 rkMac = texture(tAlb, rkMx, 3.5).rgb * rkBw.x + texture(tAlb, rkMy, 3.5).rgb * rkBw.y + texture(tAlb, rkMz, 3.5).rgb * rkBw.z;
+float rkLumB = dot(rkMac, vec3(0.333));
+vec4 rkAlb = rkA.alb * vec4(vec3(clamp(0.35 + 0.65 * rkLumB / ${lumRef.toFixed(3)}, 0.55, 1.6)), 1.0);
+vec4 rkNhr = rkA.nhr;`
     : `vec4 rkAlb = rkA.alb; vec4 rkNhr = rkA.nhr;`
 }
 // macro: dipping strata bands and broad tone patches (read at a kilometre)
@@ -237,7 +239,7 @@ float rkAbove = rkP.y - uWater;
 float rkWetK = max(uWet, 1.0 - smoothstep(0.6, 4.0 + 3.0 * rk_n(rkP.xz * 0.05 + rkP.y * 0.1), rkAbove));
 rkCol *= 1.0 - 0.45 * rkWetK;
 rkRough = mix(rkRough, 0.32, rkWetK);
-float rkIce = smoothstep(0.0, 0.35, rkAbove) * (1.0 - smoothstep(0.9, 1.6 + rk_n(rkP.xz * 0.1), rkAbove)) * step(-1e8, uWater);
+float rkIce = smoothstep(0.05, 0.25, rkAbove) * (1.0 - smoothstep(0.55, 0.95 + 0.4 * rk_n(rkP.xz * 0.1), rkAbove)) * step(-1e8, uWater) * (1.0 - smoothstep(0.35, 0.6, rkN.y));
 // snow: flat-ish surfaces only, cavities first (height-blended edge), patchy at its limit
 float rkSnowT = rkN.y + 0.3 * (0.5 - rkH) + 0.16 * (rk_fbm(rkP.xz * 0.06 + rkP.y * 0.03) - 0.5);
 float rkSnow = smoothstep(0.6, 0.74, rkSnowT) * uSnow * (1.0 - rkWetK);

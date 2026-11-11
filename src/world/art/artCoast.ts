@@ -56,12 +56,22 @@ export class ArtCoastMountain extends Mountain {
     const t = c.beyondRim(x, z);
     if (t <= 0.5) return h;
     const k = this.kitWeight(z);
-    if (k <= 0) return h;
-    let out = this.cliff.backingHeight(z, t, this.biome.terrain.coast?.depth ?? 180);
-    // the far shore (across the fjord) is unchanged
+    const depth = this.biome.terrain.coast?.depth ?? 180;
+    let out = h;
+    if (k > 0) {
+      out = this.cliff.backingHeight(z, t, depth);
+      // the far shore (across the fjord) is unchanged
+      const ef = -x - c.farShore(z);
+      if (ef > -760) out = Math.max(out, h * smoothstep(-760, -620, ef) + out * (1 - smoothstep(-760, -620, ef)));
+      out = h + (out - h) * k;
+    }
+    // no heightfield islands anywhere (they are meshes now): beyond the cliff-foot strip and short
+    // of the far shore, or out at sea past the harbour shoreline, nothing rises above the bed
     const ef = -x - c.farShore(z);
-    if (ef > -760) out = Math.max(out, h * smoothstep(-760, -620, ef) + out * (1 - smoothstep(-760, -620, ef)));
-    return h + (out - h) * k;
+    const lv = c.seaLevelAt(z);
+    const open = (t > 260 && ef < -900) || (c.finite && z > c.shoreZ(x) + 320 && ef < -900);
+    if (open && out > lv - 14) out = lv - 14 - 4 * Math.max(0, Math.min(1, (t - 260) / 200));
+    return out;
   }
 }
 

@@ -63,14 +63,22 @@ export class CliffModel {
     const s = this.frame.seed;
     const n = (k: number, sc: number) => gnoise(z / sc, k * 1.37, s + 500 + k);
     return {
-      steep: 0.34 + 0.12 * (0.5 + 0.5 * n(1, 1300)),
       tiers: 2 + Math.floor(clamp(0.5 + 0.7 * n(2, 1700), 0, 0.999) * 3),
-      band: 0.62 + 0.18 * n(3, 600),
-      bandSlope: 0.09 + 0.05 * (0.5 + 0.5 * n(4, 450)),
-      // buttress / cove offset in plan (fraction of the width)
-      plan: Math.max(0, 0.22 * (ridged(z / 520, 3.1, s + 510, 2) - 0.3) + 0.08 * n(6, 260)),
+      /** dx per metre of drop on the rock bands (0.12 ≈ 83°, 0.3 ≈ 73°) */
+      bandSlope: 0.13 + 0.12 * (0.5 + 0.5 * n(4, 450)),
+      /** fraction of each tier that is bench, and the bench's dx per metre of drop (2 ≈ 27° incline) */
+      benchFrac: 0.1 + 0.07 * (0.5 + 0.5 * n(3, 600)),
+      benchSlope: 1.9 + 1.3 * (0.5 + 0.5 * n(8, 380)),
       notch: 2 + 2.5 * (0.5 + 0.5 * n(7, 120)),
     };
+  }
+
+  /** spurs (buttresses) push whole sections of face seaward: ≥ 0, metres per metre of wall height */
+  private spur(z: number): number {
+    const s = this.frame.seed;
+    const a = ridged(z / 340, 3.1, s + 510, 2);
+    const b = ridged(z / 150 + 4.7, 1.3, s + 511, 1);
+    return Math.max(0, 0.11 * (a - 0.32) + 0.045 * (b - 0.4) + 0.03 * gnoise(z / 900, 6.1, s + 512));
   }
 
   /** gully strength (0..1) cutting back into the face at z */
@@ -93,59 +101,49 @@ export class CliffModel {
     const water = F.waterLevel(z);
     const H = Math.max(12, hRim - water + 6);
     const ch = this.character(z);
-    const W = H * ch.steep;
     const n = Math.ceil(H / DS) + 1;
     const d = new Float32Array(n);
     const occ = new Float32Array(n);
     const s = F.seed;
-    // tier edges: fraction of the drop, dipping along the coast (strata) and wandering a little
+    // tier edges (drop below the rim): dipping along the coast (strata) and wandering a little
     const nt = ch.tiers;
-    const edges: number[] = [];
-    for (let k = 1; k < nt; k++) edges.push((k / nt + 0.06 * gnoise(z / 480, k * 2.1, s + 530 + k) + 0.00004 * z) * (H - 30));
-    // tier layout: [band | bench] × nt, the last band is the sea cliff (no bench below it)
-    const tierH = H / nt;
+    const edges: number[] = [0];
+    for (let k = 1; k < nt; k++) edges.push((k / nt + 0.07 * gnoise(z / 480, k * 2.1, s + 530 + k) + 0.00004 * z) * H);
+    edges.push(H);
+    const gk = this.gully(z);
     let x = 0;
     for (let i = 0; i < n; i++) {
       const dz = i * DS;
-      // which tier and where inside it (0 = top of its band)
-      let t0 = 0;
-      let t1 = H;
-      for (const e of edges) {
-        if (dz >= e) t0 = e;
-        else {
-          t1 = e;
-          break;
-        }
-      }
-      const th = t1 - t0;
+      let k = 0;
+      while (k < nt - 1 && dz >= edges[k + 1]!) k++;
+      const t0 = edges[k]!, t1 = edges[k + 1]!;
+      const th = Math.max(1, t1 - t0);
       const local = (dz - t0) / th;
-      const last = t1 >= H;
-      const bandFrac = last ? 1 : ch.band;
-      // slope dx/d(drop): steep band, then a bench (shallow), smooth transition over ~3 m
-      const benchW = (W / nt - ch.bandSlope * tierH * bandFrac) / Math.max(1, (1 - bandFrac) * tierH);
-      const tb = smoothstep(bandFrac - 3 / th, bandFrac + 3 / th, local);
-      let slope = ch.bandSlope + (Math.max(ch.bandSlope, benchW) - ch.bandSlope) * tb * (last ? 0 : 1);
-      // the lip: convex rounding over the first ~8 m below the rim (a 45° shoulder easing in)
+      const last = k === nt - 1;
+      // a band, then (except for the sea cliff) a bench; per-tier variation of both
+      const bs = ch.bandSlope * (0.8 + 0.4 * (0.5 + 0.5 * gnoise(z / 260, k * 3.3, s + 540)));
+      const bf = last ? 0 : ch.benchFrac * (0.7 + 0.6 * (0.5 + 0.5 * gnoise(z / 310, k * 1.7, s + 541)));
+      const benchK = bf > 0 ? smoothstep(1 - bf - 2.5 / th, 1 - bf + 2.5 / th, local) : 0;
+      let slope = bs + (ch.benchSlope - bs) * benchK;
+      // the lip: a convex 45° shoulder easing in over the first ~9 m
       slope = slope + (1.1 - slope) * (1 - smoothstep(0, 9, dz));
+      // scree fan at the foot below the gullies
+      slope += gk * 2.2 * smoothstep(0.9, 1, dz / H);
       x += slope * DS;
       d[i] = x;
-      // bench backs (concave corner) and the band foot are darker
-      occ[i] = smoothstep(bandFrac - 0.08, bandFrac, local) * (1 - smoothstep(bandFrac, bandFrac + 0.1, local)) * (last ? 0 : 1);
+      occ[i] = bf > 0 ? smoothstep(1 - bf - 0.05, 1 - bf, local) * (1 - smoothstep(1 - bf, 1 - bf + 0.05, local)) : 0;
     }
-    // wave-cut notch at the waterline (the sea cliff undercut by 2–4.5 m), plan offsets, gullies
-    const planOff = ch.plan * W;
-    const gk = this.gully(z) * W * 0.16;
+    // wave-cut notch at the waterline, spurs in plan, gullies cut back (no overhang in the base profile)
+    const spur = this.spur(z) * H;
+    const gd = gk * H * 0.05;
     for (let i = 0; i < n; i++) {
       const dz = i * DS;
       const f = dz / H;
-      const above = H - 6 - dz; // height above the water
+      const above = H - 6 - dz;
       const notch = ch.notch * Math.exp(-((above - 1.2) * (above - 1.2)) / 6);
-      const g = gk * smoothstep(0.03, 0.25, f) * (1 - 0.6 * smoothstep(0.75, 1, f));
-      d[i] = d[i]! + planOff * smoothstep(0, 0.2, f) - notch - g;
-      occ[i] = Math.max(occ[i]!, clamp(g / (W * 0.12), 0, 1) * 0.6, notch / 5);
-      // never overhang in the base profile (the heightfield backing is single-valued): where a
-      // gully or the notch would cut back under the face above, the face drops vertically instead
-      // (the sculpted relief still adds small overhangs, which the backing's inset absorbs)
+      const g = gd * smoothstep(0.02, 0.12, f) * (1 - smoothstep(0.85, 1, f));
+      d[i] = d[i]! + spur * smoothstep(0.0, 0.12, f) - notch - g;
+      occ[i] = Math.max(occ[i]!, gk * smoothstep(0.02, 0.12, f) * 0.5, notch / 5);
       if (i > 0) d[i] = Math.max(d[i]!, d[i - 1]! + 0.03 * DS);
     }
     c = { z, xr, hRim, water, H, d, occ };
@@ -197,14 +195,6 @@ export class CliffModel {
     let h: number;
     if (t < foot - inset) h = c.hRim - this.dropAt(c, t + inset) - sink;
     else h = c.water - 6;
-    // talus: cones of scree against the foot below the gullies (snow-covered: the terrain shades them)
-    const s = this.frame.seed;
-    const zw = z + 55 * gnoise(z / 210, 4.4, s + 520);
-    const g = smoothstep(0.4, 0.62, ridged(zw / 95, 0.7, s + 521, 2));
-    const tal = (0.03 + 0.05 * g) * c.H * (0.6 + 0.4 * (0.5 + 0.5 * gnoise(z / 60, 3.3, s + 540)));
-    const tf = t - foot;
-    const cone = tal * clamp(1 - (tf + inset) / (tal * 1.4 + 4), 0, 1);
-    h = Math.max(h, c.water - 6 + cone + 6 * Math.min(1, cone / 4));
     // the bed falls away from the foot
     const bed = c.water - 6 - (bedDepth - 6) * smoothstep(foot + 20, foot + 420, t);
     return Math.max(Math.min(h, c.hRim), bed);
@@ -212,7 +202,8 @@ export class CliffModel {
 }
 
 /** relief displacement (m) of the face at a world point, along the face normal (+ = seaward) */
-function relief(x: number, y: number, z: number, s: number, faceK: number): number {
+function relief(x: number, y: number, z: number, s: number, faceK: number, H: number): number {
+  const A = clamp(H / 60, 1, 2.2);
   // big blocks: terraced noise → steps and ledges, a few metres
   const blocks = terraced(0.5 + 0.5 * fbm3(x / 70, y / 45, z / 70, s + 601, 3), 5, 0.3) - 0.5;
   // horizontal ledges: noise stretched along the strata
@@ -220,7 +211,7 @@ function relief(x: number, y: number, z: number, s: number, faceK: number): numb
   // ribs between chutes (vertical, short): kept weak — the old wall was all fall-line striation
   const ribs = noise3(x / 14, y / 40, z / 14, s + 621);
   const fine = fbm3(x / 6, y / 6, z / 6, s + 631, 2);
-  return faceK * (7 * blocks + 3.2 * ledges + 1.2 * ribs + 0.8 * fine);
+  return faceK * A * (7 * blocks + 3.6 * ledges + 1.0 * ribs + 0.8 * fine);
 }
 
 export interface CliffSegmentOptions {
@@ -281,9 +272,9 @@ export function buildCliffSegment(model: CliffModel, o: CliffSegmentOptions): TH
       const faceK = t <= 0 ? 0 : smoothstep(2, 14, dz) * (1 - smoothstep(c.H - 8, c.H - 2, dz) * 0.5);
       faceKs[j * nr + i] = faceK;
       const x0 = c.xr - t;
-      const r = faceK > 0 ? relief(x0, y, z, s, faceK) : 0;
+      const r = faceK > 0 ? relief(x0, y, z, s, faceK, c.H) : 0;
       const idx = (j * nr + i) * 3;
-      pos[idx] = x0 - Math.max(-6, r); // seaward = −X; inward displacement capped (stays ahead of the backing)
+      pos[idx] = x0 - Math.max(-7, r); // seaward = −X; inward displacement capped (stays ahead of the backing)
       pos[idx + 1] = y + 0.15 * r;
       pos[idx + 2] = z;
       // baked colour: concavity AO × a slow warm/cool drift

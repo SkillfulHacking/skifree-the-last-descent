@@ -66,13 +66,16 @@ function profile(sp: IslandSpec, rho: number, u: number, theta: number): number 
       return stoss + (leeP - stoss) * lee;
     }
     case 'cliffed': {
-      // a high plateau with a girdle of cliffs; one cove with a gravel beach
-      const cove = smoothstep(0.75, 0.95, Math.cos(theta - sp.ang - 1.9)) ;
-      const edge = 0.84 + 0.06 * ring(theta, 4, sp.seed + 25);
-      const plateau = 0.78 + 0.22 * Math.pow(Math.max(0, 1 - rho / edge), 0.5);
-      const wall = 1 - smoothstep(edge, edge + 0.07, rho);
-      const toe = 0.08 * (1 - smoothstep(edge + 0.05, 1, rho));
-      const cliffy = plateau * wall + toe;
+      // an uneven, domed plateau girt by cliffs of varying height over a talus toe; one cove with
+      // a gravel beach (the cliffs rise from it)
+      const cove = smoothstep(0.75, 0.95, Math.cos(theta - sp.ang - 1.9));
+      const edge = 0.8 + 0.08 * ring(theta, 4, sp.seed + 25);
+      const dome = 0.62 + 0.38 * Math.pow(Math.max(0, 1 - (rho / edge) * (rho / edge)), 0.8);
+      const lumpy = 0.08 * ring(theta * 2 + rho * 3, 3, sp.seed + 27);
+      const wall = 1 - smoothstep(edge - 0.02, edge + 0.09 + 0.04 * ring(theta, 5, sp.seed + 29), rho);
+      const toeH = 0.16 + 0.12 * (0.5 + 0.5 * ring(theta, 6, sp.seed + 31));
+      const toe = toeH * (1 - smoothstep(edge, 1, rho));
+      const cliffy = Math.max((dome + lumpy) * wall, toe);
       const beach = Math.pow(1 - rho, 1.2) * 0.9;
       return cliffy + (beach - cliffy) * cove;
     }
@@ -232,7 +235,8 @@ export function layoutIslands(o: IslandLayoutOptions): IslandSpec[] {
             ? { kind, x: cx, z: cz, a: r.range(220, 420), b: 0, ang: grain, h: r.range(35, 90), water, seed: r.int(1, 1e9) }
             : kind === 'wooded'
               ? { kind, x: cx, z: cz, a: r.range(110, 220), b: 0, ang: grain, h: r.range(14, 30), water, seed: r.int(1, 1e9) }
-              : { kind, x: cx, z: cz, a: r.range(40, 90), b: 0, ang: grain, h: r.range(4, 10), water, seed: r.int(1, 1e9) };
+              : { kind, x: cx, z: cz, a: r.range(40, 90), b: 0, ang: grain, h: 0, water, seed: r.int(1, 1e9) };
+      if (kind === 'skerry') main.h = main.a * r.range(0.12, 0.22);
       main.b = main.a * (kind === 'whaleback' ? r.range(0.35, 0.5) : r.range(0.55, 0.85));
       const group: IslandSpec[] = [];
       if (o.allowed(main.x, main.z, main.a * 1.2)) group.push(main);
@@ -245,7 +249,8 @@ export function layoutIslands(o: IslandLayoutOptions): IslandSpec[] {
         px += Math.cos(grain) * step * dir + r.range(-60, 60);
         pz += Math.sin(grain) * step * dir + r.range(-60, 60);
         const small = r.float() < 0.75;
-        const s: IslandSpec = { kind: small ? 'skerry' : 'wooded', x: px, z: pz, a: small ? r.range(18, 60) : r.range(60, 120), b: 0, ang: grain + r.range(-0.3, 0.3), h: small ? r.range(2, 7) : r.range(10, 22), water, seed: r.int(1, 1e9) };
+        const sa = small ? r.range(18, 60) : r.range(60, 120);
+        const s: IslandSpec = { kind: small ? 'skerry' : 'wooded', x: px, z: pz, a: sa, b: 0, ang: grain + r.range(-0.3, 0.3), h: small ? sa * r.range(0.1, 0.24) : r.range(10, 22), water, seed: r.int(1, 1e9) };
         s.b = s.a * r.range(0.4, 0.75);
         if (o.allowed(s.x, s.z, s.a * 1.2)) group.push(s);
       }

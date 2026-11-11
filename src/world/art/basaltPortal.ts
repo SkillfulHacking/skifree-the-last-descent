@@ -27,7 +27,7 @@ import type { Cave } from '../Cave';
 import type { Mountain } from '../course';
 import { Rng } from '../../core/rng';
 import { createRockMaterial, disposeRockMaterial } from './rockMaterial';
-import { noise3 } from './noise3';
+import { noise3, smoothstep } from './noise3';
 import { clearOfCaveCameras } from '../biomes/fjord/views/seaCave';
 import { caveCameraSightlines } from '../../cinematic/CaveCinematic';
 
@@ -153,10 +153,11 @@ export function buildBasaltPortal(m: Mountain, cave: Cave, opts: { quality?: str
   // colonnade framing the mouth: tall, tightest against the opening, both sides
   const colon = (a: number, b: number, side: number) => {
     const d = Math.abs(a) - hw;
-    return (8.5 - d * 1.1 + 1.2 * noise3(a * 0.4, b * 0.4, side, 11)) * (1 - Math.max(0, b - 1.5) * 0.08);
+    // tallest at the back against the face, stepping down toward the front rows
+    return (8.5 - d * 1.1 + 1.2 * noise3(a * 0.4, b * 0.4, side, 11)) * (0.3 + 0.7 * smoothstep(-5.5, 1.8, b));
   };
-  body(-hw - 5.5, -hw, -3.5, 2.2, (a, b) => colon(a, b, -1), 3);
-  body(hw, hw + 5.5, -3.5, 2.2, (a, b) => colon(a, b, 1), 5);
+  body(-hw - 5.5, -hw, -5.5, 2.2, (a, b) => colon(a, b, -1), 3);
+  body(hw, hw + 5.5, -5.5, 2.2, (a, b) => colon(a, b, 1), 5);
   // causeway stepping down and out on +along
   body(hw + 4.5, hw + 19, -1.5, 9, (a, b) => {
     const fa = (a - hw - 4.5) / 14.5;
