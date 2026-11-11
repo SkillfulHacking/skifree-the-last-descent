@@ -1,0 +1,21 @@
+
+> skifree-the-last-descent@0.1.0 build
+> tsc --noEmit && vite build
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+vite v8.3.6 building client environment for production...
+transforming...
+✓ 113 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                    0.87 kB │ gzip:   0.53 kB
+dist/assets/main-C-BuyS3E.css     18.57 kB │ gzip:   5.02 kB
+dist/assets/main-1L9uUBgY.js   1,193.33 kB │ gzip: 360.98 kB
+
+✓ built in 1.67s
+
+real	0m2.809s
+user	0m2.007s
+sys	0m0.445s

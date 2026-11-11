@@ -1,0 +1,30 @@
+import { test } from 'vitest';
+import { writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { simulateRun, simulateGenerated } from '../../src/game/simulate';
+import { autopilotInput, type AutopilotStyle } from '../../src/debug/autopilot';
+import { Mountain } from '../../src/world/course';
+import { makeCourse } from '../../src/game/CourseConfig';
+
+test('golden cross-version dump', () => {
+  const out: Record<string, unknown> = {};
+  const traced = (m: Mountain, style: AutopilotStyle, h: ReturnType<typeof createHash>) => (s: any, t: number) => {
+    h.update(`${s.pos.x},${s.pos.y},${s.pos.z},${s.speed},${s.heading},${s.crashed};`);
+    return autopilotInput(m, s, style, t);
+  };
+  for (const style of ['skilled', 'average', 'careless', 'cautious'] as AutopilotStyle[]) {
+    const h = createHash('sha256');
+    const m = new Mountain();
+    const r = simulateRun(traced(m, style, h), undefined, 400);
+    out[`classic-sprint/${style}`] = { r, trace: h.digest('hex') };
+  }
+  for (const [mode, len, opt, metres] of [['custom', 'standard', { customText: 'AVALANCHE' }, 10000], ['daily', 'sprint', { date: '2026-11-01' }, 3000], ['custom', 'standard', { customText: 'POWDER', difficulty: 'hard' }, 10000]] as const) {
+    const c = makeCourse(mode as any, len as any, opt as any);
+    for (const style of ['skilled', 'intermediate'] as AutopilotStyle[]) {
+      const h = createHash('sha256');
+      const r = simulateGenerated(c.seed, metres, (m) => traced(m, style, h), { maxTime: 900, snowballs: (opt as any).difficulty === 'hard', yetiSpeed: (opt as any).difficulty === 'hard' ? 1.07 : 1 });
+      out[`${mode}-${len}-${c.seed}${(opt as any).difficulty ?? ''}/${style}`] = { r, trace: h.digest('hex') };
+    }
+  }
+  writeFileSync(process.env.GOLDEN_OUT!, JSON.stringify(out, null, 1));
+}, 600000);

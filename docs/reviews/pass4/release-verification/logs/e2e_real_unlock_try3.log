@@ -1,0 +1,9 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/e2e/release.spec.ts:110:1 › a real unlock through keyboard play (Pizza Party) persists, grants its jacket and survives a reload (no ?debug) (26.8m)
+
+  Slow test file: tests/e2e/release.spec.ts (26.8m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 passed (26.8m)
+exit 0

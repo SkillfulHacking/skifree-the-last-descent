@@ -1,0 +1,224 @@
+
+ RUN  v5.1.0 /home/claude/skifree
+
+ ✓ tests/unit/course.test.ts > course config & daily mountain > daily seed is deterministic per UTC date and differs between days 3ms
+ ✓ tests/unit/course.test.ts > course config & daily mountain > rolls over at 00:00 UTC (not local midnight) 1ms
+ ✓ tests/unit/course.test.ts > course config & daily mountain > date helpers handle month/year boundaries and reject bad dates 1ms
+ ✓ tests/unit/course.test.ts > course config & daily mountain > course ids round-trip and are shareable 2ms
+ ✓ tests/unit/course.test.ts > course config & daily mountain > difficulty is part of the course identity and round-trips 0ms
+ ✓ tests/unit/course.test.ts > course config & daily mountain > the whole course is exportable as a serialisable spec 31ms
+ ✓ tests/unit/course.test.ts > course config & daily mountain > custom seeds: numbers are used directly, words are hashed case-insensitively 0ms
+ ✓ tests/unit/course.test.ts > course config & daily mountain > different daily seeds produce meaningfully different geometry 3ms
+ ✓ tests/unit/course.test.ts > course config & daily mountain > the same config always builds the same mountain 12ms
+ ✓ tests/unit/course.test.ts > course config & daily mountain > settings persist course mode, length, seed text and past-day replay 1ms
+ ✓ tests/unit/course.test.ts > course config & daily mountain > records are kept separately per course and migrated from the old single set 0ms
+ ✓ tests/unit/course.test.ts > configurable course lengths > Classic Sprint: the Yeti cave and its trigger are inside the first 300 m 1ms
+ ✓ tests/unit/course.test.ts > configurable course lengths > Endless: the chase is on ~90 % of the way too (refuge reprieves are short) 4ms
+ ✓ tests/unit/course.test.ts > configurable course lengths > Endless: the first cave comes as early as on Standard 1ms
+ ✓ tests/unit/course.test.ts > configurable course lengths > Classic Sprint is the original hand-tuned course; other lengths are generated 0ms
+ ✓ tests/unit/course.test.ts > configurable course lengths > sprint: finish at 3000 m, a valid descending route with a clear lane, the cave in the first 10 % 440ms
+ ✓ tests/unit/course.test.ts > configurable course lengths > standard: finish at 10000 m, a valid descending route with a clear lane, the cave in the first 10 % 823ms
+ ✓ tests/unit/course.test.ts > configurable course lengths > endurance: finish at 20000 m, a valid descending route with a clear lane, the cave in the first 10 % 984ms
+ ✓ tests/unit/course.test.ts > configurable course lengths > expedition: finish at 50000 m, a valid descending route with a clear lane, the cave in the first 10 % 894ms
+ ✓ tests/unit/course.test.ts > alternate lines > generated courses offer alternate lines: inside the piste, skiable, clear, and shorter than the route 1523ms
+ ✓ tests/unit/course.test.ts > alternate lines > the hand-tuned classic course is unchanged (no alternate lines added) 0ms
+ ✓ tests/unit/course.test.ts > long-course completion (headless, streaming obstacles) > a skilled skier completes sprint (3 km) and wins 725ms
+ ✓ tests/unit/course.test.ts > long-course completion (headless, streaming obstacles) > a skilled skier completes standard (10 km) and wins 1857ms
+ ✓ tests/unit/course.test.ts > long-course completion (headless, streaming obstacles) > a skilled skier completes endurance (20 km) and wins 3102ms
+ ✓ tests/unit/course.test.ts > long-course completion (headless, streaming obstacles) > a skilled skier completes expedition (50 km) and wins 8686ms
+ ✓ tests/unit/course.test.ts > long-course completion (headless, streaming obstacles) > difficulty matters: Relaxed is escapable for an intermediate skier, Hard is measurably tougher 3422ms
+ ✓ tests/unit/course.test.ts > long-course completion (headless, streaming obstacles) > a careless skier is caught on a generated course (loss is possible) 389ms
+ ✓ tests/unit/course.test.ts > endless > generates segments, encounters and refuges without end, escalating 9ms
+ ✓ tests/unit/course.test.ts > endless > a skilled skier crosses many segment boundaries and refuges; memory stays bounded 4382ms
+ ✓ tests/unit/course.test.ts > endless > run state: refuges end a chase and the next encounter follows 1ms
+ ✓ tests/unit/game.test.ts > run state machine > begins in the intro, then the learning phase 1ms
+ ✓ tests/unit/game.test.ts > run state machine > progresses by distance, not time 2ms
+ ✓ tests/unit/game.test.ts > run state machine > the cave encounter triggers reliably exactly once, even when skipping ahead 0ms
+ ✓ tests/unit/game.test.ts > run state machine > the yeti emerges after the cinematic and control returns 0ms
+ ✓ tests/unit/game.test.ts > run state machine > cannot be caught before the chase 0ms
+ ✓ tests/unit/game.test.ts > run state machine > a caught player cannot subsequently win; victory and defeat are exclusive 0ms
+ ✓ tests/unit/game.test.ts > run state machine > restart produces a fresh valid state 0ms
+ ✓ tests/unit/game.test.ts > persistence > settings round-trip and tolerate corrupt data 1ms
+ ✓ tests/unit/game.test.ts > persistence > personal bests persist and only improve 1ms
+ ✓ tests/unit/game.test.ts > world generation & fairness > is deterministic for a seed 743ms
+ ✓ tests/unit/game.test.ts > world generation & fairness > the course descends from summit to the finish with no uphill along the route 3ms
+ ✓ tests/unit/game.test.ts > world generation & fairness > the primary route lane is clear of solid obstacles 925ms
+ ✓ tests/unit/game.test.ts > world generation & fairness > the route enters the finish chute centred (no clipping the chute fences) 1ms
+ ✓ tests/unit/game.test.ts > world generation & fairness > jump opportunities exist along the route 0ms
+ ✓ tests/unit/game.test.ts > pursuit fairness (full headless runs) > a skilled skier can escape and win 615ms
+ ✓ tests/unit/game.test.ts > pursuit fairness (full headless runs) > an intermediate skier who tucks on straights can also escape 254ms
+ ✓ tests/unit/game.test.ts > pursuit fairness (full headless runs) > the yeti is faster than a careless or overly cautious skier 214ms
+ ✓ tests/unit/game.test.ts > pursuit fairness (full headless runs) > the chase is tense: the yeti gets within striking distance of a skilled skier at some point 244ms
+ ✓ tests/unit/game.test.ts > pursuit fairness (full headless runs) > a skilled skier who crashes once or twice mid-chase can still win (crashes are costly, not fatal) 1251ms
+ ✓ tests/unit/game.test.ts > pursuit fairness (full headless runs) > the pursuit stays in range: a skilled skier never escapes far out of sight 521ms
+ ✓ tests/unit/game.test.ts > pursuit fairness (full headless runs) > capture requires actual proximity 0ms
+ ✓ tests/unit/game.test.ts > pursuit fairness (full headless runs) > the yeti does not get stuck: it keeps making progress through forest 293ms
+ ✓ tests/unit/capabilities.test.ts > Alpine identity (every capability reproduces the original game) > Alpine resolves to the default capability set 3ms
+ ✓ tests/unit/capabilities.test.ts > Alpine identity (every capability reproduces the original game) > surface: identity modifiers for every surface and position 2ms
+ ✓ tests/unit/capabilities.test.ts > Alpine identity (every capability reproduces the original game) > weather: today's constants (flake drift windX = 1, base fog, base flakes) and zero physics coupling 2ms
+ ✓ tests/unit/capabilities.test.ts > Alpine identity (every capability reproduces the original game) > hazards: Alpine places none and streaming is a no-op 2ms
+ ✓ tests/unit/capabilities.test.ts > Alpine identity (every capability reproduces the original game) > physics: a scripted run on the Alpine course is bit-identical with and without the hook 1304ms
+ ✓ tests/unit/capabilities.test.ts > Alpine identity (every capability reproduces the original game) > simulation: an autopilot run of the Alpine classic course is identical with and without the environment 1159ms
+ ✓ tests/unit/capabilities.test.ts > surface modifiers through the physics hook > brake: weaker pizza → longer stopping distance 10ms
+ ✓ tests/unit/capabilities.test.ts > surface modifiers through the physics hook > friction and extra drag: glide further / lower top speed 11ms
+ ✓ tests/unit/capabilities.test.ts > surface modifiers through the physics hook > carve radius and grip: wider turns, more sideways slip 3ms
+ ✓ tests/unit/capabilities.test.ts > surface modifiers through the physics hook > drift threshold: drifts start at a lower speed on slippery ground 1ms
+ ✓ tests/unit/capabilities.test.ts > surface modifiers through the physics hook > recovery: control returns more slowly after a crash 1ms
+ ✓ tests/unit/capabilities.test.ts > surface modifiers through the physics hook > knock and crash from the environment 1ms
+ ✓ tests/unit/capabilities.test.ts > surface modifiers through the physics hook > surfaceTable blends per-kind modifiers by the surface weights; validation catches broken values 1ms
+ ✓ tests/unit/capabilities.test.ts > weather capability > is deterministic in (position, time, seed) and varies over time 1ms
+ ✓ tests/unit/capabilities.test.ts > weather capability > crosswind pushes an airborne skier; balance coupling wobbles a grounded one 1ms
+ ✓ tests/unit/capabilities.test.ts > registries and validation > hazard kinds: fairness rules are enforced 1ms
+ ✓ tests/unit/capabilities.test.ts > registries and validation > biomes: capabilities are validated at registration 1ms
+ ✓ tests/unit/capabilities.test.ts > registries and validation > presentation registries hold the Alpine finish, refuge and cave 0ms
+ ✓ tests/unit/capabilities.test.ts > registries and validation > deriveBiome shares capability models by reference and can derive from a derived biome 0ms
+ ✓ tests/unit/capabilities.test.ts > hazards: deterministic placement and streaming > placement is deterministic, order-independent and seed-dependent 11ms
+ ✓ tests/unit/capabilities.test.ts > hazards: deterministic placement and streaming > respects reservations, keeps the lane clear for dangerous kinds, follows density 4ms
+ ✓ tests/unit/capabilities.test.ts > hazards: deterministic placement and streaming > streams with the course: bounded residency, every created instance is disposed 7ms
+ ✓ tests/unit/capabilities.test.ts > hazards: deterministic placement and streaming > views are created and disposed with the hazard bands (HazardLayer) 9ms
+ ✓ tests/unit/capabilities.test.ts > hazards: timing, effects, recovery and gameplay events > periodic phases cycle dormant → telegraph → active → recovery with a per-instance offset 1ms
+ ✓ tests/unit/capabilities.test.ts > hazards: timing, effects, recovery and gameplay events > active contact knocks once per contact and reports it; telegraph is announced first 2ms
+ ✓ tests/unit/capabilities.test.ts > hazards: timing, effects, recovery and gameplay events > recovery phase only reduces grip; dormant/telegraph contact is harmless 2ms
+ ✓ tests/unit/capabilities.test.ts > hazards: timing, effects, recovery and gameplay events > 'hazard-passed' tells survived (no hit) from hit — the HazardSurvived source 1ms
+ ✓ tests/unit/capabilities.test.ts > hazards: timing, effects, recovery and gameplay events > surface-change events fire on every biome (Alpine included) 4ms
+ ✓ tests/unit/capabilities.test.ts > hazards: timing, effects, recovery and gameplay events > a skier driven through hazards by the physics is knocked and recovers (full pipeline) 9ms
+ ✓ tests/unit/capabilities.test.ts > course rules and codes > the hand-authored Classic Sprint layout is Alpine-only; other locations get a generated Sprint 2ms
+ ✓ tests/unit/capabilities.test.ts > course rules and codes > existing codes are byte-identical; location codes round-trip; codes are URL-safe 1ms
+ ✓ tests/unit/capabilities.test.ts > Location menu > only Alpine ships: the game registers no placeholder locations 0ms
+ ✓ tests/unit/capabilities.test.ts > Location menu > labels show the name, the 1–5 rating and a one-line description (escaped) 1ms
+ ✓ tests/unit/capabilities.test.ts > Location menu > selecting a registered location selects its course and code 1ms
+ ✓ tests/unit/capabilities.test.ts > Location menu > the debug test location is opt-in (?debug&testbiome) and valid 1ms
+ ✓ tests/unit/snowballs.test.ts > Hard mode snowballs > throws only in range, after a grace period, and never when not allowed 6ms
+ ✓ tests/unit/snowballs.test.ts > Hard mode snowballs > aims at or ahead of the skier, with the landing zone known at the throw 3ms
+ ✓ tests/unit/snowballs.test.ts > Hard mode snowballs > classifies hits by distance from the marked point 1ms
+ ✓ tests/unit/snowballs.test.ts > Hard mode snowballs > winds up before every throw 1ms
+ ✓ tests/unit/snowballs.test.ts > Hard mode snowballs > cutting through the zone as the ball comes down is a hit, even if clear at the instant of impact 0ms
+ ✓ tests/unit/snowballs.test.ts > Hard mode snowballs > crossing the zone while the ball is still high is not a hit 0ms
+ ✓ tests/unit/snowballs.test.ts > Hard mode snowballs > is deterministic for a seed 3ms
+ ✓ tests/unit/snowballs.test.ts > Hard mode snowballs > Hard Sprint: a skilled skier who reads the marks escapes; one who ignores them is snowballed and pays for it 2271ms
+ ✓ tests/unit/review_regressions.test.ts > review regressions > B3: alternate lines save time over the guaranteed route for a skilled driver 1816ms
+ ✓ tests/unit/review_regressions.test.ts > review regressions > E12: an invalid unconfirmed course code blocks Start instead of starting the old course 1ms
+ ✓ tests/unit/achievements.test.ts > achievement definitions > have unique, stable, well-formed ids and complete metadata 2ms
+ ✓ tests/unit/achievements.test.ts > achievement definitions > location achievements are marked as needing their biome 0ms
+ ✓ tests/unit/achievements.test.ts > working achievements unlock from event sequences > First Descent: reaching the resort, not being caught or retiring 1ms
+ ✓ tests/unit/achievements.test.ts > working achievements unlock from event sequences > Not Today, Yeti: escaping to a refuge or the finish 0ms
+ ✓ tests/unit/achievements.test.ts > working achievements unlock from event sequences > Close Shave (hidden): escaping after the Yeti got within 6 m 0ms
+ ✓ tests/unit/achievements.test.ts > working achievements unlock from event sequences > Pizza Party: 1,000 m of controlled pizza, cumulative across runs, with progress 0ms
+ ✓ tests/unit/achievements.test.ts > working achievements unlock from event sequences > Airborne: a landed jump with ≥ 1.6 s airtime 0ms
+ ✓ tests/unit/achievements.test.ts > working achievements unlock from event sequences > Long Haul: reaching the resort on an Expedition course only 0ms
+ ✓ tests/unit/achievements.test.ts > working achievements unlock from event sequences > Daily Ritual: Daily wins on 3 distinct UTC days, each played on its own day 1ms
+ ✓ tests/unit/achievements.test.ts > working achievements unlock from event sequences > Dodgeball: 10 dodged snowballs, cumulative 0ms
+ ✓ tests/unit/achievements.test.ts > working achievements unlock from event sequences > an achievement is earned once; the earned timestamp is the evaluation time 0ms
+ ✓ tests/unit/achievements.test.ts > Airborne is a skill threshold the real physics can reach > rolling over the kickers is not enough (longest ~1.45 s); popping off the lip earns it 895ms
+ ✓ tests/unit/achievements.test.ts > location achievements stay unearned on Alpine, unlock from their biome events > Scenic Route / Whiteout Survivor / Ice Dancer / Steam Runner 1ms
+ ✓ tests/unit/achievements.test.ts > hidden achievements and the view model > hidden ones are secret (no progress shown) until earned 0ms
+ ✓ tests/unit/achievements.test.ts > hidden achievements and the view model > a faulty definition cannot break evaluation of the others 0ms
+ ✓ tests/unit/achievements.test.ts > hidden achievements and the view model > progress achievements added later are reconciled from existing stats 0ms
+ ✓ tests/unit/achievements.test.ts > progress persistence > round-trips earned achievements, timestamps and stats 0ms
+ ✓ tests/unit/achievements.test.ts > progress persistence > missing storage → empty save; corrupt JSON or bad version → fresh save with a backup 0ms
+ ✓ tests/unit/achievements.test.ts > progress persistence > repairs bad fields but keeps unknown achievement ids and unknown keys 0ms
+ ✓ tests/unit/achievements.test.ts > progress persistence > a save from a newer build loads read-only 0ms
+ ✓ tests/unit/achievements.test.ts > progress persistence > new achievements need no format change: an old save simply lacks them 0ms
+ ✓ tests/unit/achievements.test.ts > persist policy: debug runs and simulations never award persistent achievements > a normal run commits unlocks and stats 1ms
+ ✓ tests/unit/achievements.test.ts > persist policy: debug runs and simulations never award persistent achievements > a debug run (persist=false) reports unlocks as unsaved and writes nothing 0ms
+ ✓ tests/unit/achievements.test.ts > persist policy: debug runs and simulations never award persistent achievements > a run tainted mid-way (e.g. teleport) never commits, even if later checks pass 0ms
+ ✓ tests/unit/achievements.test.ts > persist policy: debug runs and simulations never award persistent achievements > a tracker over a read-only save (newer build) or without a store never writes 0ms
+ ✓ tests/unit/achievements.test.ts > persist policy: debug runs and simulations never award persistent achievements > headless simulations never touch storage 46ms
+ ✓ tests/unit/biome.test.ts > biome registry > alpine is the single built-in default 2ms
+ ✓ tests/unit/biome.test.ts > biome registry > registers, validates and unregisters additional biomes 1ms
+ ✓ tests/unit/biome.test.ts > biome registry > deriveBiome deep-copies and overrides per section 0ms
+ ✓ tests/unit/biome.test.ts > biome registry > glsl literals always carry a decimal point 0ms
+ ✓ tests/unit/biome.test.ts > biome registry > weighted species picks consume one draw and respect zero weights 1ms
+ ✓ tests/unit/biome.test.ts > course codes with locations > existing codes are byte-identical and still parse to the default biome 1ms
+ ✓ tests/unit/biome.test.ts > course codes with locations > a non-default biome round-trips through its code 1ms
+ ✓ tests/unit/biome.test.ts > course codes with locations > unknown location tags are rejected; unknown biome ids fall back to the default 0ms
+ ✓ tests/unit/biome.test.ts > course codes with locations > seeds: unchanged for the default biome, biome-specific otherwise 4ms
+ ✓ tests/unit/biome.test.ts > course codes with locations > settings persist the location and repair unknown ones 1ms
+ ✓ tests/unit/biome.test.ts > mountains per biome > alpine reproduces the pre-biome terrain bit for bit 8ms
+ ✓ tests/unit/biome.test.ts > mountains per biome > a test biome with different terrain knobs builds a different mountain (same profile code path) 8ms
+ ✓ tests/unit/biome.test.ts > mountains per biome > the biome's obstacle mix and species weights drive placement 482ms
+ ✓ tests/unit/physics.test.ts > skier physics > gravity accelerates the skier down a slope 7ms
+ ✓ tests/unit/physics.test.ts > skier physics > pizza (brake) reduces speed under otherwise identical conditions 5ms
+ ✓ tests/unit/physics.test.ts > skier physics > pizza decelerates progressively but still allows turning 2ms
+ ✓ tests/unit/physics.test.ts > skier physics > tucking improves downhill performance (higher speed, more distance) 11ms
+ ✓ tests/unit/physics.test.ts > skier physics > speed is bounded (no infinite acceleration) and depends on slope 25ms
+ ✓ tests/unit/physics.test.ts > skier physics > tuck reduces steering authority 1ms
+ ✓ tests/unit/physics.test.ts > skier physics > steering changes heading consistently (sign and symmetry) 0ms
+ ✓ tests/unit/physics.test.ts > skier physics > turning is speed-dependent: wider turns at high speed 0ms
+ ✓ tests/unit/physics.test.ts > skier physics > drift only activates above the speed threshold 1ms
+ ✓ tests/unit/physics.test.ts > skier physics > drifting loses lateral grip, turns harder and bleeds speed, then recovers to carving 1ms
+ ✓ tests/unit/physics.test.ts > skier physics > grip never adds energy (cannot coast uphill on edges) 5ms
+ ✓ tests/unit/physics.test.ts > skier physics > terrain launches the skier: velocity-based takeoff, parabolic flight, longer at speed 4ms
+ ✓ tests/unit/physics.test.ts > skier physics > gravity governs flight: vertical velocity decreases at g while airborne 5ms
+ ✓ tests/unit/physics.test.ts > skier physics > pop is a single grounded jump (no double jumps in the air) 0ms
+ ✓ tests/unit/physics.test.ts > skier physics > landing impact responds to vertical velocity (soft vs hard vs crash) 1ms
+ ✓ tests/unit/physics.test.ts > skier physics > collision impulses vary by obstacle type and impact speed 2ms
+ ✓ tests/unit/physics.test.ts > skier physics > pizza can stop the skier on a typical 20° pitch 7ms
+ ✓ tests/unit/physics.test.ts > skier physics > drift is a real tool: tighter heading change than carving at the same speed 1ms
+ ✓ tests/unit/physics.test.ts > skier physics > a skier is never pinned against a trunk after crashing into it 24ms
+ ✓ tests/unit/physics.test.ts > skier physics > a skier never tunnels through a trunk at very high speed 0ms
+ ✓ tests/unit/physics.test.ts > skier physics > a fallen log can be cleared by jumping over it 1ms
+ ✓ tests/unit/physics.test.ts > skier physics > crash recovery: available after a delay, restores control 0ms
+ ✓ tests/unit/physics.test.ts > skier physics > is deterministic for identical inputs 49ms
+ ✓ tests/unit/audio.test.ts > basic math > midiToFreq 1ms
+ ✓ tests/unit/audio.test.ts > basic math > clamp handles NaN and bounds 0ms
+ ✓ tests/unit/audio.test.ts > basic math > smoothFactor is frame-rate independent 0ms
+ ✓ tests/unit/audio.test.ts > basic math > mulberry32 is deterministic and in range 4ms
+ ✓ tests/unit/audio.test.ts > envelopes > ADSR segments 0ms
+ ✓ tests/unit/audio.test.ts > envelopes > releases from the current level when gate ends during attack (no jump) 0ms
+ ✓ tests/unit/audio.test.ts > StepClock lookahead scheduling > returns steps inside the window and advances 1ms
+ ✓ tests/unit/audio.test.ts > StepClock lookahead scheduling > repeated small lookahead windows never duplicate or skip steps 1ms
+ ✓ tests/unit/audio.test.ts > StepClock lookahead scheduling > catchUp skips missed steps after a stall instead of bursting 1ms
+ ✓ tests/unit/audio.test.ts > StepClock lookahead scheduling > resync keeps the step counter 0ms
+ ✓ tests/unit/audio.test.ts > VoiceLimiter > caps per-key and global polyphony and frees voices after they end 0ms
+ ✓ tests/unit/audio.test.ts > VoiceLimiter > rate-limits retriggers 0ms
+ ✓ tests/unit/audio.test.ts > curves and impulses > soft clipper is transparent below 0.9 and never reaches 1 6ms
+ ✓ tests/unit/audio.test.ts > curves and impulses > drive curve is odd, monotonic and normalised 5ms
+ ✓ tests/unit/audio.test.ts > curves and impulses > generated impulse decays, is finite and deterministic 10ms
+ ✓ tests/unit/audio.test.ts > continuous layer mappings > wind gets louder and brighter with speed and ducks with eerie 0ms
+ ✓ tests/unit/audio.test.ts > continuous layer mappings > gust stays within 0..1 4ms
+ ✓ tests/unit/audio.test.ts > continuous layer mappings > ski scrape follows speed × edge load and is silent airborne / crashed 3ms
+ ✓ tests/unit/audio.test.ts > continuous layer mappings > braking / drifting adds crunchy chatter 0ms
+ ✓ tests/unit/audio.test.ts > continuous layer mappings > surface selects the right layers 0ms
+ ✓ tests/unit/audio.test.ts > continuous layer mappings > yeti breathing gets louder as it approaches and faster when running 0ms
+ ✓ tests/unit/audio.test.ts > continuous layer mappings > crowd scales with level 0ms
+ ✓ tests/unit/audio.test.ts > music state mapping > tempos match the brief 0ms
+ ✓ tests/unit/audio.test.ts > music state mapping > chase intensity adds layers and opens the filter monotonically 1ms
+ ✓ tests/unit/audio.test.ts > music state mapping > fades and ducking 0ms
+ ✓ tests/unit/audio.test.ts > music state mapping > victory/defeat intro is skipped only when the one-shot just played 0ms
+ ✓ tests/unit/audio.test.ts > bufferStats > reports peak, rms, NaNs and overs 0ms
+ ✓ tests/unit/events.test.ts > event bus > delivers typed events synchronously, in subscription order, typed + any 1ms
+ ✓ tests/unit/events.test.ts > event bus > unsubscribes 1ms
+ ✓ tests/unit/events.test.ts > event bus > a throwing listener never breaks the others 1ms
+ ✓ tests/unit/events.test.ts > event bus > events emitted from a listener are delivered after the current one (same order for everyone) 0ms
+ ✓ tests/unit/events.test.ts > run telemetry > reports whole-kilometre milestones once each (also when several are crossed at once) 0ms
+ ✓ tests/unit/events.test.ts > run telemetry > counts only controlled pizza braking, in chunks, and flushes the remainder 2ms
+ ✓ tests/unit/events.test.ts > run telemetry > reports a jump with airtime and horizontal distance; a crash landing is landed=false; hops are ignored 2ms
+ ✓ tests/unit/events.test.ts > run telemetry > reports drifts with duration, dominant surface and per-surface time; crashes end them uncontrolled 1ms
+ ✓ tests/unit/events.test.ts > run telemetry > forwards obstacle contacts 0ms
+ ✓ tests/unit/cosmetics.test.ts > cosmetic definitions > stable unique ids, valid unlock refs, and achievement rewards point at real items 2ms
+ ✓ tests/unit/cosmetics.test.ts > cosmetic definitions > cosmetics carry only visual parameters (no gameplay fields) 0ms
+ ✓ tests/unit/cosmetics.test.ts > ownership vs equipped loadout > defaults are owned; achievement items only once granted 1ms
+ ✓ tests/unit/cosmetics.test.ts > ownership vs equipped loadout > only owned, known, rig-compatible items can be equipped; equipping does not change ownership 0ms
+ ✓ tests/unit/cosmetics.test.ts > ownership vs equipped loadout > the resolved loadout falls back to defaults for unknown / unowned / mismatched equips 0ms
+ ✓ tests/unit/cosmetics.test.ts > ownership vs equipped loadout > reconciles ownership from earned achievements (a reward added in an update) 0ms
+ ✓ tests/unit/cosmetics.test.ts > ownership vs equipped loadout > the Locker lists every jacket for the rig with owned state and the achievement that unlocks it 0ms
+ ✓ tests/unit/cosmetics.test.ts > save migration v1 → v2 and cosmetics persistence > current version is 2 and every older version has a migration step 0ms
+ ✓ tests/unit/cosmetics.test.ts > save migration v1 → v2 and cosmetics persistence > a v1 save gains cosmetics, with rewards of already-earned achievements owned 1ms
+ ✓ tests/unit/cosmetics.test.ts > save migration v1 → v2 and cosmetics persistence > cosmetics round-trip; unknown owned ids are preserved; junk entries are dropped 0ms
+ ✓ tests/unit/cosmetics.test.ts > save migration v1 → v2 and cosmetics persistence > an achievement reward is granted with the unlock and persisted by the tracker 1ms
+ ✓ tests/unit/cosmetics.test.ts > save migration v1 → v2 and cosmetics persistence > a debug run grants nothing persistent (reward included) 0ms
+ ✓ tests/unit/input.test.ts > input > dead zone: zero inside, continuous and rescaled outside 2ms
+ ✓ tests/unit/input.test.ts > input > analog trigger values behave continuously 1ms
+ ✓ tests/unit/input.test.ts > input > detects controller families 0ms
+ ✓ tests/unit/input.test.ts > input > keyboard movement works (steer ramps, tuck, brake, drift, pop) 2ms
+ ✓ tests/unit/input.test.ts > input > gamepad inputs map correctly and hot-switch the active device 1ms
+ ✓ tests/unit/input.test.ts > input > gamepad disconnects and broken sources do not crash 1ms
+ ✓ tests/unit/input.test.ts > input > pause works from keyboard and gamepad start 0ms
+ ✓ tests/unit/input.test.ts > input > remapped keys are honoured 0ms
+
+ Test Files  12 passed (12)
+      Tests  215 passed (215)
+   Start at  10:44:10
+   Duration  42.42s (tests 99%, import 1%)
+
