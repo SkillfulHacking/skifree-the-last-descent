@@ -108,7 +108,7 @@ test('an equipped jacket persists across reloads (no ?debug)', async ({ page }) 
 });
 
 test('a real unlock through keyboard play (Pizza Party) persists, grants its jacket and survives a reload (no ?debug)', async ({ page }) => {
-  test.setTimeout(60 * 60 * 1000);
+  test.setTimeout(80 * 60 * 1000);
   await page.setViewportSize({ width: 640, height: 360 }); // a small window keeps software rendering near 1-2 fps
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -133,16 +133,18 @@ test('a real unlock through keyboard play (Pizza Party) persists, grants its jac
   // advances far slower than real time: the loop is paced by the HUD speedometer, not the clock.
   const kmh = async () => Number((await page.locator('.hud-speed').textContent())?.replace(/[^0-9]/g, '') || 0);
   let unlocked = false;
-  const deadline = Date.now() + 35 * 60 * 1000;
+  const deadline = Date.now() + 55 * 60 * 1000;
   while (!unlocked && Date.now() < deadline) {
     if (await page.locator('.menu-root:not(.hidden) .menu-row', { hasText: 'Retry' }).count()) await press(page, 'Enter'); // caught: Retry
     await page.keyboard.down('KeyW');
-    for (let t = Date.now(); Date.now() - t < 240_000 && (await kmh()) < 45; ) await page.waitForTimeout(1000);
+    for (let t = Date.now(); Date.now() - t < 240_000 && (await kmh()) < 35; ) await page.waitForTimeout(1000);
     await page.keyboard.up('KeyW');
+    const top = await kmh();
     await page.keyboard.down('KeyS');
     for (let t = Date.now(); Date.now() - t < 240_000 && (await kmh()) > 9; ) await page.waitForTimeout(1000);
     await page.keyboard.up('KeyS');
     unlocked = !!(await progress(page))?.achievements?.['pizza-party'];
+    console.log(`[pizza loop] ${new Date().toISOString()} tuck→${top} km/h, wedge→${await kmh()} km/h, ${await page.locator('.hud-dist').textContent()} to go, unlocked=${unlocked}`);
   }
   expect(unlocked, 'Pizza Party committed by real play').toBe(true);
   expect(await page.evaluate(() => (window as unknown as { __toasts: string[] }).__toasts)).toContain('Pizza Party|New jacket: Pesto Green (Locker)');
