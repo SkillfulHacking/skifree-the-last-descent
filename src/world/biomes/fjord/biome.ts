@@ -18,6 +18,7 @@
  *
  * Pure data + pure models (no three.js); the presentation is registered in ./views.
  */
+import { smoothstep } from '../../../core/rng';
 import { ALPINE, deriveBiome, type Biome } from '../../biome';
 import { parametricWeather, resetSurface, type SurfaceModel, type SurfaceQuery } from '../../capabilities';
 import type { CoastParams } from '../../coast';
@@ -43,8 +44,24 @@ export const FJORD_COAST: CoastParams = {
   nearRim: [46, 72],
 };
 
-/** Cornice guard: extra drag / friction at full guard strength (over the last ~20 m to the edge). */
-export const CORNICE = { dragAdd: 0.12, friction: 10, grip: 0.7 } as const;
+/**
+ * Cornice guard: extra drag / friction at full guard strength (over the last ~20 m to the edge).
+ * The heavy snow resists travel toward the sea: `heading` is the range of the seaward direction
+ * cosine over which it comes in (full from ≈ 53° toward the sea, a fifth of it running along the rim,
+ * none heading inland), so turning back inland — or even along the rim — always gets the skier
+ * moving again, slowly or from a standstill (no invisible trap; CORNICE_STALL is the backstop).
+ */
+export const CORNICE = { dragAdd: 0.12, friction: 10, grip: 0.7, heading: [-0.25, 0.6] } as const;
+
+/** 0..1: how much of the cornice's resistance applies to travel with horizontal velocity (vx, vz) */
+export function corniceHeading(rimSlope: number, vx: number | undefined, vz: number | undefined): number {
+  if (vx === undefined || vz === undefined) return 1;
+  const v = Math.hypot(vx, vz);
+  if (v < 1e-6) return 1;
+  // toward the sea = up the beyond-rim gradient (−1, rimX′(z)) (the sea is on −X)
+  const cos = (-vx + rimSlope * vz) / (v * Math.hypot(1, rimSlope));
+  return smoothstep(CORNICE.heading[0], CORNICE.heading[1], cos);
+}
 
 /**
  * Ridgeline spines (profile spine lines): wind-packed hard snow on the crest — the fastest snow on
@@ -82,8 +99,9 @@ export const FJORD_SURFACE: SurfaceModel = {
     }
     const g = c.guard(q.x, q.z);
     if (g <= 0) return;
-    out.dragAdd = CORNICE.dragAdd * g;
-    out.friction = 1 + (CORNICE.friction - 1) * g;
+    const r = g * corniceHeading((c.rimX(q.z + 1) - c.rimX(q.z - 1)) / 2, q.vx, q.vz);
+    out.dragAdd = CORNICE.dragAdd * r;
+    out.friction = 1 + (CORNICE.friction - 1) * r;
     out.grip = 1 + (CORNICE.grip - 1) * g;
   },
 };

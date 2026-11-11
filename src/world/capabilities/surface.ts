@@ -53,6 +53,12 @@ export interface SurfaceQuery {
   weights(): SurfaceWeights;
   /** the course being skied (terrain features such as a coast's cornice rim); absent in synthetic tests */
   readonly mountain?: Mountain;
+  /**
+   * the skier's horizontal velocity (m/s) when the query comes from physics; absent for position-only
+   * queries (renderer, tests). Lets a surface resist some directions of travel more than others.
+   */
+  readonly vx?: number;
+  readonly vz?: number;
 }
 
 export interface SurfaceModel {

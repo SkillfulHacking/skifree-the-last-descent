@@ -247,7 +247,9 @@ describe('Fjord: no way off the playable area over the cornice', () => {
             }
             const err = wrapAngle(-ang - s.heading);
             p.step({ ...NO_INPUT, steer: clamp(-err * 3, -1, 1), tuck: 1 });
-            for (const e of p.drainEvents()) if (e.type === 'relocate') relocations++;
+            // over the crest (the out-of-bounds rule); a stall in the cornice band is recovered too
+            // ('stuck in the cornice', see fjord_cornice.test.ts) but is not what this bounds
+            for (const e of p.drainEvents()) if (e.type === 'relocate' && e.reason === 'over the cornice') relocations++;
             worst = Math.max(worst, c.beyondRim(s.pos.x, s.pos.z));
           }
           expect(worst, `z0=${z0} v0=${v0} ang=${ang}`).toBeLessThan(RIM_GUARD.over + 3);

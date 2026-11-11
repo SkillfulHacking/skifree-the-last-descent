@@ -45,6 +45,15 @@ export type EnvironmentListener = (e: EnvironmentEvent) => void;
  */
 export const RIM_GUARD = { reach: 16, updraft: 30, over: 1.5, drop: 10, back: 6 } as const;
 
+/**
+ * Cornice stall recovery (coastal locations): a grounded skier who spends more than `time` s (net of
+ * time spent faster) slower than `speed` m/s within `zone` m of the crest (where the cornice is at
+ * ≥ 84 % strength — the cairns stand 7 m in — or past the crest short of RIM_GUARD.over) is put back
+ * on the piste like the out-of-bounds rule, with its own cue. The cornice snow does not resist
+ * heading inland, so this is a backstop (an idle or floundering skier), not the way out.
+ */
+export const CORNICE_STALL = { zone: 18, speed: 1, time: 3 } as const;
+
 /** how far ahead (m) a periodic hazard's telegraph/active transitions are reported */
 export const HAZARD_ALERT_RANGE = 150;
 /** how close (m, from the footprint edge) the skier must come for a 'hazard-passed' report */
@@ -75,7 +84,10 @@ export class BiomeEnvironment implements PhysicsEnvironment {
   private near: HazardInstance[] = [];
   private lastSurface: SurfaceType | null = null;
   private w = makeWeatherSample();
-  private sq: SurfaceQuery & { kind: SurfaceType; x: number; z: number; cached: SurfaceWeights | null };
+  private sq: SurfaceQuery & { kind: SurfaceType; x: number; z: number; vx: number; vz: number; cached: SurfaceWeights | null };
+  /** seconds the skier has been stalled in the cornice band (CORNICE_STALL), and the last sample time */
+  private stall = 0;
+  private stallT = 0;
 
   /** × hazard effect strength for the game difficulty (HazardSetup.intensity) */
   readonly intensity: number;
@@ -98,6 +110,8 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       x: 0,
       z: 0,
       kind: 'snow' as SurfaceType,
+      vx: 0,
+      vz: 0,
       cached: null as SurfaceWeights | null,
       weights(): SurfaceWeights {
         return (sq.cached ??= m.surfaceWeights(sq.x, sq.z));
@@ -134,6 +148,8 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     this.clock = 0;
     this.tracks.clear();
     this.lastSurface = null;
+    this.stall = 0;
+    this.stallT = 0;
   }
 
   sample(q: EnvQuery, out: EnvSample): void {
@@ -158,6 +174,8 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       const sq = this.sq;
       sq.x = q.x;
       sq.z = q.z;
+      sq.vx = q.vx;
+      sq.vz = q.vz;
       sq.kind = q.surface;
       sq.cached = null;
       caps.surface.modifiers(sq, S);
@@ -193,15 +211,28 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     // 4) a sea coast's rim: the cornice (surface model) stops a grounded skier; in the air, the
     //    updraft off the cliff pushes back onshore, and anyone who still ends up over the crest is
     //    put back on the piste (crashed, with a cue) — never stranded on the cliff
+    //    — and never stuck in it: a skier who stalls in the cornice band goes back too (CORNICE_STALL)
     const coast = this.mountain.coast;
+    const dt = Math.min(0.1, Math.max(0, q.t - this.stallT));
+    this.stallT = q.t;
     if (coast && !q.crashed) {
       const b = coast.beyondRim(q.x, q.z);
       if (!q.grounded && b > -RIM_GUARD.reach) out.airAccelX += RIM_GUARD.updraft * smoothstep(-RIM_GUARD.reach, 0, b);
       if (b > RIM_GUARD.over && (q.grounded || q.y < this.mountain.heightAt(coast.rimX(q.z), q.z) - RIM_GUARD.drop)) {
         const z = q.z - RIM_GUARD.back;
         out.relocate = { x: this.mountain.routeX(z), z, reason: 'over the cornice' };
-      }
-    }
+        this.stall = 0;
+      } else if (q.grounded && b > -CORNICE_STALL.zone) {
+        // slow time counts up, faster time counts down at the same rate: dithering at a walking pace
+        // (a little faster now and then) still adds up; skiing or skating out does not
+        this.stall = Math.max(0, this.stall + (q.speed < CORNICE_STALL.speed ? dt : -dt));
+        if (this.stall > CORNICE_STALL.time) {
+          const z = q.z - RIM_GUARD.back;
+          out.relocate = { x: this.mountain.routeX(z), z, reason: 'stuck in the cornice' };
+          this.stall = 0;
+        }
+      } else this.stall = 0;
+    } else this.stall = 0;
   }
 
   /** wind x/z (m/s, airborne coupling), grounded side-slip x/z (m/s) and airborne push x (m/s²) from hazards this step */
