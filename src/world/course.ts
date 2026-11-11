@@ -247,7 +247,9 @@ export class Mountain {
     }
     // continuous at the crest: the backing never drops faster than 20 m per m below the round-3 rim
     // (a step would be a crease for physics; the line stays inside the mesh's rounded lip)
-    out = Math.max(out, h - 20 * (t - 0.5));
+    // (a 2:1 shoulder over the first 2 m — a skier stopped on the crest slides off and is put back
+    // on the piste, fjord_cornice.test — then at most 20 m per m)
+    out = Math.max(out, h - 2 * (t - 0.5) - 18 * Math.max(0, t - 2.5));
     return h + (out - h) * k;
   }
 

@@ -120,13 +120,14 @@ export function emergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: TH
   const s: THREE.Vector3[] = [];
   // on a ring in front of the mouth (the sea lies behind the cave's hill: it shows past its flanks)
   for (const ang of [-60, -35, 35, 60])
-    for (const d of [14, 26])
-      for (const h of [6, 16, 30]) {
+    for (const [d, h] of [[14, 6], [14, 16], [14, 30], [26, 6], [26, 16], [26, 30]] as const) {
+      {
         const r = THREE.MathUtils.degToRad(ang);
         const p = mouth.clone().addScaledVector(out, d * Math.cos(r)).addScaledVector(tan, d * Math.sin(r));
         p.y = Math.max(p.y, ground ? ground(p.x, p.z) : p.y) + h;
         s.push(p);
       }
+    }
   return s;
 }
 

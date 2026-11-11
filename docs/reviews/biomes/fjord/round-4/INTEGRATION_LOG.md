@@ -41,3 +41,9 @@ Worktree `/home/claude/sf-fjord`, branch `pass4-fjord`. Running log so a success
 
 Workflow notes: capture against `npm run build` + `npx vite preview --port 4471` (NOT the dev
 server: HMR reloads kill a running capture when sources change).
+6. (after a server restart) unit fixes: crest shoulder 2:1 for the first 2 m past the rim then
+   ≤ 20 m/m (fjord_cornice.test: a skier stopped at b=0.5 was held by the steep kit backing).
+   Sea framing record (tests/unit/fjord_r4_integration): classic Sprint cave z 260: emerge 0.11,
+   leap 0.07 water share; custom Standard caves (R4I1–4, z 960): no station sees the water
+   (the mouth sits 30–70 m below the rim, mouth faces inland; crane stations up to 75 m tried, none)
+   → those keep the three-quarter shot. Known gap.
