@@ -95,6 +95,8 @@ export interface HazardContact {
   t: number;
   /** × effect strength for the game difficulty (HazardSetup.intensity; 1 when not set) */
   intensity?: number;
+  /** how far the skier is tucked, 0..1 (undefined when the caller does not know) */
+  tuck?: number;
 }
 
 /** What touching a hazard does this step (everything optional; null = nothing). */

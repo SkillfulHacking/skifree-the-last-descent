@@ -215,9 +215,11 @@ export function makeFjordBiome(): Biome {
     capabilities: {
       surface: FJORD_SURFACE,
       weather: FJORD_WEATHER,
-      // the same squalls and rock on every difficulty; on Relaxed they push and drag a little more
-      // than half as hard, on Hard a little harder (the Yeti is not touched: brief §2)
-      hazards: { kinds: ['sea-gust', 'scoured-rock', 'gap-marker'], density: 1, intensity: { relaxed: 0.25, normal: 1, hard: 1.0 } },
+      // the same gates, squalls and rock on every difficulty (course codes describe one course); the
+      // game difficulty scales how hard they punish, never whether the choice matters (round 4, D7/B3):
+      // Relaxed 0.6 (softer push, knock and drift: the same choices, smaller stakes), Hard 1.2 (the
+      // Yeti is not touched: brief §2). Round 3's Relaxed 0.25 effectively switched the location off.
+      hazards: { kinds: ['sea-gust', 'scoured-rock', 'gap-marker'], density: 1, intensity: { relaxed: 0.5, normal: 1, hard: 1.2 } },
       finish: { id: 'fjord-harbour' },
       refuge: { id: 'coastal-shelter', name: 'Coastal shelter' },
       cave: { id: 'fjord-sea-cave' },

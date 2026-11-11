@@ -146,7 +146,9 @@ describe('no skier is ever trapped in the cornice', () => {
                 let stopped = false;
                 let stopT = 0;
                 let beyond = 0;
-                for (let i = 0; i < 30 / PHYS_DT && !reloc; i++) {
+                // 45 s: a skier who first stops late in the run still gets the stall backstop's 3 s plus
+                // margin (round 4: wind gates changed some paths so that a stop fell in the last 3 s of a 30 s window)
+                for (let i = 0; i < 45 / PHYS_DT && !reloc; i++) {
                   const s = p.s;
                   if (!popped && c.guard(s.pos.x, s.pos.z) > popAt && s.grounded) {
                     popped = true;

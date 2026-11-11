@@ -313,6 +313,7 @@ export class SkierPhysics {
       q.crashed = s.crashed;
       q.surface = s.surface;
       q.t = s.time;
+      q.tuck = s.tuck;
       this.env.sample(q, E);
       if (E.relocate) this.relocate(E.relocate.x, E.relocate.z, E.relocate.reason);
       else if (E.crash && !s.crashed) this.crash(E.crash.reason, E.crash.intensity);

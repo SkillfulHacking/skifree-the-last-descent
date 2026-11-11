@@ -34,6 +34,8 @@ export interface EnvQuery {
   surface: SurfaceType;
   /** physics time since the run (re)started, s */
   t: number;
+  /** how far the skier is tucked, 0..1 (optional: hazards that treat a tucked skier differently) */
+  tuck?: number;
 }
 
 export interface EnvSample {

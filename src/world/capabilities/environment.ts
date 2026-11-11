@@ -248,7 +248,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     // physics-critical band must exist even if the caller did not stream (simulations)
     this.hazards.ensure(q.z - 1, q.z + 1);
     const near = this.hazards.near(q.x, q.z + HAZARD_ALERT_RANGE * 0.5, HAZARD_ALERT_RANGE * 0.5 + HAZARD_PASS_RANGE, this.near);
-    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity };
+    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity, tuck: q.tuck };
     for (const h of near) {
       let tr = this.tracks.get(h.id);
       const k = tr?.k ?? getHazardKind(h.kind);

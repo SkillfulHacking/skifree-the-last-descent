@@ -771,8 +771,10 @@ export class GameSession implements Stage {
         if (e.cue) this.audio.playCue(e.cue, new THREE.Vector3(e.hazard.x, e.hazard.y + 2, e.hazard.z));
         if (e.type === 'hazard-telegraph' && e.kind === 'sea-gust') {
           // captioned like the Yeti's cues (the windsock alone is easy to miss at speed)
-          const lane = ((e.hazard.params as { slip?: number }).slip ?? 0) > 0;
-          this.envCaption(lane ? '[a squall builds off the sea — it will push you left]' : '[a squall gusts across the jump ahead]', 2.4, 'squall', CAPTION_PRIORITY.warning);
+          // (throttled per squall, not per kind: one squall's warning never mutes the next one's — round 3 E1)
+          const P = e.hazard.params as { slip?: number; gate?: unknown };
+          const text = P.gate ? '[a squall builds off the sea — take the lee of the rocks, or the notch in the lull]' : (P.slip ?? 0) > 0 ? '[a squall builds off the sea — it will push you left]' : '[a squall gusts across the jump ahead]';
+          this.envCaption(text, 2.4, `squall:${e.hazard.id}`, CAPTION_PRIORITY.warning);
         }
       } else if (e.type === 'hazard-enter' && e.kind === 'scoured-rock') {
         this.audio.playCue('rock-scrape', null);

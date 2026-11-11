@@ -12,7 +12,7 @@ import { NO_INPUT, PHYS_DT, SkierPhysics } from '../../src/physics/SkierPhysics'
 import { BiomeEnvironment } from '../../src/world/capabilities/environment';
 import { getHazardKind, hazardPhase } from '../../src/world/hazards/hazard';
 import { collectPlacements } from '../../src/world/hazards/testkit';
-import { LANE_GROUP, MIN_LANES_PER_GROUP } from '../../src/world/biomes/fjord/hazards';
+import { GATE, LANE_GROUP, SQUALL_TIMING, type GustParams } from '../../src/world/biomes/fjord/hazards';
 import { BAND } from '../../src/physics/obstacles';
 import { RIM_LINE_CLEAR, SEA_CAVE_BACK } from '../../src/world/coast';
 import { yetiSpawnAfterCinematic } from '../../src/yeti/spawn';
@@ -35,21 +35,27 @@ const gust = getHazardKind('sea-gust');
 const rock = getHazardKind('scoured-rock');
 const SEEDS = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'Q8'];
 
-describe('Fjord round 3: squall lanes are a guaranteed part of every run', () => {
-  it(`at least ${MIN_LANES_PER_GROUP} lanes per ~1 km group wherever the course leaves room; never a Sprint with fewer than 4`, () => {
+describe('Fjord round 3/4: wind decisions are a guaranteed part of every run', () => {
+  it(`round 4: every Sprint has ≥ 3 wind gates and ≥ 7 wind decisions (gates + jump squalls); a gate in every ~1 km group of open running; each gate is a rib of two outcrops`, () => {
     for (const sd of SEEDS) {
       const m = mtn('sprint', sd);
       const ws = worldSeed(course('sprint', sd));
-      const lanes = collectPlacements(m, ws, [gust], 1, 0, m.finishZ).filter((h) => (h.params as { slip: number }).slip > 0);
-      expect(lanes.length, sd).toBeGreaterThanOrEqual(4);
-      // every lane has its lee rock (planned with it)
+      const all = collectPlacements(m, ws, [gust], 1, 0, m.finishZ);
+      const gates = all.filter((h) => (h.params as GustParams).gate);
+      const jumps = all.filter((h) => ((h.params as GustParams).push ?? 0) > 0);
+      expect(gates.length, sd).toBeGreaterThanOrEqual(3);
+      expect(gates.length + jumps.length, sd).toBeGreaterThanOrEqual(7);
       const rocks = collectPlacements(m, ws, [rock], 1, 0, m.finishZ);
-      for (const L of lanes) expect(rocks.some((r) => r.z > L.z && r.z < L.z + 30 && r.x > m.routeX(r.z)), `${sd} lane ${L.z.toFixed(0)}`).toBe(true);
+      for (const L of gates) {
+        const G = (L.params as GustParams).gate!;
+        expect(rocks.some((r) => Math.abs(r.z - G.z) < 0.01 && Math.abs(r.x - G.x) < 0.01), `${sd} gate ${G.z.toFixed(0)}`).toBe(true);
+        expect(rocks.some((r) => Math.abs(r.z - G.z - GATE.rib) < 0.01), `${sd} rib ${G.z.toFixed(0)}`).toBe(true);
+      }
       // full groups in open running (past the start and the first cave, before the finish run-out)
       for (let g = 2; (g + 1) * LANE_GROUP * BAND < m.finishZ - 500; g++) {
         const z0 = g * LANE_GROUP * BAND;
-        const n = lanes.filter((L) => L.z >= z0 && L.z < z0 + LANE_GROUP * BAND).length;
-        expect(n, `${sd} group ${g}`).toBeGreaterThanOrEqual(2);
+        const n = gates.filter((L) => (L.params as GustParams).gate!.z >= z0 && (L.params as GustParams).gate!.z < z0 + LANE_GROUP * BAND).length;
+        expect(n, `${sd} group ${g}`).toBeGreaterThanOrEqual(1);
       }
     }
   });
@@ -77,7 +83,7 @@ describe('Fjord round 3: the airborne squall carries a skier onto the landing ro
           const p = new SkierPhysics(m, null, () => [], blowing ? new BiomeEnvironment(m, ws) : null);
           const z0 = lip - 60;
           p.reset(kx + (m.routeX(z0) - m.routeX(lip)), z0, Math.atan2(m.routeX(lip) - m.routeX(z0), 60), 21);
-          p.s.time = tA + 0.4 - 60 / 21;
+          p.s.time = tA + 0.3 * SQUALL_TIMING.active - 60 / 21; // round 4: take off in the body of the (longer) gust
           let x0 = NaN;
           let land = NaN;
           let air = false;

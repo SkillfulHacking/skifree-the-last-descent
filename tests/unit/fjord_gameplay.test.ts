@@ -20,7 +20,7 @@ import { NO_INPUT, PHYS_DT, SkierPhysics, type SkierInput } from '../../src/phys
 import { BiomeEnvironment, RIM_GUARD } from '../../src/world/capabilities/environment';
 import { getHazardKind, hazardPhase, type HazardInstance } from '../../src/world/hazards/hazard';
 import { collectPlacements, probe } from '../../src/world/hazards/testkit';
-import { LEE_ROCK_INSET, SQUALL } from '../../src/world/biomes/fjord/hazards';
+import { GATE, SQUALL } from '../../src/world/biomes/fjord/hazards';
 import { LOOKOUT_CHASE_MAX, LOOKOUT_CHASE_MIN } from '../../src/world/coast';
 import { simulateCourse } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
@@ -37,7 +37,6 @@ const mtn = (length: LengthMode, seed: string) => {
 const gust = getHazardKind('sea-gust');
 const rock = getHazardKind('scoured-rock');
 const placements = (m: Mountain, seed: string, len: LengthMode) => collectPlacements(m, worldSeed(course(len, seed)), [gust, rock], 1, 0, Number.isFinite(m.finishZ) ? m.finishZ : 20000);
-const isLane = (h: HazardInstance) => ((h.params as { slip?: number }).slip ?? 0) > 0;
 
 /** follow the racing line (look-ahead path follower, like every autopilot) with an x offset */
 function follow(m: Mountain, offset: (z: number, t: number) => number, tuck = 1) {
@@ -49,74 +48,87 @@ function follow(m: Mountain, offset: (z: number, t: number) => number, tuck = 1)
   };
 }
 
-describe('Fjord: squall lanes push grounded skiers onshore; reading them keeps you off the rock', () => {
+type Gate = { x: number; z: number; r: number };
+const gateOf = (h: HazardInstance) => (h.params as { gate?: Gate }).gate;
+const isGateRock = (r: HazardInstance, gates: readonly HazardInstance[]) => gates.some((h) => {
+  const G = gateOf(h);
+  return !!G && (Math.abs(r.z - G.z) < 0.01 || Math.abs(r.z - G.z - GATE.rib) < 0.01);
+});
+
+describe('Fjord round 4: wind gates — the notch is free in the lull and costly in a gust; the lee is the reverse', () => {
   const seeds = ['RB1', 'RB2', 'RB3'];
-  it('lanes span the racing line on exposed stretches, slip only onshore (+X) and only while it blows, each with rock downwind', () => {
-    let lanes = 0;
+  it('every gate is a rib of outcrops on the racing line; the gust pushes onshore only in the notch (sea side) and only while it blows; the lee is sheltered but drifted', () => {
+    let n = 0;
     for (const sd of seeds) {
       const m = mtn('standard', sd);
       const all = placements(m, sd, 'standard');
       const e = new BiomeEnvironment(m, worldSeed(course('standard', sd)));
-      for (const h of all.filter(isLane)) {
-        lanes++;
-        expect(Math.abs(h.x - m.routeX(h.z))).toBeLessThan(h.r * 0.5);
-        // rock in the lee: onshore of the line, within ~25 m downstream
-        expect(all.some((r) => r.kind === 'scoured-rock' && r.z > h.z && r.z < h.z + 30 && r.x > m.routeX(r.z))).toBe(true);
+      for (const h of all.filter((q) => q.kind === 'sea-gust' && gateOf(q))) {
+        n++;
+        const G = gateOf(h)!;
+        expect(Math.abs(G.x - m.routeX(G.z))).toBeLessThan(0.01);
+        // the rib: two outcrops on the line
+        expect(all.some((r) => r.kind === 'scoured-rock' && Math.abs(r.z - G.z) < 0.01 && Math.abs(r.x - G.x) < 0.01)).toBe(true);
+        expect(all.some((r) => r.kind === 'scoured-rock' && Math.abs(r.z - G.z - GATE.rib) < 0.01)).toBe(true);
+        const notchX = G.x - G.r - 1.5;
+        const leeX = G.x + G.r + 1.5;
+        let blew = false;
         for (let t = 0; t < 30; t += 0.37) {
           const ph = hazardPhase(gust, h, t).phase;
-          const g = probe(e, m.routeX(h.z), h.z, t, 20, true).sample;
+          const g = probe(e, notchX, G.z - 6, t, 20, true).sample;
           expect(g.groundSlipX).toBeGreaterThanOrEqual(0);
           expect(g.groundSlipX).toBeLessThanOrEqual(SQUALL.slip * 1.05 + 1e-9);
           expect(g.groundSlipZ).toBe(0);
           if (ph === 'dormant') expect(g.groundSlipX).toBe(0);
-          const a = probe(e, m.routeX(h.z), h.z, t, 20, false).sample;
-          expect(a.groundSlipX).toBe(0);
+          if (g.groundSlipX > 1) blew = true;
+          // the lee: never pushed, always a little drift drag
+          const l = probe(e, leeX, G.z + 2, t, 20, true).sample;
+          expect(l.groundSlipX).toBe(0);
+          expect(l.surface.dragAdd).toBeGreaterThan(0.5 * GATE.lee.drag);
+          // airborne: no side-slip anywhere
+          expect(probe(e, notchX, G.z - 6, t, 20, false).sample.groundSlipX).toBe(0);
         }
+        expect(blew).toBe(true);
       }
     }
-    expect(lanes).toBeGreaterThanOrEqual(9);
+    expect(n).toBeGreaterThanOrEqual(30);
   });
 
-  it('crossing a lane while it blows: a reactive skier drifts ≥ 1.5 m onshore, one holding 3.5 m upwind stays on the line', () => {
+  it('passing a gate: in a gust the lee beats the notch; in the lull the notch beats the lee (tucked, 22 m/s)', () => {
     const sd = 'RB1';
     const m = mtn('standard', sd);
     const ws = worldSeed(course('standard', sd));
     const f = new ObstacleField(m, ws);
-    const lanes = placements(m, sd, 'standard').filter(isLane).slice(0, 4);
-    expect(lanes.length).toBe(4);
-    for (const h of lanes) {
+    const gates = placements(m, sd, 'standard').filter((q) => q.kind === 'sea-gust' && gateOf(q)).slice(0, 5);
+    expect(gates.length).toBe(5);
+    let gustWins = 0;
+    let calmWins = 0;
+    for (const h of gates) {
+      const G = gateOf(h)!;
       let tAct = 0;
-      for (let t = 0.02; t < 30; t += 0.02) if (hazardPhase(gust, h, t).phase === 'active' && hazardPhase(gust, h, t - 0.02).phase !== 'active') {
+      for (let t = 0.02; t < 40; t += 0.02) if (hazardPhase(gust, h, t).phase === 'active' && hazardPhase(gust, h, t - 0.02).phase !== 'active') {
         tAct = t;
         break;
       }
-      const lee = placements(m, sd, 'standard').find((r) => r.kind === 'scoured-rock' && r.z > h.z && r.z < h.z + 30 && r.x > m.routeX(r.z))!;
-      let onRock = false;
-      const dev = (upwind: number, on: boolean) => {
-        onRock = false;
-        const p = new SkierPhysics(m, f, undefined, on ? new BiomeEnvironment(m, ws) : null);
-        const z0 = h.z - 120;
-        f.ensure(z0 - 100, h.z + 300);
-        p.reset(m.routeX(z0), z0, Math.atan2(m.routeX(z0 + 10) - m.routeX(z0), 10), 20);
-        p.s.time = tAct + 0.3 - 6;
-        const drive = follow(m, (z) => (Math.abs(z - h.z) < h.r + 25 ? -upwind : 0));
-        let max = -Infinity;
-        while (p.s.pos.z < h.z + 60) {
-          p.step(drive(p.s, p.s.time), PHYS_DT);
-          if (p.s.pos.z > h.z - h.r) max = Math.max(max, p.s.pos.x - m.routeX(p.s.pos.z));
-          if (Math.hypot(p.s.pos.x - lee.x, p.s.pos.z - lee.z) < lee.r * 0.8) onRock = true;
-        }
-        return max;
+      const run = (lee: boolean, gusting: boolean) => {
+        const p = new SkierPhysics(m, f, undefined, new BiomeEnvironment(m, ws));
+        const z0 = G.z - 150;
+        f.ensure(z0 - 100, G.z + 300);
+        p.reset(m.routeX(z0), z0, Math.atan2(m.routeX(z0 + 10) - m.routeX(z0), 10), 22);
+        // arrive at the notch ~1 s into the gust, or in the middle of the lull
+        p.s.time = (gusting ? tAct + 1 : tAct - 4) - (150 - GATE.before) / 22;
+        const go = lee ? G.r + 1.5 : -G.r - 1.5;
+        const drive = follow(m, (z) => go * clamp((z - (G.z - G.r - 45)) / 33, 0, 1) * clamp((G.z + G.r + 25 - z) / 21, 0, 1));
+        const t0 = p.s.time;
+        while (p.s.pos.z < G.z + 150) p.step(drive(p.s, p.s.time), PHYS_DT);
+        return p.s.time - t0;
       };
-      // reactive: carried ≥ 1.5 m further onshore, onto the rough part of the lee rock
-      const calm = dev(0, false);
-      expect(onRock).toBe(false);
-      expect(dev(0, true) - calm).toBeGreaterThan(1.5);
-      expect(onRock).toBe(true);
-      // holding 3 m upwind: the gust carries you back over the line, short of the rock's core
-      expect(dev(3.5, true)).toBeLessThan(LEE_ROCK_INSET - 1);
-      expect(onRock).toBe(false);
+      if (run(true, true) < run(false, true) - 0.15) gustWins++;
+      if (run(false, false) < run(true, false) - 0.03) calmWins++;
     }
+    // the right side depends on the wind, at (nearly) every gate
+    expect(gustWins).toBeGreaterThanOrEqual(4);
+    expect(calmWins).toBeGreaterThanOrEqual(4);
   });
 });
 
@@ -127,7 +139,10 @@ describe('Fjord: scoured rock across the racing line', () => {
       const m = mtn('sprint', sd);
       const ws = worldSeed(course('sprint', sd));
       const f = new ObstacleField(m, ws);
-      const onLine = placements(m, sd, 'sprint').filter((h) => h.kind === 'scoured-rock' && Math.abs(h.x - m.routeX(h.z)) < h.r * 0.5);
+      const pl = placements(m, sd, 'sprint');
+      const gates = pl.filter((q) => q.kind === 'sea-gust' && gateOf(q));
+      // (a wind gate's outcrops are tested with the gate)
+      const onLine = pl.filter((h) => h.kind === 'scoured-rock' && Math.abs(h.x - m.routeX(h.z)) < h.r * 0.5 && !isGateRock(h, gates));
       for (const h of onLine.slice(0, 2)) {
         n++;
         const run = (round: boolean, on: boolean) => {
@@ -404,7 +419,9 @@ describe('Fjord: difficulty 2/5 — approachable on Relaxed, the environment rew
     expect(r).toBeGreaterThan(n);
     const m = mtn('sprint', 'RB1');
     const ws = worldSeed(course('sprint', 'RB1'));
-    expect(new BiomeEnvironment(m, ws, { difficulty: 'relaxed' }).intensity).toBeLessThan(0.6);
+    expect(new BiomeEnvironment(m, ws, { difficulty: 'relaxed' }).intensity).toBeLessThan(0.75);
+    expect(new BiomeEnvironment(m, ws, { difficulty: 'relaxed' }).intensity).toBeGreaterThanOrEqual(0.5); // round 4: never switched off
+    expect(new BiomeEnvironment(m, ws, { difficulty: 'hard' }).intensity).toBeGreaterThan(1); // round 4: Hard is not Normal
     expect(new BiomeEnvironment(m, ws, { difficulty: 'normal' }).intensity).toBe(1);
     expect(new BiomeEnvironment(m, ws, { difficulty: 'hard' }).intensity).toBeGreaterThanOrEqual(1);
   });
