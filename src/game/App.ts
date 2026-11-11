@@ -17,7 +17,13 @@ import type { QualityPreset } from '../core/types';
 import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
 import { fmtDistance } from '../ui/Hud';
 import { getBiome, listBiomes } from '../world/biome';
+import { locationNoteHtml, locationOptionLabel } from '../ui/location';
 import type { AutopilotStyle } from '../debug/autopilot';
+import { ProgressTracker } from '../progression/tracker';
+import { reconcileProgress, viewAchievements } from '../progression/achievements';
+import { browserStorage, loadProgress, writeProgress } from '../progression/save';
+import { COSMETIC_CATEGORY_LABEL, equip, getCosmetic, grantRewards, lockerItems, reconcileOwnership, resolveLoadout, skierLook } from '../progression/cosmetics';
+import { AchievementToast, achievementsGrid, achievementsSummary } from '../ui/achievementsView';
 
 type Mode = 'loading' | 'menu' | 'playing' | 'paused' | 'results';
 
@@ -49,6 +55,13 @@ export class App {
   private ui: HTMLElement;
   private contextLost = false;
   private errorStreak = 0;
+  // --- progression (achievements; see docs/PROGRESSION.md) ---
+  /** automated test harness (?debug): runs never persist progress */
+  readonly debugHarness = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+  progress!: ProgressTracker;
+  private progressNote: string | null = null;
+  private toast!: AchievementToast;
+  private detachProgress: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
     this.settings = loadSettings();
@@ -82,6 +95,7 @@ export class App {
     this.hud.reduceFlashes = this.settings.reduceFlashes;
     this.hud.showFps(this.settings.showFps);
     this.menu = new MenuSystem(this.ui);
+    this.initProgress();
     this.menu.onSound = (k) => (k === 'move' ? this.audio.playUiMove() : this.audio.playUiClick());
 
     this.loadingEl = document.createElement('div');
@@ -177,7 +191,7 @@ export class App {
       this.loadingBar.style.width = `${(f * 100).toFixed(0)}%`;
       this.loadingLabel.textContent = label;
     });
-    this.skier = new SkierModel({ quality: q });
+    this.skier = new SkierModel({ quality: q, jacketColor: skierLook(this.progress.saved.cosmetics).jacketColor });
     this.yeti = new YetiModel({ quality: q });
     world.scene.add(this.skier.root, this.yeti.root);
     // cold rim light that makes the white beast read against white snow (always in the scene: no recompiles)
@@ -217,10 +231,100 @@ export class App {
     this.skier.setVisible(true);
   }
 
+  // --- progression ---------------------------------------------------------------
+  private initProgress() {
+    const kv = browserStorage();
+    const loaded = loadProgress(kv);
+    const store = loaded.readOnly ? null : { write: (sv: typeof loaded.save) => void writeProgress(kv, sv) };
+    this.progressNote = loaded.readOnly ? 'saved by a newer version: read-only here' : this.debugHarness ? 'test mode (?debug): progress is not saved' : null;
+    // goals already met by stored statistics (achievements added in an update) are earned now,
+    // and rewards of earned achievements are owned (rewards added in an update)
+    const sv = loaded.save;
+    const now = Date.now();
+    const changed = reconcileProgress(sv.stats, sv.achievements, now).length + reconcileOwnership(sv.cosmetics, Object.keys(sv.achievements), now).length;
+    if (changed && store && !this.debugHarness) store.write(sv);
+    this.progress = new ProgressTracker(sv, store, undefined, undefined, (w, earned, t) => void grantRewards(w.cosmetics, earned, t));
+    this.toast = new AchievementToast(this.ui);
+    this.progress.onUnlock = (def, persisted) => {
+      const reward = def.reward ? getCosmetic(def.reward) : undefined;
+      const sub = !persisted ? 'Test run: not saved' : reward ? `New ${COSMETIC_CATEGORY_LABEL[reward.category].toLowerCase()}: ${reward.name} (Locker)` : null;
+      this.toast.show(def.name, def.icon, sub);
+    };
+  }
+
+  /** Apply the equipped cosmetics to the skier model (visual only). */
+  private applyCosmetics() {
+    this.skier?.setJacketColor(skierLook(this.progress.saved.cosmetics).jacketColor);
+  }
+
+  private lockerScreen(): Screen {
+    const st = this.progress.saved.cosmetics;
+    const items = lockerItems(st, 'jacket');
+    const owned = items.filter((i) => i.owned);
+    const locked = items.filter((i) => !i.owned);
+    const worn = resolveLoadout(st).jacket!;
+    const lockedHtml = locked.length
+      ? `<h3>Locked</h3>${locked.map((i) => `<p class="menu-note locker-locked"><b>${i.def.name}</b> — earn <i>${i.unlockedBy?.name ?? 'a future achievement'}</i></p>`).join('')}`
+      : '<p class="menu-note">Every jacket unlocked.</p>';
+    return {
+      id: 'locker',
+      title: 'LOCKER',
+      subtitle: 'Cosmetic only: nothing here changes how the skier handles.',
+      // no backdrop blur: the menu skier on the right shows the jacket live
+      cls: 'locker',
+      onBack: () => this.menu.pop(),
+      items: [
+        {
+          kind: 'select',
+          label: 'Jacket',
+          note: worn.description,
+          options: owned.map((i) => ({ value: i.def.id, label: i.def.name })),
+          get: () => resolveLoadout(this.progress.saved.cosmetics).jacket!.id,
+          set: (v) => {
+            this.progress.updateSaved((s) => void equip(s.cosmetics, v));
+            this.applyCosmetics();
+            this.menu.replace(this.lockerScreen());
+          },
+        },
+        { kind: 'info', html: lockedHtml },
+        { kind: 'info', html: '<p class="menu-note">More gear (helmets, goggles, skis, outfits, Yeti cosmetics, victory poses) will come as rewards for mastering the new locations and Daily runs.</p>' },
+        { kind: 'button', label: 'Back', action: () => this.menu.pop() },
+      ],
+    };
+  }
+
+  /** Start evaluating achievements for the session's events (persist policy: a real, unassisted run). */
+  private trackSession(s: GameSession) {
+    this.untrackSession();
+    this.detachProgress = this.progress.attach(s.events, () => !this.debugHarness && !s.debugUsed);
+  }
+
+  private untrackSession() {
+    this.detachProgress?.();
+    this.detachProgress = null;
+  }
+
+  private achievementsScreen(): Screen {
+    const views = viewAchievements(this.progress.saved.stats, this.progress.saved.achievements, this.progress.defs);
+    return {
+      id: 'achievements',
+      title: 'ACHIEVEMENTS',
+      subtitle: achievementsSummary(views, this.progressNote),
+      cls: 'wide achievements',
+      onBack: () => this.menu.pop(),
+      items: [
+        { kind: 'info', html: achievementsGrid(views, (id) => getCosmetic(id)?.name ?? null) },
+        { kind: 'button', label: 'Locker', hint: 'cosmetic jackets', action: () => this.menu.push(this.lockerScreen()) },
+        { kind: 'button', label: 'Back', action: () => this.menu.pop() },
+      ],
+    };
+  }
+
   // --- screens -------------------------------------------------------------------
   toMenu() {
     this.session?.dispose();
     this.session = null;
+    this.untrackSession();
     this.mode = 'menu';
     this.hud.show(false);
     this.placeMenuSkier();
@@ -274,8 +378,8 @@ export class App {
             {
               kind: 'select' as const,
               label: 'Location',
-              note: getBiome(st.biome).description,
-              options: listBiomes().map((b) => ({ value: b.id, label: b.name })),
+              note: locationNoteHtml(getBiome(c.biome)),
+              options: listBiomes().map((b) => ({ value: b.id, label: locationOptionLabel(b) })),
               get: () => c.biome,
               set: (v: string) => {
                 st.biome = v;
@@ -364,9 +468,11 @@ export class App {
           changed();
         },
       },
+      { kind: 'button', label: 'Achievements', hint: `${Object.keys(this.progress.saved.achievements).filter((id) => this.progress.defs.some((d) => d.id === id)).length} / ${this.progress.defs.length}`, action: () => this.menu.push(this.achievementsScreen()) },
       { kind: 'button', label: 'Controls', action: () => this.menu.push(this.controlsScreen()) },
       { kind: 'button', label: 'Settings', action: () => this.menu.push(this.settingsScreen()) },
-      { kind: 'button', label: 'Credits & Licences', action: () => this.menu.push(this.creditsScreen()) },
+      // Credits & Licences moved to the bottom of Settings: the Achievements row takes its place so
+      // the main menu keeps its height budget for 1366x768 (pass 4)
     );
     return {
       id: 'main',
@@ -401,6 +507,7 @@ export class App {
       onResults: (stats, won) => this.showResults(stats, won),
       onPauseRequest: () => this.pause(),
     }, { skipIntro: retry });
+    this.trackSession(this.session);
     this.session.recordsSeenCave = this.book.seenCaveCinematic;
     this.session.onCaveSeen = () => {
       this.book.seenCaveCinematic = true;
@@ -537,6 +644,7 @@ export class App {
       { kind: 'slider', label: 'Interface text size', min: 0.85, max: 1.5, step: 0.05, get: () => s.uiScale, set: (v) => ((s.uiScale = v), changed()), fmt: pct },
       { kind: 'toggle', label: 'Sound captions', get: () => s.captions, set: (v) => ((s.captions = v), changed()) },
       { kind: 'toggle', label: 'Tutorial prompts', get: () => s.showTutorial, set: (v) => ((s.showTutorial = v), changed()) },
+      { kind: 'button', label: 'Credits & Licences', action: () => this.menu.push(this.creditsScreen()) },
       { kind: 'button', label: 'Reset settings to defaults', action: () => {
         const keepQ = s.quality;
         Object.assign(s, loadSettings({ getItem: () => null, setItem: () => {} }));
@@ -856,6 +964,7 @@ export class App {
       },
       pause: () => this.pause(),
       menuId: () => this.menu.current?.id ?? null,
+      progress: () => ({ saved: structuredClone(this.progress.saved), persisting: this.progress.persisting, attached: this.progress.attached, toast: this.toast.text, jacket: this.skier?.jacketColor ?? null, events: this.session ? this.session.events.history.map((e) => e.type) : [] }),
       pressMenu: (label: string) => {
         const it = this.menu.current?.items.find((i) => i.kind === 'button' && i.label === label);
         if (it && it.kind === 'button') it.action();

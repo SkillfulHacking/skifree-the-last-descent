@@ -1,6 +1,10 @@
 import './ui/styles.css';
 import './world/biomes'; // registers additional locations before settings load
+import { registerDebugTestBiome, wantsDebugTestBiome } from './world/biomes/debugTestBiome';
 import { App } from './game/App';
+
+// debug only: an internal second location to exercise the multi-location menu (?debug&testbiome)
+if (wantsDebugTestBiome(location.search)) registerDebugTestBiome();
 
 function webgl2Available(): boolean {
   try {

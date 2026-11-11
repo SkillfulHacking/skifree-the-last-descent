@@ -1,0 +1,19 @@
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+Running 1 test using 1 worker
+
+[pizza loop] 2026-11-11T21:18:34.138Z tuck→35 km/h, wedge→0 km/h, 2.9 km to go, unlocked=false
+[pizza loop] 2026-11-11T21:23:07.636Z tuck→24 km/h, wedge→5 km/h, 2.8 km to go, unlocked=false
+[pizza loop] 2026-11-11T21:27:32.980Z tuck→23 km/h, wedge→8 km/h, 2.8 km to go, unlocked=false
+[pizza loop] 2026-11-11T21:31:50.183Z tuck→0 km/h, wedge→0 km/h, 2.8 km to go, unlocked=false
+[pizza loop] 2026-11-11T21:36:05.577Z tuck→1 km/h, wedge→0 km/h, 2.7 km to go, unlocked=false
+[pizza loop] 2026-11-11T21:40:36.388Z tuck→16 km/h, wedge→5 km/h, 2.7 km to go, unlocked=false
+[pizza loop] 2026-11-11T21:48:13.887Z tuck→28 km/h, wedge→8 km/h, 2.7 km to go, unlocked=true
+  ✓  1 tests/e2e/release.spec.ts:110:1 › a real unlock through keyboard play (Pizza Party) persists, grants its jacket and survives a reload (no ?debug) (35.7m)
+
+  Slow test file: tests/e2e/release.spec.ts (35.7m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 passed (35.8m)
+exit 0

@@ -1,0 +1,30 @@
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+Running 2 tests using 1 worker
+
+  ✘  1 tests/e2e/migration.spec.ts:102:1 › a Pass 3 save (settings + per-course records, no progress key) loads unchanged in the pass-4 build and stays playable (7.1m)
+  -  2 tests/e2e/migration.spec.ts:182:1 › a v1 progress save migrates to v2 without ?debug: reward granted, unknown data kept, written back as v2
+
+
+  1) tests/e2e/migration.spec.ts:102:1 › a Pass 3 save (settings + per-course records, no progress key) loads unchanged in the pass-4 build and stays playable 
+
+    Error: expect(received).not.toBe(expected) // Object.is equality
+
+    Expected: not "3.0 km"
+
+      150 |   await page.waitForTimeout(4000);
+      151 |   await page.keyboard.up('KeyW');
+    > 152 |   expect(await page.locator('.hud-dist').textContent()).not.toBe(dist0);
+          |                                                             ^
+      153 |   await page.screenshot({ path: 'docs/reviews/pass4/release-verification/migration_pass3_playing.png' });
+      154 |   await press(page, 'Escape');
+      155 |   await expect(page.locator('.menu-root:not(.hidden) .menu-title')).toBeVisible();
+        at /home/claude/skifree/tests/e2e/migration.spec.ts:152:61
+
+    Error Context: test-results/migration-a-Pass-3-save-se-cbc47--4-build-and-stays-playable/error-context.md
+
+  1 failed
+    tests/e2e/migration.spec.ts:102:1 › a Pass 3 save (settings + per-course records, no progress key) loads unchanged in the pass-4 build and stays playable 
+  1 did not run

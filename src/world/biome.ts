@@ -24,8 +24,14 @@
  *
  * The built-in biome "alpine" reproduces the original game exactly: every value below is the
  * literal that used to be hard-coded at the place noted in its comment.
+ *
+ * Gameplay and presentation beyond look/terrain (surface physics, weather, hazards, finish, refuge,
+ * cave dressing, ambience, difficulty rating) are optional *capability modules* in
+ * `Biome.capabilities` (src/world/capabilities/index.ts); every module left out falls back to the
+ * Alpine default. Read them with `capabilitiesOf(biome)`.
  */
 import type { SegmentType } from './profile';
+import { validateCapabilities, type BiomeCapabilities } from './capabilities';
 
 /** Linear RGB, 0..1 (values > 1 allowed for tints/multipliers). */
 export type RGB = readonly [number, number, number];
@@ -217,6 +223,11 @@ export interface Biome {
   obstacles: BiomeObstacles;
   terrain: BiomeTerrain;
   audio: BiomeAudio;
+  /**
+   * Optional capability modules (surface, weather, hazards, finish, refuge, cave, audio, rating).
+   * Omitted modules use the Alpine defaults; resolve with `capabilitiesOf(biome)`.
+   */
+  capabilities?: Partial<BiomeCapabilities>;
 }
 
 // =============================================================================================
@@ -324,6 +335,8 @@ export function registerBiome(b: Biome): Biome {
   if (b.id === DEFAULT_BIOME && registry.get(DEFAULT_BIOME) !== b) throw new Error('the default biome cannot be replaced');
   for (const o of registry.values()) if (o.id !== b.id && o.code === b.code) throw new Error(`biome code "${b.code}" is already used by "${o.id}"`);
   if (b.trees.species.length !== 3) throw new Error('a biome needs exactly three tree species');
+  const capErrors = validateCapabilities(b);
+  if (capErrors.length) throw new Error(`biome "${b.id}": ${capErrors.join('; ')}`);
   registry.set(b.id, b);
   return b;
 }
@@ -338,10 +351,14 @@ export function unregisterBiome(id: BiomeId): void {
  * `deriveBiome(ALPINE, { id: 'dusk', code: 'DUSK', name: 'Dusk', lighting: { sunIntensity: 2 } })`.
  */
 export function deriveBiome(base: Biome, over: { id: BiomeId; code: string; name: string; description?: string } & { [K in Exclude<keyof Biome, 'id' | 'code' | 'name' | 'description'>]?: Partial<Biome[K]> }): Biome {
-  const b = structuredClone(base) as Biome;
+  // capability modules hold functions (models): they are shared by reference, never cloned
+  const { capabilities: baseCaps, ...data } = base;
+  const b = structuredClone(data) as Biome;
+  if (baseCaps) b.capabilities = { ...baseCaps };
   const mut = b as unknown as Record<string, unknown>;
   for (const [k, v] of Object.entries(over)) {
-    if (v && typeof v === 'object' && !Array.isArray(v)) mut[k] = { ...(mut[k] as object), ...structuredClone(v) };
+    if (k === 'capabilities') b.capabilities = { ...(b.capabilities ?? {}), ...(v as Partial<BiomeCapabilities>) };
+    else if (v && typeof v === 'object' && !Array.isArray(v)) mut[k] = { ...(mut[k] as object), ...structuredClone(v) };
     else mut[k] = v;
   }
   return b;

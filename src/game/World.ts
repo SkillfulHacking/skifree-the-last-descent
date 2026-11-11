@@ -3,8 +3,14 @@
  * Owns the scene graph for terrain, vegetation, environment, caves, story props, checkpoints,
  * the resort and FX.
  *
- * Streaming: terrain chunks, obstacle bands, vegetation, caves (one per encounter) and Endless
- * checkpoints exist only in a window around the action, so memory is bounded on any course length.
+ * Streaming: terrain chunks, obstacle bands, hazard bands (+ their views), vegetation, caves (one
+ * per encounter) and Endless checkpoints exist only in a window around the action, so memory is
+ * bounded on any course length.
+ *
+ * Location capabilities (src/world/capabilities): `environment` is the biome's pure gameplay
+ * environment (surface, weather, hazards) that GameSession hands to SkierPhysics; the finish,
+ * refuge and cave dressing are built from the biome's presentation registries
+ * (src/world/presentation).
  *
  * Floating origin: simulation runs in absolute world coordinates (float64 in JS). At render time
  * the whole scene and the camera are shifted by −origin (origin snapped to 1 km steps near the
@@ -19,19 +25,22 @@ import { TerrainRenderer } from '../world/TerrainRenderer';
 import { Vegetation } from '../world/Vegetation';
 import { Environment } from '../world/Environment';
 import { Cave, Footprints, StoryProps } from '../world/Cave';
-import { Resort } from '../world/Resort';
 import { Particles } from '../fx/Particles';
 import { SkiTracks } from '../fx/SkiTracks';
 import { StartArea } from '../world/StartArea';
-import { Checkpoint } from '../world/Checkpoint';
 import { AltMarkers } from '../world/Markers';
 import { buildMountain, courseId, worldSeed, type CourseConfig } from './CourseConfig';
 import type { Biome } from '../world/biome';
+import { BiomeEnvironment } from '../world/capabilities/environment';
+import { makeWeatherSample } from '../world/capabilities/weather';
+import { HazardLayer, presentationOf, type BiomePresentation, type CaveDressing, type FinishDefinition, type FinishEnvironment, type RefugeView } from '../world/presentation';
 
 export interface CaveSlot {
   enc: Encounter;
   cave: Cave;
   story: StoryProps;
+  /** the location's extra dressing around the cave (null for Alpine) */
+  dressing: CaveDressing | null;
 }
 
 const ORIGIN_STEP = 1024;
@@ -47,8 +56,18 @@ export class World {
   readonly env: Environment;
   readonly footprints: Footprints;
   readonly yetiPrints: Footprints;
-  /** null on Endless (no finish) */
-  readonly resort: Resort | null;
+  /** the finish environment (Alpine: the Resort); null on Endless (no finish) */
+  readonly finish: FinishEnvironment | null;
+  /** the finish definition (scene builder + victory script) of this location */
+  readonly finishDef: FinishDefinition;
+  /** the location's gameplay environment: surface + weather + streamed hazards (pure) */
+  readonly environment: BiomeEnvironment;
+  /** three.js views of the streamed hazards (follow the hazard bands) */
+  readonly hazardViews: HazardLayer;
+  /** finish / refuge / cave presentation of this location */
+  readonly presentation: BiomePresentation;
+  /** weather at the focus this frame (physics clock) */
+  readonly weather = makeWeatherSample();
   readonly particles: Particles;
   readonly tracks: SkiTracks;
   readonly start: StartArea;
@@ -61,7 +80,7 @@ export class World {
   private caves = new Map<number, CaveSlot>();
   /** caves being built in time slices (one step per frame) */
   private caveJobs = new Map<number, { enc: Encounter; job: Generator<void, Cave, void> }>();
-  private lodges = new Map<number, Checkpoint>();
+  private lodges = new Map<number, RefugeView>();
   private markers = new Map<number, AltMarkers>();
   /** the encounter the session cares about now (set by GameSession) */
   focusEncounter: Encounter | null = null;
@@ -75,6 +94,9 @@ export class World {
     this.mountain = buildMountain(course);
     this.biome = this.mountain.biome;
     this.obstacles = new ObstacleField(this.mountain, this.seed);
+    this.presentation = presentationOf(this.biome);
+    this.finishDef = this.presentation.finish;
+    this.environment = new BiomeEnvironment(this.mountain, this.seed);
     this.terrain = new TerrainRenderer(this.mountain, quality);
     this.scene.add(this.terrain.group);
     this.env = new Environment(this.scene, renderer, quality, this.biome);
@@ -87,11 +109,13 @@ export class World {
     const fz = this.mountain.finishZ;
     if (Number.isFinite(fz)) {
       const fx = this.mountain.routeX(fz);
-      this.resort = new Resort({ quality, heightAt: (x, z) => this.mountain.heightAt(x, z), finishCenter: new THREE.Vector3(fx, this.mountain.heightAt(fx, fz), fz) });
-      this.scene.add(this.resort.group);
-      const t = this.resort.trophy;
+      this.finish = this.finishDef.build({ quality, mountain: this.mountain, biome: this.biome, heightAt: (x, z) => this.mountain.heightAt(x, z), finishCenter: new THREE.Vector3(fx, this.mountain.heightAt(fx, fz), fz) });
+      this.scene.add(this.finish.group);
+      const t = this.finish.trophy;
       this.trophyHome = { parent: t.parent, pos: t.position.clone(), quat: t.quaternion.clone(), scale: t.scale.clone() };
-    } else this.resort = null;
+    } else this.finish = null;
+    this.hazardViews = new HazardLayer(this.environment, { mountain: this.mountain, quality, biome: this.biome });
+    this.scene.add(this.hazardViews.group);
     this.start = new StartArea(this.mountain);
     this.scene.add(this.start.group);
     const cap = { low: 2500, medium: 4500, high: 7000, ultra: 10000 }[quality];
@@ -127,6 +151,7 @@ export class World {
     const ahead = this.vegetation.farDist;
     // physics-critical window: always complete
     this.obstacles.ensure(z - 80, z + 400);
+    this.environment.stream(z);
     // visual window: nearest missing band first, one per frame
     if (all) this.obstacles.ensure(z - 600, z + ahead);
     else {
@@ -139,6 +164,7 @@ export class World {
     if (all || Math.abs(z - this.streamZ) > 64) {
       this.streamZ = z;
       this.obstacles.release(z - 900, z + ahead + 400);
+      this.environment.release(z - 900, z + ahead + 400);
       this.syncCaves(z);
       if (all) for (const j of [...this.caveJobs.values()]) this.buildCave(j.enc);
       this.syncLodges(z);
@@ -200,7 +226,9 @@ export class World {
   private installCave(e: Encounter, cave: Cave): CaveSlot {
     const story = new StoryProps(this.mountain, this.footprints, e.anchor);
     this.scene.add(cave.group, story.group);
-    const slot = { enc: e, cave, story };
+    const dressing = this.presentation.cave.dress?.({ mountain: this.mountain, anchor: e.anchor, cave, quality: this.quality, biome: this.biome }) ?? null;
+    if (dressing) this.scene.add(dressing.group);
+    const slot = { enc: e, cave, story, dressing };
     this.caves.set(e.index, slot);
     return slot;
   }
@@ -209,6 +237,10 @@ export class World {
     this.scene.remove(s.cave.group, s.story.group);
     s.cave.dispose();
     s.story.dispose();
+    if (s.dressing) {
+      this.scene.remove(s.dressing.group);
+      s.dressing.dispose();
+    }
   }
 
   private syncLodges(z: number) {
@@ -217,7 +249,7 @@ export class World {
     cps.forEach((cz) => {
       if (this.lodges.has(cz)) return;
       const idx = this.mountain.profile.encounters(cz - 1, cz + 1).find((e) => e.checkpointZ === cz)?.index ?? 0;
-      const c = new Checkpoint(this.mountain, cz, idx);
+      const c = this.presentation.refuge.build({ mountain: this.mountain, z: cz, index: idx, quality: this.quality, biome: this.biome });
       this.scene.add(c.group);
       this.lodges.set(cz, c);
     });
@@ -267,9 +299,14 @@ export class World {
   // --- trophy -------------------------------------------------------------------------
   private trophyHome: { parent: THREE.Object3D | null; pos: THREE.Vector3; quat: THREE.Quaternion; scale: THREE.Vector3 } | null = null;
 
+  /** The finish environment (kept under its original name for App/GameSession). */
+  get resort(): FinishEnvironment | null {
+    return this.finish;
+  }
+
   resetTrophy() {
-    if (!this.resort || !this.trophyHome) return;
-    const t = this.resort.trophy;
+    if (!this.finish || !this.trophyHome) return;
+    const t = this.finish.trophy;
     const h = this.trophyHome;
     if (h.parent && t.parent !== h.parent) h.parent.add(t);
     t.position.copy(h.pos);
@@ -279,7 +316,7 @@ export class World {
   }
 
   /** Colliders that are not part of the procedural obstacle field (resort buildings etc). */
-  extraColliders = () => this.resort?.colliders() ?? [];
+  extraColliders = () => this.finish?.colliders() ?? [];
 
   /** Make everything visible for shader pre-compilation (call update() afterwards to restore). */
   showAllForWarmup() {
@@ -291,7 +328,13 @@ export class World {
     this.stepCaves();
     this.terrain.update(focus.x, focus.z, terrainBudgetMs, time);
     this.vegetation.update(camPos, time);
-    this.env.update(dt, focus, camPos, time);
+    // weather on the physics clock (Alpine: constant; fog, flakes exactly as before)
+    const env = this.environment;
+    env.weatherAt(focus.x, focus.z, env.clock, this.weather);
+    this.env.applyWeather(this.weather.visibility * env.hazardVisibility(focus.x, focus.z, env.clock), this.weather.snowfall);
+    this.env.update(dt, focus, camPos, time, this.weather.windX);
+    this.hazardViews.update(dt);
+    for (const s of this.caves.values()) s.dressing?.update?.(dt, time);
     this.particles.update(dt);
   }
 
@@ -351,7 +394,9 @@ export class World {
     this.env.dispose();
     this.footprints.dispose();
     this.yetiPrints.dispose();
-    this.resort?.dispose();
+    this.finish?.dispose();
+    this.hazardViews.dispose();
+    this.environment.dispose();
     this.particles.dispose();
     this.tracks.dispose();
     this.start.dispose();

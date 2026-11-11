@@ -180,8 +180,30 @@ export class Environment {
     this.snow.visible = visible;
   }
 
+  private fogBoost = 0;
+  private weatherFog = 1;
+  private snowfall = 1;
+
   setFogBoost(f: number) {
-    this.fog.density = this.baseFogDensity * (1 + f);
+    this.fogBoost = f;
+    this.fog.density = this.baseFogDensity * this.weatherFog * (1 + f);
+  }
+
+  /**
+   * Weather from the biome's WeatherModel (World.update, every frame): `visibility` × the base fog
+   * density, `snowfall` × the base flake opacity. Alpine passes 1 and 1, which leaves both exactly
+   * at their original values.
+   */
+  applyWeather(visibility: number, snowfall: number) {
+    if (visibility !== this.weatherFog) {
+      this.weatherFog = visibility;
+      this.fog.density = this.baseFogDensity * visibility * (1 + this.fogBoost);
+    }
+    if (snowfall !== this.snowfall) {
+      this.snowfall = snowfall;
+      const m = this.snow.material as THREE.PointsMaterial;
+      m.opacity = this.biome.weather.flakeOpacity * Math.min(1, snowfall);
+    }
   }
 
   dispose() {

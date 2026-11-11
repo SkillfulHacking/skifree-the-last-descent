@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import type { QualityPreset, SkierPose } from '../core/types';
 import { BONE, BONE_COUNT, DIM, armBones, legBones, sideSign } from './skier/rig';
 import { acquireSkierGeometry, releaseSkierGeometry, type SkierGeometry } from './skier/parts';
-import { createSkierMaterials, type SkierMaterials } from './skier/materials';
+import { createSkierMaterials, setJacketColor, type SkierMaterials } from './skier/materials';
 import { PoseSpec, buildActivePose, buildCrashPose, type SmoothedPose } from './skier/pose';
 import { basisQuat, clamp, damp, smoothstep, solveTwoBone } from './skier/math';
 
@@ -265,6 +265,16 @@ export class SkierModel {
 
   setVisible(v: boolean): void {
     this.root.visible = v;
+  }
+
+  /** Cosmetics: recolour the jacket (purely visual). */
+  setJacketColor(color: number): void {
+    setJacketColor(this.mats, color);
+  }
+
+  /** current jacket colour (sRGB hex; tests) */
+  get jacketColor(): number {
+    return this.mats.jacket.color.getHex();
   }
 
   dispose(): void {

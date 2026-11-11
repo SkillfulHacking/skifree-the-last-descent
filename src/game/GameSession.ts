@@ -26,6 +26,8 @@ import type { Stage } from './Stage';
 import { SnowballBarrage, SNOWBALL, clampToPiste, type SnowballEvent } from '../yeti/Snowballs';
 import { SnowballView } from '../yeti/SnowballView';
 import { THROW } from '../yeti/model/animation';
+import { EventBus, type GameEvent, type RunContext, type RunOutcome } from './events';
+import { RunTelemetry } from './telemetry';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -66,7 +68,15 @@ export class GameSession implements Stage {
   private defeat: DefeatCinematic | null = null;
   private victory: VictoryCinematic | null = null;
   private intro: Timeline | null = null;
-  autopilot: AutopilotStyle | null = null;
+  private autopilotStyle: AutopilotStyle | null = null;
+  /** debug autopilot (taints the run: its progress never persists) */
+  get autopilot(): AutopilotStyle | null {
+    return this.autopilotStyle;
+  }
+  set autopilot(v: AutopilotStyle | null) {
+    if (v) this.debugUsed = true;
+    this.autopilotStyle = v;
+  }
   paused = false;
   // scoring
   private multiplier = 1;
@@ -91,6 +101,16 @@ export class GameSession implements Stage {
   private lastLeft = new THREE.Vector3();
   private lastRight = new THREE.Vector3();
 
+  // --- gameplay events (achievements / statistics; see events.ts) ---------------------------
+  /** Gameplay event bus of this run. Subscribe before the first frame (RunStarted is emitted on the first simulated step). */
+  readonly events: EventBus;
+  private telemetry: RunTelemetry;
+  private runStartedSent = false;
+  private runFinishedSent = false;
+  private chaseMinGap = Infinity;
+  /** a debug control (teleport, fast-forward, autopilot, forced chase …) was used: progress from this run must not persist */
+  debugUsed = false;
+
   constructor(
     readonly world: World,
     readonly skier: SkierModel,
@@ -100,13 +120,15 @@ export class GameSession implements Stage {
     readonly settings: Settings,
     readonly camera: THREE.PerspectiveCamera,
     private hooks: SessionHooks,
-    opts: { skipIntro?: boolean } = {},
+    opts: { skipIntro?: boolean; events?: EventBus } = {},
   ) {
     const m = world.mountain;
+    this.events = opts.events ?? new EventBus();
+    this.telemetry = new RunTelemetry(this.events);
     this.run = new RunState({ tutorialEndZ: m.profile.tutorialEndZ, finishZ: m.finishZ, encounters: (a, b) => m.profile.encounters(a, b) });
     world.focusEncounter = null;
     world.stream(2, true);
-    this.phys = new SkierPhysics(world.mountain, world.obstacles, world.extraColliders);
+    this.phys = new SkierPhysics(world.mountain, world.obstacles, world.extraColliders, world.environment);
     this.phys.reset(m.routeX(2), 2, 0, 0);
     this.yetiAI = new YetiAI(world.mountain, world.obstacles);
     this.snowballs = world.course.difficulty === 'hard' ? new SnowballBarrage(world.seed, (x, z) => m.heightAt(x, z), (x, z) => clampToPiste(m, x, z)) : null;
@@ -356,9 +378,14 @@ export class GameSession implements Stage {
     this.prevPos.copy(s.pos);
     this.prevHeading = s.heading;
     if (!this.autopilot) this.input.recover = this.recoverLatch;
+    if (!this.runStartedSent) this.emitRunStarted();
     this.phys.step(this.input, PHYS_DT);
     this.recoverLatch = false;
-    for (const e of this.phys.drainEvents()) this.onEvent(e);
+    for (const e of this.phys.drainEvents()) {
+      this.onEvent(e);
+      this.telemetry.onSkierEvent(e, s);
+    }
+    this.telemetry.step(s, PHYS_DT);
 
     // tutorial bookkeeping
     if (this.run.phase === 'learn') {
@@ -384,9 +411,13 @@ export class GameSession implements Stage {
       const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded };
       this.yetiAI.update(PHYS_DT, target);
       this.stepSnowballs();
+      if (this.yetiAI.phase === 'chase' && !this.yetiAI.airborne) this.chaseMinGap = Math.min(this.chaseMinGap, this.yetiAI.distance);
       if (this.yetiAI.canCatch(target) && this.run.catchPlayer()) this.beginDefeat();
       else if (s.pos.z >= this.world.mountain.finishZ && this.run.reachFinish()) this.beginVictory();
-      else if (this.run.reachCheckpoint(s.pos.z)) this.onCheckpoint();
+      else {
+        const encIdx = this.run.encounter?.index ?? -1;
+        if (this.run.reachCheckpoint(s.pos.z)) this.onCheckpoint(encIdx);
+      }
     }
 
     // foreshadowing: growls & eerie ambience by progress (relative to the coming cave)
@@ -428,7 +459,9 @@ export class GameSession implements Stage {
   }
 
   /** A refuge at the end of a chase was reached (Endless: bank the run). The Yeti gives up for now. */
-  private onCheckpoint() {
+  private onCheckpoint(encounter: number) {
+    this.events.emit({ type: 'YetiEscaped', encounter, via: 'refuge', chaseTime: this.run.chaseTime, closestGap: this.chaseMinGap });
+    this.events.emit({ type: 'RefugeReached', index: this.run.checkpointsReached });
     if (this.endless) this.banked = this.liveScore();
     this.yetiAI.standDown();
     this.snowballs?.reset();
@@ -452,6 +485,7 @@ export class GameSession implements Stage {
   /** Endless: end the run now, keeping the banked score. */
   retire(): boolean {
     if (!this.endless || !this.run.retire()) return false;
+    this.emitRunFinished('retired');
     this.sendResults(false);
     return true;
   }
@@ -552,6 +586,7 @@ export class GameSession implements Stage {
         continue;
       }
       if (e.type === 'throw') {
+        this.events.emit({ type: 'SnowballThrown' });
         const f = e.ball.from;
         fx.emit({ x: f.x, y: f.y, z: f.z, vx: 0, vy: 0.6, vz: 3, spread: 0.6, size: 0.35, life: 0.5, count: 10, gravity: 0.4, drag: 2, grow: 1.3, alpha: 0.6 });
         this.audio.playYetiGrowl(this.yeti.root.position, false);
@@ -566,8 +601,12 @@ export class GameSession implements Stage {
         if (Math.hypot(s.pos.x - p.x, s.pos.z - p.z) < 9) this.shake(0.12);
         continue;
       }
-      if (e.hit === 'miss') continue;
+      if (e.hit === 'miss') {
+        this.events.emit({ type: 'SnowballDodged', distance: e.distance });
+        continue;
+      }
       const direct = e.hit === 'direct';
+      this.events.emit({ type: 'SnowballHit', direct, distance: e.distance });
       this.phys.knock(direct ? SNOWBALL.directKeep : SNOWBALL.nearKeep, direct ? SNOWBALL.directWobble : SNOWBALL.nearWobble);
       this.shake(direct ? 0.9 : 0.35);
       if (direct) {
@@ -602,6 +641,8 @@ export class GameSession implements Stage {
     this.snowballs?.reset();
     this.recordsSeenCave = true;
     this.onCaveSeen?.();
+    this.chaseMinGap = Infinity;
+    if (this.run.encounter) this.events.emit({ type: 'YetiEncountered', encounter: this.run.encounter.index, difficulty: this.world.course.difficulty });
     this.hud.setSkipHint(null);
     this.hud.title('RUN.', '', 'run', 1.6);
     this.audio.playRunPrompt();
@@ -623,6 +664,7 @@ export class GameSession implements Stage {
   private tmpHeld = new THREE.Vector3();
 
   private beginDefeat() {
+    this.emitRunFinished('caught');
     this.hud.setPrompt(null);
     this.yetiAI.phase = 'caught';
     this.defeat = new DefeatCinematic(this);
@@ -630,6 +672,8 @@ export class GameSession implements Stage {
   }
 
   private beginVictory() {
+    this.events.emit({ type: 'YetiEscaped', encounter: this.run.encounter?.index ?? -1, via: 'finish', chaseTime: this.run.chaseTime, closestGap: this.chaseMinGap });
+    this.emitRunFinished('victory');
     this.hud.setPrompt(null);
     this.yetiAI.phase = 'stopped';
     this.victory = new VictoryCinematic(this);
@@ -641,6 +685,42 @@ export class GameSession implements Stage {
     this.resultsSent = true;
     this.run.showResults();
     this.hooks.onResults(this.stats(won), won);
+  }
+
+  // --- gameplay events --------------------------------------------------------------
+  /** Course identity carried by run-level events. */
+  get runContext(): RunContext {
+    const c = this.world.course;
+    return { courseId: this.world.id, mode: c.mode, length: c.length, biome: c.biome, difficulty: c.difficulty, date: c.date };
+  }
+
+  private emitRunStarted() {
+    this.runStartedSent = true;
+    this.events.emit({ type: 'RunStarted', ...this.runContext });
+    this.events.emit({ type: 'BiomeVisited', biome: this.world.course.biome });
+  }
+
+  private emitRunFinished(outcome: RunOutcome) {
+    if (this.runFinishedSent) return;
+    this.runFinishedSent = true;
+    this.telemetry.flush();
+    const st = this.stats(outcome === 'victory');
+    this.events.emit({ type: 'RunFinished', ...this.runContext, outcome, distance: st.distance, time: st.time, refuges: st.checkpoints ?? 0, crashes: st.crashes, score: st.score });
+  }
+
+  /** Emit a gameplay event from outside the session (biome hazards, scenic triggers). */
+  emitEvent(e: GameEvent) {
+    this.events.emit(e);
+  }
+
+  /** Biome hazards: the skier got through a hazard of this kind without crashing. */
+  reportHazardSurvived(kind: string) {
+    this.events.emit({ type: 'HazardSurvived', biome: this.world.course.biome, kind });
+  }
+
+  /** Biome scenery: a designated scenic location (stable id within the biome) was reached. */
+  reportScenicDiscovered(id: string) {
+    this.events.emit({ type: 'ScenicLocationDiscovered', biome: this.world.course.biome, id });
   }
 
   /** score of the run so far (before end-of-run bonuses) */
@@ -893,6 +973,7 @@ export class GameSession implements Stage {
 
   // --- debug / test harness (not exposed in UI) -----------------------------------
   debugTeleport(z: number, speed = 18) {
+    this.debugUsed = true;
     const m = this.world.mountain;
     this.world.stream(z, true);
     this.world.vegetation.flush();
@@ -900,6 +981,7 @@ export class GameSession implements Stage {
     const x = m.routeX(z);
     this.phys.teleport(x, z, Math.atan2(m.routeX(z + 10) - x, 10), speed);
     this.prevPos.copy(this.phys.s.pos);
+    this.telemetry.resync(this.phys.s);
     this.follow.snap(this.followTarget());
     if (this.intro) this.endIntro();
     // keep phase consistent with progress (never skip the next cave)
@@ -909,6 +991,7 @@ export class GameSession implements Stage {
 
   /** Debug: skip a cave cinematic that is playing. */
   debugSkipCave() {
+    this.debugUsed = true;
     if (this.cave) {
       this.cave.tl.skip();
       this.finishCave();
@@ -928,6 +1011,7 @@ export class GameSession implements Stage {
   }
 
   debugPlaceYeti(gap: number) {
+    this.debugUsed = true;
     if (this.run.phase !== 'chase') return;
     const s = this.phys.s;
     const z = s.pos.z - gap;
@@ -937,6 +1021,7 @@ export class GameSession implements Stage {
 
   /** Fast-forward the simulation without rendering (deterministic). */
   debugAdvance(seconds: number) {
+    this.debugUsed = true;
     const n = Math.round(seconds / PHYS_DT);
     for (let i = 0; i < n; i++) {
       if (!this.run.simulating) break;
@@ -950,6 +1035,7 @@ export class GameSession implements Stage {
 
   /** Run the per-frame logic N times at a fixed dt (cinematics included). */
   debugFrames(n: number, dt = 1 / 30) {
+    this.debugUsed = true;
     const neutral = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recoverPressed: false, lookBack: false, pausePressed: false, skipPressed: false, camX: 0, camY: 0 };
     for (let i = 0; i < n; i++) this.frame(dt, neutral, 'keyboard');
   }
@@ -994,6 +1080,9 @@ export class GameSession implements Stage {
     this.world.env.setAmbientScale(1);
     this.timers = [];
     this.yeti.onFootstep = null;
+    // an abandoned run (restart / exit) still reports its last partial pizza chunk and open drift
+    if (!this.runFinishedSent) this.telemetry.flush();
+    this.events.clear();
     // return the trophy to the podium for the next run
     this.world.resetTrophy();
     this.skier.setVisible(true);

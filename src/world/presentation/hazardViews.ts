@@ -1,0 +1,104 @@
+/**
+ * Hazard views: three.js presentation for hazard kinds, kept apart from their pure logic.
+ *
+ * A view factory is registered by id (the kind's `view`). HazardLayer follows the streamed
+ * HazardField: when a band of hazards is generated it creates one view per instance, when the band
+ * is released it disposes them, so view lifetime equals band lifetime (exactly like vegetation
+ * follows obstacle bands). Every frame it passes each view its current phase (computed from the
+ * PHYSICS clock, so what the player sees is what the physics does).
+ */
+import * as THREE from 'three';
+import type { QualityPreset } from '../../core/types';
+import type { Mountain } from '../course';
+import type { Biome } from '../biome';
+import type { BiomeEnvironment } from '../capabilities/environment';
+import { getHazardKind, hazardPhase, type HazardInstance, type HazardPhaseState } from '../hazards/hazard';
+
+export interface HazardView {
+  readonly object: THREE.Object3D;
+  /** per frame: phase from the physics clock, t = physics time, dt = frame time */
+  update?(phase: HazardPhaseState, t: number, dt: number): void;
+  dispose(): void;
+}
+
+export interface HazardViewContext {
+  mountain: Mountain;
+  quality: QualityPreset;
+  biome: Biome;
+}
+
+export type HazardViewFactory = (h: HazardInstance, ctx: HazardViewContext) => HazardView;
+
+const views = new Map<string, HazardViewFactory>();
+
+export function registerHazardView(id: string, f: HazardViewFactory): HazardViewFactory {
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) throw new Error(`hazard view id "${id}" must be lowercase [a-z0-9-]`);
+  const prev = views.get(id);
+  if (prev && prev !== f) throw new Error(`hazard view "${id}" is already registered`);
+  views.set(id, f);
+  return f;
+}
+
+export function unregisterHazardView(id: string): void {
+  views.delete(id);
+}
+
+export function hasHazardView(id: string): boolean {
+  return views.has(id);
+}
+
+export class HazardLayer {
+  readonly group = new THREE.Group();
+  readonly stats = { created: 0, disposed: 0 };
+  private live = new Map<number, { h: HazardInstance; v: HazardView }>();
+  private off: () => void;
+
+  constructor(
+    private env: BiomeEnvironment,
+    private ctx: HazardViewContext,
+  ) {
+    this.group.name = 'hazards';
+    this.off = env.hazards.onBand((_b, list, added) => (added ? this.add(list) : this.remove(list)));
+  }
+
+  get liveCount(): number {
+    return this.live.size;
+  }
+
+  private add(list: readonly HazardInstance[]) {
+    for (const h of list) {
+      const view = getHazardKind(h.kind).view;
+      if (!view || this.live.has(h.id)) continue;
+      const f = views.get(view);
+      if (!f) throw new Error(`hazard "${h.kind}" uses unregistered view "${view}"`);
+      const v = f(h, this.ctx);
+      this.group.add(v.object);
+      this.live.set(h.id, { h, v });
+      this.stats.created++;
+    }
+  }
+
+  private remove(list: readonly HazardInstance[]) {
+    for (const h of list) {
+      const e = this.live.get(h.id);
+      if (!e) continue;
+      this.group.remove(e.v.object);
+      e.v.dispose();
+      this.live.delete(h.id);
+      this.stats.disposed++;
+    }
+  }
+
+  /** Animate views on the physics clock (BiomeEnvironment.clock). */
+  update(dt: number): void {
+    if (!this.live.size) return;
+    const t = this.env.clock;
+    for (const { h, v } of this.live.values()) v.update?.(hazardPhase(getHazardKind(h.kind), h, t), t, dt);
+  }
+
+  dispose(): void {
+    this.off();
+    this.remove([...this.live.values()].map((e) => e.h));
+    this.group.removeFromParent();
+  }
+}

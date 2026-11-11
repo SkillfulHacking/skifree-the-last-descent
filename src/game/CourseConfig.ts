@@ -175,6 +175,21 @@ function parseBaseCourseId(s: string): CourseConfig | null {
   return null;
 }
 
+/**
+ * A course code as a URL query parameter (`course=CLASSIC-SPR%40FJORD`). The location separator
+ * '@' (and anything else) is percent-encoded, so codes survive share links and query strings.
+ * Nothing in the game puts codes in URLs yet; use these two helpers when something does.
+ */
+export function courseCodeQuery(c: CourseConfig, key = 'course'): string {
+  return `${encodeURIComponent(key)}=${encodeURIComponent(courseId(c))}`;
+}
+
+/** The course named by a query string's `key` parameter (null if absent or not a valid code). */
+export function courseFromQuery(search: string, key = 'course'): CourseConfig | null {
+  const v = new URLSearchParams(search).get(key);
+  return v ? parseCourseId(v) : null;
+}
+
 export function courseLabel(c: CourseConfig): string {
   const name = c.mode === 'daily' ? `Daily Mountain · ${c.date} (UTC)` : c.mode === 'custom' ? `Custom seed “${c.customText}”` : 'The Last Descent';
   const d = c.difficulty && c.difficulty !== 'normal' ? ` · ${DIFFICULTY[c.difficulty].label}` : '';
@@ -215,12 +230,27 @@ export function sameCourse(a: CourseConfig, b: CourseConfig): boolean {
 }
 
 /**
- * Build the mountain for a config. Classic Sprint is the original hand-tuned 3 km course
- * (ClassicProfile, unchanged); every other combination is a generated course. The biome skins
- * the mountain and (for generated courses) scales its terrain; see worldSeed for the seed.
+ * True only for the original hand-authored 3 km layout (ClassicProfile): Classic mode, Sprint
+ * length, in the default (Alpine) location. It is the legacy baseline and stays Alpine-only.
+ *
+ * Decision (Pass 4, brief §1): in any other location, Classic mode means that location's fixed
+ * "signature" mountain (seed SEED_DEFAULT mixed with the biome id, see worldSeed), and its Sprint
+ * is GENERATED with the biome's own terrain like every other length. The Alpine classic layout is
+ * deliberately not offered outside Alpine, so a location's Sprint is never "Alpine with different
+ * colours". Course codes are unaffected (CLASSIC-SPR@CODE names that generated Sprint).
+ */
+export function usesClassicLayout(c: CourseConfig): boolean {
+  return c.mode === 'classic' && c.length === 'sprint' && (c.biome ?? DEFAULT_BIOME) === DEFAULT_BIOME;
+}
+
+/**
+ * Build the mountain for a config. Alpine Classic Sprint is the original hand-tuned 3 km course
+ * (ClassicProfile, unchanged); every other combination — including Sprint in every other
+ * location — is a generated course. The biome skins the mountain and scales its generated
+ * terrain; see worldSeed for the seed and usesClassicLayout for the rule.
  */
 export function buildMountain(c: CourseConfig): Mountain {
   const biome = getBiome(c.biome);
-  if (c.mode === 'classic' && c.length === 'sprint') return Mountain.classic(worldSeed(c), biome);
+  if (usesClassicLayout(c)) return Mountain.classic(worldSeed(c), biome);
   return Mountain.generated(worldSeed(c), LENGTH_INFO[c.length].metres, biome);
 }
