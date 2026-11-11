@@ -118,7 +118,7 @@ export class IslandSet {
       const geo = mergeGeometries(list, false)!;
       for (const g of list) g.dispose();
       geo.computeBoundingSphere();
-      const mat = createRockMaterial({ kind: 'gneiss', vertexColors: true, water, snow: 1, strata: 0.45 });
+      const mat = createRockMaterial({ kind: 'gneiss', vertexColors: true, water, snow: 1, strata: 0.45, snowFrom: 0.8 });
       this.mats.push(mat);
       const mesh = new THREE.Mesh(geo, mat);
       mesh.castShadow = true;

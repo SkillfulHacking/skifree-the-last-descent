@@ -24,7 +24,7 @@
  * CliffKit keeps the segments within a z-window around the focus (8 at most) and disposes the rest.
  */
 import * as THREE from 'three';
-import { fbm3, noise3, ridged3, terraced, smoothstep, clamp } from './noise3';
+import { fbm3, noise3, terraced, smoothstep, clamp } from './noise3';
 import { gnoise, ridged } from '../../core/rng';
 
 /** What the cliff needs to know about the coast (implemented over Coast + Mountain). */
@@ -76,9 +76,9 @@ export class CliffModel {
   /** spurs (buttresses) push whole sections of face seaward: ≥ 0, metres per metre of wall height */
   private spur(z: number): number {
     const s = this.frame.seed;
-    const a = ridged(z / 340, 3.1, s + 510, 2);
-    const b = ridged(z / 150 + 4.7, 1.3, s + 511, 1);
-    return Math.max(0, 0.11 * (a - 0.32) + 0.045 * (b - 0.4) + 0.03 * gnoise(z / 900, 6.1, s + 512));
+    const a = ridged(z / 300, 3.1, s + 510, 2);
+    const b = ridged(z / 130 + 4.7, 1.3, s + 511, 1);
+    return Math.max(0, 0.2 * (a - 0.3) + 0.07 * (b - 0.4) + 0.03 * gnoise(z / 900, 6.1, s + 512));
   }
 
   /** gully strength (0..1) cutting back into the face at z */
@@ -135,7 +135,7 @@ export class CliffModel {
     }
     // wave-cut notch at the waterline, spurs in plan, gullies cut back (no overhang in the base profile)
     const spur = this.spur(z) * H;
-    const gd = gk * H * 0.05;
+    const gd = gk * H * 0.08;
     for (let i = 0; i < n; i++) {
       const dz = i * DS;
       const f = dz / H;
@@ -194,24 +194,29 @@ export class CliffModel {
     const foot = this.footOffset(c);
     let h: number;
     if (t < foot - inset) h = c.hRim - this.dropAt(c, t + inset) - sink;
-    else h = c.water - 6;
+    else h = -Infinity; // beyond the foot: the bed
     // the bed falls away from the foot
     const bed = c.water - 6 - (bedDepth - 6) * smoothstep(foot + 20, foot + 420, t);
     return Math.max(Math.min(h, c.hRim), bed);
   }
 }
 
-/** relief displacement (m) of the face at a world point, along the face normal (+ = seaward) */
+/**
+ * relief displacement (m) of the face at a world point, along the face normal (+ = seaward).
+ * Only forms the vertex grid can carry (≥ ~15 m): high-frequency noise here aliases against the
+ * grid into a regular hatch (the baked normal map does the small scale).
+ */
 function relief(x: number, y: number, z: number, s: number, faceK: number, H: number): number {
-  const A = clamp(H / 60, 1, 2.2);
-  // big blocks: terraced noise → steps and ledges, a few metres
-  const blocks = terraced(0.5 + 0.5 * fbm3(x / 70, y / 45, z / 70, s + 601, 3), 5, 0.3) - 0.5;
-  // horizontal ledges: noise stretched along the strata
-  const ledges = ridged3(x / 90, y / 7, z / 90, s + 611, 2) - 0.35;
-  // ribs between chutes (vertical, short): kept weak — the old wall was all fall-line striation
-  const ribs = noise3(x / 14, y / 40, z / 14, s + 621);
-  const fine = fbm3(x / 6, y / 6, z / 6, s + 631, 2);
-  return faceK * A * (7 * blocks + 3.6 * ledges + 1.0 * ribs + 0.8 * fine);
+  const A = clamp(H / 60, 1, 2.4);
+  // big blocks: terraced noise → steps and ledges
+  const blocks = terraced(0.5 + 0.5 * fbm3(x / 110, y / 60, z / 110, s + 601, 3), 4, 0.3) - 0.5;
+  // strata ledges: each bed juts out at its top and recedes at its base (sawtooth in height, beds
+  // 9–22 m thick, wavering along the coast) — the low sun turns every ledge into a shadow line
+  const bedY = y / (14 + 5 * noise3(x / 300, 0.5, z / 300, s + 611)) + 0.6 * noise3(x / 160, y / 400, z / 160, s + 612);
+  const fr = bedY - Math.floor(bedY);
+  const ledge = (fr < 0.82 ? fr / 0.82 : (1 - fr) / 0.18) - 0.5;
+  const ledgeK = 0.5 + 0.5 * smoothstep(-0.2, 0.4, noise3(x / 220, y / 90, z / 220, s + 613));
+  return faceK * A * (8 * blocks + 3.2 * ledge * ledgeK);
 }
 
 export interface CliffSegmentOptions {

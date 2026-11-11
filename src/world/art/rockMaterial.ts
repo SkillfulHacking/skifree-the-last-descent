@@ -125,6 +125,8 @@ export interface RockMaterialOptions {
   fill?: number;
   /** two triplanar scales (true) or one (low quality) */
   hq?: boolean;
+  /** snow settles where the world normal's y exceeds this (0.6 ≈ 53°; islands use a higher value) */
+  snowFrom?: number;
   /** the mesh carries the shared cave's baked `aCave` (sky visibility, AO): darken the chamber */
   caveAttr?: boolean;
 }
@@ -241,8 +243,8 @@ rkCol *= 1.0 - 0.45 * rkWetK;
 rkRough = mix(rkRough, 0.32, rkWetK);
 float rkIce = smoothstep(0.05, 0.25, rkAbove) * (1.0 - smoothstep(0.55, 0.95 + 0.4 * rk_n(rkP.xz * 0.1), rkAbove)) * step(-1e8, uWater) * (1.0 - smoothstep(0.35, 0.6, rkN.y));
 // snow: flat-ish surfaces only, cavities first (height-blended edge), patchy at its limit
-float rkSnowT = rkN.y + 0.3 * (0.5 - rkH) + 0.16 * (rk_fbm(rkP.xz * 0.06 + rkP.y * 0.03) - 0.5);
-float rkSnow = smoothstep(0.6, 0.74, rkSnowT) * uSnow * (1.0 - rkWetK);
+float rkSnowT = rkN.y + 0.3 * (0.5 - rkH) + 0.16 * (rk_fbm(rkP.xz * 0.06 + rkP.y * 0.03) - 0.5) + 0.12 * (rk_fbm(rkP.xz * 0.012) - 0.5);
+float rkSnow = smoothstep(${(o.snowFrom ?? 0.6).toFixed(3)}, ${((o.snowFrom ?? 0.6) + 0.14).toFixed(3)}, rkSnowT) * uSnow * (1.0 - rkWetK);
 #ifdef RK_CAVE
 // no snow in the chamber; the floor (kind 1) is grit
 rkSnow *= smoothstep(0.55, 0.85, vRkCave.x) * (1.0 - step(0.5, vRkCave.z));
@@ -282,7 +284,7 @@ reflectedLight.indirectDiffuse += uFill * diffuseColor.rgb * vec3(0.55, 0.68, 0.
       )
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vRkW);');
   };
-  m.customProgramCacheKey = () => `art-rock-${kind}-${hq ? 2 : 1}-${macro}-${o.vertexColors ? 1 : 0}-${o.caveAttr ? 1 : 0}`;
+  m.customProgramCacheKey = () => `art-rock-${kind}-${hq ? 2 : 1}-${macro}-${o.vertexColors ? 1 : 0}-${o.caveAttr ? 1 : 0}-${o.snowFrom ?? 0.6}`;
   m.userData = { rock: U, kind };
   return m as THREE.MeshStandardMaterial & { userData: { rock: RockUniforms; kind: RockKind } };
 }

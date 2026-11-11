@@ -117,7 +117,10 @@ export function buildIsland(sp: IslandSpec, detail = 1): { geometry: THREE.Buffe
       const y0 = sp.water + hN * sp.h;
       const steepK = rho < 1 ? smoothstep(0.6, 0.95, rho) : 0;
       const n1 = fbm3(x / 40, y0 / 25, z / 40, sp.seed + 31, 3);
-      const knob = (sp.kind === 'skerry' ? 0.06 : 0.04) * sp.h * n1 * (rho < 1 ? 1 - steepK * 0.5 : 0.3);
+      // glacial grain: ridges and grooves along the ice-flow axis (roche moutonnée texture)
+      const gu = (ct * r) * ca + (st * r) * sa, gv = -(ct * r) * sa + (st * r) * ca;
+      const grainR = fbm3(gu / 90, y0 / 40, gv / 14, sp.seed + 33, 2);
+      const knob = sp.h * (0.07 * n1 + 0.06 * grainR) * (rho < 1 ? 1 - steepK * 0.5 : 0.3);
       const blocks = (terraced(0.5 + 0.5 * fbm3(x / 22, y0 / 9, z / 22, sp.seed + 37, 2), 4, 0.35) - 0.5) * Math.min(6, sp.h * 0.08);
       r += blocks * steepK * (rho < 1 ? 1 : 0.3);
       x = sp.x + ct * r;
