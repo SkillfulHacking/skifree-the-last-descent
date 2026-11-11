@@ -311,7 +311,63 @@ function basalt() {
   return { R, G, B, ao, H, rough, tileM, nStrength: 1.0 };
 }
 
+// ---------------------------------------------------------------------------------------------
+// BASALT, MASSIVE (round 4 integration, review P-M2): the sea cave's rock mass around the mouth is
+// not columnar — column joints only form inside a cooling flow, not on the skin of a mound. Dark,
+// fine-grained lava with a weathered rind: a few irregular, non-orthogonal fractures that start and
+// stop (from a warped Worley edge field, thresholded by a second noise so no cell outline closes),
+// pitted vesicle patches, rough blocky relief, salt-rime streaks running down from ledges, wet
+// darkening and sparse pale lichen. Tile = 6 m.
+function basaltMassive() {
+  const tileM = 6;
+  const R = plane(), G = plane(), B = plane(), H = plane(), rough = plane();
+  for (let y = 0; y < N; y++)
+    for (let x = 0; x < N; x++) {
+      const u = x / N, v = y / N, i = y * N + x;
+      const wu = u + 0.085 * fbm(u, v, 3, 3, 401) + 0.02 * fbm(u, v, 11, 2, 431);
+      const wv = v + 0.085 * fbm(u, v, 3, 3, 403) + 0.02 * fbm(u, v, 11, 2, 433);
+      const W = worley(mod(wu, 1), mod(wv, 1), 5, 405, 0.95);
+      const edge = W.f2 - W.f1;
+      // fractures: only part of every cell edge is open (no closed polygons = no crazy paving)
+      const openK = smooth(0.12, 0.4, fbm(u, v, 4, 3, 407) + 0.02);
+      const crack = (1 - smooth(0.0, 0.035 + 0.02 * fbm(u, v, 12, 2, 409), edge)) * openK;
+      // a second, finer set of hairline fractures, sparse
+      const W2 = worley(mod(wu * 1.0, 1), mod(wv, 1), 13, 411, 0.9);
+      const hair = (1 - smooth(0.0, 0.02, W2.f2 - W2.f1)) * smooth(0.25, 0.55, fbm(u, v, 6, 2, 413)) * 0.6;
+      const grain = fbm(u, v, 40, 4, 415);
+      const lump = fbm(u, v, 3, 4, 417);
+      const blockH = (W.id - 0.5) * 0.03;
+      const Wv = worley(u, v, 46, 419, 0.9);
+      const vesK = smooth(0.1, 0.45, fbm(u, v, 5, 2, 421));
+      const ves = (1 - smooth(0.05, 0.14, Wv.f1)) * vesK * (Wv.id > 0.35 ? 1 : 0);
+      const h = 0.09 * lump + blockH + 0.012 * grain - 0.045 * crack - 0.015 * hair - 0.008 * ves;
+      H[i] = h;
+      let r = 0.058, g = 0.058, b = 0.062;
+      const tone = 0.9 + 0.1 * W.id + 0.22 * fbm(u, v, 2, 3, 423);
+      const m = (0.88 + 0.24 * grain) * tone;
+      r *= m; g *= m; b *= m;
+      // weathering rind: slightly brown-grey on exposed lumps
+      const rind = smooth(0.0, 0.5, lump) * 0.5;
+      r = lerp(r, 0.105, rind * 0.6); g = lerp(g, 0.098, rind * 0.6); b = lerp(b, 0.092, rind * 0.6);
+      // salt rime streaks running down (along v), patchy
+      const streak = smooth(0.35, 0.75, fbm(u * 4, v * 0.5, 3, 3, 425) * 0.5 + 0.5) * smooth(0.2, 0.6, fbm(u, v, 4, 2, 427) + 0.2);
+      r = lerp(r, 0.17, streak * 0.35); g = lerp(g, 0.175, streak * 0.35); b = lerp(b, 0.18, streak * 0.35);
+      const lich = smooth(0.55, 0.68, fbm(u, v, 8, 4, 429)) * (1 - crack);
+      r = lerp(r, 0.16, lich * 0.45); g = lerp(g, 0.165, lich * 0.45); b = lerp(b, 0.13, lich * 0.45);
+      const dk = Math.max(crack, hair * 0.7, ves * 0.6);
+      r *= 1 - 0.55 * dk; g *= 1 - 0.55 * dk; b *= 1 - 0.5 * dk;
+      R[i] = r; G[i] = g; B[i] = b;
+      rough[i] = clamp(0.78 + 0.12 * grain + 0.1 * dk - 0.12 * streak, 0.45, 1);
+    }
+  const m1 = boxBlur(H, 6), m2 = boxBlur(H, 24);
+  const ao = plane();
+  for (let i = 0; i < N * N; i++) ao[i] = clamp(1 - 9 * Math.max(0, m1[i] - H[i]) - 4 * Math.max(0, m2[i] - H[i]), 0.35, 1);
+  return { R, G, B, ao, H, rough, tileM, nStrength: 1.0 };
+}
+
 const t0 = Date.now();
-await writeSet('gneiss', gneiss());
-await writeSet('basalt', basalt());
+const only = process.env.SETS ? process.env.SETS.split(',') : ['gneiss', 'basalt', 'basalt_massive'];
+if (only.includes('gneiss')) await writeSet('gneiss', gneiss());
+if (only.includes('basalt')) await writeSet('basalt', basalt());
+if (only.includes('basalt_massive')) await writeSet('basalt_massive', basaltMassive());
 console.log(`done in ${((Date.now() - t0) / 1000).toFixed(1)} s`);

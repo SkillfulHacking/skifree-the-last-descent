@@ -24,6 +24,18 @@ const AHEAD = 8;
 /** the low preset keeps 2.5 km ahead (the far terrain is coarser and fogged there anyway) */
 const AHEAD_LOW = 5;
 
+/** where a hamlet house stands (chunk group userData['houses']: tests check it is on its flat) */
+export interface HousePlacement {
+  x: number;
+  y: number;
+  z: number;
+  w: number;
+  d: number;
+  /** to the ridge */
+  h: number;
+  yaw: number;
+}
+
 interface ChunkView {
   group: THREE.Group;
   geos: THREE.BufferGeometry[];
@@ -44,6 +56,8 @@ export class FjordScenery implements SceneryView {
   private time = 0;
   /** round 4: the authored sea cliffs (null without the cliff kit) */
   readonly cliffs: CliffStream | null;
+  private cliffWin: [number, number] = [0, 0];
+  private cliffFocus = new THREE.Vector3(NaN, 0, NaN);
 
   constructor(private ctx: SceneryContext) {
     const coast = ctx.mountain.coast;
@@ -88,8 +102,11 @@ export class FjordScenery implements SceneryView {
     }
     this.mist.stream(z);
     this.syncShips(z);
-    // the cliffs: 1 km behind to the end of the scenery window ahead
-    this.cliffs?.want(z - 1000, (c1 + 1) * CHUNK, this.m.routeX(z), z);
+    // the cliffs: 1 km behind to the end of the scenery window ahead; LOD by distance from the
+    // camera (the skier until the first frame)
+    this.cliffWin = [z - 1000, (c1 + 1) * CHUNK];
+    if (!Number.isFinite(this.cliffFocus.x)) this.cliffFocus.set(this.m.routeX(z), 0, z);
+    this.cliffs?.want(this.cliffWin[0], this.cliffWin[1], this.cliffFocus.x, this.cliffFocus.z);
   }
 
   /** Advance queued chunk builds for about `budgetMs` (one slice is ≤ ~budget; see chunkSteps). */
@@ -138,6 +155,7 @@ export class FjordScenery implements SceneryView {
     const m = this.m;
     const coast = this.coast;
     const b = new Batch();
+    const houses: HousePlacement[] = [];
     const rnd = new Rand((m.seed ^ Math.imul(c + 977, 0x2c1b3c6d)) >>> 0);
     const looks = coast.lookouts(z0 - 60, z1 + 60);
     const nearLook = (z: number) => looks.some((l) => Math.abs(l.z - z) < 22);
@@ -155,7 +173,7 @@ export class FjordScenery implements SceneryView {
       if (tk.over()) yield;
     }
     for (const h of coast.hamlets(z0, z1 - 1)) {
-      yield* this.hamlet(b, h.z, h.seed, tk);
+      yield* this.hamlet(b, h.z, h.seed, tk, houses);
       if (tk.over()) yield;
     }
     // granite outcrops along the rim (lichen, rime, snow in the lee): coastal dressing that sits
@@ -171,6 +189,7 @@ export class FjordScenery implements SceneryView {
     const meshes = b.build(this.mats, { cast: this.hi, receive: true });
     const group = new THREE.Group();
     group.name = `fjord-chunk-${c}`;
+    group.userData['houses'] = houses;
     for (const me of meshes) group.add(me);
     this.group.add(group);
     this.chunks.set(c, { group, geos: meshes.map((me) => me.geometry) });
@@ -181,7 +200,7 @@ export class FjordScenery implements SceneryView {
   }
 
   /** a fishing hamlet on the strand flat at the foot of the wall: houses, boathouses, a jetty, boats */
-  private *hamlet(b: Batch, z: number, seed: number, tk: Tick): Generator<void, void, void> {
+  private *hamlet(b: Batch, z: number, seed: number, tk: Tick, out: HousePlacement[] = []): Generator<void, void, void> {
     const m = this.m;
     const level = this.coast.seaLevelAt(z);
     const rnd = new Rand(seed);
@@ -199,7 +218,10 @@ export class FjordScenery implements SceneryView {
       let hx = cliff ? footX(hz) - rnd.range(16, 58) : xf - rnd.range(8, 46);
       const gy = m.heightAt(hx, hz);
       if (gy < level + 1.5 || gy > level + 14) continue;
-      house(b, hx, gy + 0.2, hz, Math.PI / 2 + rnd.range(-0.12, 0.12), { w: rnd.range(8, 12), d: rnd.range(5.5, 7), h: rnd.range(4.2, 6.2), color: PAINT[rnd.int(0, PAINT.length - 1)]!, door: 'side', chimney: rnd.next() < 0.6 }, rnd);
+      const yaw = Math.PI / 2 + rnd.range(-0.12, 0.12);
+      const o = { w: rnd.range(8, 12), d: rnd.range(5.5, 7), h: rnd.range(4.2, 6.2), color: PAINT[rnd.int(0, PAINT.length - 1)]!, door: 'side' as const, chimney: rnd.next() < 0.6 };
+      house(b, hx, gy + 0.2, hz, yaw, o, rnd);
+      out.push({ x: hx, y: gy + 0.2, z: hz, w: o.w, d: o.d, h: o.h + o.d * 0.42, yaw });
       hx += 0;
       if (tk.over()) yield;
     }
@@ -246,6 +268,12 @@ export class FjordScenery implements SceneryView {
     this.time += dt;
     this.water.update(time, f.camPos, f.origin);
     this.cliffs?.setOrigin(f.origin);
+    this.cliffs?.update(time);
+    // re-LOD the cliffs when the camera has moved (cinematics and far shots look from elsewhere)
+    if (this.cliffs && this.cliffWin[1] > this.cliffWin[0] && Math.hypot(f.camPos.x - this.cliffFocus.x, f.camPos.z - this.cliffFocus.z) > 80) {
+      this.cliffFocus.copy(f.camPos);
+      this.cliffs.want(this.cliffWin[0], this.cliffWin[1], f.camPos.x, f.camPos.z);
+    }
     // clear skies: only thin, high cloud shadows drift over the snow (cinematics may still dim)
     if (this.terrainU.uCloudShadow.value === 1) this.terrainU.uCloudShadow.value = 0.45;
     this.mist.update(time, f.camPos);

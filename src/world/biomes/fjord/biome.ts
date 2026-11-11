@@ -205,6 +205,8 @@ export function makeFjordBiome(): Biome {
       wallHeight: 380,
       wallRelief: 170,
       rangeHeight: 1150,
+      // round 4: rounded summits on the inland skyline (the 5-octave ridged crests read as needles)
+      rangeSoft: 1,
       undulation: 8,
       detail: 1.6,
       moguls: 0.36,

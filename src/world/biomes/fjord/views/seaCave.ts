@@ -29,6 +29,8 @@ import { kitMaterials } from './buildings';
 import { PrismSet, clinkerHull, hullKeelY } from './basaltKit';
 import { caveCameraSightlines } from '../../../../cinematic/CaveCinematic';
 import { dressingTicker } from '../../../presentation/cave';
+import { createRockMaterial, disposeRockMaterial } from '../../../art/rockMaterial';
+import { bestSeaPose, emergeStations, leapStations, type SeaPose } from './seaFraming';
 
 /** distance from p to the segment ab */
 function segDist(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): number {
@@ -57,111 +59,6 @@ export function clearOfCaveCameras(lines: Array<{ cam: THREE.Vector3; look: THRE
     if (segDist(p, l.cam, end) < r + CAVE_CAM_CLEARANCE + widen) return false;
   }
   return true;
-}
-
-/** basalt column material: per-column tone (vertex colour), cross-joints, wet foot, salt rime and lichen */
-function basaltMaterial(): THREE.MeshStandardMaterial {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.0, flatShading: true });
-  // the Fjord sky environment is bright: at full strength its (rough) reflection alone lifts a
-  // near-black albedo to mid grey (round 2 measured RGB ≈ 90). Basalt keeps a little sheen only.
-  m.envMapIntensity = 0.28;
-  m.onBeforeCompile = (sh) => {
-    sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute vec3 aJ;\nvarying vec3 vJ;\nvarying vec3 vBN;\nvarying vec3 vBW;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvJ = aJ;\nvBN = normal;\nvBW = (modelMatrix * vec4(position, 1.0)).xyz;');
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vJ;\nvarying vec3 vBN;\nvarying vec3 vBW;\nfloat bs_h(float n){ return fract(sin(n) * 43758.5453); }\nfloat bs_n(vec3 p){ vec3 i = floor(p); vec3 f = fract(p); f = f * f * (3.0 - 2.0 * f); float n = dot(i, vec3(1.0, 57.0, 113.0)); return mix(mix(mix(bs_h(n), bs_h(n + 1.0), f.x), mix(bs_h(n + 57.0), bs_h(n + 58.0), f.x), f.y), mix(mix(bs_h(n + 113.0), bs_h(n + 114.0), f.x), mix(bs_h(n + 170.0), bs_h(n + 171.0), f.x), f.y), f.z); }')
-      .replace(
-        '#include <color_fragment>',
-        `#include <color_fragment>
-{
-  // vJ = (column seed, height above the snow along the column, column height)
-  float seed = vJ.x;
-  float y = vJ.y;
-  vec3 bn = normalize(vBN);
-  float side = 1.0 - abs(bn.y);
-  // cross-joints: irregular spacing per column (0.45–1.2 m), slightly wavy, anti-aliased
-  float sp = 0.45 + 0.75 * bs_h(seed * 3.1);
-  float q = y / sp + bs_h(seed * 7.7) + 0.08 * sin(y * 3.7 + seed);
-  float fq = fwidth(q);
-  float d = abs(fract(q) - 0.5);
-  float joint = smoothstep(0.5 - 0.06 - fq, 0.5 - fq * 0.5, d) * (1.0 - smoothstep(0.15, 0.4, fq));
-  diffuseColor.rgb *= 1.0 - 0.7 * joint * side;
-  // wet and blackest at the foot; a faint cold sheen higher up
-  float wet = 1.0 - smoothstep(0.0, 1.6, y);
-  diffuseColor.rgb *= 1.0 - 0.4 * wet;
-  // vesicular grain / weathering mottling (world space, two scales)
-  float g = bs_n(vBW * 2.3) * 0.6 + bs_n(vBW * 7.1) * 0.4;
-  diffuseColor.rgb *= 0.75 + 0.5 * g;
-  // salt rime and frost on the upper faces, pale grey-green crust lichen in places
-  float rime = smoothstep(0.62, 0.85, bs_n(vBW * vec3(1.1, 3.5, 1.1) + seed)) * smoothstep(0.6, 2.5, y) * side;
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.07, 0.075, 0.08), rime * 0.5);
-  float lich = smoothstep(0.7, 0.86, bs_n(vBW * 1.7 + 40.0)) * (1.0 - side * 0.6);
-  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.045, 0.045, 0.03), lich * 0.5);
-}`,
-      )
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.4, 1.0 - smoothstep(0.0, 1.2, vJ.y));')
-      // the Fjord sky light (irradiance ≈ 5) lifts even a 0.02 albedo to mid grey: basalt takes a
-      // third of it (it reads black in sun, as the reference photos of wet basalt do)
-      .replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\nreflectedLight.indirectDiffuse *= 0.32;\nreflectedLight.directDiffuse *= 0.5;\nreflectedLight.directSpecular *= 0.25;\nreflectedLight.indirectSpecular *= 0.3;');
-  };
-  m.customProgramCacheKey = () => 'fjord-basalt-v3';
-  return m;
-}
-
-/** The Fjord pass on the shared cave rock material: sea-worn columnar basalt (material only). */
-function basaltCaveRock(cave: CaveDressingContext['cave']): void {
-  const rock = cave.group.getObjectByName('cave-rock') as THREE.Mesh | undefined;
-  const m = rock?.material as THREE.MeshStandardMaterial | undefined;
-  if (!m || m.userData['fjordBasalt']) return;
-  m.userData['fjordBasalt'] = true;
-  const prev = m.onBeforeCompile;
-  m.onBeforeCompile = (sh, r) => {
-    prev.call(m, sh, r);
-    sh.fragmentShader = sh.fragmentShader
-      .replace('float cv_dist = 0.0;', 'float cv_dist = 0.0;\nfloat fj_bas = 0.0;')
-      .replace(
-        '  // --- floor: compacted rubble and grit',
-        `  {
-    // Fjord: columnar basalt — hexagonal joints in plan (columns ~1 m across), near-black and wet.
-    // It REPLACES the shared bedded rock (round 2 kept 8 % of it: its pale weathering ovals then
-    // dominated the black and read as camouflage blotches)
-    vec2 hp = ap.xz / 0.95;
-    vec2 hs = vec2(1.0, 1.7320508);
-    vec4 hC = floor(vec4(hp, hp - vec2(0.5, 1.0)) / hs.xyxy) + 0.5;
-    vec4 hh = vec4(hp - hC.xy * hs, hp - (hC.zw + 0.5) * hs);
-    vec4 hc = dot(hh.xy, hh.xy) < dot(hh.zw, hh.zw) ? vec4(hh.xy, hC.xy) : vec4(hh.zw, hC.zw + 0.5);
-    vec2 ha = abs(hc.xy);
-    float he = 0.5 - max(dot(ha, hs * 0.5), ha.x);
-    float hid = fract(sin(dot(hc.zw, vec2(12.9898, 78.233))) * 43758.5453);
-    vec3 bas = vec3(0.016, 0.017, 0.02) * (0.75 + 0.5 * hid);
-    // column joints read as vertical seams on steep faces only (open in most cells)
-    float colFace = smoothstep(0.55, 0.85, steep) * (1.0 - smoothstep(18.0, 60.0, cv_dist)) * step(0.2, hid);
-    bas *= 1.0 - 0.55 * (1.0 - smoothstep(0.0, 0.05, he)) * colFace;
-    // cross-joints along the columns (horizontal partings on the steep faces)
-    float cj = 1.0 - smoothstep(0.0, 0.06, abs(fract(ap.y / (0.7 + 0.5 * hid) + hid) - 0.5) - 0.44);
-    bas *= 1.0 - 0.35 * cj * colFace;
-    // faint salt crust high on the faces
-    float salt = smoothstep(0.66, 0.88, cv_n3(vec3(ap.x * 0.6, ap.y * 1.4, ap.z * 0.6) + 11.0)) * steep;
-    bas = mix(bas, vec3(0.2, 0.21, 0.22), salt * 0.12);
-    rock = bas;
-    fj_bas = 1.0 - kind;
-  }
-  // --- floor: compacted rubble and grit`,
-      )
-      .replace(
-        'reflectedLight.indirectDiffuse *= mix(vec3(0.88, 0.97, 1.2), vec3(1.0), (1.0 - cv_snow) * 0.5);',
-        `reflectedLight.indirectDiffuse *= mix(vec3(0.88, 0.97, 1.2), vec3(1.0), (1.0 - cv_snow) * 0.5);
-// basalt: the bright sky's reflection would lift the black rock to mid grey (round 2: RGB ≈ 95)
-reflectedLight.indirectSpecular *= 1.0 - 0.75 * fj_bas * (1.0 - cv_snow);
-reflectedLight.indirectDiffuse *= 1.0 - 0.68 * fj_bas * (1.0 - cv_snow);
-reflectedLight.directDiffuse *= 1.0 - 0.45 * fj_bas * (1.0 - cv_snow);
-reflectedLight.directSpecular *= 1.0 - 0.7 * fj_bas * (1.0 - cv_snow);`,
-      );
-  };
-  const key = m.customProgramCacheKey?.bind(m);
-  m.customProgramCacheKey = () => (key ? key() : '') + '|fjord-basalt-v3';
-  m.needsUpdate = true;
 }
 
 function netTexture(): THREE.CanvasTexture {
@@ -289,6 +186,22 @@ function faceSampler(cave: CaveDressingContext['cave'], mouth: THREE.Vector3, ou
   };
 }
 
+/** the cinematic's sea-framing poses (null: no station shows the sea with the subject in view) */
+export interface SeaShots {
+  emerge: SeaPose | null;
+  leap: SeaPose | null;
+}
+
+interface Partial3 {
+  mats: THREE.Material[];
+  texs: THREE.Texture[];
+  group: THREE.Group | null;
+  /** triplanar rock materials (shared textures: released with disposeRockMaterial) */
+  rock: THREE.MeshStandardMaterial[];
+  /** put the cave's own rock material back */
+  restore: (() => void) | null;
+}
+
 /** The dressing, built in one go (tests, and presentations without slicing). */
 export function dressSeaCave(c: CaveDressingContext): CaveDressing {
   const job = dressSeaCaveSteps(c, Infinity);
@@ -305,7 +218,7 @@ export function dressSeaCave(c: CaveDressingContext): CaveDressing {
 export function* dressSeaCaveSteps(c: CaveDressingContext, budgetMs = 3): Generator<void, CaveDressing, void> {
   const tick = dressingTicker(budgetMs);
   let done = false;
-  const partial: { mats: THREE.Material[]; texs: THREE.Texture[]; group: THREE.Group | null } = { mats: [], texs: [], group: null };
+  const partial: Partial3 = { mats: [], texs: [], group: null, rock: [], restore: null };
   try {
     const d = yield* buildSeaCave(c, tick, partial);
     done = true;
@@ -318,18 +231,28 @@ export function* dressSeaCaveSteps(c: CaveDressingContext, budgetMs = 3): Genera
       partial.group?.removeFromParent();
       for (const m of partial.mats) m.dispose();
       for (const t of partial.texs) t.dispose();
+      for (const m of partial.rock) disposeRockMaterial(m);
+      partial.restore?.();
     }
   }
 }
 
-function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partial: { mats: THREE.Material[]; texs: THREE.Texture[]; group: THREE.Group | null }): Generator<void, CaveDressing, void> {
+function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partial: Partial3): Generator<void, CaveDressing, void> {
   const { cave, mountain: m } = c;
   const hi = c.quality === 'high' || c.quality === 'ultra';
   const group = new THREE.Group();
   group.name = 'FjordSeaCave';
   const rnd = new Rand(31337 + Math.round(c.anchor.z));
   const K = kitMaterials();
-  const basalt = basaltMaterial();
+  // round 4 (art pipeline; review P-M2): the columns take the baked columnar-basalt set, the cave's
+  // rock mass a massive, fractured lava set (no column joints on the mound), both triplanar and
+  // physically lit — no light multipliers (round 3's 0.32/0.5 left the cave at 0–2/255). FILL: the
+  // bounce from the sunlit snowfield in front of the back-lit mouth (the sky IBL's ground is far
+  // darker than real snow): the basalt lands at ~35–60/255 in the game, the chamber stays dark
+  // (baked visibility, RK_CAVE).
+  const FILL = 0.55;
+  const basalt = createRockMaterial({ kind: 'basalt', vertexColors: true, snow: 1, strata: 0, macro: 5, fill: FILL, hq: hi });
+  partial.rock.push(basalt);
   const ice = new THREE.MeshPhysicalMaterial({ color: 0xd8ecff, roughness: 0.06, transparent: true, opacity: 0.88, emissive: 0x16304a, emissiveIntensity: 0.22, clearcoat: 1 });
   const net = new THREE.MeshStandardMaterial({ color: 0x3f5f4a, roughness: 0.9, side: THREE.DoubleSide, alphaTest: 0.4 });
   const drift = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 });
@@ -337,7 +260,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   const iceTex = iceTexture();
   const seaIce = new THREE.MeshPhysicalMaterial({ map: iceTex, roughness: 0.12, clearcoat: 1, clearcoatRoughness: 0.05, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
   const plates = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0 });
-  const M: Record<string, THREE.Material> = { ...K, basalt, ice, drift, plates, hull: hullMat };
+  const M: Record<string, THREE.Material> = { ...K, ice, drift, plates, hull: hullMat };
   const b = new Batch();
   const out = cave.outward.clone().setY(0).normalize();
   const tan = new THREE.Vector3(out.z, 0, -out.x);
@@ -353,7 +276,16 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     const z = mouth.z + tan.z * along - out.z * back;
     return new THREE.Vector3(x, m.heightAt(x, z), z);
   };
-  basaltCaveRock(cave);
+  const shell = cave.group.getObjectByName('cave-rock') as THREE.Mesh | undefined;
+  const shellPrev = shell ? shell.material : null;
+  const shellMat = createRockMaterial({ kind: 'basalt_massive', snow: 1, strata: 0.25, macro: 6, wet: 0, fill: FILL, hq: hi, caveAttr: !!shell?.geometry.getAttribute('aCave') });
+  partial.rock.push(shellMat);
+  if (shell) {
+    shell.material = shellMat;
+    partial.restore = () => {
+      if (shellPrev) shell.material = shellPrev;
+    };
+  }
   // the shared cave's own icicles hang inside the mouth, where against the dark chamber they read
   // as pale floating shards (round 2, A4): the Fjord hangs its icicles from the lintel instead
   const sharedIce = cave.group.getObjectByName('cave-icicles');
@@ -392,7 +324,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     const mtx = new THREE.Matrix4().compose(new THREE.Vector3(p.x, base, p.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(rnd.range(-lean, lean), 0, rnd.range(-lean, lean))), new THREE.Vector3(1, 1, 1));
     const broken = opts.slant && rnd.next() < 0.35;
     const slant: [number, number] = broken ? [rnd.range(-0.45, 0.45), rnd.range(-0.45, 0.45)] : [rnd.range(-0.05, 0.05), rnd.range(-0.05, 0.05)];
-    const tone = 0.012 + 0.012 * rnd.next();
+    const tone = 0.5 + 0.36 * rnd.next(); // (× the baked basalt albedo: per-column variety)
     cols.prism(mtx, { sides: rnd.next() < 0.6 ? 6 : rnd.next() < 0.5 ? 5 : 7, r, h, rot: rnd.range(0, 6.28), slant, tone, seed, ground: gy - base, rnd, snow: rnd.next() < 0.6, up });
     if (!broken) perches.push({ p: new THREE.Vector3(p.x, top + 0.25, p.z), brow: opts.brow });
     props.push({ p: centre, r: rad, kind });
@@ -437,7 +369,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     const centre = p.clone().setY(p.y + r * 0.5);
     if (!ok(centre, len / 2 + r)) continue;
     const mtx = new THREE.Matrix4().compose(new THREE.Vector3(p.x, p.y + r * 0.45, p.z).addScaledVector(new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)), -len / 2), new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, yaw, rnd.range(-0.2, 0.2), 'YXZ')), new THREE.Vector3(1, 1, 1));
-    cols.prism(mtx, { sides: 6, r, h: len, rot: rnd.range(0, 6), tone: 0.014, seed: rnd.next() * 100, ground: -1, rnd });
+    cols.prism(mtx, { sides: 6, r, h: len, rot: rnd.range(0, 6), tone: 0.72, seed: rnd.next() * 100, ground: -1, rnd });
     props.push({ p: centre, r: len / 2 + r, kind: 'drum' });
   }
   if (tick.over()) yield;
@@ -463,15 +395,17 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   {
     const hw = 4.6;
     const lowY = 6.1;
-    for (let row = 0; row < 4; row++) {
+    // (round 4: lit, the dense 4-row grid of column ends read as a pile of hex nuts — fewer, longer,
+    // broken ends in three ragged rows)
+    for (let row = 0; row < 3; row++) {
       const yUp = lowY + row * 0.95;
       for (let al = -hw - 0.6 + (row % 2) * 0.55; al <= hw + 0.6; al += 1.1) {
-        if (rnd.next() < 0.14) continue;
+        if (rnd.next() < 0.42) continue;
         const f = face(al, yUp);
         if (f === null) continue;
         const r = rnd.range(0.48, 0.6);
         // protrusion: an irregular, mostly shallow relief; the lowest row overhangs the opening
-        const len = rnd.next() < 0.2 ? rnd.range(0.6, 1.2) * (row === 0 ? 1.4 : 1) : rnd.range(0.05, 0.4);
+        const len = rnd.next() < 0.4 ? rnd.range(0.6, 1.5) * (row === 0 ? 1.3 : 1) : rnd.range(0.15, 0.6);
         const tilt = 0.18 + Math.abs(al) * 0.05 + rnd.range(-0.06, 0.06);
         const axis = out.clone().multiplyScalar(Math.cos(tilt)).add(new THREE.Vector3(0, Math.sin(tilt), 0)).addScaledVector(tan, al * 0.03).normalize();
         const base = mouth.clone().addScaledVector(tan, al).add(new THREE.Vector3(0, yUp, 0)).addScaledVector(out, f - 1.1);
@@ -480,7 +414,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
         if (!clearOfCaveCameras(lines, centre, r + 0.2)) continue;
         const q = new THREE.Quaternion().setFromUnitVectors(up, axis);
         const mtx = new THREE.Matrix4().compose(base, q, new THREE.Vector3(1, 1, 1));
-        cols.prism(mtx, { sides: rnd.next() < 0.7 ? 6 : 5, r, h: 0.9 + len, rot: rnd.range(0, 6.28), tone: 0.012 + 0.01 * rnd.next(), seed: rnd.next() * 100, ground: -2, rnd });
+        cols.prism(mtx, { sides: rnd.next() < 0.7 ? 6 : 5, r, h: 0.9 + len, rot: rnd.range(0, 6.28), tone: 0.6 + 0.3 * rnd.next(), seed: rnd.next() * 100, ground: -2, rnd });
         props.push({ p: centre, r: r + 0.2, kind: 'lintel' });
         // a perch on top of the column end, near its tip
         if (axis.y < 0.5 && rnd.next() < 0.5) perches.push({ p: base.clone().addScaledVector(axis, 0.6 + len * 0.8).add(new THREE.Vector3(0, r * 0.85, 0)), brow: true });
@@ -650,7 +584,9 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     cm.receiveShadow = true;
     cm.name = 'fjord-basalt-columns';
     group.add(cm);
-    const sg = cols.snowGeometry();
+    // (round 4: the snow on the tops comes from the triplanar rock material — the separate cushions
+    // read as white-rimmed cups on top of it)
+    const sg = null as THREE.BufferGeometry | null;
     if (sg) {
       const sm = new THREE.Mesh(sg, K['snow']!);
       sm.receiveShadow = true;
@@ -691,6 +627,21 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     props.push({ p: netMesh.position.clone(), r: 1.8, kind: 'net' });
   }
 
+  // the cinematic's sea framing (round 4, Phase B): stations around the cave scored by how much open
+  // water their frame shows, with the subject in clear view of the terrain and every prop above
+  {
+    const run = function* <T>(g: Generator<void, T, void>): Generator<void, T, void> {
+      let r = g.next();
+      while (!r.done) {
+        if (tick.over()) yield;
+        r = g.next();
+      }
+      return r.value;
+    };
+    const emerge = yield* run(bestSeaPose(m, mouth.clone().addScaledVector(out, 1.0).add(new THREE.Vector3(0, 1.7, 0)), emergeStations(mouth, out, tan, (x, z) => m.heightAt(x, z)), props, 52));
+    const leap = yield* run(bestSeaPose(m, cave.ledge.clone().addScaledVector(out, 5).add(new THREE.Vector3(0, 2.2, 0)), leapStations(cave.ledge, out, tan, (x, z) => m.heightAt(x, z)), props, 56));
+    group.userData['seaShots'] = { emerge, leap } satisfies SeaShots;
+  }
   group.userData['props'] = props;
   group.userData['perches'] = perches;
   group.userData['mouth'] = mouth.clone();
@@ -712,6 +663,9 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
         if (o instanceof THREE.Mesh) o.geometry.dispose();
       });
       for (const mt of new Set(Object.values(M))) mt.dispose();
+      disposeRockMaterial(basalt);
+      if (shell && shellPrev) shell.material = shellPrev;
+      disposeRockMaterial(shellMat);
       net.dispose();
       tex.dispose();
       seaIce.dispose();

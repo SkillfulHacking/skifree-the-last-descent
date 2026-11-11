@@ -1111,14 +1111,14 @@ export class GameSession implements Stage {
   }
 
   // --- debug / test harness (not exposed in UI) -----------------------------------
-  debugTeleport(z: number, speed = 18) {
+  debugTeleport(z: number, speed = 18, atX?: number, heading?: number) {
     this.debugUsed = true;
     const m = this.world.mountain;
     this.world.stream(z, true);
     this.world.vegetation.flush();
     this.world.terrain.flushAround(m.routeX(z), z);
-    const x = m.routeX(z);
-    this.phys.teleport(x, z, Math.atan2(m.routeX(z + 10) - x, 10), speed);
+    const x = atX ?? m.routeX(z);
+    this.phys.teleport(x, z, heading ?? Math.atan2(m.routeX(z + 10) - x, 10), speed);
     this.prevPos.copy(this.phys.s.pos);
     this.telemetry.resync(this.phys.s);
     this.follow.snap(this.followTarget());

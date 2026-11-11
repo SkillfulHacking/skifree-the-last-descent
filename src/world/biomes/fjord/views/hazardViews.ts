@@ -16,6 +16,13 @@ import { registerHazardView, type HazardView } from '../../../presentation/hazar
 import type { HazardInstance, HazardPhaseState } from '../../../hazards/hazard';
 import type { Mountain } from '../../../course';
 import { softParticle } from '../../../resort/textures';
+import { GATE } from '../hazards';
+
+const GATE_RIB = GATE.rib;
+const GATE_BEFORE = GATE.before;
+const GATE_AFTER = GATE.after;
+const GATE_LEE_BEFORE = GATE.leeBefore;
+const GATE_LEE_AFTER = GATE.leeAfter;
 
 let shared: { pole: THREE.Material; sock: THREE.Material; rock: THREE.Material; skin: THREE.Material; stone: THREE.Material; drift: THREE.PointsMaterial; tex: THREE.Texture } | null = null;
 function mats() {
@@ -50,13 +57,87 @@ function windsockGeometry(): THREE.BufferGeometry {
   return g;
 }
 
+/**
+ * Wind gate cues (round 4 integration, task 4): the choice at a gate must read before the skier
+ * commits (~1.5–2 s out):
+ *  - the LEE (land side of the rib) is drift-loaded: a broad, soft drift tail streams inland from
+ *    the outcrops, its surface carved into wind ripples (sastrugi) with blue shadow in the troughs —
+ *    "deep, slow snow, but sheltered";
+ *  - the NOTCH (sea side) is wind-scoured: hard, polished crust in streaks along the wind (+x) with a
+ *    blue-grey glaze and bare gravel showing — "fast, exposed"; the spindrift is funnelled through
+ *    it (the streamers fly through the notch, not across the whole stretch) and the windsock stands
+ *    at its sea edge.
+ * Visual only: the effect (hazards.ts GATE) is unchanged. Draped on a ground grid with polygon
+ * offset like the rock skins (never floats or sinks); one merged draw for both skins.
+ */
+function gateSkins(G: { x: number; z: number; r: number }, m: Mountain, seed: number): THREE.BufferGeometry {
+  const zA = G.z - G.r - GATE_LEE_BEFORE, zB = G.z + GATE_RIB + GATE_LEE_AFTER;
+  const R = Math.max(zB - zA, 2 * (G.r + 16)) / 2 + 4;
+  const H = groundGrid(m, G.x, (zA + zB) / 2, R, 1.5);
+  const pos: number[] = [];
+  const col: number[] = [];
+  const idx: number[] = [];
+  const skin = (x0: number, x1: number, z0: number, z1: number, nx: number, nz: number, f: (x: number, z: number, u: number, v: number) => { lift: number; c: [number, number, number, number] }) => {
+    const base = pos.length / 3;
+    for (let j = 0; j <= nz; j++)
+      for (let i = 0; i <= nx; i++) {
+        const u = i / nx, v = j / nz;
+        const x = x0 + (x1 - x0) * u, z = z0 + (z1 - z0) * v;
+        const r = f(x, z, u, v);
+        pos.push(x, H(x, z) + r.lift, z);
+        col.push(...r.c);
+      }
+    for (let j = 0; j < nz; j++)
+      for (let i = 0; i < nx; i++) {
+        const a = base + j * (nx + 1) + i;
+        idx.push(a, a + nx + 1, a + 1, a + 1, a + nx + 1, a + nx + 2);
+      }
+  };
+  const edge = (u: number, v: number, k = 0.18) => Math.min(1, u / k, (1 - u) / k, v / k, (1 - v) / k);
+  // the lee drift: from the rib's land flank inland ~13 m, thickest just behind the rocks, rippled
+  skin(G.x + 0.2 * G.r, G.x + G.r + 13, zA, zB, 22, 34, (x, z, u, v) => {
+    const behind = Math.exp(-((u - 0.25) * (u - 0.25)) / 0.08);
+    const rip = 0.5 + 0.5 * Math.sin(x * 1.9 + Math.sin(z * 0.21 + seed) * 2.2 + 0.4 * Math.sin(z * 0.9));
+    const e = Math.max(0, edge(u, v, 0.22));
+    const lift = (0.07 + 0.13 * behind + 0.05 * rip) * e;
+    const shade = 0.86 + 0.12 * rip;
+    return { lift, c: [0.86 * shade, 0.92 * shade, 1.0 * shade, 0.9 * Math.pow(e, 0.6)] };
+  });
+  // the notch: scoured streaks along the wind, glazed and gravelly toward the rib
+  skin(G.x - G.r - 11, G.x - 0.25 * G.r, G.z - GATE_BEFORE, G.z + G.r + GATE_AFTER, 20, 36, (x, z, u, v) => {
+    const streak = Math.max(0, Math.sin(z * 1.35 + Math.sin(x * 0.18 + seed) * 1.4) * 0.5 + 0.5 * Math.sin(z * 0.43 + 1.7));
+    const nearRib = Math.pow(u, 1.5);
+    const e = Math.max(0, edge(u, v, 0.25));
+    const glaze = 0.35 + 0.65 * streak;
+    const c: [number, number, number, number] = [0.5 - 0.12 * nearRib, 0.6 - 0.1 * nearRib, 0.7 - 0.06 * nearRib, (0.15 + 0.6 * glaze * (0.5 + 0.5 * nearRib)) * e];
+    return { lift: 0.01, c };
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 4));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return g;
+}
+
 function gustView(h: HazardInstance, m: Mountain): HazardView {
   const M = mats();
   const obj = new THREE.Group();
   obj.name = 'sea-gust';
-  // windsock on a pole at the side of the jump (upwind side: the sea, −x)
-  const px = h.x - h.r * 0.6 - 1.5;
-  const pz = h.z - 8;
+  const G = (h.params as { gate?: { x: number; z: number; r: number } } | undefined)?.gate;
+  let gateGeo: THREE.BufferGeometry | null = null;
+  if (G) {
+    gateGeo = gateSkins(G, m, h.seed);
+    const sk = new THREE.Mesh(gateGeo, M.skin);
+    sk.name = 'wind-gate-skins';
+    sk.receiveShadow = true;
+    obj.add(sk);
+  }
+  // windsock on a pole at the side of the jump (upwind side: the sea, −x); at a wind gate, at the
+  // notch's sea edge just before the rib
+  const px = G ? G.x - G.r - 12 : h.x - h.r * 0.6 - 1.5;
+  const pz = G ? G.z - 6 : h.z - 8;
   const py = m.heightAt(px, pz);
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 7.2, 6), M.pole);
   pole.position.set(px, py + 3.6, pz);
@@ -130,8 +211,11 @@ function gustView(h: HazardInstance, m: Mountain): HazardView {
       for (let i = 0; i < N; i++) {
         const s0 = seeds[i * 3]!;
         const s2 = seeds[i * 3 + 2]!;
-        const x = h.x - span / 2 + (((s0 * span + t * (11 + 7 * s2)) % span) + span) % span;
-        const z = ground[i]!;
+        // (a wind gate: the streamers are funnelled through the notch, between the windsock and the rib)
+        const sp = G ? G.r + 13 : span;
+        const x0 = G ? G.x - G.r - 13 : h.x - span / 2;
+        const x = x0 + (((s0 * sp + t * (11 + 7 * s2)) % sp) + sp) % sp;
+        const z = G ? G.z - GATE_BEFORE * 0.6 + seeds[i * 3 + 1]! * (GATE_BEFORE * 0.6 + G.r + GATE_AFTER * 0.6) : ground[i]!;
         const y = groundAt(x, z) + 0.3 + s2 * s2 * 4.5 + Math.sin(t * 3 + i) * 0.3;
         pos[i * 3] = x;
         pos[i * 3 + 1] = y;
@@ -143,6 +227,7 @@ function gustView(h: HazardInstance, m: Mountain): HazardView {
       pole.geometry.dispose();
       ring.geometry.dispose();
       sockGeo.dispose();
+      gateGeo?.dispose();
       geo.dispose();
       mat.dispose();
       obj.removeFromParent();

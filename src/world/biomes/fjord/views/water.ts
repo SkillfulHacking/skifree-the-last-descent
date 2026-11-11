@@ -92,8 +92,17 @@ void main() {
   // fjord water: very dark teal-blue, a little lighter in the ripple troughs facing the sky
   vec3 deep = vec3(0.010, 0.034, 0.052);
   vec3 body = mix(deep, vec3(0.02, 0.07, 0.09), 0.35 * (h0 - 0.4));
+  vec3 col;
   // close to the camera at grazing angles the haze reflection washed the water to a pale sheet
-  vec3 col = mix(body, skyCol, F * 0.92 * (1.0 - 0.3 * nearK));
+  // (round 4, Phase B: the cold-plunge water at the quay still read as snow from a low camera).
+  // Near the camera and at grazing view the reflection is what stands around the water (quays,
+  // houses, the mountain), not the pale horizon haze: reflect a darker, bluer horizon there, cap
+  // the Fresnel, and let fine wind ripples break it into dark/light streaks (water, not drifts).
+  float graze = nearK * (1.0 - smoothstep(0.03, 0.3, V.y));
+  vec3 surround = mix(vec3(0.16, 0.2, 0.25), uSky * 0.55, 0.35);
+  skyCol = mix(skyCol, surround, graze * (1.0 - smoothstep(0.0, 0.25, ry)));
+  float streak = graze * uDetail * (wv_n(p * vec2(0.9, 3.2) + vec2(uTime * 0.35, 0.0)) - 0.5);
+  col = mix(body, skyCol, clamp(F * (0.92 - 0.42 * graze) * (1.0 - 0.3 * nearK) + 0.35 * streak, 0.0, 1.0));
   // low-sun glitter path + a soft sheen
   float sd = max(dot(R, uSun), 0.0);
   col += vec3(1.0, 0.86, 0.66) * (pow(sd, 900.0) * 18.0 + pow(sd, 90.0) * 0.55 + pow(sd, 12.0) * 0.06);

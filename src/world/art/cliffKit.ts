@@ -43,7 +43,7 @@ function relief(x: number, y: number, z: number, s: number, faceK: number, H: nu
   // 9–22 m thick, wavering along the coast) — the low sun turns every ledge into a shadow line
   const bedY = y / (14 + 5 * noise3(x / 300, 0.5, z / 300, s + 611)) + 0.6 * noise3(x / 160, y / 400, z / 160, s + 612);
   const fr = bedY - Math.floor(bedY);
-  const ledge = (fr < 0.82 ? fr / 0.82 : (1 - fr) / 0.18) - 0.5;
+  const ledge = (fr < 0.6 ? fr / 0.6 : (1 - fr) / 0.4) - 0.5;
   const ledgeK = 0.5 + 0.5 * smoothstep(-0.2, 0.4, noise3(x / 220, y / 90, z / 220, s + 613));
   return faceK * A * (8 * blocks + 3.2 * ledge * ledgeK);
 }
@@ -142,6 +142,23 @@ export function* cliffSegmentSteps(model: CliffModel, o: CliffSegmentOptions, ov
     }
     if (over()) yield;
   }
+  // where each column's displaced face meets the water (the surf line, review P-M5): x, z per column
+  // (NaN: none — a hamlet's strand flat meets the water as heightfield, which has its own surf)
+  const foam = new Float32Array(nc * 2).fill(NaN);
+  for (let j = 0; j < nc; j++) {
+    const c = cols[j]!.c;
+    if (c.hm > 0.5) continue;
+    for (let i = 1; i < nr; i++) {
+      const a = (j * nr + i - 1) * 3, b2 = (j * nr + i) * 3;
+      const ya = pos[a + 1]!, yb = pos[b2 + 1]!;
+      if (ya >= c.water && yb < c.water) {
+        const f = (ya - c.water) / Math.max(1e-6, ya - yb);
+        foam[j * 2] = pos[a]! + (pos[b2]! - pos[a]!) * f;
+        foam[j * 2 + 1] = c.z;
+        break;
+      }
+    }
+  }
   const idx = new Uint32Array((nc - 1) * (nr - 1) * 6);
   let q = 0;
   for (let j = 0; j < nc - 1; j++)
@@ -180,6 +197,7 @@ export function* cliffSegmentSteps(model: CliffModel, o: CliffSegmentOptions, ov
   g.computeBoundingSphere();
   g.computeBoundingBox();
   g.userData['faceK'] = faceKs;
+  g.userData['foam'] = foam;
   return g;
 }
 

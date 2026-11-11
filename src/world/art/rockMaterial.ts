@@ -21,11 +21,13 @@
 import * as THREE from 'three';
 import { ATMOSPHERE_GLSL, addAtmosphereUniforms } from '../look/atmosphere';
 
-export type RockKind = 'gneiss' | 'basalt';
+export type RockKind = 'gneiss' | 'basalt' | 'basalt_massive';
 
 const URLS: Record<RockKind, { albedo: string; nhr: string; tile: number }> = {
   gneiss: { albedo: new URL('./textures/gneiss_albedo.webp', import.meta.url).href, nhr: new URL('./textures/gneiss_nhr.webp', import.meta.url).href, tile: 8 },
   basalt: { albedo: new URL('./textures/basalt_albedo.webp', import.meta.url).href, nhr: new URL('./textures/basalt_nhr.webp', import.meta.url).href, tile: 4 },
+  // round 4 integration (review P-M2): the sea cave's rock mass — fractured lava, no column joints
+  basalt_massive: { albedo: new URL('./textures/basalt_massive_albedo.webp', import.meta.url).href, nhr: new URL('./textures/basalt_massive_nhr.webp', import.meta.url).href, tile: 6 },
 };
 
 interface SetEntry {
@@ -118,6 +120,13 @@ export function rockSetsReady(): Promise<void> {
   return Promise.all([...sets.values()].map((s) => s.ready)).then(() => undefined);
 }
 
+/**
+ * The render origin (World's floating origin), shared by every rock material: the triplanar
+ * textures are anchored to absolute world space. The location's scenery copies World.origin here
+ * every frame (FjordScenery.update).
+ */
+export const ROCK_ORIGIN = { value: new THREE.Vector3() };
+
 export interface RockMaterialOptions {
   kind?: RockKind;
   /** water level for the wet band / ice foot (world y); -1e9 = none */
@@ -162,14 +171,14 @@ export function createRockMaterial(o: RockMaterialOptions = {}): THREE.MeshStand
   const U: RockUniforms = {
     uWater: { value: o.water ?? -1e9 },
     uSnow: { value: o.snow ?? 1 },
-    uOrigin: { value: new THREE.Vector3() },
+    uOrigin: ROCK_ORIGIN,
     uStrata: { value: o.strata ?? 1 },
     uWet: { value: o.wet ?? 0 },
     uFill: { value: o.fill ?? 0 },
   };
   const macro = o.macro ?? 7.3;
   const hq = o.hq !== false;
-  const lumRef = kind === 'basalt' ? 0.045 : 0.075;
+  const lumRef = kind === 'basalt' ? 0.045 : kind === 'basalt_massive' ? 0.05 : 0.075;
   if (o.caveAttr) m.defines = { ...(m.defines ?? {}), RK_CAVE: '' };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U, { tAlb: { value: set.albedo }, tNhr: { value: set.nhr } });

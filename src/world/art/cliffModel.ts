@@ -201,7 +201,8 @@ export class CliffModel {
     const foot = this.footOffset(c);
     let h: number;
     if (t < foot - inset) h = c.hRim - this.dropAt(c, t + inset) - sink;
-    else h = -Infinity; // beyond the foot: the bed
+    // beyond: a talus slope from the face's foot down to the bed (continuous, no step)
+    else h = c.hRim - this.dropAt(c, foot) - sink - 1.5 * (t - (foot - inset));
     // the bed falls away from the foot (from a hamlet's strand flat, after the flat)
     const w = this.strandWidth(c);
     const bed = c.base - (c.base - (c.water - bedDepth)) * smoothstep(foot + 20 + w, foot + 420 + w, t);

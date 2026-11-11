@@ -22,7 +22,8 @@ import * as THREE from 'three';
 import type { CaveCinematicContext, CaveCinematicExtras } from '../../../presentation/cave';
 import { CAVE_CAMS } from '../../../../cinematic/CaveCinematic';
 import { ease, pose } from '../../../../cinematic/Timeline';
-import type { SeaCavePerch } from './seaCave';
+import type { SeaCavePerch, SeaShots } from './seaCave';
+import { turnedLook } from './seaFraming';
 
 interface Gull {
   o: THREE.Group;
@@ -83,6 +84,7 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
   // perches: the portal column tops and the lintel of this cave's dressing (nearest dressing group)
   let perches: SeaCavePerch[] = [];
   let icicles: THREE.InstancedMesh | null = null;
+  let seaShots: SeaShots | null = null;
   let best = Infinity;
   st.world.scene.traverse((o) => {
     if (o.name !== 'FjordSeaCave') return;
@@ -92,11 +94,13 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
       best = d;
       perches = (o.userData['perches'] as SeaCavePerch[]) ?? [];
       icicles = (o.getObjectByName('fjord-brow-icicles') as THREE.InstancedMesh | undefined) ?? null;
+      seaShots = (o.userData['seaShots'] as SeaShots | undefined) ?? null;
     }
   });
   if (best > 5) {
     perches = [];
     icicles = null;
+    seaShots = null;
   }
   const group = new THREE.Group();
   group.name = 'fjord-cave-gulls';
@@ -135,9 +139,14 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
     g.wr.rotation.set(0, 1.35, 0.25);
   }
 
-  // does the mouth look out over the sea? (the cave can sit either side of the piste)
+  // does the mouth look out over the sea? Only a cave on the inland side of the piste does (its
+  // mouth faces −X across the piste toward the rim). Since round 4 the Fjord cuts its caves into the
+  // sea side, mouth inland, so this is false for them — round 4 Phase B: the emergence and the leap
+  // then take the dressing's sea-framing stations (seaFraming.ts: the frame with the most open water
+  // and the Yeti in clear view) instead of losing the sea altogether.
   const coast = st.world.mountain.coast;
-  const seaward = coast ? Math.sign(O.x) === Math.sign(coast.rimX(M.z) - M.x) : false;
+  const mouthToSea = coast ? Math.sign(O.x) === Math.sign(coast.rimX(M.z) - M.x) : false;
+  const sea = seaShots as SeaShots | null;
   const ep = cave.exitPath;
   const pathAt = (s: number) => {
     // exitPath[i] lies at depth 14 − 0.75·i (the last one is the ledge)
@@ -152,7 +161,7 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
   const browLook = brow.clone().addScaledVector(O, 1.2).add(new THREE.Vector3(0, -1.2, 0));
   tl.shot({ start: 2.4, end: 3.8, from: () => pose(at(...CAVE_CAMS.slough0), browLook.clone().add(new THREE.Vector3(0, 0.6, 0)), 30), to: () => pose(at(...CAVE_CAMS.slough1), browLook.clone().add(new THREE.Vector3(0, 1.6, 0)), 34), handheld: 0.03 });
   // 7.9 s: the emergence from inside the cave
-  if (seaward) {
+  if (mouthToSea) {
     const camIn = pathAt(3.6);
     const ceil = cave.clearanceAt(camIn.x, camIn.z);
     camIn.y += Math.min(1.25, Math.max(0.8, ceil - 1.2));
@@ -166,8 +175,22 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
       easing: ease.inOut,
       handheld: 0.015,
     });
+  } else if (sea?.emerge) {
+    // the sea lies behind the cave: from out on the snow to one side, the Yeti rising out of the
+    // portal with the fjord beyond the cave's flank
+    const e = sea.emerge;
+    const toward = M.clone().sub(e.cam).setY(0).normalize();
+    tl.shot({
+      start: 7.9,
+      end: 11.0,
+      // (the frame turned by the station's yaw: the Yeti off-centre, the fjord on the open side)
+      from: () => pose(e.cam, turnedLook(e.cam, yetiAt().add(new THREE.Vector3(0, 1.6, 0)), e.yaw), e.fov),
+      to: () => pose(e.cam.clone().addScaledVector(toward, 1.2), turnedLook(e.cam.clone().addScaledVector(toward, 1.2), yetiAt().add(new THREE.Vector3(0, 1.9, 0)), e.yaw), e.fov - 2),
+      easing: ease.inOut,
+      handheld: 0.015,
+    });
   } else {
-    // the sea lies behind the cave: a high three-quarter angle across the portal
+    // no station sees the sea: a high three-quarter angle across the portal
     tl.shot({
       start: 7.9,
       end: 11.0,
@@ -180,8 +203,10 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
   tl.shot({ start: 11.0, end: 12.3, from: () => pose(at(...CAVE_CAMS.roar0), M.clone().add(new THREE.Vector3(0, 3.6, 0)).addScaledVector(O, 1.2), 56), to: () => pose(at(...CAVE_CAMS.roar1), M.clone().add(new THREE.Vector3(0, 3.8, 0)).addScaledVector(O, 1.2), 52) });
   // 14.6 s: the leap, from the ledge behind him, down onto the skier (and the sea beyond)
   const P = st.phys.s.pos.clone();
-  const ledgeCam = cave.ledge.clone().addScaledVector(O, -2.6).addScaledVector(T, 1.4).add(new THREE.Vector3(0, 2.7, 0));
-  const leapLook = () => yetiAt().add(new THREE.Vector3(0, 1.6, 0)).lerp(P.clone().add(new THREE.Vector3(0, 1.0, 0)), 0.42);
+  // (mouth facing inland: the dressing's sea-framing station, out on the slope looking back up at him)
+  const ledgeCam = !mouthToSea && sea?.leap ? sea.leap.cam.clone() : cave.ledge.clone().addScaledVector(O, -2.6).addScaledVector(T, 1.4).add(new THREE.Vector3(0, 2.7, 0));
+  const leapYaw = !mouthToSea && sea?.leap ? sea.leap.yaw : 0;
+  const leapLook = () => turnedLook(ledgeCam, yetiAt().add(new THREE.Vector3(0, 1.6, 0)).lerp(P.clone().add(new THREE.Vector3(0, 1.0, 0)), 0.42), leapYaw);
   tl.shot({ start: 14.6, end: 16.95, from: () => pose(ledgeCam, leapLook(), 56), to: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), 60) });
   const followPos = new THREE.Vector3();
   const followLook = new THREE.Vector3();

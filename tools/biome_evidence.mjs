@@ -226,7 +226,7 @@ if (want('cave') || want('cinematic') || want('pursuit')) {
       // the sea cave from inside its mouth: the basalt portal framing the run and the fjord beyond
       await P(`(w) => { const c = w.cave; const o = c.outward; const i = Math.min(c.exitPath.length - 1, Math.round((14 - 4.5) / 0.75)); const q = c.exitPath[i]; window.__skifree.freeCam([q.x, q.y + 1.6, q.z], [c.mouth.x + o.x * 60, c.mouth.y - 14, c.mouth.z + o.z * 60], 62); }`);
       await settle(3000);
-      await shot('07b_yeti_cave_outlook', 'Fjord: the sea cave from inside its mouth, looking out past the basalt portal to the fjord');
+      await shot('07b_yeti_cave_outlook', 'Fjord: the sea cave from inside its mouth, looking out past the basalt portal (the mouth faces inland, toward the piste)');
     }
     await ev(() => { window.__skifree.freeCam(null); window.__skifree.hud(true); });
   }
@@ -350,6 +350,92 @@ if (G.finite && (want('finish') || want('victory'))) {
       await shot(name, note);
     }
   }
+}
+
+// ---- round 4 additions (Fjord): wind gate (gust + lull), gap jump, viewpoint, cornice relocation
+// cue, and an Expedition water arm with the rear view
+if (biome === 'fjord' && (want('gate') || want('gap') || want('viewpoint') || want('cornice'))) {
+  await ev(() => { window.__skifree.hold(false); window.__skifree.freeCam(null); window.__skifree.toMenu(); });
+  await settle(1500);
+  await ev(([m, l, b]) => window.__skifree.setCourse(m, l, { difficulty: 'normal', biome: b }), [mode, length, biome]);
+  await ev(() => window.__skifree.startRun(true));
+  await settle(2000);
+  await ev(() => { window.__skifree.hold(true); window.__skifree.toChase(); window.__skifree.autopilot(null); });
+  if (want('gate')) {
+    const gates = await P(`(w, m) => { for (let z = 300; z < ${G.L} - 300; z += 150) w.environment.stream(z); const out = []; for (const h of w.environment.hazards.all()) if (h.kind === 'sea-gust' && h.params && h.params.gate) out.push({ id: h.id, g: h.params.gate }); out.sort((a, b) => a.g.z - b.g.z); return out; }`);
+    log('gates', gates.length);
+    const gt = gates[Math.min(gates.length - 1, 1)];
+    if (gt) {
+      const g = gt.g;
+      await goTo(g.z - 150, 0);
+      await ev(() => { window.__skifree.hold(true); window.__skifree.hud(false); });
+      const pose = `(w, m) => { const g = ${JSON.stringify(g)}; const cz = g.z - 40, cx = m.routeX(cz) + 6; window.__skifree.freeCam([cx, m.heightAt(cx, cz) + 8.5, cz], [g.x - 2, m.heightAt(g.x, g.z + 8) - 0.5, g.z + 8], 56); }`;
+      const r1 = await framesUntil(`(s) => (window.__skifree.hazards('sea-gust').find((h) => h.id === ${gt.id}) || {}).phase === 'active'`, 900);
+      await framesUntil(`(s) => false`, 20);
+      await P(pose);
+      await settle(3000);
+      await shot('12_wind_gate_gust', `Wind gate (id ${gt.id}) in the gust (${r1.ok ? 'active' : 'phase not reached'}): windsock flying, spindrift funnelled through the notch (sea side, frame right); drifted lee behind the rib (frame left)`);
+      const r2 = await framesUntil(`(s) => (window.__skifree.hazards('sea-gust').find((h) => h.id === ${gt.id}) || {}).phase === 'dormant'`, 900);
+      await framesUntil(`(s) => false`, 30);
+      await P(pose);
+      await settle(2500);
+      await shot('12b_wind_gate_lull', `The same wind gate in the lull (${r2.ok ? 'dormant' : 'phase not reached'}): windsock limp, the notch is free`);
+    }
+  }
+  if (want('gap')) {
+    await ev(() => window.__skifree.freeCam(null));
+    const gaps = await P(`(w) => window.__skifree.hazards('gap-marker')`);
+    const all = gaps.length ? gaps : await P(`(w, m) => { for (let z = 300; z < ${G.L} - 300; z += 150) w.environment.stream(z); return window.__skifree.hazards('gap-marker'); }`);
+    const gp = all[Math.floor(all.length / 2)];
+    if (gp) {
+      await goTo(gp.z - 120, 0);
+      await ev(() => { window.__skifree.hold(true); window.__skifree.hud(false); });
+      await P(`(w, m) => { const h = ${JSON.stringify(gp)}; const cx = h.x + 22, cz = h.z - 18; window.__skifree.freeCam([cx, m.heightAt(cx, cz) + 7, cz], [h.x - 4, m.heightAt(h.x, h.z) - 1.5, h.z + 6], 54); }`);
+      await settle(3000);
+      await shot('13_gap_jump', `Gap jump (gap-marker id ${gp.id}): the gully across the spine and its marker poles`);
+    } else log('no gap marker on this course');
+  }
+  if (want('viewpoint')) {
+    await ev(() => window.__skifree.freeCam(null));
+    const co = await ev(() => window.__skifree.coast(0, 100000));
+    const lk = co.lookouts.find((l) => !l.chase) ?? co.lookouts[0];
+    if (lk) {
+      await goTo(lk.z - 100, 0);
+      await ev(() => { window.__skifree.hold(true); window.__skifree.hud(false); });
+      await P(`(w, m, c) => { const l = ${JSON.stringify(lk)}; const y = m.heightAt(l.x, l.z); const cx = l.x + 16, cz = l.z - 14; window.__skifree.freeCam([cx, Math.max(m.heightAt(cx, cz), y) + 5, cz], [l.x - 420, c.seaLevelAt(l.z) + 120, l.z + 260], 58); }`);
+      await settle(3000);
+      await shot('14_viewpoint', `Scenic viewpoint at z≈${Math.round(lk.z)} (${lk.chase ? 'chase stretch' : 'free stretch'}): the platform and the view over the fjord`);
+    }
+  }
+  if (want('cornice')) {
+    await ev(() => window.__skifree.freeCam(null));
+    const zc = Math.round(G.L * 0.45);
+    await P(`(w, m, c) => { const z = ${zc}; window.__skifree.teleport(z, 7, c.rimX(z) + 5, -Math.PI / 2 + 0.25); }`);
+    await ev(() => { window.__skifree.hold(true); window.__skifree.hud(true); window.__skifree.autopilot(null); });
+    const r = await framesUntil(`(s) => Math.abs(s.x - window.__skifree.world().mountain.routeX(s.z)) < 4`, 600);
+    await framesUntil(`(s) => false`, 8);
+    await settle(2000);
+    await shot('15_cornice_relocation', `Cornice relocation cue: the skier sent over the rim at z≈${zc} is put back on the piste (${r.ok ? 'relocated' : 'not relocated within 20 s'}) with the title and caption`);
+  }
+}
+if (biome === 'fjord' && want('arm')) {
+  await ev(() => { window.__skifree.hold(false); window.__skifree.freeCam(null); window.__skifree.toMenu(); });
+  await settle(1500);
+  await ev((b) => window.__skifree.setCourse('classic', 'expedition', { difficulty: 'normal', biome: b }), biome);
+  await ev(() => window.__skifree.startRun(true));
+  await settle(3000);
+  await ev(() => { window.__skifree.hold(true); window.__skifree.skipCave?.(); window.__skifree.toChase(); window.__skifree.hud(true); });
+  const co = await ev(() => window.__skifree.coast(0, 100000));
+  const arms = co.reaches.filter((r) => r.z1 !== null && r.z0 > 1000);
+  const arm = arms[Math.min(arms.length - 1, 2)] ?? co.reaches[1];
+  const za = Math.round((arm.z0 + (arm.z1 ?? arm.z0 + 3000)) / 2);
+  await goTo(za, 22);
+  await ev(() => { window.__skifree.hold(true); window.__skifree.autopilot('skilled'); window.__skifree.hud(true); });
+  await framesUntil(`(s) => s.phase === 'chase'`, 300);
+  await ev(() => window.__skifree.placeYeti(22));
+  await framesUntil(`(s) => false`, 90);
+  await settle(2000);
+  await shot('16_expedition_arm', `Expedition: ordinary chase gameplay beside fjord arm ${arm.index} (z ${Math.round(arm.z0)}–${Math.round(arm.z1 ?? 0)}), rear view showing the Yeti`);
 }
 
 manifest.seconds = Math.round((Date.now() - t0) / 1000);

@@ -205,6 +205,12 @@ export interface BiomeTerrain {
   wallRelief: number;
   /** height of the far ranges rising beyond the walls (m) */
   rangeHeight: number;
+  /**
+   * Optional (round 4, Fjord): rounds the far ranges' summits instead of the 5-octave ridged noise's
+   * needle crests (0 / absent = the original ranges, bit-identical). Only applies ≥ 350 m beyond the
+   * piste edge (art-only: no line, obstacle or hazard comes near).
+   */
+  rangeSoft?: number;
   /** large-scale rolling undulation (m) */
   undulation: number;
   /** mid-scale variation (m) */

@@ -10,7 +10,7 @@ import type { SurfaceType } from '../core/types';
 import { caveTerrainHeight, CAVE_INFLUENCE_Z, type CaveAnchor } from './caveTerrain';
 import { CLASSIC, foreshadowFor, ClassicProfile, GeneratedProfile, type CliffBand, type CourseProfile, type Kicker } from './profile';
 import { getBiome, type Biome } from './biome';
-import { Coast } from './coast';
+import { Coast, FJORD_HEAD_Z } from './coast';
 import { CliffModel } from './art/cliffModel';
 
 export type { Kicker, CliffBand, CourseProfile, Encounter, Sighting, SegmentType, AltRoute } from './profile';
@@ -51,6 +51,7 @@ export class Mountain {
   private readonly kDrifts: number;
   private readonly kDriftsPowder: number;
   private readonly kRollers: number;
+  private readonly kRangeSoft: number;
   private kTmp: Kicker[] = [];
   private cTmp: CliffBand[] = [];
   private caveCache: { z0: number; z1: number; list: CaveAnchor[] } = { z0: 1, z1: 0, list: [] };
@@ -83,6 +84,7 @@ export class Mountain {
     this.kDrifts = t.drifts;
     this.kDriftsPowder = t.driftsPowder;
     this.kRollers = t.rollers;
+    this.kRangeSoft = t.rangeSoft ?? 0;
     if (typeof seedOrProfile === 'number') {
       this.seed = seedOrProfile;
       this.profile = new ClassicProfile(seedOrProfile);
@@ -202,7 +204,7 @@ export class Mountain {
   }
 
   /**
-   * 0..1: how much of the cliff kit applies at z. None at the headland ridges between fjord arms
+   * 0..1: how much of the cliff kit applies at z. None at the headland ridges between fjord arms, the fjord head
    * (the levels change there; the ridge stays heightfield) nor at the finish harbour. The scenery
    * builds cliff meshes only where this is 1.
    */
@@ -212,6 +214,8 @@ export class Mountain {
     let k = 1;
     for (const cr of c.crestsIn(z - 600, z + 600)) k = Math.min(k, smoothstep(260, 520, Math.abs(z - cr)));
     if (c.finite) k *= 1 - smoothstep(c.finishZ - 520, c.finishZ - 300, z);
+    // nor at the fjord head (the ridge closing the first arm)
+    k *= smoothstep(FJORD_HEAD_Z + 260, FJORD_HEAD_Z + 520, z);
     return k;
   }
 
@@ -241,7 +245,22 @@ export class Mountain {
       const f = smoothstep(-760, -620, ef);
       out = Math.max(out, h * f + out * (1 - f));
     }
+    // continuous at the crest: the backing never drops faster than 20 m per m below the round-3 rim
+    // (a step would be a crease for physics; the line stays inside the mesh's rounded lip)
+    out = Math.max(out, h - 20 * (t - 0.5));
     return h + (out - h) * k;
+  }
+
+  /**
+   * The far ranges with rounded summits (terrain.rangeSoft, Fjord): the same ridged field without its
+   * two finest octaves (the 32–64 m far tiles sample those as single-vertex needles), its crest
+   * compressed above 0.55 (broad shoulders, not knife edges) and a smooth fbm swell instead.
+   */
+  private softRange(x: number, z: number, s: number): number {
+    const r = ridged(x / 900, z / 900, s + 11, 3);
+    const k = this.kRangeSoft;
+    const crest = r > 0.55 ? 0.55 + (r - 0.55) * (1 - 0.6 * k) : r;
+    return crest + 0.12 * k * (0.5 + 0.5 * fbm(x / 520, z / 520, s + 12, 3));
   }
 
   /** Height of the land (everything but a coast's cliffs and sea), at world (x, z). */
@@ -285,7 +304,7 @@ export class Mountain {
       } else {
         h += wall + rough;
         // distant ranges
-        h += this.kRanges * smoothstep(350, 2600, e) * (0.35 + ridged(x / 900, z / 900, s + 11, 5));
+        h += this.kRanges * smoothstep(350, 2600, e) * (0.35 + (this.kRangeSoft > 0 ? this.softRange(x, z, s) : ridged(x / 900, z / 900, s + 11, 5)));
       }
     }
 

@@ -959,7 +959,8 @@ export class App {
       },
       startRun: (skipIntro = true) => this.startRun(skipIntro, false),
       toMenu: () => this.toMenu(),
-      teleport: (z: number, speed = 18) => this.session?.debugTeleport(z, speed),
+      /** (evidence captures) optional x and heading (rad, 0 = down the course +Z) */
+      teleport: (z: number, speed = 18, x?: number, heading?: number) => this.session?.debugTeleport(z, speed, x, heading),
       toCave: () => {
         const e = this.session?.run.encounter;
         if (e) this.session?.debugTeleport(e.triggerZ - 12, 16);
