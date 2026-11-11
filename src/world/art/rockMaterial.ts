@@ -193,14 +193,15 @@ struct RkS { vec4 alb; vec4 nhr; };
 RkS rk_tri(vec3 P, vec3 bw, float sc, float rot) {
   float c = cos(rot), s = sin(rot);
   mat2 R = mat2(c, -s, s, c);
-  // (rot only turns the up-facing projection: on walls the bedding must stay horizontal)
-  vec2 ux = P.zy * sc, uy = R * P.xz * sc, uz = P.xy * sc;
+  // (only the up-facing projection is turned and enlarged — on walls the bedding stays horizontal;
+  // seen from above, the jointing must not read as masonry)
+  vec2 ux = P.zy * sc, uy = mat2(0.825, -0.565, 0.565, 0.825) * R * P.xz * sc * 0.43, uz = P.xy * sc;
   RkS o;
   o.alb = texture(tAlb, ux) * bw.x + texture(tAlb, uy) * bw.y + texture(tAlb, uz) * bw.z;
   vec4 nx = texture(tNhr, ux), ny = texture(tNhr, uy), nz = texture(tNhr, uz);
   o.nhr = nx * bw.x + ny * bw.y + nz * bw.z;
   // world-space normal perturbation (UDN blend): stash the three tangent XYs in a single vector
-  vec2 tx = nx.xy * 2.0 - 1.0, ty = R * (ny.xy * 2.0 - 1.0), tz = nz.xy * 2.0 - 1.0;
+  vec2 tx = nx.xy * 2.0 - 1.0, ty = transpose(mat2(0.825, -0.565, 0.565, 0.825) * R) * (ny.xy * 2.0 - 1.0), tz = nz.xy * 2.0 - 1.0;
   o.nhr.xy = vec2(0.0);
   rk_dN = vec3(0.0, tx.y, tx.x) * bw.x + vec3(ty.x, 0.0, ty.y) * bw.y + vec3(tz.x, tz.y, 0.0) * bw.z;
   return o;
@@ -243,7 +244,7 @@ rkCol *= 1.0 - 0.45 * rkWetK;
 rkRough = mix(rkRough, 0.32, rkWetK);
 float rkIce = smoothstep(0.05, 0.25, rkAbove) * (1.0 - smoothstep(0.55, 0.95 + 0.4 * rk_n(rkP.xz * 0.1), rkAbove)) * step(-1e8, uWater) * (1.0 - smoothstep(0.35, 0.6, rkN.y));
 // snow: flat-ish surfaces only, cavities first (height-blended edge), patchy at its limit
-float rkSnowT = rkN.y + 0.3 * (0.5 - rkH) + 0.16 * (rk_fbm(rkP.xz * 0.06 + rkP.y * 0.03) - 0.5) + 0.12 * (rk_fbm(rkP.xz * 0.012) - 0.5);
+float rkSnowT = rkN.y + 0.1 * (0.5 - rkH) + 0.2 * (rk_fbm(rkP.xz * 0.06 + rkP.y * 0.03) - 0.5) + 0.14 * (rk_fbm(rkP.xz * 0.012) - 0.5);
 float rkSnow = smoothstep(${(o.snowFrom ?? 0.6).toFixed(3)}, ${((o.snowFrom ?? 0.6) + 0.14).toFixed(3)}, rkSnowT) * uSnow * (1.0 - rkWetK);
 #ifdef RK_CAVE
 // no snow in the chamber; the floor (kind 1) is grit
