@@ -85,8 +85,8 @@ export class CliffModel {
   private gully(z: number): number {
     const s = this.frame.seed;
     const zw = z + 55 * gnoise(z / 210, 4.4, s + 520);
-    const g = ridged(zw / 95, 0.7, s + 521, 2);
-    return smoothstep(0.42, 0.62, g) * (0.4 + 0.6 * smoothstep(-0.3, 0.4, gnoise(z / 700, 1.9, s + 522)));
+    const g = ridged(zw / 150, 0.7, s + 521, 2);
+    return smoothstep(0.3, 0.62, g) * (0.4 + 0.6 * smoothstep(-0.3, 0.4, gnoise(z / 700, 1.9, s + 522)));
   }
 
   column(zIn: number): Column {
@@ -188,6 +188,13 @@ export class CliffModel {
    * mesh), talus cones at the foot under the gullies, then the fjord bed.
    */
   backingHeight(z: number, t: number, bedDepth: number): number {
+    // conservative over the heightfield's sampling footprint (far tiles are 32 m): the most inland
+    // face of the neighbouring columns, so linear interpolation between samples never pokes out
+    // in front of a gully wall
+    return Math.min(this.backingAt(z - 18, t, bedDepth), this.backingAt(z, t, bedDepth), this.backingAt(z + 18, t, bedDepth));
+  }
+
+  private backingAt(z: number, t: number, bedDepth: number): number {
     const c = this.column(z);
     const inset = 9;
     const sink = 4;
@@ -297,8 +304,14 @@ export function buildCliffSegment(model: CliffModel, o: CliffSegmentOptions): TH
     for (let i = 0; i < nr - 1; i++) {
       const a = j * nr + i, b = a + 1, c2 = a + nr, d = c2 + 1;
       // winding: the face looks seaward (−X)
-      idx[q++] = a; idx[q++] = b; idx[q++] = c2;
-      idx[q++] = b; idx[q++] = d; idx[q++] = c2;
+      // alternate the diagonal (no directional streaks in the shading)
+      if ((i + j) & 1) {
+        idx[q++] = a; idx[q++] = b; idx[q++] = c2;
+        idx[q++] = b; idx[q++] = d; idx[q++] = c2;
+      } else {
+        idx[q++] = a; idx[q++] = d; idx[q++] = c2;
+        idx[q++] = a; idx[q++] = b; idx[q++] = d;
+      }
     }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));

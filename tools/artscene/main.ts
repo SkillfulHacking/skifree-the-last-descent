@@ -165,7 +165,7 @@ async function main() {
   }
   if (mode === 'proposed') {
     const am = m as ArtCoastMountain;
-    const kitMat = createRockMaterial({ kind: 'gneiss', vertexColors: true, water: coast.seaLevelAt(P.focus.z), snow: 1, strata: 1 });
+    const kitMat = createRockMaterial({ kind: 'gneiss', vertexColors: true, water: coast.seaLevelAt(P.focus.z), snow: 1, strata: 1, tint: 0xc2cad4 });
     const kit = new CliffKit(am.cliff, kitMat, 256, 24);
     kit.sync(P.zWin[0], P.zWin[1], camera.position.x, camera.position.z);
     scene.add(kit.group);
