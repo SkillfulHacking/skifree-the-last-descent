@@ -96,12 +96,13 @@ export class HazardLayer {
   }
 
   /**
-   * Build pending views for up to `ms` of main-thread time (at least one per call, nearest first).
+   * Build pending views for up to `ms` of main-thread time (nearest first; at least one per call
+   * unless `atLeastOne` is false — World's shared frame budget decides that since round 4).
    * Views are created ~1 km ahead (World streams hazard bands that far), so a band's views spread
    * over a few frames instead of costing one frame 10–50 ms (round 2, D1).
    */
-  pump(ms: number, focusZ = -Infinity): void {
-    if (!this.pending.size) return;
+  pump(ms: number, focusZ = -Infinity, atLeastOne = true): void {
+    if (!this.pending.size || (!atLeastOne && ms <= 0)) return;
     const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
     const t0 = now();
     const order = [...this.pending.values()].sort((a, b) => Math.abs(a.z - focusZ) - Math.abs(b.z - focusZ));

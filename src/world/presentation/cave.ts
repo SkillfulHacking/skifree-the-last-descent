@@ -11,6 +11,7 @@
  *
  * Alpine: "alpine-cave" (no extra dressing: the original StoryProps), registered in ./alpine.ts.
  */
+import { frameBudget } from '../../core/frameBudget';
 import type * as THREE from 'three';
 import type { QualityPreset } from '../../core/types';
 import type { Mountain } from '../course';
@@ -102,7 +103,8 @@ export function dressingTicker(ms: number): { over(): boolean } {
   return {
     over() {
       const t = now();
-      if (t - t0 < ms) return false;
+      // (round 4) also once the frame's shared streaming budget is spent
+      if (t - t0 < ms && t < frameBudget.deadline) return false;
       t0 = t;
       return true;
     },

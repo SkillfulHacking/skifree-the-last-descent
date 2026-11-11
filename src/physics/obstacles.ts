@@ -131,8 +131,43 @@ export class ObstacleField {
     for (let b = b0; b <= b1; b++) if (!this.bands.has(b)) this.addBand(b);
   }
 
+  /** bands being generated in time slices (prefetch) */
+  private jobs = new Map<number, Generator<void, Obstacle[], void>>();
+
+  /** true when a band overlapping [z0, z1] is not generated yet */
+  missing(z0: number, z1: number): boolean {
+    for (let b = Math.floor(z0 / BAND); b <= Math.floor(z1 / BAND); b++) if (!this.bands.has(b)) return true;
+    return false;
+  }
+
+  /**
+   * Time-sliced generation of the nearest missing band in [z0, z1] (round 4, Phase E: the visual
+   * window ahead of the physics window), for up to `ms` (at least one row). A band that `ensure`
+   * needs before its job is done is finished synchronously — with the same result.
+   */
+  prefetch(z0: number, z1: number, ms: number): void {
+    const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    for (let b = Math.floor(z0 / BAND); b <= Math.floor(z1 / BAND); b++) {
+      if (this.bands.has(b)) continue;
+      let job = this.jobs.get(b);
+      if (!job) this.jobs.set(b, (job = generateBandSteps(this.mountain, this.seed, b)));
+      for (;;) {
+        const r = job.next();
+        if (r.done) {
+          this.jobs.delete(b);
+          this.install(b, r.value);
+          break;
+        }
+        if (now() - t0 >= ms) return;
+      }
+      if (now() - t0 >= ms) return;
+    }
+  }
+
   /** Release bands entirely outside [keep0, keep1]. */
   release(keep0: number, keep1: number) {
+    for (const b of [...this.jobs.keys()]) if (b * BAND + BAND < keep0 || b * BAND > keep1) this.jobs.delete(b);
     for (const [b, list] of this.bands) {
       const z0 = b * BAND;
       if (z0 + BAND >= keep0 && z0 <= keep1) continue;
@@ -167,7 +202,18 @@ export class ObstacleField {
   }
 
   private addBand(b: number) {
-    const list = generateBand(this.mountain, this.seed, b);
+    const job = this.jobs.get(b);
+    let list: Obstacle[];
+    if (job) {
+      let r = job.next();
+      while (!r.done) r = job.next();
+      this.jobs.delete(b);
+      list = r.value;
+    } else list = generateBand(this.mountain, this.seed, b);
+    this.install(b, list);
+  }
+
+  private install(b: number, list: Obstacle[]) {
     this.bands.set(b, list);
     for (const o of list) {
       this.byId.set(o.id, o);
@@ -179,6 +225,18 @@ export class ObstacleField {
 
 /** Deterministic obstacle generation for one band. */
 export function generateBand(m: Mountain, seed: number, band: number): Obstacle[] {
+  const g = generateBandSteps(m, seed, band);
+  let r = g.next();
+  while (!r.done) r = g.next();
+  return r.value;
+}
+
+/**
+ * The same generation as a time-sliced job (round 4, Phase E): yields after every row of cells. The
+ * result is identical to generateBand's (the random stream is local to the job), whenever and
+ * however it is stepped.
+ */
+export function* generateBandSteps(m: Mountain, seed: number, band: number): Generator<void, Obstacle[], void> {
   const P = m.profile;
   // location mix (alpine: all 1 / no weights, i.e. the original placement, draw for draw)
   const B = m.biome;
@@ -209,6 +267,7 @@ export function generateBand(m: Mountain, seed: number, band: number): Obstacle[
   };
 
   for (let gz = Math.max(zA, -260); gz < zB; gz += CELL) {
+    if (gz > Math.max(zA, -260)) yield;
     // per-row seed so a band's layout does not depend on generation order
     for (let gx = X_MIN; gx < X_MAX; gx += CELL) {
       const x = gx + rng.range(0.1, 0.9) * CELL;

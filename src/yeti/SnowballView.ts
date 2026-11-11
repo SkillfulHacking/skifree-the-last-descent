@@ -94,8 +94,19 @@ export class SnowballView {
   private q: Vec3 = { x: 0, y: 0, z: 0 };
   private n = new THREE.Vector3();
 
+  /**
+   * Round 4 (D r3 defect 5): the first throw slot (ball, marker, the alphaMap beam — a program no
+   * other material uses — glint and trail) is created here, visible far below the course, so the
+   * warm-up compile at session start (App: GameSession.warmupObjects) covers it instead of the
+   * first throw mid-chase. The session's set-up call to update() keeps it shown; the next one
+   * (the first frame, after the compile) hides it.
+   */
+  private warm = 2;
+
   constructor(private readonly normalAt: (x: number, z: number, out: Vec3) => void) {
     this.group.name = 'snowballs';
+    const s = this.slot();
+    for (const o of [s.ball, s.marker, s.beam, s.glint, ...s.trail]) o.position.set(0, -5000, 0);
   }
 
   private slot(): Slot {
@@ -150,6 +161,7 @@ export class SnowballView {
         if (this.heldBall) this.heldBall.scale.setScalar(1.25 + 0.15 * pulse);
       }
     }
+    if (this.warm > 0 && --this.warm > 0 && !barrage) return; // keep the warm-up slot shown for the compile
     for (const s of this.slots) s.used = false;
     if (barrage) for (const b of barrage.balls) this.draw(this.slot(), b, time);
     for (const s of this.slots) {

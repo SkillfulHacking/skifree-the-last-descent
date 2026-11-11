@@ -342,7 +342,8 @@ export class Vegetation {
 
   update(camPos: THREE.Vector3, time: number, budgetMs = 2) {
     this.uTime.value = time;
-    if (this.queue.length) {
+    // (budgetMs ≤ 0: World's shared frame budget is spent — build nothing this frame, round 4)
+    if (this.queue.length && budgetMs > 0) {
       // nearest band first
       this.queue.sort((a, b) => Math.abs(a.band * BAND + BAND / 2 - camPos.z) - Math.abs(b.band * BAND + BAND / 2 - camPos.z));
       const t0 = performance.now();

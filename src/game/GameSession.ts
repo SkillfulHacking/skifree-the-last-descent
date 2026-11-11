@@ -1010,7 +1010,7 @@ export class GameSession implements Stage {
 
     const focus = this.run.phase === 'caveCinematic' ? this.world.cave.mouth : this.renderPos;
     this.world.updateOrigin(focus);
-    this.world.update(dt, this.time, focus, this.camera.position, 3.5);
+    this.world.update(dt, this.time, focus, this.camera.position);
   }
 
   private updateTutorial(dt: number) {

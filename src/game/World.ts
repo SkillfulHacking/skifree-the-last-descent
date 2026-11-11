@@ -33,7 +33,8 @@ import { buildMountain, courseId, worldSeed, type CourseConfig } from './CourseC
 import type { Biome } from '../world/biome';
 import { BiomeEnvironment } from '../world/capabilities/environment';
 import { makeWeatherSample } from '../world/capabilities/weather';
-import { HAZARD_VIEW_BUDGET_MS, HazardLayer, SCENERY_BUDGET_MS, presentationOf, type BiomePresentation, type CaveDressing, type FinishDefinition, type FinishEnvironment, type RefugeView, type SceneryView } from '../world/presentation';
+import { frameBudget } from '../core/frameBudget';
+import { HazardLayer, presentationOf, type BiomePresentation, type CaveDressing, type FinishDefinition, type FinishEnvironment, type RefugeView, type SceneryView } from '../world/presentation';
 
 export interface CaveSlot {
   enc: Encounter;
@@ -44,6 +45,18 @@ export interface CaveSlot {
 }
 
 const ORIGIN_STEP = 1024;
+
+/**
+ * One streaming budget per frame (ms of main-thread time), shared by every streaming consumer in
+ * priority order (round 4, Reviewer D r3 defect 1: terrain 3.5 + caves 4 + dressing 3 + scenery 3 +
+ * hazard views 2 + vegetation 2 ms each ran in the same frame, and each overshot by one unit).
+ */
+export const STREAM_BUDGET_MS = 6;
+/** a consumer with work pending that has had no turn for this many frames gets one minimal slice */
+export const STREAM_STARVE_FRAMES = 8;
+/** streaming consumers, highest priority first */
+const STREAM_ORDER = ['terrain', 'obstacles', 'vegetation', 'hazards', 'caves', 'scenery', 'lodges', 'far'] as const;
+type StreamConsumer = (typeof STREAM_ORDER)[number];
 
 /** hazard bands (and their views) are streamed this far ahead of the skier, m */
 export const HAZARD_VIEW_AHEAD = 1100;
@@ -94,6 +107,8 @@ export class World {
   /** the encounter the session cares about now (set by GameSession) */
   focusEncounter: Encounter | null = null;
   private streamZ = -Infinity;
+  /** focus z of the last stream() (the visual obstacle window starts here) */
+  private streamZ0 = 0;
 
   private constructor(renderer: THREE.WebGLRenderer, quality: QualityPreset, course: CourseConfig) {
     this.quality = quality;
@@ -177,15 +192,10 @@ export class World {
           if (this.environment.hazards.bandCount !== before) break;
         }
     }
-    // visual window: nearest missing band first, one per frame
+    // visual window (trees and rocks seen ahead): time-sliced on the frame's streaming budget
+    // (round 4: a coastal band was 16–25 ms in one frame); the physics window above is always whole
+    this.streamZ0 = z;
     if (all) this.obstacles.ensure(z - 600, z + ahead);
-    else {
-      for (let d = 0; d <= ahead; d += BAND) {
-        const before = this.obstacles.bandCount;
-        this.obstacles.ensure(z + d, z + d);
-        if (this.obstacles.bandCount !== before) break;
-      }
-    }
     if (all || Math.abs(z - this.streamZ) > 64) {
       this.streamZ = z;
       this.obstacles.release(z - 900, z + ahead + 400);
@@ -422,14 +432,106 @@ export class World {
     this.hazardViews.warmup();
   }
 
-  update(dt: number, time: number, focus: THREE.Vector3, camPos: THREE.Vector3, terrainBudgetMs: number) {
-    this.stream(focus.z);
-    this.stepCaves();
-    this.stepLodges();
-    this.hazardViews.pump(HAZARD_VIEW_BUDGET_MS, focus.z);
-    this.scenery?.pump?.(SCENERY_BUDGET_MS);
-    this.terrain.update(focus.x, focus.z, terrainBudgetMs, time);
-    this.vegetation.update(camPos, time);
+  /** frames each streaming consumer has waited with work pending (starvation guard) */
+  private starved: Record<StreamConsumer, number> = { terrain: 0, obstacles: 0, vegetation: 0, hazards: 0, caves: 0, scenery: 0, lodges: 0, far: 0 };
+  /** per-frame streaming diagnostics (tests, perf harness): which consumers ran last frame */
+  readonly streamStats = { served: [] as StreamConsumer[], starvedTurns: 0 };
+
+  private pendingOf(c: StreamConsumer): boolean {
+    switch (c) {
+      case 'terrain':
+        return this.terrain.pendingNear > 0;
+      case 'obstacles':
+        return this.obstacles.missing(this.streamZ0, this.streamZ0 + this.vegetation.farDist);
+      case 'vegetation':
+        return this.vegetation.pending > 0;
+      case 'hazards':
+        return this.hazardViews.pendingCount > 0;
+      case 'caves':
+        return this.caveJobs.size + this.dressJobs.size > 0;
+      case 'scenery':
+        return (this.scenery?.pending ?? 0) > 0;
+      case 'lodges':
+        return this.lodgeJobs.size > 0;
+      case 'far':
+        return this.terrain.pendingFar > 0;
+    }
+  }
+
+  private runConsumer(c: StreamConsumer, ms: number, focus: THREE.Vector3, camPos: THREE.Vector3) {
+    switch (c) {
+      case 'terrain':
+        return this.terrain.pumpNear(focus.x, focus.z, ms);
+      case 'obstacles':
+        return this.obstacles.prefetch(this.streamZ0, this.streamZ0 + this.vegetation.farDist, ms);
+      case 'vegetation':
+        return this.vegetation.update(camPos, this.frameTime, ms);
+      case 'hazards':
+        return this.hazardViews.pump(ms, focus.z, false);
+      case 'caves':
+        return this.stepCaves();
+      case 'scenery':
+        return this.scenery?.pump?.(ms);
+      case 'lodges':
+        return this.stepLodges();
+      case 'far':
+        return this.terrain.pumpFar(ms);
+    }
+  }
+  private frameTime = 0;
+
+  /**
+   * The streaming work of one frame on one shared budget, in priority order (STREAM_ORDER): each
+   * consumer runs only while the budget lasts (its own slices also end with it: core/frameBudget),
+   * so at most one unit overruns; a consumer starved for STREAM_STARVE_FRAMES gets one minimal
+   * slice (one starved consumer per frame), so nothing waits for ever behind higher priorities.
+   */
+  private stepStreaming(focus: THREE.Vector3, camPos: THREE.Vector3) {
+    const served = this.streamStats.served;
+    served.length = 0;
+    let rescued = false;
+    for (const c of STREAM_ORDER) {
+      const pending = this.pendingOf(c);
+      const left = frameBudget.remaining();
+      if (c === 'vegetation') {
+        // vegetation also updates its LOD visibility every frame: always called, building only on budget
+        const rescue = !(left > 0) && pending && !rescued && this.starved[c] >= STREAM_STARVE_FRAMES;
+        if (rescue) {
+          rescued = true;
+          this.streamStats.starvedTurns++;
+        }
+        this.vegetation.update(camPos, this.frameTime, left > 0 ? left : rescue ? 0.5 : 0);
+        if (pending && (left > 0 || rescue)) served.push(c);
+        this.starved[c] = pending && !(left > 0) && !rescue ? this.starved[c] + 1 : 0;
+        continue;
+      }
+      if (left > 0 && pending) {
+        this.runConsumer(c, left, focus, camPos);
+        if (pending) served.push(c);
+        this.starved[c] = 0;
+      } else if (pending && !rescued && this.starved[c] >= STREAM_STARVE_FRAMES) {
+        rescued = true;
+        this.streamStats.starvedTurns++;
+        this.runConsumer(c, 0.5, focus, camPos);
+        served.push(c);
+        this.starved[c] = 0;
+      } else if (pending) this.starved[c]++;
+      else this.starved[c] = 0;
+    }
+  }
+
+  update(dt: number, time: number, focus: THREE.Vector3, camPos: THREE.Vector3, streamBudgetMs: number = STREAM_BUDGET_MS) {
+    this.frameTime = time;
+    frameBudget.begin(streamBudgetMs);
+    try {
+      // physics-critical streaming first (obstacles and hazards near the skier: bounded, one band)
+      this.stream(focus.z);
+      // terrain bookkeeping every frame (window, LOD wishes, time uniform), even with no budget left
+      this.terrain.syncLod(focus.x, focus.z, time);
+      this.stepStreaming(focus, camPos);
+    } finally {
+      frameBudget.end();
+    }
     // weather on the physics clock (Alpine: constant; fog, flakes exactly as before)
     const env = this.environment;
     env.weatherAt(focus.x, focus.z, env.clock, this.weather);

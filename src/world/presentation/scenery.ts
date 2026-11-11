@@ -43,6 +43,8 @@ export interface SceneryView {
   stream(z: number): void;
   /** advance queued builds for about `budgetMs` of main-thread time (World calls it every frame) */
   pump?(budgetMs: number): void;
+  /** queued builds still to do (World's shared frame budget: starvation guard) */
+  readonly pending?: number;
   /** finish every queued build now (loading, teleports) */
   flush?(): void;
   update(dt: number, time: number, f: SceneryFrame): void;
