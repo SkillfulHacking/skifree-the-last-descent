@@ -12,6 +12,10 @@
  *  - airborne when the terrain falls away faster than gravity can follow (natural jumps);
  *  - landings evaluate impact speed into the surface and ski/velocity alignment;
  *  - obstacle collisions classify light / heavy / catastrophic contacts;
+ *  - terrain steeper than TERRAIN_CONTACT.wallDeg that the skier moves into is a WALL, not a ramp: the step is
+ *    blocked, the velocity into the face is removed (light / heavy / crash like a boulder) and the
+ *    skier slides along it; ground snapping never creates mechanical energy beyond a tiny
+ *    discretisation allowance (see groundFollow / wallHit);
  *  - a location (biome) changes the feel only through ONE hook, the optional PhysicsEnvironment
  *    (./environment.ts): surface modifiers, crosswind, balance, hazard knocks/crashes. With no
  *    environment, or Alpine's identity one, every number below is used unchanged.
@@ -55,6 +59,58 @@ export const TUNING = {
 /** How a grounded side-slip (EnvSample.groundSlip*) takes hold, by what the skier is doing. */
 export const SLIP_EDGE = { base: 1, tuck: 0.6, brake: 0.45, drift: 0.6 } as const;
 
+/**
+ * Terrain-contact limits (engine-wide, every location).
+ *  - wallDeg: terrain the skier would have to climb more steeply than this in one step is a wall.
+ *    Pistes, kickers, rollers and banks are far below it (steepest grounded climb seen in normal
+ *    Alpine runs: rise/run 0.10, ≈ 6°); cave cliff faces and cliff-band sides are far above it.
+ *  - snapExcessTol: how far (m) one step's ground snap may lift the skier above the straight-line
+ *    prediction before the extra height is paid for out of kinetic energy. Smooth terrain stays well
+ *    under it (normal-run max 0.013 m), so only kinks pay; the most energy one step can gain from
+ *    snapping is g·snapExcessTol ≈ 0.25 J/kg.
+ *  - Wall impacts use the boulder thresholds (normal speed into the face, m/s).
+ */
+export const TERRAIN_CONTACT = {
+  wallDeg: 50,
+  wallSlope: Math.tan((50 * Math.PI) / 180),
+  snapExcessTol: 0.025,
+  /**
+   * most mechanical energy a takeoff step may gain from turning the velocity to the path's secant
+   * slope: takeoffTolJ J/kg + takeoffTolFrac of the kinetic energy. Real kicker lips gain up to
+   * 1.97 % (6.1 J/kg at 25 m/s; crests are slightly convex); steep-face and cave-mouth "launches"
+   * gained 8–155 % before this cap.
+   */
+  takeoffTolJ: 2,
+  takeoffTolFrac: 0.03,
+  /**
+   * most the path slope (rise/run) may steepen in one grounded step; more is a ledge, not a curve
+   * (normal-run max 0.094; a one-step 20 cm ledge at a cave mouth is ≈ 1.2)
+   */
+  maxSlopeStep: 0.25,
+  wallCos: Math.cos((50 * Math.PI) / 180),
+  /**
+   * an oblique contact with a wall-steep face counts once the skier would climb it faster than
+   * wallClimbMax m/s, or heads into it at more than wallIntoFrac of the speed (sliding along its foot,
+   * on a contour, does not count)
+   */
+  wallClimbMax: 0.3,
+  wallIntoFrac: 0.03,
+  /** stencil (m) for the face's own slope and orientation (wall test and wall response) */
+  faceProbe: 0.1,
+  /** a wall must rise at least this far (m) above the skier within wallProbe m: lower steps are bumps */
+  wallMinRise: 0.5,
+  wallProbe: 0.5,
+  wallCrash: 9,
+  wallHeavy: 3.5,
+  /** the terrain-normal stencil half-width (m), as Mountain.normalAt; see sampleNormal */
+  normalEps: 0.35,
+  /**
+   * concavity (m, sum of both side rises over ±normalEps) that marks the foot of a wall rather than
+   * a curve; normal Alpine runs peak at 0.064 (kicker transitions)
+   */
+  kinkRise: 0.15,
+};
+
 export interface SkierInput {
   steer: number; // -1..1 (+ = right)
   tuck: number; // 0..1
@@ -88,6 +144,8 @@ export class SkierState {
   airSpin = 0;
   crashed = false;
   crashTime = 0;
+  /** crashed against a wall in mid-air: the body falls to the ground before it can recover */
+  crashFalling = false;
   recoverTime = 0; // >0 while getting up
   tuck = 0;
   brake = 0;
@@ -155,9 +213,76 @@ export class SkierPhysics {
     s.pathSlope = hs > 1e-3 ? s.vel.y / hs : -Math.hypot(s.normal.x, s.normal.z) / s.normal.y;
   }
 
+  /**
+   * Terrain normal under the skier: central differences ±normalEps (the same stencil and arithmetic as
+   * Mountain.normalAt), except beside the foot of a wall. There the stencil would blend the face into
+   * the floor and turn horizontal speed into vertical; on an axis with a sharp concave kink (see
+   * kinkRise) the one-sided difference on the lower (floor) side is used instead. Skiable terrain never
+   * has such kinks, so everywhere else the result is bit-identical to Mountain.normalAt.
+   */
   private sampleNormal() {
-    this.mountain.normalAt(this.s.pos.x, this.s.pos.z, _n);
-    this.s.normal.set(_n.x, _n.y, _n.z);
+    const m = this.mountain;
+    const s = this.s;
+    const x = s.pos.x;
+    const z = s.pos.z;
+    const e = TERRAIN_CONTACT.normalEps;
+    const hl = m.heightAt(x - e, z);
+    const hr = m.heightAt(x + e, z);
+    const hd = m.heightAt(x, z - e);
+    const hu = m.heightAt(x, z + e);
+    let nx = hl - hr;
+    let nz = hd - hu;
+    const ny = 2 * e;
+    // a sharp concave kink on an axis (both sides together rise more than kinkRise above the skier,
+    // the steep one too): take the slope on the lower side only, i.e. the floor's
+    const K = TERRAIN_CONTACT.kinkRise;
+    const y = s.pos.y;
+    const dl = hl - y;
+    const dr = hr - y;
+    if (dl + dr > K && Math.max(dl, dr) > K) nx = dr > dl ? 2 * dl : -2 * dr;
+    const dd = hd - y;
+    const du = hu - y;
+    if (dd + du > K && Math.max(dd, du) > K) nz = du > dd ? 2 * dd : -2 * du;
+    const l = Math.hypot(nx, ny, nz);
+    s.normal.set(nx / l, ny / l, nz / l);
+  }
+
+  /**
+   * Is the terrain at (x1, z1) — one step from (x0, z0), where the skier was at height y0, moving with
+   * horizontal velocity (vx, vz) — a wall? Either the step itself climbs more steeply than wallSlope
+   * (head-on), or it climbs onto a face steeper than wallDeg while moving into it (oblique: a face
+   * that steep cannot be traversed or edged up either). And the face must rise more than wallMinRise
+   * above the skier within wallProbe (a low step is a bump to ride over). Only climbing steps pay for
+   * the closer look; on skiable terrain it always answers no.
+   */
+  private isWall(y0: number, x0: number, z0: number, x1: number, z1: number, h1: number, ref: boolean, vx: number, vz: number): boolean {
+    const T = TERRAIN_CONTACT;
+    const hd = Math.hypot(x1 - x0, z1 - z0);
+    if (h1 - y0 <= 1e-4) return false; // only a step that climbs can meet a wall
+    const base = ref ? this.groundRef(y0, x0, z0) : y0;
+    if (h1 - base <= 1e-4) return false;
+    this.mountain.normalAt(x1, z1, _n, T.faceProbe); // a tight stencil: the face's own orientation
+    let steep = h1 - base > T.wallSlope * hd + 1e-4;
+    const gl = Math.hypot(_n.x, _n.z);
+    if (!steep && gl > 1e-6) {
+      // oblique: the face's slope at and just uphill of (x1, z1)
+      const ux = -_n.x / gl;
+      const uz = -_n.z / gl;
+      const d = T.faceProbe;
+      const face = Math.max(gl / _n.y, (this.mountain.heightAt(x1 + ux * d, z1 + uz * d) - h1) / d);
+      if (face > T.wallSlope) {
+        // really moving into it: fast enough to climb it (rate = into · face slope), or at a real angle
+        // (sliding along its foot, on a contour, is fine)
+        const into = vx * ux + vz * uz;
+        steep = into * face > T.wallClimbMax || into > T.wallIntoFrac * Math.hypot(vx, vz);
+      }
+    }
+    if (!steep) return false;
+    if (h1 - base > T.wallMinRise) return true;
+    // tall enough? probe up the face (its gradient) and straight on
+    if (gl > 1e-6 && this.mountain.heightAt(x1 - (_n.x / gl) * T.wallProbe, z1 - (_n.z / gl) * T.wallProbe) - base > T.wallMinRise) return true;
+    const k = hd > 1e-9 ? T.wallProbe / hd : 0;
+    return this.mountain.heightAt(x1 + (x1 - x0) * k, z1 + (z1 - z0) * k) - base > T.wallMinRise;
   }
 
   private emit(e: SkierEvent) {
@@ -251,7 +376,9 @@ export class SkierPhysics {
     let vl = s.vel.dot(l);
     const pizzaGrip = 1 + 0.25 * s.brake;
     const wobbleGrip = 1 - 0.35 * s.wobble;
-    const grip = THREE.MathUtils.lerp(TUNING.gripCarve, TUNING.gripDrift, s.driftAmount) * TUNING.gripMul[surf] * pizzaGrip * wobbleGrip * M.grip;
+    // no edge holds on a face steeper than a wall: the skier slides down it (never on skiable terrain)
+    const faceGrip = n.y < TERRAIN_CONTACT.wallCos ? 0 : 1;
+    const grip = THREE.MathUtils.lerp(TUNING.gripCarve, TUNING.gripDrift, s.driftAmount) * TUNING.gripMul[surf] * pizzaGrip * wobbleGrip * M.grip * faceGrip;
     const removed = vl * (1 - Math.exp(-grip * dt));
     const vlNew = vl - removed;
     const eff = THREE.MathUtils.lerp(TUNING.carveEfficiency, TUNING.driftEfficiency, s.driftAmount) * (surf === 'ice' ? 0.85 : 1);
@@ -306,51 +433,169 @@ export class SkierPhysics {
     } else if (!input.pop) s.popCharge = 0;
 
     // --- integrate & ground follow / natural takeoff
-    // The path slope from the previous step (secant) is the launch direction: sampling the
-    // smoothed normal right on a crest would bend the velocity down before the lip.
-    const prevY = s.pos.y;
-    tmpA.copy(s.pos).addScaledVector(s.vel, dt);
-    // a location's side-slip (a squall blowing the snow out from under the skis): moves the skier
-    // without changing their speed. Biting edges (pizza) resist it; a tuck or a drift gives it more.
-    if (E.groundSlipX !== 0 || E.groundSlipZ !== 0) {
-      const k = SLIP_EDGE.base * (1 + SLIP_EDGE.tuck * s.tuck) * (1 - SLIP_EDGE.brake * s.brake) * (1 + SLIP_EDGE.drift * s.driftAmount);
-      tmpA.x += E.groundSlipX * k * dt;
-      tmpA.z += E.groundSlipZ * k * dt;
-    }
-    const hNew = this.mountain.heightAt(tmpA.x, tmpA.z);
-    const hd = Math.hypot(tmpA.x - s.pos.x, tmpA.z - s.pos.z);
-    const yBallistic = prevY + s.pathSlope * hd - 0.5 * GRAVITY * dt * dt;
-    const fallAway = yBallistic - hNew;
-    // Leaves the ground when the terrain drops away faster than gravity can follow.
-    if (fallAway > 0.006 && speed > 6) {
-      const hs = Math.hypot(s.vel.x, s.vel.z);
-      s.vel.y = s.pathSlope * hs - GRAVITY * dt;
-      s.pos.copy(tmpA);
-      s.pos.y = yBallistic;
-      this.goAirborne();
-      return;
-    }
-    s.pos.copy(tmpA);
-    s.pos.y = hNew;
-    if (hd > 1e-5) s.pathSlope = (hNew - prevY) / hd;
-    // re-project onto the new tangent plane while conserving speed (compressions)
-    let sp0 = s.vel.length();
-    this.sampleNormal();
-    // compressions (velocity driven into the snow by a concave transition) cost a little speed and
-    // load the legs/camera; smooth terrain changes are energy-neutral
-    const into = -s.vel.dot(s.normal);
-    if (into > 0.4) {
-      sp0 *= 1 - Math.min(0.08, 0.018 * into);
-      s.landImpact = Math.max(s.landImpact, clamp(into / 8, 0, 0.6));
-      if (into > 2.5) s.wobble = Math.max(s.wobble, clamp(into / 10, 0, 0.5));
-    }
-    s.vel.addScaledVector(s.normal, -s.vel.dot(s.normal));
-    const sp1 = s.vel.length();
-    if (sp1 > 1e-5) s.vel.multiplyScalar(sp0 / sp1);
+    if (!this.groundFollow(dt, speed)) return; // took off, or crashed into a wall
 
     // lean (for animation): centripetal / g, plus steering intent
     const lat = speed * s.steerSmoothed * rate;
     s.lean = damp(s.lean, clamp(Math.atan2(lat, GRAVITY) * 0.9, -0.9, 0.9), 9, dt);
+  }
+
+  /**
+   * Move one grounded step along the terrain. Returns false when the skier left the ground or
+   * crashed (the caller stops there).
+   *
+   * The path slope from the previous step (secant) is the launch direction: sampling the smoothed
+   * normal right on a crest would bend the velocity down before the lip.
+   *
+   * Energy rules (the cave-wall launch fix): the step never climbs a face steeper than
+   * TERRAIN_CONTACT.wallSlope (that is a wall: wallHit), a snap that lifts the skier above the
+   * straight-line prediction by more than snapExcessTol pays for the extra height out of kinetic
+   * energy, a one-step ledge does not become the launch direction (maxSlopeStep), and a takeoff gains
+   * at most takeoffTolJ + takeoffTolFrac of the kinetic energy (the secant launch's own slack).
+   */
+  private groundFollow(dt: number, speed: number): boolean {
+    const s = this.s;
+    const T = TERRAIN_CONTACT;
+    for (let attempt = 0; ; attempt++) {
+      const prevY = s.pos.y;
+      tmpA.copy(s.pos).addScaledVector(s.vel, dt);
+      // a location's side-slip (a squall blowing the snow out from under the skis): moves the skier
+      // without changing their speed. Biting edges (pizza) resist it; a tuck or a drift gives it more.
+      const E = this.envOut;
+      if (E.groundSlipX !== 0 || E.groundSlipZ !== 0) {
+        const k = SLIP_EDGE.base * (1 + SLIP_EDGE.tuck * s.tuck) * (1 - SLIP_EDGE.brake * s.brake) * (1 + SLIP_EDGE.drift * s.driftAmount);
+        tmpA.x += E.groundSlipX * k * dt;
+        tmpA.z += E.groundSlipZ * k * dt;
+      }
+      const hNew = this.mountain.heightAt(tmpA.x, tmpA.z);
+      const hd = Math.hypot(tmpA.x - s.pos.x, tmpA.z - s.pos.z);
+      // a face too steep to ski up: collide with it instead of climbing it (one retry along the face)
+      if (this.isWall(prevY, s.pos.x, s.pos.z, tmpA.x, tmpA.z, hNew, true, s.vel.x, s.vel.z)) {
+        if (!this.wallHit(tmpA.x, tmpA.z, true)) return false;
+        // the path now runs along the floor in the new direction (not up the face it never climbed)
+        const hs = Math.hypot(s.vel.x, s.vel.z);
+        s.pathSlope = hs > 1e-3 ? s.vel.y / hs : 0;
+        if (attempt === 0) continue;
+        return true; // still against the face: stay put this step
+      }
+      const yBallistic = prevY + s.pathSlope * hd - 0.5 * GRAVITY * dt * dt;
+      const fallAway = yBallistic - hNew;
+      // Leaves the ground when the terrain drops away faster than gravity can follow.
+      if (fallAway > 0.006 && speed > 6) {
+        const sp = s.vel.length();
+        const hs = Math.hypot(s.vel.x, s.vel.z);
+        const vyTangent = s.vel.y;
+        s.vel.y = s.pathSlope * hs - GRAVITY * dt;
+        // The launch direction comes from the path, but the takeoff may not gain energy: kinetic plus
+        // the height above where the velocity was heading stays within the takeoff tolerance.
+        const lift = GRAVITY * (yBallistic - prevY - vyTangent * dt);
+        const out2 = s.vel.lengthSq();
+        const tol = T.takeoffTolJ + T.takeoffTolFrac * 0.5 * sp * sp;
+        if (0.5 * (out2 - sp * sp) + lift > tol && out2 > 1e-12) s.vel.multiplyScalar(Math.sqrt(Math.max(0, sp * sp + 2 * (tol - lift)) / out2));
+        s.pos.copy(tmpA);
+        s.pos.y = yBallistic;
+        this.goAirborne();
+        return false;
+      }
+      const predictedY = prevY + s.vel.y * dt;
+      const px = s.pos.x;
+      const pz = s.pos.z;
+      s.pos.copy(tmpA);
+      s.pos.y = hNew;
+      // the path slope is the next launch direction: a one-step ledge (the secant jumping up far more
+      // than any curve can turn in one step) is a bump to ride over, not a ramp to launch from
+      if (hd > 1e-5) s.pathSlope = Math.min((hNew - prevY) / hd, s.pathSlope + T.maxSlopeStep);
+      // re-project onto the new tangent plane while conserving speed (compressions)
+      let sp0 = s.vel.length();
+      this.sampleNormal();
+      // compressions (velocity driven into the snow by a concave transition) cost a little speed and
+      // load the legs/camera; smooth terrain changes are energy-neutral
+      const into = -s.vel.dot(s.normal);
+      if (into > 0.4) {
+        sp0 *= 1 - Math.min(0.08, 0.018 * into);
+        s.landImpact = Math.max(s.landImpact, clamp(into / 8, 0, 0.6));
+        if (into > 2.5) s.wobble = Math.max(s.wobble, clamp(into / 10, 0, 0.5));
+      }
+      // a kink lifted the skier above where the velocity was heading: that height is not free
+      let excess = hNew - predictedY - T.snapExcessTol;
+      if (excess > 0) excess = hNew - (predictedY - prevY + this.groundRef(prevY, px, pz)) - T.snapExcessTol;
+      if (excess > 0) sp0 = Math.sqrt(Math.max(0, sp0 * sp0 - 2 * GRAVITY * excess));
+      s.vel.addScaledVector(s.normal, -s.vel.dot(s.normal));
+      const sp1 = s.vel.length();
+      if (sp1 > 1e-5) s.vel.multiplyScalar(sp0 / sp1);
+      return true;
+    }
+  }
+
+  /**
+   * Height the skier's last step really started from: its y, or the ground under it if an obstacle
+   * push moved it sideways onto higher ground since (pushes change x/z only). Only evaluated when a
+   * cheap test against y alone has already fired, so normal steps pay nothing for it.
+   */
+  private groundRef(y: number, x: number, z: number): number {
+    return Math.max(y, this.mountain.heightAt(x, z));
+  }
+
+  /**
+   * Contact with terrain too steep to ride (a cliff or cave wall) at (x, z), which the skier was
+   * about to move into. Removes the horizontal velocity into the face like a boulder contact
+   * (light: slide along it; heavy: bounce and lose speed; at ≥ wallCrash m/s: crash). The skier's
+   * position is not changed (the step into the face is cancelled). Never adds energy.
+   * Returns false if the skier crashed.
+   */
+  private wallHit(x: number, z: number, grounded: boolean): boolean {
+    const s = this.s;
+    const T = TERRAIN_CONTACT;
+    // face normal (horizontal, pointing out of the face) from the terrain gradient there, on the same
+    // tight stencil as the wall test (the ±0.35 m one would blend in the floor's own fall line)
+    this.mountain.normalAt(x, z, _n, TERRAIN_CONTACT.faceProbe);
+    const nl = Math.hypot(_n.x, _n.z);
+    if (nl < 1e-6) return true;
+    const nx = _n.x / nl;
+    const nz = _n.z / nl;
+    const vn = -(s.vel.x * nx + s.vel.z * nz); // speed into the face
+    if (vn <= 0) return true;
+    if (s.crashed) {
+      s.vel.x += nx * vn;
+      s.vel.z += nz * vn;
+      s.vel.multiplyScalar(0.5);
+      return false;
+    }
+    const sp0 = s.vel.length();
+    if (vn >= T.wallCrash) {
+      s.vel.x += nx * vn;
+      s.vel.z += nz * vn;
+      s.vel.multiplyScalar(0.3);
+      this.emit({ type: 'impact', kind: 'rock-heavy', intensity: 1, x, z });
+      this.crash('hit the cliff', 1);
+      return false;
+    }
+    if (vn >= T.wallHeavy) {
+      // bounce off a little, but never faster than before the hit
+      s.vel.x += nx * vn * 1.25;
+      s.vel.z += nz * vn * 1.25;
+      s.vel.multiplyScalar(0.62);
+      s.wobble = 1;
+      this.emit({ type: 'impact', kind: 'rock-heavy', intensity: clamp(vn / T.wallCrash, 0.4, 0.95), x, z });
+    } else {
+      s.vel.x += nx * vn;
+      s.vel.z += nz * vn;
+      s.vel.multiplyScalar(Math.exp(-1.5 * PHYS_DT));
+      s.wobble = Math.max(s.wobble, 0.4);
+      if (vn > 1.5) this.emit({ type: 'impact', kind: 'rock-light', intensity: clamp(vn / T.wallHeavy, 0.1, 0.4), x, z });
+    }
+    const sp1 = s.vel.length();
+    if (sp1 > sp0 && sp1 > 1e-9) s.vel.multiplyScalar(sp0 / sp1);
+    if (grounded) {
+      // back into the floor's tangent plane (the floor under the skier, not the face)
+      this.sampleNormal();
+      const n = s.normal;
+      const before = s.vel.length();
+      s.vel.addScaledVector(n, -s.vel.dot(n));
+      const after = s.vel.length();
+      if (after > before && after > 1e-9) s.vel.multiplyScalar(before / after);
+    }
+    return true;
   }
 
   private goAirborne() {
@@ -384,9 +629,26 @@ export class SkierPhysics {
       s.vel.z += E.airAccelZ * dt;
     }
     s.vel.y -= GRAVITY * dt;
+    const px = s.pos.x;
+    const py = s.pos.y;
+    const pz = s.pos.z;
     s.pos.addScaledVector(s.vel, dt);
-    const h = this.mountain.heightAt(s.pos.x, s.pos.z);
+    let h = this.mountain.heightAt(s.pos.x, s.pos.z);
     if (s.pos.y <= h) {
+      // flew into a face too steep to land on (it rises above where the skier just was): a wall hit,
+      // not a landing on top of it — the step into the face is cancelled and the skier falls beside it
+      if (this.isWall(py, px, pz, s.pos.x, s.pos.z, h, false, s.vel.x, s.vel.z)) {
+        const ok = this.wallHit(s.pos.x, s.pos.z, false);
+        s.pos.x = px;
+        s.pos.z = pz;
+        h = this.mountain.heightAt(px, pz);
+        if (!ok) {
+          s.crashFalling = s.pos.y > h;
+          if (!s.crashFalling) s.pos.y = h;
+          return;
+        }
+        if (s.pos.y > h) return;
+      }
       s.pos.y = h;
       this.land();
     }
@@ -460,6 +722,30 @@ export class SkierPhysics {
   private stepCrashed(input: SkierInput, dt: number) {
     const s = this.s;
     s.crashTime += dt;
+    if (s.crashFalling) {
+      // knocked off a wall in mid-air: fall (no recovery until on the ground)
+      s.vel.y -= GRAVITY * dt;
+      const px = s.pos.x;
+      const py = s.pos.y;
+      const pz = s.pos.z;
+      s.pos.addScaledVector(s.vel, dt);
+      let h = this.mountain.heightAt(s.pos.x, s.pos.z);
+      if (s.pos.y <= h && this.isWall(py, px, pz, s.pos.x, s.pos.z, h, false, s.vel.x, s.vel.z)) {
+        this.wallHit(s.pos.x, s.pos.z, false);
+        s.pos.x = px;
+        s.pos.z = pz;
+        h = this.mountain.heightAt(px, pz);
+      }
+      if (s.pos.y <= h) {
+        s.pos.y = h;
+        s.crashFalling = false;
+        s.crashTime = Math.min(s.crashTime, 0.5);
+        this.sampleNormal();
+        s.vel.addScaledVector(s.normal, -s.vel.dot(s.normal));
+        s.vel.multiplyScalar(0.4);
+      }
+      return;
+    }
     s.grounded = true;
     this.sampleNormal();
     const n = s.normal;
@@ -472,8 +758,18 @@ export class SkierPhysics {
     const sp = s.vel.length();
     const decel = 7.5 + 0.02 * sp * sp;
     if (sp > 0) s.vel.multiplyScalar(Math.max(0, sp - decel * dt) / sp);
+    const px = s.pos.x;
+    const py = s.pos.y;
+    const pz = s.pos.z;
     s.pos.addScaledVector(s.vel, dt);
-    s.pos.y = this.mountain.heightAt(s.pos.x, s.pos.z);
+    const h = this.mountain.heightAt(s.pos.x, s.pos.z);
+    if (this.isWall(py, px, pz, s.pos.x, s.pos.z, h, true, s.vel.x, s.vel.z)) {
+      // a tumbling body stops against a wall instead of climbing it
+      this.wallHit(s.pos.x, s.pos.z, false);
+      s.pos.x = px;
+      s.pos.z = pz;
+      s.pos.y = this.mountain.heightAt(px, pz);
+    } else s.pos.y = h;
     this.collide(dt);
     const canRecover = s.crashTime > 1.0;
     if ((canRecover && input.recover) || s.crashTime > 3.2) this.recover();
@@ -700,6 +996,7 @@ export class SkierPhysics {
     s.airTime = 0;
     s.airSpin = 0;
     s.pathSlope = 0;
+    s.crashFalling = false;
     s.touching.clear();
     this.emit({ type: 'relocate', reason, x, z });
     s.crashed = false;
