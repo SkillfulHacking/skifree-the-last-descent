@@ -1,8 +1,9 @@
 /**
  * Fjord Coast hazards (pure: no three.js). Registered before the biome (see ./index.ts).
  *
- * Every Fjord hazard asks the skier for a decision they can read in advance, and none of them can
- * knock the skier down or push them toward the sea:
+ * Every Fjord hazard asks the skier for a decision they can read in advance; none of them can
+ * crash the skier or push them toward the sea (the worst is a gust catching a tucked skier's skis in
+ * a wind gate's notch: a telegraphed speed knock and a wobble):
  *
  *  - sea-gust: a squall funnelled off the fjord. Periodic and slow enough to read: the windsock and
  *    spindrift build up for 2.4 s (telegraph, with a rising whoosh and a caption), the gust blows

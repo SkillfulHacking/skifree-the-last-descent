@@ -9,8 +9,8 @@
  *
  * Gameplay (environment-driven, never a faster Yeti): wide open, steady runs (no segment flatter
  * than 11°) with alternate lines; ridgeline spines with gap jumps; a gentle onshore crosswind on
- * airborne skiers (weather coupling); squall lanes that blow grounded skiers onshore across exposed
- * stretches of the racing line, squalls over jumps, and wind-scoured rock on and beside the line
+ * airborne skiers (weather coupling); wind gates on exposed stretches of the racing line (round 4:
+ * a rock rib with a gusty notch on its sea side and a drifted lee on its land side), squalls over jumps, and wind-scoured rock on and beside the line
  * (./hazards.ts); a cornice along the cliff rim that bogs down anyone who heads for the edge (the
  * surface model below) with an updraft and an out-of-bounds recovery for anyone who jumps it
  * (capabilities/environment.ts); and optional viewpoints on the rim in the stretches where nothing
