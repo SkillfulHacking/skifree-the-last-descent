@@ -31,7 +31,7 @@ export function waterFraction(m: Mountain, cam: THREE.Vector3, look: THREE.Vecto
   return r.value;
 }
 
-/** the same, yielding after each row of rays (a row costs a few ms of height samples) */
+/** the same, yielding after each ray */
 export function* waterFractionSteps(m: Mountain, cam: THREE.Vector3, look: THREE.Vector3, fov: number, aspect = 16 / 9, nx = 7, ny = 4): Generator<void, number, void> {
   const coast = m.coast;
   if (!coast) return 0;
@@ -60,8 +60,9 @@ export function* waterFractionSteps(m: Mountain, cam: THREE.Vector3, look: THREE
         if (d.y > 0 && p.y > cam.y + 1500) break;
         t += 2 + t * 0.11;
       }
+      // (a long ray over the fjord costs ~a hundred height samples: yield after each)
+      if (j < ny - 1 || i < nx - 1) yield;
     }
-    if (j < ny - 1) yield;
   }
   return hits / (nx * ny);
 }

@@ -43,6 +43,8 @@ export interface Column {
 }
 
 export const DS = 2;
+/** column grid for heightfield queries (m): the LOD0 mesh columns */
+const GRID = 4;
 
 export class CliffModel {
   private cache = new Map<number, Column>();
@@ -139,7 +141,7 @@ export class CliffModel {
       if (i > 0) d[i] = Math.max(d[i]!, d[i - 1]! + 0.03 * DS);
     }
     c = { z, xr, hRim, water, H, hm, base, d, occ };
-    if (this.cache.size > 1500) this.cache.clear();
+    if (this.cache.size > 3000) this.cache.clear();
     this.cache.set(key, c);
     return c;
   }
@@ -194,7 +196,25 @@ export class CliffModel {
     return Math.min(this.backingAt(z - 18, t, bedDepth), this.backingAt(z, t, bedDepth), this.backingAt(z + 18, t, bedDepth));
   }
 
+  /**
+   * The backing between the 4 m column grid (the mesh's LOD0 columns), linearly interpolated: every
+   * heightfield query hits the column cache (round 4 integration: per-metre columns thrashed the
+   * cache under terrain streaming — frame-time harness).
+   */
   private backingAt(z: number, t: number, bedDepth: number): number {
+    const g = z / GRID;
+    const a = Math.floor(g);
+    const f = g - a;
+    const ha = this.backingCol(a * GRID, t, bedDepth);
+    return f < 1e-6 ? ha : ha + (this.backingCol((a + 1) * GRID, t, bedDepth) - ha) * f;
+  }
+
+  /** the column on the 4 m grid nearest z (cheap: cached) */
+  gridColumn(z: number): Column {
+    return this.column(Math.round(z / GRID) * GRID);
+  }
+
+  private backingCol(z: number, t: number, bedDepth: number): number {
     const c = this.column(z);
     const inset = 9;
     const sink = 4;

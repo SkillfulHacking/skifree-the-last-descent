@@ -233,7 +233,7 @@ export class Mountain {
     if (k <= 0) return h;
     const cliff = this.cliff!;
     let out = cliff.backingHeight(z, t, c.p.depth);
-    const foot = cliff.footOffset(cliff.column(z));
+    const foot = cliff.footOffset(cliff.gridColumn(z));
     const wI = smoothstep(foot + 260, foot + 560, t);
     if (wI > 0) {
       const isl = c.islandHeight(x, z);
