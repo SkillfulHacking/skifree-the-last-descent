@@ -4,7 +4,7 @@
 - **New location: Fjord Coast** (2/5 "Scenic"): a descent along sea cliffs to a fishing harbour.
   Cornice along the rim (anisotropic friction, stall recovery after 3 s), wind gates (sheltered lee
   vs. the gusty notch) and squalls over jumps with a windsock telegraph (intensity Relaxed 0.5 /
-  Normal 1 / Hard 1.2; the Yeti is unchanged), gap jumps, scoured rock, a basalt sea cave with its
+  Normal 1 / Hard 1, × 0.85 on runs of 20 km and more; the Yeti is unchanged), gap jumps, scoured rock, a basalt sea cave with its
   own Yeti emergence, coastal refuges, the harbour finish (trophy, cold plunge, sea-to-summit
   reveal) and optional viewpoints (*Scenic Route* is now earnable).
 - **Art:** an authored sea-cliff kit streamed in 256 m segments with a triplanar rock material

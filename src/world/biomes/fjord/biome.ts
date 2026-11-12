@@ -221,9 +221,12 @@ export function makeFjordBiome(): Biome {
       weather: FJORD_WEATHER,
       // the same gates, squalls and rock on every difficulty (course codes describe one course); the
       // game difficulty scales how hard they punish, never whether the choice matters (round 4, D7/B3):
-      // Relaxed 0.6 (softer push, knock and drift: the same choices, smaller stakes), Hard 1.2 (the
-      // Yeti is not touched: brief §2). Round 3's Relaxed 0.25 effectively switched the location off.
-      hazards: { kinds: ['sea-gust', 'scoured-rock', 'gap-marker'], density: 1, intensity: { relaxed: 0.5, normal: 1, hard: 1.2 } },
+      // Relaxed 0.5 (softer push, knock and drift: the same choices, smaller stakes), Hard 1.0 — round
+      // 4b (B r4 #2): Hard 1.2 made the Alpine→Fjord step far steeper on Hard than on Normal; Hard is
+      // already harder through its own Yeti and snowballs. Long courses (≥ 20 km, Endless) × 0.85: the
+      // cost adds up over a long run (B r4: Normal Expedition min Yeti gap 6 m vs Alpine 45 m). The
+      // Yeti is not touched (brief §2). Round 3's Relaxed 0.25 effectively switched the location off.
+      hazards: { kinds: ['sea-gust', 'scoured-rock', 'gap-marker'], density: 1, intensity: { relaxed: 0.5, normal: 1, hard: 1 }, longCourse: 0.85 },
       finish: { id: 'fjord-harbour' },
       refuge: { id: 'coastal-shelter', name: 'Coastal shelter' },
       cave: { id: 'fjord-sea-cave' },

@@ -33,6 +33,11 @@ export interface HazardSetup {
    * without touching the Yeti (brief §2).
    */
   readonly intensity?: Readonly<Partial<Record<GameDifficulty, number>>>;
+  /**
+   * × intensity on long courses (finite ≥ 20 km, and Endless): the environment's cost accumulates
+   * over a long run, so a location can ease it there to keep its place on the difficulty ladder.
+   */
+  readonly longCourse?: number;
 }
 
 /** The player's game difficulty setting (mirrors game/CourseConfig Difficulty; world code may not import game). */
