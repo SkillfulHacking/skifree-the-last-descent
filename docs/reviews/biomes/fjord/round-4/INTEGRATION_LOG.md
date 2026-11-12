@@ -47,3 +47,12 @@ server: HMR reloads kill a running capture when sources change).
    leap 0.07 water share; custom Standard caves (R4I1–4, z 960): no station sees the water
    (the mouth sits 30–70 m below the rim, mouth faces inland; crane stations up to 75 m tried, none)
    → those keep the three-quarter shot. Known gap.
+7. Iteration captures (1280×720, /tmp, not committed) checked by eye: cave shell median ≈ 42/255,
+   shell flank ≈ 34, columns ≈ 49, chamber ≈ 1 (iter2 crop medians); chamber sun gate added after a
+   sunlit inner wall showed as a tan slab; 08/08b now hold the Yeti with the fjord in frame
+   (classic Sprint cave); 11h plunge water reads as water; gate lee ripples + notch glaze visible.
+   Full vitest after these: 304 tests, 1 failure (lintel count expectation, updated: intentional).
+## Next
+- freeze: tsc, vitest, build, full Playwright (PW_PORT=4472) → TESTS.md; candidate SHA
+- evidence from the candidate (fresh build + preview 4471): 1920 all + 1366/2560 menu,summit,finish
+- frames harness on the candidate → EVIDENCE.md
