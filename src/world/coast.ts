@@ -135,6 +135,9 @@ const SEA_CAVE_RIM_NEAR = 150;
 const SEA_CAVE_RIM_FAR = 260;
 /** rim cache grid (m) */
 const RIM_CELL = 8;
+/** round 6: islands are drawn as scanned rock meshes; the heightfield keeps a low base (m above the water) */
+export const MESH_ISLANDS = true;
+const ISLAND_BASE = 0.8;
 /** viewpoints: free stretches start this far down the run-in / past a refuge, end this far before a trigger */
 const LOOKOUT_RUNIN = 90;
 const LOOKOUT_AFTER_REFUGE = 170;
@@ -743,12 +746,26 @@ export class Coast {
           const q = Math.sqrt(u * u + v * v);
           if (q > 1.25) continue;
           const shore = 1 - smoothstep(0.92, 1.25, q);
-          const top = islandProfile(b, u, v, q, sd) * shore;
+          // round 6: the islands themselves are scanned rock meshes (art/scanIslands.ts); the
+          // heightfield keeps a low, rocky base under each (its shore band and foam ring the island,
+          // and it marks where an island stands)
+          const top = (MESH_ISLANDS ? Math.min(ISLAND_BASE, islandProfile(b, u, v, q, sd)) : islandProfile(b, u, v, q, sd)) * shore;
           const hgt = lv - this.p.depth + (this.p.depth + top) * smoothstep(1.25, 0.98, q);
           if (hgt > best) best = hgt;
         }
       }
     return best;
+  }
+
+  /** the islands of the cluster layout whose centres lie in z ∈ [z0, z1], at any x (deterministic) */
+  islandBlobs(z0: number, z1: number): IslandBlob[] {
+    const CELL = 1350;
+    const out: IslandBlob[] = [];
+    const xr = this.rimX((z0 + z1) / 2);
+    for (let cj = Math.floor((z0 - 600) / CELL); cj <= Math.floor((z1 + 600) / CELL); cj++)
+      for (let ci = Math.floor((xr - 9000) / CELL); ci <= Math.floor((xr + 300) / CELL); ci++)
+        for (const b of this.cluster(ci, cj, CELL)) if (b.z >= z0 && b.z <= z1) out.push(b);
+    return out;
   }
 
   private clusterCache = new Map<number, IslandBlob[]>();
@@ -827,7 +844,7 @@ export class Coast {
 }
 
 /** one island of a cluster: kind 0 skerry, 1 whaleback, 2 peak island */
-interface IslandBlob {
+export interface IslandBlob {
   kind: 0 | 1 | 2;
   x: number;
   z: number;

@@ -113,3 +113,21 @@ scene and the (unused in game) island meshes.
 Authors above match the Poly Haven API `/info/{slug}` records relayed by the coordinator. Later in the
 session `api.polyhaven.com` / `dl.polyhaven.org` were allowed (build-time only, with a tool User-Agent);
 nothing further was downloaded this round — the game never calls the API.
+
+## Round 6 Fjord islands: scanned rock models (branch `pass4-fjord`) — in the game build
+
+Fetched at build time from the Poly Haven API (`api.polyhaven.com/files/{slug}` → the 1K glTF, with
+the User-Agent `SkiFree-TheLastDescent-dev/1.0 (build-time asset pipeline)`), kept outside the
+repository, and converted with `tools/artbake/scan_to_skm.mjs` (meshoptimizer: positions welded,
+simplified to 5,000 triangles, quantised to 16 bits; the scans' own textures are NOT used — the
+islands take the triplanar rock material). Only the `.skm` files are committed. The game never calls
+Poly Haven. Licence CC0 1.0. Authors from the API `/info/{slug}` records (2026-11-12).
+
+| File (committed) | Asset | Source URL | Authors | Used for |
+|---|---|---|---|---|
+| `src/world/art/models/mountainside.skm` | Mountainside | https://polyhaven.com/a/mountainside | Dario Barresi; Rico Cilliers | high "peak" islands |
+| `src/world/art/models/namaqualand_cliff_02.skm` | Namaqualand Cliff 02 | https://polyhaven.com/a/namaqualand_cliff_02 | Dario Barresi; Rico Cilliers | high "peak" islands |
+| `src/world/art/models/namaqualand_boulder_02.skm` | Namaqualand Boulder 02 | https://polyhaven.com/a/namaqualand_boulder_02 | Greg Zaal; Rico Cilliers | whaleback islands |
+| `src/world/art/models/namaqualand_boulder_06.skm` | Namaqualand Boulder 06 | https://polyhaven.com/a/namaqualand_boulder_06 | Greg Zaal; Jenelle van Heerden | whalebacks, skerries |
+| `src/world/art/models/boulder_01.skm` | Boulder 01 | https://polyhaven.com/a/boulder_01 | Rico Cilliers | whaleback islands |
+| `src/world/art/models/namaqualand_boulders_01.skm` | Namaqualand Boulders 01 | https://polyhaven.com/a/namaqualand_boulders_01 | Greg Zaal; Jenelle van Heerden | skerry chains |

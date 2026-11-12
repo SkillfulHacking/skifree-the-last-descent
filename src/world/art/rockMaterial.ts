@@ -223,7 +223,7 @@ export function createRockMaterial(o: RockMaterialOptions = {}): THREE.MeshStand
     addAtmosphereUniforms(sh.uniforms);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vRkW;\nvarying vec3 vRkN;\n#ifdef RK_CAVE\nattribute vec4 aCave;\nvarying vec4 vRkCave;\n#endif')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRkW = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvRkN = normalize(mat3(modelMatrix) * objectNormal);\n#ifdef RK_CAVE\nvRkCave = aCave;\n#endif');
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvRkW = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvRkN = normalize(transpose(inverse(mat3(modelMatrix))) * objectNormal);\n#ifdef RK_CAVE\nvRkCave = aCave;\n#endif');
     sh.fragmentShader = sh.fragmentShader
       .replace(
         '#include <common>',

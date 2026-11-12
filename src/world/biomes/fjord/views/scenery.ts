@@ -16,6 +16,7 @@ import { SeaMist } from './mist';
 import { PAINT, cairn, ferry, fishingBoat, house, jetty, kitMaterials, rimOutcrop } from './buildings';
 import { viewpointProps } from './viewpoint';
 import { CliffStream } from '../../../art/cliffStream';
+import { ScanIslands } from '../../../art/scanIslands';
 
 const CHUNK = 512;
 /** chunks kept behind / ahead of the skier (hamlets far below must show from far away) */
@@ -56,6 +57,8 @@ export class FjordScenery implements SceneryView {
   private time = 0;
   /** round 4: the authored sea cliffs (null without the cliff kit) */
   readonly cliffs: CliffStream | null;
+  /** round 6: scanned-rock islands */
+  readonly islands: ScanIslands;
   private cliffWin: [number, number] = [0, 0];
   private cliffFocus = new THREE.Vector3(NaN, 0, NaN);
 
@@ -77,6 +80,8 @@ export class FjordScenery implements SceneryView {
     this.shipGeo = b.build(this.mats, { cast: false, receive: false });
     this.cliffs = ctx.mountain.cliff ? new CliffStream(ctx.mountain, ctx.quality) : null;
     if (this.cliffs) this.group.add(this.cliffs.group);
+    this.islands = new ScanIslands(ctx.mountain, ctx.quality);
+    this.group.add(this.islands.group);
   }
 
   // --- streaming ------------------------------------------------------------------------------
@@ -107,6 +112,7 @@ export class FjordScenery implements SceneryView {
     this.cliffWin = [z - 1000, (c1 + 1) * CHUNK];
     if (!Number.isFinite(this.cliffFocus.x)) this.cliffFocus.set(this.m.routeX(z), 0, z);
     this.cliffs?.want(this.cliffWin[0], this.cliffWin[1], this.cliffFocus.x, this.cliffFocus.z);
+    this.islands.want(z - 2500, (c1 + 1) * CHUNK + 6000);
   }
 
   /** Advance queued chunk builds for about `budgetMs` (one slice is ≤ ~budget; see chunkSteps). */
@@ -312,6 +318,7 @@ export class FjordScenery implements SceneryView {
   dispose(): void {
     this.jobs.length = 0;
     this.cliffs?.dispose();
+    this.islands.dispose();
     for (const v of this.chunks.values()) this.dropChunk(v);
     this.chunks.clear();
     for (const s of this.ships) s.obj.removeFromParent();
