@@ -371,6 +371,8 @@ export class Guest {
    */
   hold = 0;
   holdLift = 0;
+  /** extra sideways offset of the presenting hands (m, toward the side the hands already favour) */
+  holdSide = 0;
   tuck = 0;
   /** forced run cycle (stride phase, radians) for a scripted dash; null = off */
   run: number | null = null;
@@ -1251,7 +1253,7 @@ export class Guest {
       if (this.hold > 0) {
         // present: both hands together in front of the chest (raised with holdLift)
         const lift = clamp01(this.holdLift);
-        this.tmpB.set(side * 0.1 - 0.17, -0.04 + 0.4 * lift, 0.36 - 0.06 * lift);
+        this.tmpB.set(side * 0.1 - 0.17 - this.holdSide, -0.04 + 0.4 * lift, 0.36 - 0.06 * lift);
         T.lerp(this.tmpB, clamp01(this.hold));
         this.tmpA.set(side * 0.9, -1, -0.1);
         P.lerp(this.tmpA, clamp01(this.hold)).normalize();

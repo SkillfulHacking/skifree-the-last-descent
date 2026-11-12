@@ -1116,6 +1116,7 @@ export class Harbour implements FinishEnvironment {
     this.crown.visible = false;
     this.presenter.hold = 0;
     this.presenter.holdLift = 0;
+    this.presenter.holdSide = 0;
     this.presenter.place(this.presentAt.x, this.presentAt.z, Math.atan2(this.stop.x - this.presentAt.x, this.stop.z - this.presentAt.z), null);
   }
 

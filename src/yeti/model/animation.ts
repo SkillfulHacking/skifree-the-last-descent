@@ -718,6 +718,44 @@ function disgust(o: PoseSample, t: number, c: AnimCtx): void {
   void c;
 }
 
+/**
+ * The Fjord victory gag (round-3 C #4: "no body business, hands hang at his sides"): he hunches
+ * over the bite, the left hand flies to his throat, he retches twice with the jaw wide and the
+ * head thrust forward, and a shudder runs through the shoulders. The right hand (with the cod)
+ * comes away from the mouth, held out in front, ready to fling it.
+ */
+function gag(o: PoseSample, t: number, c: AnimCtx): void {
+  const hunch = smooth(0, 0.25, t);
+  const throat = smooth(0.05, 0.3, t) * (1 - smooth(1.6, 2.1, t));
+  const retch = Math.max(0, Math.sin(TAU * 2.2 * t)) * smooth(0.15, 0.3, t) * (1 - smooth(1.2, 1.5, t));
+  const shudder = smooth(0.2, 0.35, t) * (1 - smooth(1.4, 1.8, t)) * Math.sin(TAU * 11 * t);
+  posture(o, 0.7);
+  o.add('spine1', 0.1 * hunch + 0.08 * retch);
+  o.add('spine2', 0.14 * hunch + 0.1 * retch, 0, 0.04 * shudder);
+  o.add('spine3', 0.1 * hunch, 0, -0.05 * shudder);
+  o.hips.z += -0.08 * hunch;
+  // left hand clutching the throat
+  o.armIK[L] = throat;
+  o.hand[L].set(0.12, 1.88, 0.42);
+  o.elbow[L].set(1, -0.5, 0.2);
+  o.curl[L] = 0.55;
+  o.curl2[L] = 0.45;
+  o.thumb[L] = 0.4;
+  // right hand (holding the fish) out in front at chest height, away from the mouth
+  o.armIK[R] = hunch;
+  o.hand[R].set(-0.5, 1.5, 0.75);
+  o.elbow[R].set(-1, -0.5, -0.1);
+  o.curl[R] = 0.9;
+  o.curl2[R] = 0.8;
+  o.thumb[R] = 0.7;
+  for (let i = 0; i < 2; i++) o.addSide('clav', i, 0, 0.06 * shudder * SGN[i], 0.05 * shudder);
+  // head thrust forward on each retch, jaw wide
+  o.add('neck', 0.15 * hunch + 0.2 * retch);
+  o.add('head', -0.25 * retch, 0.05 * shudder, 0);
+  o.jaw = 0.25 + 0.7 * retch;
+  void c;
+}
+
 function turnAway(o: PoseSample, _t: number, c: AnimCtx): void {
   biped(o, c, { hunch: 1.0, armSwing: 0.12, heavy: 0.6, slump: 1 });
   o.add('neck', 0.25);
@@ -850,6 +888,9 @@ export function sampleMode(mode: YetiMode, o: PoseSample, t: number, c: AnimCtx)
       break;
     case 'disgust':
       disgust(o, t, c);
+      break;
+    case 'gag':
+      gag(o, t, c);
       break;
     case 'turnAway':
       turnAway(o, t, c);

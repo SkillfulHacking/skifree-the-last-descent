@@ -100,7 +100,7 @@ export const CLIFF_SEG = 256;
  * to cold grey gneiss-like rock. (Cliff Side was tried first: its regular sandstone bedding tiled into
  * a pinstripe across a kilometre of wall.)
  */
-const CLIFF_GRADE = { lum: 0.085, desat: 0.94, tint: [0.92, 0.98, 1.08] as [number, number, number] };
+const CLIFF_GRADE = { lum: 0.07, desat: 0.94, tint: [0.92, 0.98, 1.08] as [number, number, number] };
 /** LOD by distance from the skier (m): < LOD_NEAR → 0, < LOD_MID → 1, else 2 */
 const LOD_NEAR = 520;
 const LOD_MID = 1400;
@@ -160,7 +160,7 @@ export class CliffStream {
     const key = Math.round(water * 10) / 10;
     let mt = this.mats.get(key);
     if (!mt) {
-      mt = createRockMaterial({ kind: 'rock_face_03', tile: 9, vertexColors: true, water: key, snow: 1, strata: 0.8, hq: this.quality !== 'low', snowFrom: 0.8, grade: CLIFF_GRADE });
+      mt = createRockMaterial({ kind: 'rock_face_03', tile: 9, vertexColors: true, water: key, snow: 1, strata: 0.8, hq: this.quality !== 'low', snowFrom: 0.8, grade: CLIFF_GRADE, macroSet: { kind: 'cliff_side', tile: 85, strength: 0.65 }, streaks: 1.2 });
       this.mats.set(key, mt);
     }
     return mt;

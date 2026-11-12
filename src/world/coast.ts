@@ -726,9 +726,10 @@ export class Coast {
     const ci = Math.floor(x / CELL);
     const cj = Math.floor(z / CELL);
     let best = -1e9;
-    // warp the sample point a little so outlines are ragged (coves, points), not ellipses
-    const wx = x + 38 * gnoise(x / 170, z / 170, this.seed + 94) + 12 * gnoise(x / 41, z / 41, this.seed + 95);
-    const wz = z + 38 * gnoise(x / 170 + 7.3, z / 170, this.seed + 96) + 12 * gnoise(x / 41, z / 41 + 3.1, this.seed + 97);
+    const sd = this.seed;
+    // warp the sample point so outlines are ragged (coves, points, skerry tails), not ellipses
+    const wx = x + 44 * gnoise(x / 170, z / 170, sd + 94) + 16 * gnoise(x / 47, z / 47, sd + 95);
+    const wz = z + 44 * gnoise(x / 170 + 7.3, z / 170, sd + 96) + 16 * gnoise(x / 47, z / 47 + 3.1, sd + 97);
     for (let dj = -1; dj <= 1; dj++)
       for (let di = -1; di <= 1; di++) {
         const cl = this.cluster(ci + di, cj + dj, CELL);
@@ -736,21 +737,13 @@ export class Coast {
           const ex = wx - b.x;
           const ez = wz - b.z;
           if (Math.abs(ex) > b.a * 1.3 + 60 || Math.abs(ez) > b.a * 1.3 + 60) continue;
-          // rotated, elongated distance: q = 1 at the shoreline
+          // rotated, elongated distance: q = 1 at the shoreline; u runs along the ice-flow grain
           const u = (ex * b.c + ez * b.s) / b.a;
           const v = (-ex * b.s + ez * b.c) / b.b;
           const q = Math.sqrt(u * u + v * v);
           if (q > 1.25) continue;
           const shore = 1 - smoothstep(0.92, 1.25, q);
-          // steep shore (the first ~18 % inside the waterline rises fast: bare rock), then a
-          // flatter rounded top where snow lies; clefts and ridges follow the grain (along u)
-          const rise = smoothstep(1.0, 0.78, q);
-          const dome = Math.pow(Math.max(0, 1 - q * q), 0.75);
-          const grain = ridged(u * 2.4 + b.k, v * 0.9, this.seed + 98, 2) - 0.45;
-          const cleft = 1 - 0.35 * smoothstep(0.82, 1.0, 1 - Math.abs(gnoise(u * 1.7 + b.k, 0.5, this.seed + 99)));
-          // mostly a rounded dome (it must stay rounded when the 64 m far-field tiles sample it),
-          // with a steeper rocky rim near the waterline
-          const top = (2.5 + b.h * (0.28 * rise + 0.72 * Math.pow(dome, 1.25)) * cleft + b.h * 0.2 * grain * dome) * shore;
+          const top = islandProfile(b, u, v, q, sd) * shore;
           const hgt = lv - this.p.depth + (this.p.depth + top) * smoothstep(1.25, 0.98, q);
           if (hgt > best) best = hgt;
         }
@@ -758,9 +751,17 @@ export class Coast {
     return best;
   }
 
-  private clusterCache = new Map<number, Array<{ x: number; z: number; a: number; b: number; c: number; s: number; h: number; k: number }>>();
-  /** the islands of one cluster cell (deterministic, cached) */
-  private cluster(ci: number, cj: number, cell: number) {
+  private clusterCache = new Map<number, IslandBlob[]>();
+  /**
+   * The islands of one cluster cell (deterministic, cached). Round 4 (F-009, "repeated loaves"):
+   * the main island is no longer one tall dome per cluster. Glacial archipelagos are mostly LOW:
+   *  - whaleback (most): a long, low (50–105 m) scoured hump, gentle up-ice, plucked cliffs at the
+   *    down-ice end, benches along the grain;
+   *  - peak island (two clusters in five): a steep multi-summit island (130–250 m) — two or
+   *    three tops along a ridge, not a dome;
+   *  - satellites: low skerries (6–22 m) strung along the grain, some barely awash.
+   */
+  private cluster(ci: number, cj: number, cell: number): IslandBlob[] {
     const key = (ci + 4096) * 65536 + (cj + 32768);
     let out = this.clusterCache.get(key);
     if (out) return out;
@@ -771,19 +772,19 @@ export class Coast {
       const cz = (cj + r.range(0.2, 0.8)) * cell;
       const ang = r.range(0, Math.PI);
       // sizes are chosen to be resolved by the 64 m far-field terrain tiles (most of the sea is
-      // drawn by them): nothing smaller than ~150 m across
-      const big = r.float() < 0.6;
-      const a = big ? r.range(260, 480) : r.range(140, 240);
-      const main = { x: cx, z: cz, a, b: a * r.range(0.4, 0.62), c: Math.cos(ang), s: Math.sin(ang), h: big ? r.range(95, 185) : r.range(40, 80), k: r.range(0, 50) };
+      // drawn by them): nothing main smaller than ~150 m across
+      const peak = r.float() < 0.4;
+      const a = peak ? r.range(200, 340) : r.range(200, 460);
+      const main: IslandBlob = { kind: peak ? 2 : 1, x: cx, z: cz, a, b: a * (peak ? r.range(0.55, 0.8) : r.range(0.32, 0.55)), c: Math.cos(ang), s: Math.sin(ang), h: peak ? r.range(130, 250) : r.range(50, 105), k: r.range(0, 50) };
       out.push(main);
-      // satellite islets and skerries along the grain, off the ends and one side
-      const n = r.int(1, 4);
+      // satellite skerries along the grain, off the ends and one side
+      const n = r.int(2, 5);
       for (let i = 0; i < n; i++) {
-        const along = (r.float() < 0.5 ? -1 : 1) * r.range(1.0, 1.8) * a;
+        const along = (r.float() < 0.5 ? -1 : 1) * r.range(1.0, 2.0) * a;
         const across = r.range(-0.9, 0.9) * main.b;
         const sa = r.range(75, 150);
-        const aa = ang + r.range(-0.4, 0.4);
-        out.push({ x: cx + main.c * along - main.s * across, z: cz + main.s * along + main.c * across, a: sa, b: sa * r.range(0.45, 0.75), c: Math.cos(aa), s: Math.sin(aa), h: r.range(12, 34), k: r.range(0, 50) });
+        const aa = ang + r.range(-0.35, 0.35);
+        out.push({ kind: 0, x: cx + main.c * along - main.s * across, z: cz + main.s * along + main.c * across, a: sa, b: sa * r.range(0.45, 0.7), c: Math.cos(aa), s: Math.sin(aa), h: r.range(6, 22), k: r.range(0, 50) });
       }
     }
     if (this.clusterCache.size > 4096) this.clusterCache.clear();
@@ -823,4 +824,57 @@ export class Coast {
   isWater(z: number, h: number): boolean {
     return h < this.seaLevelAt(z) - 0.2;
   }
+}
+
+/** one island of a cluster: kind 0 skerry, 1 whaleback, 2 peak island */
+interface IslandBlob {
+  kind: 0 | 1 | 2;
+  x: number;
+  z: number;
+  a: number;
+  b: number;
+  c: number;
+  s: number;
+  h: number;
+  k: number;
+}
+
+/**
+ * Height of an island above the water (m) at local (u along the grain, v across, q radial; q = 1 at
+ * the shoreline). Steep rocky shores everywhere (the first ~15 % inside the waterline), then:
+ *  - skerry: a low, flat-backed rock with a ragged ridged top (wave-washed, little snow);
+ *  - whaleback: a stoss–lee hump — a long gentle ramp from the up-ice end (u < 0), a plateau, a
+ *    plucked cliff near the down-ice end (u > 0) — cut by benches and grooves along the grain;
+ *  - peak: two or three summits along the long axis on a steep-sided base (a ridge, not a dome).
+ */
+function islandProfile(b: IslandBlob, u: number, v: number, q: number, sd: number): number {
+  const rim = smoothstep(1.0, 0.8, q); // the steep rocky shore band
+  const grain = ridged(u * 2.6 + b.k, v * 0.8, sd + 98, 3); // grooves along the ice-flow grain
+  const rough = gnoise(u * 5.1 + b.k, v * 4.3, sd + 99);
+  if (b.kind === 0) {
+    const back = Math.pow(Math.max(0, 1 - q * q), 0.45);
+    return 1.2 + b.h * (0.35 * rim + 0.65 * back) * (0.75 + 0.35 * grain) + 1.2 * rough;
+  }
+  if (b.kind === 1) {
+    // stoss (u < 0): long convex ramp; lee (u > 0): the plateau breaks off in a plucked cliff
+    const leeEdge = 0.62 + 0.1 * gnoise(v * 2.2 + b.k, 1.7, sd + 100);
+    const stoss = Math.pow(Math.max(0, 1 - q * q), 0.6);
+    const plateau = Math.pow(Math.max(0, 1 - (v * v) / 0.9), 0.5) * (1 - smoothstep(leeEdge, leeEdge + 0.14, u));
+    const leeT = smoothstep(-0.2, 0.4, u);
+    let f = stoss * (1 - leeT) + Math.max(plateau * (0.9 + 0.1 * (1 - u)), 0.18 * rim) * leeT;
+    // benches: stepped levels (snow lies on them, rock shows on the risers)
+    f = f * 0.55 + 0.45 * (Math.floor(f * 4) + smoothstep(0.55, 1, (f * 4) % 1)) / 4;
+    return 1.5 + b.h * Math.max(0.3 * rim, f) * (0.62 + 0.6 * grain) + 3 * rough;
+  }
+  // peak island: summits along the axis, steep flanks, a talus / rock shelf at the shore
+  let f = 0;
+  const tops = 2 + (Math.floor(b.k) % 2);
+  for (let i = 0; i < tops; i++) {
+    const ut = -0.45 + (0.9 * i) / Math.max(1, tops - 1) + 0.12 * gnoise(i * 3.1 + b.k, 0.3, sd + 101);
+    const ht = 0.62 + 0.38 * (0.5 + 0.5 * gnoise(i * 1.7 + b.k, 4.2, sd + 102));
+    const d = Math.hypot((u - ut) * 1.5, v * 1.1);
+    f = Math.max(f, ht * Math.pow(Math.max(0, 1 - d), 1.35));
+  }
+  const shelf = 0.08 * rim;
+  return 2 + b.h * Math.max(shelf, f * (0.82 + 0.25 * grain)) + 3 * rough;
 }

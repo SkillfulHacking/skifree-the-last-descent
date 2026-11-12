@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { World } from './World';
 import { GameSession } from './GameSession';
+import { autoUiScale } from '../ui/scale';
 import { SkierModel } from '../player/SkierModel';
 import { YetiModel } from '../yeti/YetiModel';
 import { AudioEngine } from '../audio/AudioEngine';
@@ -136,6 +137,7 @@ export class App {
     this.camera.updateProjectionMatrix();
     this.applyPixelRatio();
     this.world?.particles.setPixelRatio(this.renderer.getPixelRatio(), innerHeight);
+    this.applyUiScale();
   }
 
   private applyVolumes() {
@@ -143,7 +145,7 @@ export class App {
   }
 
   private applyUiScale() {
-    document.documentElement.style.setProperty('--ui-scale', String(this.settings.uiScale));
+    document.documentElement.style.setProperty('--ui-scale', String(this.settings.uiScale * autoUiScale(innerWidth, innerHeight)));
   }
 
   private saveAll() {
@@ -1071,3 +1073,4 @@ export function fmtTime(s: number): string {
   const r = s - m * 60;
   return `${m}:${r.toFixed(1).padStart(4, '0')}`;
 }
+
