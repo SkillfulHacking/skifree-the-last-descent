@@ -12,6 +12,7 @@
  *  - gap-marker: banded poles and a pennant line at the lip of a spine's gap gully.
  */
 import * as THREE from 'three';
+import { createRockMaterial } from '../../../art/rockMaterial';
 import { registerHazardView, type HazardView } from '../../../presentation/hazardViews';
 import type { HazardInstance, HazardPhaseState } from '../../../hazards/hazard';
 import type { Mountain } from '../../../course';
@@ -31,11 +32,12 @@ function mats() {
   shared = {
     pole: new THREE.MeshStandardMaterial({ color: 0xe8e4dc, roughness: 0.6 }),
     sock: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, side: THREE.DoubleSide }),
-    rock: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88 }),
+    // (round 4b, A r4 M5: "untextured grey plates") the scanned rock, triplanar, regraded dark and cold
+    rock: createRockMaterial({ kind: 'rock_face_03', tile: 2.5, vertexColors: true, snow: 0.6, strata: 0.2, snowFrom: 0.85, grade: { lum: 0.06, desat: 0.9, tint: [0.92, 0.97, 1.06] } }),
     // ground skin: vertex alpha fades the rim into the snow; pulled toward the camera in depth
     // instead of lifted, so it hugs the terrain at every LOD
     skin: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -6 }),
-    stone: new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.9, flatShading: true }),
+    stone: createRockMaterial({ kind: 'rock_face_03', tile: 1.5, snow: 0.4, strata: 0, grade: { lum: 0.04, desat: 0.9, tint: [0.92, 0.97, 1.06] } }),
     drift: new THREE.PointsMaterial({ size: 2.2, map: tex, color: 0xf4f8ff, transparent: true, opacity: 0.0, depthWrite: false, sizeAttenuation: true }),
     tex,
   };

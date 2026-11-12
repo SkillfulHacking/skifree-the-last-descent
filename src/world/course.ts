@@ -297,7 +297,11 @@ export class Mountain {
       const wall = this.kWall * (1 - Math.exp(-(es * es) / (2 * 230 * 230))) + 0.0025 * es * es * Math.exp(-es / 120) + 0.04 * es;
       // wall relief: ridged noise gives spurs and gullies, but on its own its sharp creases read as
       // "egg-crate" spikes (A30) — blend in smooth fbm and soften the finest octave
-      const rr = ridged(x / 160, z / 160, s + 7, 3);
+      // (round 4b, A r4 M1: on the Fjord the valley walls are seen whole in the summit-to-sea reveal,
+      // where the 32–64 m far tiles turn the finest ridged octave into needle spikes: rangeSoft drops
+      // that octave and compresses the crests into shoulders, like the far ranges)
+      let rr = ridged(x / 160, z / 160, s + 7, this.kRangeSoft > 0 ? 2 : 3);
+      if (this.kRangeSoft > 0 && rr > 0.5) rr = 0.5 + (rr - 0.5) * (1 - 0.6 * this.kRangeSoft);
       const rf = 0.5 + 0.5 * fbm(x / 210, z / 210, s + 17, 3);
       const rough = (0.55 * rr + 0.45 * rf) * this.kRelief * smoothstep(30, 220, e) * (0.6 + 0.4 * P.rockBias(z));
       if (side < 0 && this.coast) {

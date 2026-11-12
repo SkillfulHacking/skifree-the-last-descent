@@ -32,6 +32,9 @@ import { dressingTicker } from '../../../presentation/cave';
 import { createRockMaterial, disposeRockMaterial } from '../../../art/rockMaterial';
 import { bestSeaPose, emergeStations, leapStations, type SeaPose } from './seaFraming';
 
+/** the torn net prop (off since round 4b: it read as a floating black sheet) */
+const NET_PLACED = false as boolean;
+
 /** distance from p to the segment ab */
 function segDist(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): number {
   const ab = b.clone().sub(a);
@@ -339,7 +342,8 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       for (let i = 0; ; i++) {
         const al = a0 + i * S + (j % 2) * S * 0.5;
         if (al > a1) break;
-        if (rnd.next() > density) continue;
+        // clumps and gaps (a smooth field), not an even scatter
+        if (rnd.next() > density * (0.25 + 1.5 * vn2(al * 0.18 + 7.7, bk * 0.18, seedK + 3))) continue;
         const ja = al + rnd.range(-0.18, 0.18) * S;
         const jb = bk + rnd.range(-0.18, 0.18) * S;
         // height: highest against the wall and toward the mouth side, falling off in an
@@ -357,9 +361,11 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     }
   };
   const big = rnd.next() < 0.5 ? -1 : 1;
-  causeway(big > 0 ? 6.0 : -19, big > 0 ? 19 : -6.0, -10.5, -1.0, 7.5, big > 0 ? 6 : -6, 3.1, hi ? 0.92 : 0.7);
+  // (round 4b, F r4 #1: ~60 evenly packed prisms on bare snow read as a blockout grid: sparser, so
+// the causeways break into clumps and gaps with snow between them)
+  causeway(big > 0 ? 6.0 : -19, big > 0 ? 19 : -6.0, -10.5, -1.0, 7.5, big > 0 ? 6 : -6, 3.1, hi ? 0.55 : 0.45);
   if (tick.over()) yield;
-  causeway(big > 0 ? -13 : 6.5, big > 0 ? -6.5 : 13, -6.5, -1.5, 4.2, big > 0 ? -6.5 : 6.5, 8.4, hi ? 0.78 : 0.6);
+  causeway(big > 0 ? -13 : 6.5, big > 0 ? -6.5 : 13, -6.5, -1.5, 4.2, big > 0 ? -6.5 : 6.5, 8.4, hi ? 0.45 : 0.35);
   // fallen drums from the collapsed side lying in the snow (column sections on their sides)
   for (let i = 0; i < (hi ? 5 : 3); i++) {
     const p = place(-big * rnd.range(7, 14), -rnd.range(7, 12));
@@ -598,7 +604,9 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   const tex = netTexture();
   net.map = tex;
   const perchL = perches.filter((q) => q.p.clone().sub(mouth).dot(tan) < 0).sort((a, b2) => a.p.y - b2.p.y)[0];
-  if (perchL && clearOfCaveCameras(lines, perchL.p, 1.8)) {
+  // (round 4b, F r4 #1 / C r4 #2: lit, the net read as a free-standing black sheet hanging in the
+  // air — it is no longer placed)
+  if (perchL && clearOfCaveCameras(lines, perchL.p, 1.8) && NET_PLACED) {
     netMesh.position.copy(perchL.p).add(new THREE.Vector3(0, -1.1, 0)).addScaledVector(out, 0.9);
     netMesh.rotation.y = Math.atan2(out.x, out.z);
     netMesh.rotation.x = -0.25;

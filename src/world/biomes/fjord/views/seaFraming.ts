@@ -95,17 +95,30 @@ export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THRE
   let best: SeaPose | null = null;
   let bestScore = -Infinity;
   // the subject in the centre, or a third of the way in from either side (the frame turned toward the sea)
-  const hfov = Math.atan(Math.tan(THREE.MathUtils.degToRad(fov) / 2) * (16 / 9));
   for (const cam of stations) {
     yield;
     if (!clearShot(m, cam, subject, props)) continue;
-    for (const yaw of [0, 0.42 * hfov, -0.42 * hfov]) {
+    // far stations shoot long (a telephoto keeps the Yeti large in frame: ~ the same size as from
+    // the near ring at the base fov)
+    const dist = cam.distanceTo(subject);
+    const fovS = dist > 45 ? Math.max(26, fov * Math.min(1, 70 / dist)) : fov;
+    // (round 4b: also tilted up, the subject in the lower third — from above the cave's hill the sea
+    // lies beyond and below the hill's crest, near the top of a frame centred on the mouth)
+    const vf = THREE.MathUtils.degToRad(fovS) / 2;
+    const hfovS = Math.atan(Math.tan(vf) * (16 / 9));
+    for (const [yaw, pitch] of [[0, 0], [0.42 * hfovS, 0], [-0.42 * hfovS, 0], [0, 0.55 * vf], [0.42 * hfovS, 0.55 * vf], [-0.42 * hfovS, 0.55 * vf]] as const) {
       const look = turnedLook(cam, subject, yaw);
-      const w = yield* waterFractionSteps(m, cam, look, fov);
+      if (pitch !== 0) {
+        const dl = look.clone().sub(cam);
+        const hl = Math.hypot(dl.x, dl.z);
+        const a = Math.atan2(dl.y, hl) + pitch;
+        look.copy(cam).add(new THREE.Vector3((dl.x / hl) * Math.cos(a), Math.sin(a), (dl.z / hl) * Math.cos(a)).multiplyScalar(dl.length()));
+      }
+      const w = yield* waterFractionSteps(m, cam, look, fovS);
       // (closer stations win a near tie: the Yeti must stay large in frame)
-      const score = w - 0.0025 * cam.distanceTo(subject);
+      const score = w - 0.0015 * dist;
       if (w >= minWater && (!best || score > bestScore + 1e-9)) {
-        best = { cam: cam.clone(), look, fov, water: w, yaw };
+        best = { cam: cam.clone(), look, fov: fovS, water: w, yaw };
         bestScore = score;
       }
     }
@@ -126,8 +139,13 @@ export function turnedLook(cam: THREE.Vector3, subject: THREE.Vector3, yaw: numb
 export function emergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: THREE.Vector3, ground?: (x: number, z: number) => number): THREE.Vector3[] {
   const s: THREE.Vector3[] = [];
   // on a ring in front of the mouth (the sea lies behind the cave's hill: it shows past its flanks)
-  for (const ang of [-60, -35, 35, 60])
-    for (const [d, h] of [[14, 6], [14, 16], [14, 30], [26, 6], [26, 16], [26, 30]] as const) {
+  // (round 4b, C r4 #1: on Standard and longer the cave sits in an ordinary valley side and the sea
+  // lies behind its hill — the low ring found no water for any of 10 such caves; higher and wider
+  // stations look over the hill's shoulder to the fjord)
+  // stations far out on the slope, low: their frame is near-level, so its upper rays clear the
+  // cave's hill and reach the fjord far below and behind it)
+  for (const ang of [-60, -35, -15, 15, 35, 60])
+    for (const [d, h] of [[14, 6], [14, 16], [14, 30], [26, 6], [26, 16], [26, 30], [55, 5], [80, 6], [110, 8], [60, 60], [90, 85], [120, 110]] as const) {
       {
         const r = THREE.MathUtils.degToRad(ang);
         const p = mouth.clone().addScaledVector(out, d * Math.cos(r)).addScaledVector(tan, d * Math.sin(r));
@@ -140,9 +158,9 @@ export function emergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: TH
 
 export function leapStations(ledge: THREE.Vector3, out: THREE.Vector3, tan: THREE.Vector3, ground?: (x: number, z: number) => number): THREE.Vector3[] {
   const s: THREE.Vector3[] = [];
-  for (const a of [12])
-    for (const b of [-12, -6, 6, 12])
-      for (const h of [3, 9]) {
+  for (const a of [12, 22, 60, 90])
+    for (const b of [-16, -12, -6, 6, 12, 16])
+      for (const h of [3, 9, 22, 55, 80]) {
         const p = ledge.clone().addScaledVector(out, a).addScaledVector(tan, b);
         p.y = Math.max(p.y, ground ? ground(p.x, p.z) : p.y) + h;
         s.push(p);
