@@ -8,10 +8,10 @@ Round-4 logs. Verification evidence column is filled only from independent revie
 | ID | Sev | Subsystem | Defect | Repro / source | Repair commit | Verification | Status |
 |---|---|---|---|---|---|---|---|
 | F-001 | C | engine physics | Cliff/cave walls launch the skier (15→60 m/s up, 8.5 s air); Alpine too | B final §1; cave sweep | 37e30f9, 8faa17a (engine-cliff, PR #6) | tests/unit/terrain_contact.test.ts; 1,080-run sweep 123→0 | CLAIMED |
-| F-002 | M | Fjord physics | Cornice friction dead zone traps skiers (87/5,600) | B final §1 | 6b44459, 3cca991 | fjord_cornice.test.ts (5,600 stops); 28,840-approach stress | CLAIMED |
-| F-003 | M | cave art | Sea cave renders near-black after R4 cave move | A M1, C #1, F #2 | 13dcc2d…f8747ce, d837618 | integration-log crop medians (not independent) | CLAIMED |
+| F-002 | M | Fjord physics | Cornice friction dead zone traps skiers (87/5,600) | B final §1 | 6b44459, 3cca991 | fjord_cornice.test.ts (5,600 stops); 28,840-approach stress | VERIFIED FIXED (B r4: 0/1,630) |
+| F-003 | M | cave art | Sea cave renders near-black after R4 cave move | A M1, C #1, F #2 | 13dcc2d…f8747ce, d837618 | integration-log crop medians (not independent) | VERIFIED FIXED (A, C, F r4) |
 | F-004 | M | cinematic | Fjord cave shots lose sea framing (`seaward` false) | C #2 | views/seaFraming.ts (R4) | fjord_r4_integration test; custom Standard caves still no sea | CLAIMED (partial) |
-| F-005 | M | water | Cold-plunge water reads as snow at grazing angles | A M3, C, F #4 | R4 water grazing fix | integration-log eyeball only | CLAIMED |
+| F-005 | M | water | Cold-plunge water reads as snow at grazing angles | A M3, C, F #4 | R4 water grazing fix | integration-log eyeball only | VERIFIED FIXED (A, C, F r4) |
 | F-006 | M | gameplay | Squall is a time tax, not a decision (0.29 s/Sprint) | F #1 | eb8a3b2 (wind gates) | round-4 harness: wrong/ignore +2–3.7 s/Sprint (dev-run) | CLAIMED |
 | F-007 | M | perf | Summed streaming spikes (156 >16 ms/24 km vs Alpine 34) | D #1 | 4fb9bd0, cb3ad0c | CPU replay 129→2 (dev-run) | CLAIMED |
 | F-008 | M | art | Needle-spike cliff crest, vertical smearing | A M4, F | cliff kit (art-r4 merge), rangeSoft | not yet reviewed in game | CLAIMED |
@@ -22,8 +22,23 @@ Round-4 logs. Verification evidence column is filled only from independent revie
 | F-013 | m | art | No foam where cliffs/columns meet water | art-scene P-M5 | cliffStream foam (R4) | — | CLAIMED |
 | F-014 | m | cinematic | Cod prop reads as a stick through the Yeti's nose; presenter pose | C | bcc16bd (cod orientation, gag mode, presenter, beacon) | candidate shots 11f/11g/11c | CLAIMED |
 | F-015 | m | gameplay | Slow gully drop-ins crash ("hard landing") | B, E final | — (investigated: the two remaining crashes are squall drift mid-air + misalignment; terrain change made it worse, reverted) | scratch gap2 on fjord-r4b | OPEN (minor, accepted for preview) |
-| F-016 | m | UI | Menu/HUD don't scale at 1440p+ | E | f49855b (autoUiScale) | tests/unit/ui_scale.test.ts; candidate res-2560 shots; menu.spec 2560 fit | CLAIMED |
-| F-017 | m | QA | Squall caption throttle per kind hides consecutive squalls | E #1 | eb8a3b2 (per squall) | — | CLAIMED |
+| F-016 | m | UI | Menu/HUD don't scale at 1440p+ | E | f49855b (autoUiScale) | tests/unit/ui_scale.test.ts; candidate res-2560 shots; menu.spec 2560 fit | VERIFIED (E r4: menu); rear view fixed in 129110b |
+| F-017 | m | QA | Squall caption throttle per kind hides consecutive squalls | E #1 | eb8a3b2 (per squall) | — | VERIFIED FIXED (E r4) |
 | F-018 | m | difficulty | Relaxed hazard intensity 0.25 erased the mechanic | B, F | eb8a3b2 (0.5) | — | CLAIMED |
-| F-019 | m | perf | Snowball beam shader compiles mid-chase | D #5 | 4fb9bd0 | — | CLAIMED |
+| F-019 | m | perf | Snowball beam shader compiles mid-chase | D #5 | 4fb9bd0 | — | VERIFIED FIXED (D r4) |
 | F-020 | m | test/QA | Browser suite never run on the integrated R4 build | RECOVERY.md | — | round-4/TESTS.md: 19/19 browser, 306/306 unit on the candidate | FIXED |
+| F-021 | **C** | engine physics | Wall rule leaves a skier pinned in a pocket at a cave mouth, no rescue (Alpine + Fjord, ~2.5 % of cave-side approaches) | B r4 #1, E r4 #1 | 2e1bfbf (pinWatchdog, no frozen velocity) | tests/unit/pin_rescue.test.ts; E's trap probe on fjord-r4b: 0/864 + 0/864 unrecovered (was 24 + 25); B's pinsweep 0 | CLAIMED |
+| F-022 | M | difficulty | Hard step Alpine→Fjord too steep; long Normal runs too tight | B r4 #2, E r4 #2 | 2e1bfbf (Hard 1.0, ×0.85 ≥ 20 km) | fjord_gameplay test | CLAIMED |
+| F-023 | M | cave art | Lintel column ends float over the mouth; net sheet floats; prism grid reads as blockout | A M8, C #2, F #1, D | 96621e1, a3c… (lintel removed, net off, clumped causeways) | r5a/07 | CLAIMED |
+| F-024 | M | cinematic | Cave shots show the sea only on Sprint caves (0/10 Standard+) | C r4 #1 | fjord-r4b (high/far stations, tilted frames, telephoto) | C's seashots: emerge 15/18, leap 13/18 (was 7/7) | CLAIMED |
+| F-025 | M | cinematic | Catch shot (11) looks inland | C r4 #3 | fjord-r4b (profile from up-slope, fjord behind) | round-5 shots | CLAIMED |
+| F-026 | M | art | Cliff detail tile lattice / pinstripe at distance | A M6, D #2, F #3 | 96621e1 + 129110b (detail and macro fade with distance) | round-5 06 | CLAIMED |
+| F-027 | M | art | Needle face on the valley walls in the reveal | A M1 | fjord-r4b (rangeSoft on wall relief) | round-5 11c/11i | CLAIMED |
+| F-028 | M | art | Harbour headland: white streaks on a vertical face | A M2 | — | — | OPEN |
+| F-029 | M | art | Summit sugarloaf blocks the sea view | A M3 | — | — | OPEN |
+| F-030 | M | art | Scoured rock = untextured plates | A M5 | fjord-r4b (scanned rock material) | r5a/04b | CLAIMED |
+| F-031 | M | art | No foam / wet line at shores | A M7 | fjord-r4b + 129110b (terrain surf scales with distance; foam on cliff kit) | round-5 | CLAIMED |
+| F-032 | m | art | Repeated boulder chips on inland walls; repeated house model in plunge backdrop | A M9, C #4 | — | — | OPEN |
+| F-033 | M | perf | No production-build frame times for the candidate | D r4 #1 | — | round-5 perf harness at the shipped 6 ms budget + live-site check | OPEN |
+| F-034 | m | perf | Cliff materials per water level never freed; normals double-lossy; unused gneiss shipped; rock textures not preloaded | D r4 minors | — | — | OPEN |
+| F-035 | m | QA | Squalls entered mid-gust get no warning | E r4 | — | — | OPEN |
