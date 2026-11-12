@@ -98,7 +98,8 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     opts: { difficulty?: GameDifficulty } = {},
   ) {
     this.caps = capabilitiesOf(mountain.biome);
-    this.intensity = this.caps.hazards.intensity?.[opts.difficulty ?? 'normal'] ?? 1;
+    const long = !Number.isFinite(mountain.finishZ) || mountain.finishZ >= 20000;
+    this.intensity = (this.caps.hazards.intensity?.[opts.difficulty ?? 'normal'] ?? 1) * (long ? (this.caps.hazards.longCourse ?? 1) : 1);
     this.kinds = this.caps.hazards.kinds.map(getHazardKind);
     this.hazards = new HazardField(mountain, seed, this.kinds, this.caps.hazards.density);
     const cpl = this.caps.weather.coupling;

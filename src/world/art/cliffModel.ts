@@ -217,7 +217,7 @@ export class CliffModel {
   private backingCol(z: number, t: number, bedDepth: number): number {
     const c = this.column(z);
     const inset = 9;
-    const sink = 4;
+    const sink = 5;
     const foot = this.footOffset(c);
     let h: number;
     if (t < foot - inset) h = c.hRim - this.dropAt(c, t + inset) - sink;

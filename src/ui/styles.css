@@ -223,6 +223,6 @@ kbd {
 
 /* Fjord round-2 E4 residuals: the rear-view label sits on a dark pill (it was pale pink on pale sky)
    and the score multiplier is larger, white-cored and outlined, so both read over snow and sky. */
-.rear-view::after { top: 5px; left: 7px; padding: 2px 8px 2px 9px; border-radius: 999px; background: rgba(8, 12, 24, 0.72); color: #ffe1e1; font-size: 12px; letter-spacing: 0.22em; text-shadow: none; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); }
+.rear-view::after { top: 5px; left: 7px; padding: 2px 8px 2px 9px; border-radius: 999px; background: rgba(8, 12, 24, 0.72); color: #ffe1e1; font-size: calc(12px * var(--ui-scale, 1)); letter-spacing: 0.22em; text-shadow: none; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); }
 .hud-mult { display: inline-block; margin-top: 5px; padding: 1px 8px; border-radius: 8px; background: rgba(8, 14, 28, 0.5); font-size: 17px; color: #e9f6ff; -webkit-text-stroke: 0.4px rgba(0, 20, 50, 0.6); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85); }
 .hud-mult.hot { color: #ffd28a; }

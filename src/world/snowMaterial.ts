@@ -159,16 +159,19 @@ const shoreGlsl = (low: boolean) => /* glsl */ `
       // surf: a bright, breaking line at the water's edge (animated; not on the low preset)
       float ph = uTime * 0.55 + sf_vn(vNPos.xz * 0.02) * 6.0;
       float swell = 0.35 + 0.35 * sin(ph);
-      float surf = smoothstep(-0.35, 0.0, dh - swell * 0.4) * (1.0 - smoothstep(0.1, 0.9 + 0.5 * sn, dh - swell * 0.4));
+      // (round 4b, A r4 M7: the 1 m line vanished at a few hundred metres — the band widens with
+      // distance so a foam line still rings every island and cliff foot far away)
+      float fw = max(1.0, sf_dist * 0.0035);
+      float surf = smoothstep(-0.35 * fw, 0.0, dh - swell * 0.4) * (1.0 - smoothstep(0.1 * fw, (0.9 + 0.5 * sn) * fw, dh - swell * 0.4));
       surf *= 0.55 + 0.45 * smoothstep(0.35, 0.7, sf_vnBL(vNPos.xz * 0.9 + vec2(uTime * 0.3, 0.0), sf_fp(sf_fY, vec2(0.9))));
-      col = mix(col, vec3(0.86, 0.9, 0.93), surf * (1.0 - smoothstep(1500.0, 4000.0, sf_dist)));`
+      col = mix(col, vec3(0.86, 0.9, 0.93), surf * (1.0 - smoothstep(2500.0, 6000.0, sf_dist)));`
       }
     }
     // round 2 (art review D3): the lowest 40–120 m of every wall and steep shore is spray-washed
     // bare rock, darker and wetter towards the water: no white snow skirt at sea level
     // round 3 (A2): also on the gentler foot of the walls (the white apron at the waterline in 06),
     // still never on the flat harbour ground
-    float lowWall = max((1.0 - smoothstep(60.0 + 40.0 * sn2, 150.0 + 40.0 * sn2, dh)) * smoothstep(0.1, 0.28, slope),
+    float lowWall = max((1.0 - smoothstep(60.0 + 40.0 * sn2, 150.0 + 40.0 * sn2, dh)) * smoothstep(0.08, 0.24, slope),
                         (1.0 - smoothstep(18.0 + 20.0 * sn2, 55.0 + 25.0 * sn2, dh)) * smoothstep(0.035, 0.1, slope));
     vec3 wetRock = rock * mix(0.5, 0.9, smoothstep(0.0, 70.0, dh));
     col = mix(col, wetRock, lowWall * (1.0 - wash) * (1.0 - spray * 0.5));

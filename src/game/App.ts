@@ -854,10 +854,12 @@ export class App {
     if (k <= 0.02 || !this.world) return null;
     const W = innerWidth;
     const H = innerHeight;
-    const w = Math.round(Math.min(420, W * 0.3));
+    // (round 4b, E r4: the window and its label scale with the UI, like the HUD around it)
+    const ui = this.settings.uiScale * autoUiScale(W, H);
+    const w = Math.round(Math.min(420 * ui, W * 0.3));
     const h = Math.round(w / 2.4);
     const x = Math.round((W - w) / 2);
-    const top = 78;
+    const top = Math.round(78 * ui);
     this.rearFrame.style.cssText = `left:${x}px;top:${top}px;width:${w}px;height:${h}px;opacity:${k}`;
     this.rearCam.position.copy(this.rearPose.pos);
     this.rearCam.lookAt(this.rearPose.look);

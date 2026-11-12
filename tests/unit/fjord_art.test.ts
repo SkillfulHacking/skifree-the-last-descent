@@ -77,9 +77,9 @@ describe('Fjord sea cave: props keep out of the cave-cinematic cameras', () => {
       const props = d.group.userData['props'] as Array<{ p: THREE.Vector3; r: number; kind: string }>;
       expect(props.length).toBeGreaterThan(20);
       expect(props.some((p) => p.kind === 'column')).toBe(true);
-      // the portal's lintel of column ends is built on the face, and the gulls have brow perches
-      // (round 4 integration: a sparser lintel of fewer, longer column ends — lit, the dense grid read as a pile of hex nuts)
-      expect(props.filter((p) => p.kind === 'lintel').length).toBeGreaterThan(3);
+      // no lintel of column ends any more (round 4b: they read as loose hex blocks floating over the
+      // mouth); the portal columns still give the gulls brow perches
+      expect(props.filter((p) => p.kind === 'lintel').length).toBe(0);
       expect((d.group.userData['perches'] as Array<{ brow?: boolean }>).some((q) => q.brow)).toBe(true);
       const lines = caveCameraSightlines(cave.mouth, cave.outward, cave.lipTop);
       for (const p of props) expect(clearOfCaveCameras(lines, p.p, p.r), `${p.kind} at ${p.p.toArray().map((v) => v.toFixed(1))}`).toBe(true);

@@ -755,7 +755,7 @@ export class Coast {
   /**
    * The islands of one cluster cell (deterministic, cached). Round 4 (F-009, "repeated loaves"):
    * the main island is no longer one tall dome per cluster. Glacial archipelagos are mostly LOW:
-   *  - whaleback (most): a long, low (50–105 m) scoured hump, gentle up-ice, plucked cliffs at the
+   *  - whaleback (most): a long, low (65–125 m) scoured hump, gentle up-ice, plucked cliffs at the
    *    down-ice end, benches along the grain;
    *  - peak island (two clusters in five): a steep multi-summit island (130–250 m) — two or
    *    three tops along a ridge, not a dome;
@@ -775,7 +775,7 @@ export class Coast {
       // drawn by them): nothing main smaller than ~150 m across
       const peak = r.float() < 0.4;
       const a = peak ? r.range(200, 340) : r.range(200, 460);
-      const main: IslandBlob = { kind: peak ? 2 : 1, x: cx, z: cz, a, b: a * (peak ? r.range(0.55, 0.8) : r.range(0.32, 0.55)), c: Math.cos(ang), s: Math.sin(ang), h: peak ? r.range(130, 250) : r.range(50, 105), k: r.range(0, 50) };
+      const main: IslandBlob = { kind: peak ? 2 : 1, x: cx, z: cz, a, b: a * (peak ? r.range(0.55, 0.8) : r.range(0.32, 0.55)), c: Math.cos(ang), s: Math.sin(ang), h: peak ? r.range(130, 250) : r.range(65, 125), k: r.range(0, 50) };
       out.push(main);
       // satellite skerries along the grain, off the ends and one side
       const n = r.int(2, 5);
@@ -853,7 +853,7 @@ function islandProfile(b: IslandBlob, u: number, v: number, q: number, sd: numbe
   const rough = gnoise(u * 5.1 + b.k, v * 4.3, sd + 99);
   if (b.kind === 0) {
     const back = Math.pow(Math.max(0, 1 - q * q), 0.45);
-    return 1.2 + b.h * (0.35 * rim + 0.65 * back) * (0.75 + 0.35 * grain) + 1.2 * rough;
+    return 1.2 + b.h * (0.35 * rim + 0.65 * back) * (0.55 + 0.75 * grain) + 1.6 * rough;
   }
   if (b.kind === 1) {
     // stoss (u < 0): long convex ramp; lee (u > 0): the plateau breaks off in a plucked cliff
@@ -862,8 +862,10 @@ function islandProfile(b: IslandBlob, u: number, v: number, q: number, sd: numbe
     const plateau = Math.pow(Math.max(0, 1 - (v * v) / 0.9), 0.5) * (1 - smoothstep(leeEdge, leeEdge + 0.14, u));
     const leeT = smoothstep(-0.2, 0.4, u);
     let f = stoss * (1 - leeT) + Math.max(plateau * (0.9 + 0.1 * (1 - u)), 0.18 * rim) * leeT;
-    // benches: stepped levels (snow lies on them, rock shows on the risers)
-    f = f * 0.55 + 0.45 * (Math.floor(f * 4) + smoothstep(0.55, 1, (f * 4) % 1)) / 4;
+    // (round 4b, A r4 M4 "two-tier slab": stepped benches read as a layer cake — instead crags: a
+    // mid-scale ridged relief that breaks the top into knolls and hollows)
+    const crag = ridged(u * 3.4 + b.k * 0.7, v * 3.1, sd + 103, 2);
+    f = f * (0.7 + 0.5 * crag);
     return 1.5 + b.h * Math.max(0.3 * rim, f) * (0.62 + 0.6 * grain) + 3 * rough;
   }
   // peak island: summits along the axis, steep flanks, a talus / rock shelf at the shore

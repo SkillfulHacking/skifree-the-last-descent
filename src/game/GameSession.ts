@@ -594,7 +594,10 @@ export class GameSession implements Stage {
         // out of bounds (over a sea cliff's crest): back on the piste, with a clear cue
         this.prevPos.copy(s.pos);
         this.follow.snap(this.followTarget());
-        if (e.reason === 'stuck in the cornice') {
+        if (e.reason === 'pinned against the rock') {
+          this.hud.title('BACK ON THE PISTE', 'You were boxed in against the rock. Back to the run.', 'intro', 3);
+          this.hud.caption('[you scramble out from under the rock — back on the piste]', 3);
+        } else if (e.reason === 'stuck in the cornice') {
           this.hud.title('BACK ON THE PISTE', 'You bogged down in the deep cornice snow. Keep inside the cairns along the cliff.', 'intro', 3);
           this.hud.caption('[you flounder out of the cornice — back on the piste]', 3);
         } else {

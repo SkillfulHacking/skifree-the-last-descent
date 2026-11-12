@@ -421,9 +421,12 @@ describe('Fjord: difficulty 2/5 — approachable on Relaxed, the environment rew
     const ws = worldSeed(course('sprint', 'RB1'));
     expect(new BiomeEnvironment(m, ws, { difficulty: 'relaxed' }).intensity).toBeLessThan(0.75);
     expect(new BiomeEnvironment(m, ws, { difficulty: 'relaxed' }).intensity).toBeGreaterThanOrEqual(0.5); // round 4: never switched off
-    expect(new BiomeEnvironment(m, ws, { difficulty: 'hard' }).intensity).toBeGreaterThan(1); // round 4: Hard is not Normal
+    // round 4b (B r4 #2): Hard keeps Normal's environment (Hard's own Yeti and snowballs make it
+    // harder; 1.2 made the Alpine→Fjord step far steeper on Hard); long courses ease it × 0.85
     expect(new BiomeEnvironment(m, ws, { difficulty: 'normal' }).intensity).toBe(1);
-    expect(new BiomeEnvironment(m, ws, { difficulty: 'hard' }).intensity).toBeGreaterThanOrEqual(1);
+    expect(new BiomeEnvironment(m, ws, { difficulty: 'hard' }).intensity).toBe(1);
+    const lm = buildMountain(makeCourse('custom', 'expedition', { biome: 'fjord', customText: 'RB1' }));
+    expect(new BiomeEnvironment(lm, ws, { difficulty: 'normal' }).intensity).toBeCloseTo(0.85, 6);
   });
 
   it('the environment costs a hazard-blind skier more time than one who reads it, and the reader is faster', () => {

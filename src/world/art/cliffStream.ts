@@ -160,7 +160,7 @@ export class CliffStream {
     const key = Math.round(water * 10) / 10;
     let mt = this.mats.get(key);
     if (!mt) {
-      mt = createRockMaterial({ kind: 'rock_face_03', tile: 9, vertexColors: true, water: key, snow: 1, strata: 0.8, hq: this.quality !== 'low', snowFrom: 0.8, grade: CLIFF_GRADE, macroSet: { kind: 'cliff_side', tile: 85, strength: 0.65 }, streaks: 1.2 });
+      mt = createRockMaterial({ kind: 'rock_face_03', tile: 9, vertexColors: true, water: key, snow: 1, strata: 0.8, hq: this.quality !== 'low', snowFrom: 0.8, grade: CLIFF_GRADE, macroSet: { kind: 'cliff_side', tile: 85, strength: 0.55 }, streaks: 1.2 });
       this.mats.set(key, mt);
     }
     return mt;
