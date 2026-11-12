@@ -91,7 +91,7 @@ export function clearShot(m: Mountain, cam: THREE.Vector3, subject: THREE.Vector
  * Best sea-framing pose among `stations` (time-sliced: yields after each station). Returns null when
  * no station both sees the subject and shows at least `minWater` of open water.
  */
-export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THREE.Vector3[], props: Array<{ p: THREE.Vector3; r: number }>, fov: number, minWater = 0.05): Generator<void, SeaPose | null, void> {
+export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THREE.Vector3[], props: Array<{ p: THREE.Vector3; r: number }>, fov: number, minWater = 0.05, maxDropDeg = 24): Generator<void, SeaPose | null, void> {
   let best: SeaPose | null = null;
   let bestScore = -Infinity;
   // the subject in the centre, or a third of the way in from either side (the frame turned toward the sea)
@@ -101,6 +101,11 @@ export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THRE
     // far stations shoot long (a telephoto keeps the Yeti large in frame: ~ the same size as from
     // the near ring at the base fov)
     const dist = cam.distanceTo(subject);
+    // (round 5 capture: a high station looking steeply down at the mouth rolled the frame into a
+    // map view with the sea as a "sky" — a character shot stays near eye level: ≤ 24° down for the
+    // emergence, ≤ 32° for the leap, which looks down the slope at him anyway)
+    const drop = cam.y - subject.y;
+    if (drop > Math.tan(THREE.MathUtils.degToRad(maxDropDeg)) * Math.hypot(cam.x - subject.x, cam.z - subject.z)) continue;
     const fovS = dist > 45 ? Math.max(26, fov * Math.min(1, 70 / dist)) : fov;
     // (round 4b: also tilted up, the subject in the lower third — from above the cave's hill the sea
     // lies beyond and below the hill's crest, near the top of a frame centred on the mouth)
@@ -145,7 +150,7 @@ export function emergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: TH
   // stations far out on the slope, low: their frame is near-level, so its upper rays clear the
   // cave's hill and reach the fjord far below and behind it)
   for (const ang of [-60, -35, -15, 15, 35, 60])
-    for (const [d, h] of [[14, 6], [14, 16], [14, 30], [26, 6], [26, 16], [26, 30], [55, 5], [80, 6], [110, 8], [60, 60], [90, 85], [120, 110]] as const) {
+    for (const [d, h] of [[14, 6], [14, 16], [14, 30], [26, 6], [26, 16], [26, 30], [55, 5], [80, 6], [110, 8]] as const) {
       {
         const r = THREE.MathUtils.degToRad(ang);
         const p = mouth.clone().addScaledVector(out, d * Math.cos(r)).addScaledVector(tan, d * Math.sin(r));
