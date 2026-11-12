@@ -30,8 +30,14 @@ import { PrismSet, clinkerHull, hullKeelY } from './basaltKit';
 import { caveCameraSightlines } from '../../../../cinematic/CaveCinematic';
 import { dressingTicker } from '../../../presentation/cave';
 import { createRockMaterial, disposeRockMaterial } from '../../../art/rockMaterial';
+import { loadScan, type ScanId } from '../../../art/scanModels';
 import { bestSeaPose, emergeStations, leapStations, type SeaPose } from './seaFraming';
 
+/**
+ * The beachcombing hoard (hull, oar, driftwood, lobster pots, floats): off since round 6 — lit, it read
+ * as blocks, planks and a card floating in front of the cave (A r5 M5, C r5 #4, F r5 #1).
+ */
+const WRECKAGE = false as boolean;
 /** the torn net prop (off since round 4b: it read as a floating black sheet) */
 const NET_PLACED = false as boolean;
 
@@ -363,9 +369,44 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   const big = rnd.next() < 0.5 ? -1 : 1;
   // (round 4b, F r4 #1: ~60 evenly packed prisms on bare snow read as a blockout grid: sparser, so
 // the causeways break into clumps and gaps with snow between them)
-  causeway(big > 0 ? 6.0 : -19, big > 0 ? 19 : -6.0, -10.5, -1.0, 7.5, big > 0 ? 6 : -6, 3.1, hi ? 0.55 : 0.45);
+  // round 6: thinned, a few columns stood alone like posts — the free-standing causeway is gone; the
+  // portal colonnade (on the face) carries the basalt, scanned boulders fill the snow in front
+  void causeway;
   if (tick.over()) yield;
-  causeway(big > 0 ? -13 : 6.5, big > 0 ? -6.5 : 13, -6.5, -1.5, 4.2, big > 0 ? -6.5 : 6.5, 8.4, hi ? 0.45 : 0.35);
+  // (round 6: the second, collapsed causeway is gone — scanned boulders take its place)
+  // round 6 (A r5 M4, F r5 #1: "uniform capped prisms on bare snow"): scanned boulders fallen from
+  // the brow, half-buried in the drifts between and around the column clumps — real rock forms, so
+  // the basalt reads as part of a rock mass, not as a set of props. Placed now (clearance), meshes
+  // added when the shared scans arrive.
+  {
+    const ids: ScanId[] = ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'];
+    const picks: Array<{ id: ScanId; p: THREE.Vector3; sx: number; sy: number; sz: number; yaw: number }> = [];
+    for (let i = 0; i < (hi ? 14 : 9); i++) {
+      const p = place(rnd.range(-16, 16), -rnd.range(2.5, 13));
+      const r = rnd.range(1.1, 2.6);
+      if (!ok(p.clone().setY(p.y + r * 0.4), r)) continue;
+      const gy = seat(p, r * 0.7);
+      p.y = gy - r * 0.35;
+      picks.push({ id: ids[i % ids.length]!, p, sx: 2 * r * rnd.range(0.9, 1.3), sy: r * rnd.range(0.9, 1.4), sz: 2 * r * rnd.range(0.7, 1.0), yaw: rnd.range(0, 6.28) });
+      props.push({ p: p.clone().setY(gy + r * 0.3), r, kind: 'boulder' });
+    }
+    const bmat = createRockMaterial({ kind: 'rock_face_03', tile: 2.5, snow: 1, strata: 0.2, snowFrom: 0.62, fill: FILL, hq: hi, grade: { lum: 0.05, desat: 0.9, tint: [0.94, 0.98, 1.05] } });
+    partial.rock.push(bmat);
+    const bg = new THREE.Group();
+    bg.name = 'fjord-cave-boulders';
+    group.add(bg);
+    for (const pk of picks)
+      void loadScan(pk.id).then((g) => {
+        if (!g || !bg.parent) return;
+        const mesh = new THREE.Mesh(g, bmat);
+        mesh.position.copy(pk.p);
+        mesh.scale.set(pk.sx, pk.sy, pk.sz);
+        mesh.rotation.y = pk.yaw;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        bg.add(mesh);
+      });
+  }
   // fallen drums from the collapsed side lying in the snow (column sections on their sides)
   for (let i = 0; i < (hi ? 5 : 3); i++) {
     const p = place(-big * rnd.range(7, 14), -rnd.range(7, 12));
@@ -402,7 +443,8 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   // the basalt. Icicles hang from the brow itself, seated on the rock face a hand's width out.
   {
     const hw = 4.6;
-    const yUp = 6.1;
+    // just above the opening's top (a lower line hung the icicles inside the mouth, in the air)
+    const yUp = Math.max(6.1, cave.lipTop.y - mouth.y + 0.3);
     for (let al = -hw; al <= hw; al += 0.7) {
       if (rnd.next() < (hi ? 0.45 : 0.65)) continue;
       const f = face(al, yUp);
@@ -484,7 +526,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     const HL = 5.4;
     const HB = 1.8;
     const HD = 0.72;
-    if (ok(p.clone().setY(p.y + 0.6), 3.0)) {
+    if (WRECKAGE && ok(p.clone().setY(p.y + 0.6), 3.0)) {
       const yaw = Math.atan2(tan.x, tan.z) - big * 0.55;
       const gy = Math.min(m.heightAt(p.x, p.z), seat(p, 2.0));
       const mtx = new THREE.Matrix4().compose(new THREE.Vector3(p.x, gy - 0.06, p.z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, 0.07)), new THREE.Vector3(1, 1, 1));
@@ -509,7 +551,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   }
   if (tick.over()) yield;
   // silver driftwood logs
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < (WRECKAGE ? 4 : 0); i++) {
     const p = place(rnd.range(-14, 14), rnd.range(-15, -8));
     if (!ok(p.clone().setY(p.y + 0.2), 1.8)) continue;
     const L = rnd.range(2.2, 4.2);
@@ -518,7 +560,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     props.push({ p: p.clone().setY(p.y + 0.2), r: L / 2, kind: 'driftwood' });
   }
   // lobster pots: wooden slat cages with a net funnel end
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < (WRECKAGE ? 3 : 0); i++) {
     const p = place(-big * (8.5 + i * 1.25), -10 - rnd.range(0, 2.5));
     if (!ok(p.clone().setY(p.y + 0.35), 0.9)) continue;
     const yaw = rnd.range(0, 3);
@@ -533,7 +575,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   // floats are half sunk into it (round 2: the line was a straight chord and hung in the air)
   {
     let prev: THREE.Vector3 | null = null;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < (WRECKAGE ? 6 : 0); i++) {
       const p = place(-big * (rnd.range(3, 8) + i * 0.4), -rnd.range(15, 17.5));
       if (!ok(p.clone().setY(p.y + 0.2), 0.4)) continue;
       b.add('paint', new THREE.SphereGeometry(0.26, 10, 8), mat(p.x, p.y + 0.07, p.z), i % 2 ? 0xe86a1e : 0xf2efe7);
@@ -653,6 +695,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       disposeRockMaterial(basalt);
       if (shell && shellPrev) shell.material = shellPrev;
       disposeRockMaterial(shellMat);
+      for (const rm of partial.rock) if (rm !== basalt && rm !== shellMat) disposeRockMaterial(rm);
       net.dispose();
       tex.dispose();
       seaIce.dispose();
