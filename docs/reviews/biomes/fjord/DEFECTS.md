@@ -15,15 +15,15 @@ Round-4 logs. Verification evidence column is filled only from independent revie
 | F-006 | M | gameplay | Squall is a time tax, not a decision (0.29 s/Sprint) | F #1 | eb8a3b2 (wind gates) | round-4 harness: wrong/ignore +2–3.7 s/Sprint (dev-run) | CLAIMED |
 | F-007 | M | perf | Summed streaming spikes (156 >16 ms/24 km vs Alpine 34) | D #1 | 4fb9bd0, cb3ad0c | CPU replay 129→2 (dev-run) | CLAIMED |
 | F-008 | M | art | Needle-spike cliff crest, vertical smearing | A M4, F | cliff kit (art-r4 merge), rangeSoft | not yet reviewed in game | CLAIMED |
-| F-009 | M | art | Islands: repeated loaves / cakes / saucers | A M6, art-scene P-M3/4 | none (kept round-3 islands) | — | OPEN |
+| F-009 | M | art | Islands: repeated loaves / cakes / saucers | A M6, art-scene P-M3/4 | ac5234a (coast.ts island archetypes) | fjord unit tests; candidate shots 03/06 (round-4/candidate) | CLAIMED |
 | F-010 | M | art | Scoured-rock view looks placeholder | A M5, F | gate skins (R4) | — | CLAIMED (partial) |
-| F-011 | M | art | Rock reads as concrete/masonry (baked textures) | art-scene P-M1/2 | d837618 (Poly Haven Rock Face 03) | — | CLAIMED |
+| F-011 | M | art | Rock reads as concrete/masonry (baked textures) | art-scene P-M1/2 | d837618 + ac5234a (Cliff Side macro, relief, streaks) | candidate shot 06 | CLAIMED |
 | F-012 | M | art | Hamlets would float/clip with the cliff kit | art-scene P-M6 | R4 carve-out | — | CLAIMED |
 | F-013 | m | art | No foam where cliffs/columns meet water | art-scene P-M5 | cliffStream foam (R4) | — | CLAIMED |
-| F-014 | m | cinematic | Cod prop reads as a stick through the Yeti's nose; presenter pose | C | — | — | OPEN |
-| F-015 | m | gameplay | Slow gully drop-ins crash ("hard landing") | B, E final | — | — | OPEN |
-| F-016 | m | UI | Menu/HUD don't scale at 1440p+ | E | — | — | OPEN |
+| F-014 | m | cinematic | Cod prop reads as a stick through the Yeti's nose; presenter pose | C | bcc16bd (cod orientation, gag mode, presenter, beacon) | candidate shots 11f/11g/11c | CLAIMED |
+| F-015 | m | gameplay | Slow gully drop-ins crash ("hard landing") | B, E final | — (investigated: the two remaining crashes are squall drift mid-air + misalignment; terrain change made it worse, reverted) | scratch gap2 on fjord-r4b | OPEN (minor, accepted for preview) |
+| F-016 | m | UI | Menu/HUD don't scale at 1440p+ | E | f49855b (autoUiScale) | tests/unit/ui_scale.test.ts; candidate res-2560 shots; menu.spec 2560 fit | CLAIMED |
 | F-017 | m | QA | Squall caption throttle per kind hides consecutive squalls | E #1 | eb8a3b2 (per squall) | — | CLAIMED |
 | F-018 | m | difficulty | Relaxed hazard intensity 0.25 erased the mechanic | B, F | eb8a3b2 (0.5) | — | CLAIMED |
 | F-019 | m | perf | Snowball beam shader compiles mid-chase | D #5 | 4fb9bd0 | — | CLAIMED |
-| F-020 | m | test/QA | Browser suite never run on the integrated R4 build | RECOVERY.md | — | Round-4 TESTS.md | OPEN |
+| F-020 | m | test/QA | Browser suite never run on the integrated R4 build | RECOVERY.md | — | round-4/TESTS.md: 19/19 browser, 306/306 unit on the candidate | FIXED |

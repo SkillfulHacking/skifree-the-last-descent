@@ -6,14 +6,19 @@ to outrun it to the ski resort at the bottom.
 
 It is an original reimagining of the premise of the 1991 Windows game *SkiFree*. No assets from that
 game are used. Every model, texture, animation, sound effect and music cue is generated procedurally
-at runtime by code in this repository, so the game has no binary asset files.
+at runtime by code in this repository, with one exception: the Fjord Coast's rock uses a few
+photo-scanned CC0 texture sets from Poly Haven, bundled into the build (listed with their authors in
+`docs/ASSETS_AND_LICENSES.md`; the game never calls Poly Haven at runtime).
 
 **Play online:** https://skillfulhacking.github.io/skifree-the-last-descent/ (deployed from `main` by GitHub Actions; see `.github/workflows/deploy.yml`).
 
 ## Locations (biomes)
 
-The mountain's look, vegetation, obstacle mix and terrain character come from a **biome**. Alpine is
-the only one so far; `docs/BIOMES.md` explains how to add more. A non-default location is shown in
+The mountain's look, vegetation, obstacle mix and terrain character come from a **biome**. Two are
+playable: **Alpine** (1/5, the original mountain) and **Fjord Coast** (2/5 "Scenic": sea cliffs,
+islands, a cornice along the rim, wind gates and squalls, a sea cave, a harbour finish and optional
+viewpoints that unlock *Scenic Route*). Choose one on the menu's Location row. `docs/BIOMES.md`
+explains how to add more. A non-default location is shown in
 the menu (a Location row appears once there is more than one) and in course codes as a suffix,
 e.g. `DAILY-2026-11-08-STD-N@DUSK`; Alpine codes are unchanged.
 Beyond looks, a location can plug in capability modules — surface physics, weather, hazards, its

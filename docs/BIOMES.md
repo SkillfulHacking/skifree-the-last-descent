@@ -496,7 +496,8 @@ Tuning notes:
 |---|---|
 | Biome data, surface (cornice guard), weather (onshore breeze, airborne-only coupling), coast params | `src/world/biomes/fjord/biome.ts` |
 | Hazard kinds `sea-gust` and `scoured-rock`. Round 4: **wind gates** (a rib of two outcrops on the racing line, ≥ 3 per Sprint; the gust funnels through the *notch* on the sea side — onshore push, gust drag, a knock for a tucked skier — while the *lee* on the land side is sheltered but drift-loaded: notch in the lull, lee in a gust), squalls over jumps (airborne push toward a landing rock 4 m onshore), cycle 5.5 / 2.4 (windsock telegraph) / 6.0 / 1.0 s. Intensity by game difficulty: Relaxed 0.5 (rock 0.25), Normal 1, Hard 1.2 — the layout is the same on every difficulty | `src/world/biomes/fjord/hazards.ts` |
-| Terrain: cliffs, fjord arms, islands, harbour shore, viewpoints, hamlets | `src/world/coast.ts` |
+| Terrain: cliffs, fjord arms, islands (round 4b: whaleback / peak-island / skerry archetypes — `Coast.cluster`, `islandProfile`), harbour shore, viewpoints, hamlets | `src/world/coast.ts` |
+| Sea-cliff kit (authored mesh over the hidden heightfield backing; buttresses, ribs, benches, notch) and its triplanar rock material (Poly Haven Rock Face 03 detail + Cliff Side macro, seepage streaks) | `src/world/art/{cliffModel,cliffKit,cliffStream,rockMaterial}.ts` |
 | Water (per-arm level surfaces), sea mist, hamlets, cairns, viewpoints, ferries | `src/world/biomes/fjord/views/{water,mist,scenery,viewpoint,buildings}.ts` |
 | Finish `fjord-harbour` + victory (trophy, cold plunge, sea-to-summit reveal) | `views/harbour.ts`, `views/harbourVictory.ts` |
 | Refuge `coastal-shelter`, cave dressing `fjord-sea-cave`, hazard views | `views/shelter.ts`, `views/seaCave.ts`, `views/hazardViews.ts` |

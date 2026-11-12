@@ -38,7 +38,9 @@ async function boot(page: Page, settings: Record<string, unknown> = {}, url = '/
 async function click(page: Page, target: ReturnType<Page['locator']>) {
   await page.addStyleTag({ content: '*, *::before, *::after { transition: none !important; animation: none !important; }' });
   await expect(target).toBeVisible();
-  await target.click({ timeout: 60_000 });
+  // (a 1920×1080 SwiftShader menu frame takes ~7 s on the 2-CPU CI box — measured identical on the
+  // Pass 4 release build — and the actionability checks need several frames: 60 s was too tight)
+  await target.click({ timeout: 240_000 });
 }
 
 /** one key press per rendered frame (the menu reads input once per frame) */
