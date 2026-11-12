@@ -170,12 +170,25 @@ export class CliffStream {
   want(z0: number, z1: number, fx: number, fz: number): void {
     const i0 = Math.floor(z0 / CLIFF_SEG);
     const i1 = Math.floor(z1 / CLIFF_SEG);
+    let dropped = false;
     for (const [i, s] of this.segs) {
       if (i >= i0 && i <= i1) continue;
       this.dropFoam(s.mesh);
       s.mesh.geometry.dispose();
       s.mesh.removeFromParent();
       this.segs.delete(i);
+      dropped = true;
+    }
+    // (round 4b, D r4: one material per fjord-arm water level, never freed — 3 grew to 13 over 40 km
+    // of Endless) free the materials no live segment uses any more; a queued job asks again
+    if (dropped && this.mats.size > 2) {
+      const live = new Set<THREE.Material>();
+      for (const sg of this.segs.values()) live.add(sg.mesh.material as THREE.Material);
+      for (const [k, mt] of this.mats)
+        if (!live.has(mt)) {
+          disposeRockMaterial(mt);
+          this.mats.delete(k);
+        }
     }
     this.jobs = this.jobs.filter((j) => {
       if (j.i >= i0 && j.i <= i1) return true;
