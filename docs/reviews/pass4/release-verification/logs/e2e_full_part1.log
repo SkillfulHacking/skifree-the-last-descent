@@ -1,0 +1,49 @@
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+Running 13 tests using 1 worker
+
+  ✓   1 tests/e2e/game.spec.ts:57:1 › main menu loads with a rendered 3D background and no fatal errors (2.0m)
+  ✓   2 tests/e2e/game.spec.ts:71:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory (16.2m)
+  ✓   3 tests/e2e/game.spec.ts:190:1 › pause/resume and gamepad hot-plug do not break the game (4.4m)
+  ✓   4 tests/e2e/menu.spec.ts:62:3 › main menu fits 1920x1080 without scrolling, title intact (3.3m)
+  ✓   5 tests/e2e/menu.spec.ts:62:3 › main menu fits 1920x900 without scrolling, title intact (3.3m)
+  ✓   6 tests/e2e/menu.spec.ts:62:3 › main menu fits 1366x768 without scrolling, title intact (2.6m)
+  ✘   7 tests/e2e/menu.spec.ts:62:3 › main menu fits 2560x1440 without scrolling, title intact (6.1m)
+  -   8 tests/e2e/menu.spec.ts:74:1 › browser zoom 125% and UI scale 150% keep the menu usable (scroll only if needed)
+  -   9 tests/e2e/menu.spec.ts:100:1 › keyboard, mouse and gamepad drive the course controls; the choice persists
+  -  10 tests/e2e/menu.spec.ts:136:1 › a course code typed into the menu selects that course
+  -  11 tests/e2e/menu.spec.ts:177:1 › with a second location (debug-only test location) the Location row shows name, rating and description and the menu still fits
+  ✓  12 tests/e2e/progression.spec.ts:87:1 › Achievements + Locker: layout, keyboard/mouse/gamepad, v1 save migration, equip persists and recolours the skier (14.3m)
+  ✓  13 tests/e2e/progression.spec.ts:171:1 › an automated ?debug run reports unlocks but never persists them (4.3m)
+
+
+  1) tests/e2e/menu.spec.ts:62:3 › main menu fits 2560x1440 without scrolling, title intact ────────
+
+    TimeoutError: page.screenshot: Timeout 120000ms exceeded.
+    Call log:
+      - taking page screenshot
+      - waiting for fonts to load...
+      - fonts loaded
+
+
+      68 |       expect(l, `${mode} @ ${w}x${h}`).toMatchObject({ panelScroll: 0, overflowX: 0, overflowY: 0, titleClipped: false, rowsOutside: 0 });
+      69 |     }
+    > 70 |     await page.screenshot({ path: `docs/reviews/pass2/menu/e2e_menu_${w}x${h}.png` });
+         |                ^
+      71 |   });
+      72 | }
+      73 |
+        at /home/claude/skifree/tests/e2e/menu.spec.ts:70:16
+
+    Error Context: test-results/menu-main-menu-fits-2560x1440-without-scrolling-title-intact/error-context.md
+
+  Slow test file: tests/e2e/game.spec.ts (22.6m)
+  Slow test file: tests/e2e/progression.spec.ts (18.6m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 failed
+    tests/e2e/menu.spec.ts:62:3 › main menu fits 2560x1440 without scrolling, title intact ─────────
+  4 did not run
+  8 passed (56.5m)
+exit 1

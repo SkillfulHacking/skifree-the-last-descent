@@ -1,0 +1,182 @@
+{
+ "classic-sprint/skilled": {
+  "r": {
+   "outcome": "victory",
+   "time": 156.99166666668822,
+   "chaseTime": 129.8083333333558,
+   "minGap": 53.56743216241489,
+   "crashes": 0,
+   "maxSpeed": 30.34747790283683,
+   "avgChaseSpeed": 22.806160847654642,
+   "finalGap": 113.24212295726997,
+   "maxGap": 169.4646041697457,
+   "distance": 3000.113509376425,
+   "encountersSurvived": 1,
+   "peakBands": 0
+  },
+  "trace": "f2a1a9cb186583be77ad6587d27112bf0ddaa3c9b61c4ab6e66d0b05b4a73cdc"
+ },
+ "classic-sprint/average": {
+  "r": {
+   "outcome": "caught",
+   "time": 101.84166666669378,
+   "chaseTime": 66.95000000002845,
+   "minGap": 2.7432575538535655,
+   "crashes": 0,
+   "maxSpeed": 19.11203666698669,
+   "avgChaseSpeed": 16.088974841208415,
+   "finalGap": 0,
+   "maxGap": 75.02731120110683,
+   "distance": 1258.7317959655793,
+   "encountersSurvived": 0,
+   "peakBands": 0
+  },
+  "trace": "48fe57e6eea4dfd948dbbc047e6656d0a421c6ff077c6de71fdd5ab3f3db5cb7"
+ },
+ "classic-sprint/careless": {
+  "r": {
+   "outcome": "caught",
+   "time": 47.48333333333128,
+   "chaseTime": 11.499999999999346,
+   "minGap": 2.843813717886433,
+   "crashes": 0,
+   "maxSpeed": 14.013110802851855,
+   "avgChaseSpeed": 11.278673553552657,
+   "finalGap": 0,
+   "maxGap": 44.64092214998986,
+   "distance": 402.7241643918972,
+   "encountersSurvived": 0,
+   "peakBands": 0
+  },
+  "trace": "065100582f36f39a90cf4fa23f2118e4205d6b2979d0c0cd1585551d228c8f30"
+ },
+ "classic-sprint/cautious": {
+  "r": {
+   "outcome": "caught",
+   "time": 75.41666666667275,
+   "chaseTime": 40.525000000007424,
+   "minGap": 2.8675337310110924,
+   "crashes": 0,
+   "maxSpeed": 16.89663756106744,
+   "avgChaseSpeed": 15.533208295581463,
+   "finalGap": 0,
+   "maxGap": 56.88467425463975,
+   "distance": 869.901700988884,
+   "encountersSurvived": 0,
+   "peakBands": 0
+  },
+  "trace": "4f0da29afe5e1cf15e0953b1088117e9d841f015a253fb99d67ec6313e96a908"
+ },
+ "custom-standard-3803621719/skilled": {
+  "r": {
+   "outcome": "victory",
+   "time": 484.91666666639,
+   "chaseTime": 424.36666666639275,
+   "minGap": 48.18289110085852,
+   "crashes": 0,
+   "maxSpeed": 29.39401624279639,
+   "avgChaseSpeed": 22.456330470587062,
+   "finalGap": 108.81995870313106,
+   "maxGap": 159.53995020140746,
+   "distance": 10000.008777050074,
+   "encountersSurvived": 1,
+   "peakBands": 6
+  },
+  "trace": "68b5151e14f9d263088e950b17e671e888985f9e9a934f1d5814dd6166a2ea3a"
+ },
+ "custom-standard-3803621719/intermediate": {
+  "r": {
+   "outcome": "victory",
+   "time": 488.7416666663865,
+   "chaseTime": 428.19166666638927,
+   "minGap": 48.18289110085852,
+   "crashes": 0,
+   "maxSpeed": 26.28836917019235,
+   "avgChaseSpeed": 22.255605447467737,
+   "finalGap": 108.88566997727276,
+   "maxGap": 148.30665709874745,
+   "distance": 10000.09915563683,
+   "encountersSurvived": 1,
+   "peakBands": 6
+  },
+  "trace": "ef74ecd2159064bebdf1a1ca31a11bcfee5e9be13118a3da47029f6866c69d70"
+ },
+ "daily-sprint-2203377306/skilled": {
+  "r": {
+   "outcome": "victory",
+   "time": 150.16666666669443,
+   "chaseTime": 121.68333333336207,
+   "minGap": 46.47989483946047,
+   "crashes": 0,
+   "maxSpeed": 27.74335562989499,
+   "avgChaseSpeed": 23.70501646295981,
+   "finalGap": 116.88614554904386,
+   "maxGap": 146.3237171777097,
+   "distance": 3000.0080707283255,
+   "encountersSurvived": 1,
+   "peakBands": 6
+  },
+  "trace": "ff911d23faecc1a61e441068cc116d93d02226cfa4ec5ec65090e274df5d6af6"
+ },
+ "daily-sprint-2203377306/intermediate": {
+  "r": {
+   "outcome": "victory",
+   "time": 151.99166666669277,
+   "chaseTime": 123.42500000002708,
+   "minGap": 46.60726626951018,
+   "crashes": 0,
+   "maxSpeed": 26.27927089591015,
+   "avgChaseSpeed": 23.369099120806222,
+   "finalGap": 115.97271401047158,
+   "maxGap": 142.40702774822626,
+   "distance": 3000.1398351592247,
+   "encountersSurvived": 1,
+   "peakBands": 6
+  },
+  "trace": "78e2222afd010d7055e957a131cdc68cac801add279046b9834c614fb8d92ef7"
+ },
+ "custom-standard-4055206780hard/skilled": {
+  "r": {
+   "outcome": "victory",
+   "time": 514.0249999996969,
+   "chaseTime": 452.3666666663664,
+   "minGap": 15.187394811435999,
+   "crashes": 0,
+   "maxSpeed": 30.29778263749999,
+   "avgChaseSpeed": 21.31753142560293,
+   "finalGap": 87.02929987050591,
+   "maxGap": 159.62513899490145,
+   "distance": 10000.022200684958,
+   "encountersSurvived": 1,
+   "peakBands": 6,
+   "snowballs": {
+    "throws": 61,
+    "hits": 30,
+    "near": 18
+   }
+  },
+  "trace": "c1cae6a5a6e1ee8d4f03a08ad5df88ee54375ffca65aab5922d8abe7351aebec"
+ },
+ "custom-standard-4055206780hard/intermediate": {
+  "r": {
+   "outcome": "victory",
+   "time": 515.408333333029,
+   "chaseTime": 453.7499999996985,
+   "minGap": 17.94866403280265,
+   "crashes": 0,
+   "maxSpeed": 26.279390276679443,
+   "avgChaseSpeed": 21.25181170119707,
+   "finalGap": 75.23849550855796,
+   "maxGap": 146.76615474582746,
+   "distance": 10000.069073258564,
+   "encountersSurvived": 1,
+   "peakBands": 6,
+   "snowballs": {
+    "throws": 63,
+    "hits": 30,
+    "near": 21
+   }
+  },
+  "trace": "8d1e85b55808f32a1960d625ff0efd785e8d30b38957f85f974684015d98b6c3"
+ }
+}

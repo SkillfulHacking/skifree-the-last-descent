@@ -1,0 +1,14 @@
+
+ RUN  v5.1.0 /home/claude/skifree
+
+
+ Test Files  12 passed (12)
+      Tests  215 passed (215)
+   Start at  10:42:40
+   Duration  47.30s (tests 97%, transform 2%, import 1%)
+
+
+real	0m47.792s
+user	0m46.470s
+sys	0m0.981s
+vitest exit 0

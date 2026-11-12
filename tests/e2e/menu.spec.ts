@@ -67,7 +67,8 @@ for (const [w, h] of [
       const l = await layout(page);
       expect(l, `${mode} @ ${w}x${h}`).toMatchObject({ panelScroll: 0, overflowX: 0, overflowY: 0, titleClipped: false, rowsOutside: 0 });
     }
-    await page.screenshot({ path: `docs/reviews/pass2/menu/e2e_menu_${w}x${h}.png` });
+    // software rendering of a 2560x1440 frame can take minutes on a loaded CI box (the layout checks above are what matter)
+    await page.screenshot({ path: `docs/reviews/pass2/menu/e2e_menu_${w}x${h}.png`, timeout: 600_000 });
   });
 }
 
