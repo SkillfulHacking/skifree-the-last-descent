@@ -70,7 +70,8 @@ it(`frames ${BIOME} ${Q} ${KM} km`, async () => {
     const c0 = cpu();
     const t0 = performance.now();
     w.updateOrigin(focus);
-    w.update(1 / 60, time, focus, cam, 3.5);
+    // (round 5, D r4 #1: the shipped per-frame streaming budget — World.STREAM_BUDGET_MS — unless BUDGET is set)
+    w.update(1 / 60, time, focus, cam, env.BUDGET ? Number(env.BUDGET) : undefined);
     const dt = performance.now() - t0;
     const dc = cpu() - c0;
     wall.push(dt);

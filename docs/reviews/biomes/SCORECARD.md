@@ -108,5 +108,28 @@ streaks (A); sea framing only on Sprint caves (C); catch shot faces inland (C); 
 production build (D). Evidence gaps: res-1366/res-2560 and perf were late (rendering on a 2-CPU box).
 Remediation → round 5 (branch `fjord-r4b`).
 
+### Round 5 — build `e2ce964` — **FAIL** at the gate (visual reviewers A, C, F; B/D/E not run — see note)
+
+| Category | A | C | F | Gate |
+|---|---|---|---|---|
+| Visual art direction | **7.5** | 7.5 | 7 | ✗ (< 8) |
+| Environmental uniqueness | **7.5** | 8 | 8 | ✗ |
+| Skiing and hazard mechanics | 6.5 (lc) | 7 (lc) | 7.5 | ✗ |
+| Difficulty and fairness | 7 (lc) | 7 (lc) | 7.5 | ✗ |
+| Cinematics | 7 | **8** | 7.5 | ✗ |
+| Performance and stability | 7 (lc) | 7 (lc) | 7 (lc) | ✗ |
+| Accessibility and controls | 7 (lc) | 7 (lc) | 7.5 (lc) | ✗ |
+| Overall player experience | 7 | 7.5 | **7.5** | ✗ (< 8) |
+
+Verified fixed: the round-4 Critical (pinned skier — F's 360 runs, unit tests), Hard Sprint step (F: 11/12 = Alpine),
+floating lintel and net, scoured rock textured, reveal needles softened, cliff lattice gone, foam line present.
+Not fixed / not visible: islands (heightfield shapes barely changed on screen: A, F), cave dressing still reads as
+props (A, C, F), harbour headland streaks, summit dome, repeated house model, catch shot still has no sea,
+cave sea framing on Standard+ (C: 0/15 after the steep frames were removed; the cinematic ignores the chosen tilt).
+B, D and E were not run this round: with A and F below the bar the gate cannot be met on this build, and the
+art category has now moved only 6.5 → 7 → 7.5 over three rounds of heightfield/shader tuning (F's Overall
+7 → 7.5 → 7.5). Per the brief, the methodology changes before the next round (authored meshes for islands,
+cave dressing and the harbour headland instead of further heightfield/shader tuning).
+
 ## Whiteout Ridge, Frozen Frontier, Volcanic Expanse
 Not started.
