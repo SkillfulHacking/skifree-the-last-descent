@@ -107,7 +107,7 @@ test('Scenic Route: choose Fjord Coast, ski to a viewpoint, unlock, toast, Achie
       await press(page, 'Enter');
       await page.waitForSelector('.hud:not(.hidden)', { timeout: 600_000 });
       // from here the page clock is driven by the test
-      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 50));
+      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 3000)); // a little ahead: SwiftShader frames are slow
     } else {
       // pause → Restart (same course)
       await page.keyboard.press('Escape');
