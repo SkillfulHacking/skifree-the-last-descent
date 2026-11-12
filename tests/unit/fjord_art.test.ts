@@ -75,7 +75,7 @@ describe('Fjord sea cave: props keep out of the cave-cinematic cameras', () => {
       const mountain = { heightAt: (x: number) => 50 + (x - 100) * 0.08 * -outX };
       const d = dressSeaCave({ cave: cave as never, mountain: mountain as never, anchor: { z: 400 } as never, quality: 'high', biome: {} as never });
       const props = d.group.userData['props'] as Array<{ p: THREE.Vector3; r: number; kind: string }>;
-      expect(props.length).toBeGreaterThan(20);
+      expect(props.length).toBeGreaterThan(12); // round 6: no free-standing causeway or wreckage; portal columns + scanned boulders
       expect(props.some((p) => p.kind === 'column')).toBe(true);
       // no lintel of column ends any more (round 4b: they read as loose hex blocks floating over the
       // mouth); the portal columns still give the gulls brow perches
