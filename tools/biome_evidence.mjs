@@ -433,13 +433,15 @@ if (biome === 'fjord' && want('arm')) {
   const span = await P(`(w, m) => { const e = m.profile.encounters(-Infinity, m.finishZ)[0]; const cp = m.profile.checkpoints(e.triggerZ, m.finishZ)[0] ?? m.finishZ; return [e.triggerZ, cp]; }`);
   const arms = co.reaches.filter((r) => r.z1 !== null && (r.z0 + r.z1) / 2 > span[0] + 400 && (r.z0 + r.z1) / 2 < span[1] - 400);
   const arm = arms[0] ?? co.reaches.find((r) => r.z1 !== null && r.z1 > span[0] + 800) ?? co.reaches[1];
-  const za = Math.round(Math.min(Math.max((arm.z0 + (arm.z1 ?? arm.z0 + 3000)) / 2, span[0] + 400), span[1] - 400));
+  // where the run passes closest to the rim along that arm (the water in the gameplay view)
+  const za = await P(`(w, m, c) => { const a = Math.max(${arm.z0} + 300, ${span[0]} + 400), b = Math.min(${arm.z1 ?? arm.z0 + 3000} - 300, ${span[1]} - 400); let best = Math.round((a + b) / 2), bd = Infinity; for (let z = a; z < b; z += 20) { const d = m.routeX(z) - c.rimX(z); if (d < bd) { bd = d; best = z; } } return best - 120; }`);
   await goTo(za, 22);
   await ev(() => { if (window.__skifree.state().session?.phase === 'caveCinematic') window.__skifree.skipCave(); });
   await ev(() => { window.__skifree.hold(true); window.__skifree.autopilot('skilled'); window.__skifree.hud(true); });
   await framesUntil(`(s) => s.phase === 'chase'`, 300);
-  await ev(() => window.__skifree.placeYeti(22));
-  await framesUntil(`(s) => false`, 90);
+  await framesUntil(`(s) => false`, 60);
+  await ev(() => window.__skifree.placeYeti(16));
+  await framesUntil(`(s) => false`, 25);
   await settle(2000);
   await shot('16_expedition_arm', `Expedition: ordinary chase gameplay beside fjord arm ${arm.index} (z ${Math.round(arm.z0)}–${Math.round(arm.z1 ?? 0)}), rear view showing the Yeti`);
 }
