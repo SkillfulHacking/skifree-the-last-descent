@@ -45,7 +45,14 @@ function relief(x: number, y: number, z: number, s: number, faceK: number, H: nu
   const fr = bedY - Math.floor(bedY);
   const ledge = (fr < 0.6 ? fr / 0.6 : (1 - fr) / 0.4) - 0.5;
   const ledgeK = 0.5 + 0.5 * smoothstep(-0.2, 0.4, noise3(x / 220, y / 90, z / 220, s + 613));
-  return faceK * A * (8 * blocks + 3.2 * ledge * ledgeK * ledgeLod);
+  // round 4 (art: "a flat canvas wall" at a kilometre): buttresses and ribs. Outward only (the
+  // inward cap keeps the face ahead of the backing): vertical ribs 40–90 m apart that wander down the
+  // face and die out at random heights, and broad buttresses a few hundred metres across, so the low
+  // sun draws vertical shadow lines and the wall breaks into masses instead of one plane
+  const zr = z + 22 * noise3(x / 200, y / 160, z / 200, s + 614);
+  const rib = Math.pow(Math.max(0, noise3(zr / 62, y / 420, x / 62, s + 615)), 1.6) * smoothstep(-0.3, 0.3, noise3(z / 140, y / 110, 0.7, s + 616));
+  const butt = Math.max(0, fbm3(z / 340, y / 700, x / 340, s + 617, 2));
+  return faceK * A * (8 * blocks + 3.2 * ledge * ledgeK * ledgeLod + 22 * rib + 26 * butt);
 }
 
 export interface CliffSegmentOptions {

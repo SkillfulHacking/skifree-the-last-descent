@@ -100,7 +100,7 @@ Authors and licence verified on each asset page on 2026-11-11 (WebFetch of polyh
 
 | File (committed) | Asset | Source URL | Authors (from the page) | Licence | Used for |
 |---|---|---|---|---|---|
-| — (converted, tried, not committed, not used) | Cliff Side (1.8 m wide) | https://polyhaven.com/a/cliff_side | Dario Barresi, James Ray Cock (photography); Jenelle van Heerden (processing) | CC0 | tried on the cliff kit: its regular sandstone bedding tiled into a pinstripe across the wall; not used |
+| `src/world/art/textures/cliff_side_albedo.webp`, `cliff_side_nhr.webp` | Cliff Side (1.8 m wide) | https://polyhaven.com/a/cliff_side | Dario Barresi, James Ray Cock (photography); Jenelle van Heerden (processing) | CC0 | round 4b: the sea-cliff kit's MACRO layer only (luminance + cavity, 85 m and ~230 m tiles, mip-biased so its thin bedding does not pinstripe; colour discarded). Tried earlier as the detail layer and rejected (pinstripe) |
 | `src/world/art/textures/rock_face_03_albedo.webp`, `rock_face_03_nhr.webp` | Rock Face 03 (2.7 m wide) | https://polyhaven.com/a/rock_face_03 | Dario Barresi (photography); Rico Cilliers (processing) | CC0 | Fjord sea-cave rock mass (regraded dark basalt-grey, 4 m tiles) and the sea-cliff kit (regraded cold grey, 9 m tiles) |
 | — (converted, not committed, not used) | Aerial Rocks 02 | https://polyhaven.com/a/aerial_rocks_02 | Rob Tuytel | CC0 | not used this round (the scoured-rock hazard views use their own vertex-colour material) |
 | — (converted, not committed, not used) | Coast Sand Rocks 02 | https://polyhaven.com/a/coast_sand_rocks_02 | Rob Tuytel | CC0 | not used this round (no wet-shore mesh takes the rock material) |

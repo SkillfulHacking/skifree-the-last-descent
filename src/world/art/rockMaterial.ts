@@ -21,7 +21,7 @@
 import * as THREE from 'three';
 import { ATMOSPHERE_GLSL, addAtmosphereUniforms } from '../look/atmosphere';
 
-export type RockKind = 'gneiss' | 'basalt' | 'rock_face_03';
+export type RockKind = 'gneiss' | 'basalt' | 'rock_face_03' | 'cliff_side';
 
 const URLS: Record<RockKind, { albedo: string; nhr: string; tile: number }> = {
   gneiss: { albedo: new URL('./textures/gneiss_albedo.webp', import.meta.url).href, nhr: new URL('./textures/gneiss_nhr.webp', import.meta.url).href, tile: 8 },
@@ -29,6 +29,10 @@ const URLS: Record<RockKind, { albedo: string; nhr: string; tile: number }> = {
   // round 4 integration: photo-scanned CC0 sets from Poly Haven (docs/ASSETS_AND_LICENSES.md), packed
   // into the same layout (1K; AO from the displacement). Regraded in the shader (RockGrade).
   rock_face_03: { albedo: new URL('./textures/rock_face_03_albedo.webp', import.meta.url).href, nhr: new URL('./textures/rock_face_03_nhr.webp', import.meta.url).href, tile: 4 },
+  // round 4 (F-011/F-008 follow-up): Poly Haven "Cliff Side" — a layered cliff face, used as the
+  // MACRO layer of the sea cliffs (its bedding and ledges read at 100 m–1 km where the 9 m detail
+  // tile has averaged out to a flat grey "canvas")
+  cliff_side: { albedo: new URL('./textures/cliff_side_albedo.webp', import.meta.url).href, nhr: new URL('./textures/cliff_side_nhr.webp', import.meta.url).href, tile: 40 },
 };
 
 interface SetEntry {
@@ -129,7 +133,7 @@ export function rockSetsReady(): Promise<void> {
 export const ROCK_ORIGIN = { value: new THREE.Vector3() };
 
 /** mean linear albedo (channel average) of the scanned sets: the macro term and the regrade divide by it */
-const SCAN_LUM: Partial<Record<RockKind, number>> = { rock_face_03: 0.154 };
+const SCAN_LUM: Partial<Record<RockKind, number>> = { rock_face_03: 0.154, cliff_side: 0.1136 };
 
 /**
  * Regrade of a scanned set toward cold Nordic rock (the scans are warm sandstone / brown rock):
@@ -172,6 +176,13 @@ export interface RockMaterialOptions {
   grade?: RockGrade;
   /** world size of one texture tile (m); default: the set's own */
   tile?: number;
+  /**
+   * A second scanned set as a large-scale layer (luminance and cavity only, triplanar): bedding,
+   * ledges and broad tone that read from far away. Tile in m (default: the set's own).
+   */
+  macroSet?: { kind: RockKind; tile?: number; strength?: number };
+  /** dark seepage / wet streaks running down steep faces (0 = none) */
+  streaks?: number;
 }
 
 export interface RockUniforms {
@@ -184,7 +195,7 @@ export interface RockUniforms {
 }
 
 /** A triplanar rock material. Dispose with disposeRockMaterial (releases the shared textures). */
-export function createRockMaterial(o: RockMaterialOptions = {}): THREE.MeshStandardMaterial & { userData: { rock: RockUniforms; kind: RockKind } } {
+export function createRockMaterial(o: RockMaterialOptions = {}): THREE.MeshStandardMaterial & { userData: { rock: RockUniforms; kind: RockKind; macroKind?: RockKind } } {
   const kind = o.kind ?? 'gneiss';
   const set = acquireRockSet(kind);
   const tile = o.tile ?? URLS[kind].tile;
@@ -199,10 +210,16 @@ export function createRockMaterial(o: RockMaterialOptions = {}): THREE.MeshStand
   };
   const macro = o.macro ?? 7.3;
   const hq = o.hq !== false;
+  const ms = o.macroSet && hq ? acquireRockSet(o.macroSet.kind) : null;
+  const msTile = o.macroSet ? (o.macroSet.tile ?? URLS[o.macroSet.kind].tile) : 1;
+  const msLum = o.macroSet ? (SCAN_LUM[o.macroSet.kind] ?? 0.1) : 1;
+  const msK = o.macroSet?.strength ?? 1;
+  if (ms) m.defines = { ...(m.defines ?? {}), RK_MACRO: '' };
+  if ((o.streaks ?? 0) > 0) m.defines = { ...(m.defines ?? {}), RK_STREAKS: (o.streaks ?? 0).toFixed(3) };
   const lumRef = SCAN_LUM[kind] ?? (kind === 'basalt' ? 0.045 : 0.075);
   if (o.caveAttr) m.defines = { ...(m.defines ?? {}), RK_CAVE: '' };
   m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, U, { tAlb: { value: set.albedo }, tNhr: { value: set.nhr } });
+    Object.assign(sh.uniforms, U, { tAlb: { value: set.albedo }, tNhr: { value: set.nhr }, tMac: { value: ms ? ms.albedo : set.albedo } });
     addAtmosphereUniforms(sh.uniforms);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vRkW;\nvarying vec3 vRkN;\n#ifdef RK_CAVE\nattribute vec4 aCave;\nvarying vec4 vRkCave;\n#endif')
@@ -218,6 +235,7 @@ varying vec4 vRkCave;
 #endif
 uniform sampler2D tAlb;
 uniform sampler2D tNhr;
+uniform sampler2D tMac;
 uniform float uWater;
 uniform float uSnow;
 uniform vec3 uOrigin;
@@ -285,6 +303,37 @@ float rkBand = rk_fbm(vec2(rkY * 0.09, rkP.x * 0.0015 + rkP.z * 0.0015));
 float rkBand2 = rk_n(vec2(rkY * 0.33, (rkP.x + rkP.z) * 0.01));
 vec3 rkCol = rkAlb.rgb * (1.0 + uStrata * (0.55 * (rkBand - 0.5) + 0.22 * (rkBand2 - 0.5)));
 rkCol *= 0.82 + 0.36 * rk_fbm(rkP.xz * 0.011 + rkP.y * 0.006);
+#ifdef RK_MACRO
+{
+  // the macro scan: its luminance (bedding, ledges, broad tone) and cavity, never its colour; the
+  // top projection is rotated so its layering never draws straight lines across a plateau
+  float mt = ${(1 / msTile).toFixed(5)};
+  vec3 mP = rkP + vec3(31.7, 7.3, 13.1);
+  // (mip-biased: the scan's thin sandstone bedding must not tile into a pinstripe across a wall —
+  // only its broad ledges and tone survive)
+  vec4 m1 = texture(tMac, mP.zy * mt, 2.2) * rkBw.x + texture(tMac, mat2(0.6, -0.8, 0.8, 0.6) * mP.xz * mt, 2.2) * rkBw.y + texture(tMac, mP.xy * mt, 2.2) * rkBw.z;
+  // and the same layer twice as large again, so it never repeats visibly across a whole wall
+  vec4 m2 = texture(tMac, mP.zy * mt * 0.37 + 0.31, 1.5) * rkBw.x + texture(tMac, mat2(0.6, -0.8, 0.8, 0.6) * mP.xz * mt * 0.37, 1.5) * rkBw.y + texture(tMac, mP.xy * mt * 0.37 + 0.53, 1.5) * rkBw.z;
+  float ml = dot(m1.rgb, vec3(0.2126, 0.7152, 0.0722)) / ${msLum.toFixed(4)};
+  float ml2 = dot(m2.rgb, vec3(0.2126, 0.7152, 0.0722)) / ${msLum.toFixed(4)};
+  float mod1 = clamp(0.3 + 0.7 * ml * mix(1.0, m1.a, 0.8), 0.35, 1.75);
+  float mod2 = clamp(0.45 + 0.55 * ml2 * m2.a, 0.5, 1.5);
+  rkCol *= mix(1.0, mod1 * mod2, ${msK.toFixed(3)});
+}
+#endif
+#ifdef RK_STREAKS
+{
+  // seepage: dark wet streaks down steep faces from ledges and cracks (long in y, narrow across)
+  float steep = 1.0 - smoothstep(0.35, 0.7, abs(rkN.y));
+  float across = (rkP.x * 0.8 + rkP.z * 0.6) * 0.07;
+  float sk = rk_fbm(vec2(across, rkP.y * 0.006 + 0.15 * rk_n(vec2(across * 0.3, 2.0))));
+  float st = smoothstep(0.55, 0.78, sk) * (0.6 + 0.4 * rk_n(vec2(across * 2.3, rkP.y * 0.05)));
+  rkCol *= 1.0 - RK_STREAKS * 0.5 * st * steep;
+  // and broad, cold / warm tone zones a few hundred metres across (no wall is one grey)
+  float zone = rk_fbm(vec2((rkP.x + rkP.z) * 0.0021, rkP.y * 0.0035) + 3.7);
+  rkCol *= mix(vec3(0.72, 0.78, 0.86), vec3(1.08, 1.06, 1.04), zone) * (0.72 + 0.5 * zone);
+}
+#endif
 float rkAO = rkAlb.a;
 float rkH = rkNhr.z;
 float rkRough = rkNhr.w;
@@ -344,13 +393,15 @@ reflectedLight.indirectDiffuse += uFill * diffuseColor.rgb * vec3(0.55, 0.68, 0.
       )
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vRkW);');
   };
-  m.customProgramCacheKey = () => `art-rock-${kind}-${hq ? 2 : 1}-${macro}-${o.vertexColors ? 1 : 0}-${o.caveAttr ? 1 : 0}-${o.snowFrom ?? 0.6}-${o.grade ? JSON.stringify(o.grade) : ''}-${tile}`;
-  m.userData = { rock: U, kind };
-  return m as THREE.MeshStandardMaterial & { userData: { rock: RockUniforms; kind: RockKind } };
+  m.customProgramCacheKey = () => `art-rock-${kind}-${hq ? 2 : 1}-${macro}-${o.vertexColors ? 1 : 0}-${o.caveAttr ? 1 : 0}-${o.snowFrom ?? 0.6}-${o.grade ? JSON.stringify(o.grade) : ''}-${tile}-${ms ? `${o.macroSet!.kind}:${msTile}:${msK}` : ''}-${o.streaks ?? 0}`;
+  m.userData = { rock: U, kind, macroKind: ms ? o.macroSet!.kind : undefined };
+  return m as THREE.MeshStandardMaterial & { userData: { rock: RockUniforms; kind: RockKind; macroKind?: RockKind } };
 }
 
 export function disposeRockMaterial(m: THREE.MeshStandardMaterial): void {
   const kind = m.userData['kind'] as RockKind | undefined;
+  const mk = m.userData['macroKind'] as RockKind | undefined;
   m.dispose();
   if (kind) releaseRockSet(kind);
+  if (mk) releaseRockSet(mk);
 }
