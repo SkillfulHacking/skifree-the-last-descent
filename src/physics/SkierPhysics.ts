@@ -67,6 +67,9 @@ export const TUNING = {
  *    snapping is g·snapExcessTol ≈ 0.25 J/kg.
  *  - Wall impacts use the boulder thresholds (normal speed into the face, m/s).
  */
+/** pinned-against-a-wall rescue (SkierPhysics.pinWatchdog): seconds without getting `escape` m away, wall contact within `contact` s, `offPiste` m from the line */
+export const PIN_WATCH = { window: 4, escape: 3, contact: 1, offPiste: 10 };
+
 export const TERRAIN_CONTACT = {
   wallDeg: 50,
   wallSlope: Math.tan((50 * Math.PI) / 180),
@@ -126,7 +129,9 @@ export type SkierEvent =
   | { type: 'crash'; reason: string; intensity: number }
   | { type: 'pop' }
   | { type: 'recover' }
-  | { type: 'trick'; name: string; points: number };
+  | { type: 'trick'; name: string; points: number }
+  /** put back on the piste (see SkierPhysics.relocate) */
+  | { type: 'relocate'; reason: string; x: number; z: number };
 
 export class SkierState {
   pos = new THREE.Vector3();
@@ -167,6 +172,14 @@ export class SkierState {
   crashes = 0;
   style = 0;
   time = 0;
+  /** last time (s) a grounded wall contact happened (TERRAIN_CONTACT walls) */
+  wallContactT = -1e9;
+  /** pinned-against-a-wall watchdog: where the skier was when the current 4 s window began */
+  pinAnchorX = 0;
+  pinAnchorZ = 0;
+  pinAnchorT = 0;
+  /** since when (s) the player has been continuously trying to move (tuck/skate or steer held) */
+  pushSince = 0;
 
   get speed(): number {
     return this.vel.length();
@@ -312,6 +325,7 @@ export class SkierPhysics {
       if (E.crash && !s.crashed) this.crash(E.crash.reason, E.crash.intensity);
       else if (E.knock) this.knock(E.knock.keep, E.knock.wobble);
     }
+    this.pinWatchdog(input);
 
     if (s.crashed) {
       this.stepCrashed(input, dt);
@@ -462,7 +476,10 @@ export class SkierPhysics {
         const hs = Math.hypot(s.vel.x, s.vel.z);
         s.pathSlope = hs > 1e-3 ? s.vel.y / hs : 0;
         if (attempt === 0) continue;
-        return true; // still against the face: stay put this step
+        // still against the face: stay put this step, and stop (a skier left here kept a non-zero
+        // velocity while not moving — frozen, unable to skate away)
+        s.vel.set(0, 0, 0);
+        return true;
       }
       const yBallistic = prevY + s.pathSlope * hd - 0.5 * GRAVITY * dt * dt;
       const fallAway = yBallistic - hNew;
@@ -532,6 +549,7 @@ export class SkierPhysics {
   private wallHit(x: number, z: number, grounded: boolean): boolean {
     const s = this.s;
     const T = TERRAIN_CONTACT;
+    if (grounded) s.wallContactT = s.time;
     // face normal (horizontal, pointing out of the face) from the terrain gradient there, on the same
     // tight stencil as the wall test (the ±0.35 m one would blend in the floor's own fall line)
     this.mountain.normalAt(x, z, _n, TERRAIN_CONTACT.faceProbe);
@@ -968,6 +986,53 @@ export class SkierPhysics {
     s.vel.multiplyScalar(Math.exp(-1.5 * PHYS_DT));
     s.wobble = Math.max(s.wobble, 0.4);
     if (fresh || vn > 1.5) this.emit({ type: 'impact', kind: kind === 'tree-heavy' ? 'branch' : 'rock-light', intensity: clamp(vn / heavyAt, 0.1, 0.4), x: ox, z: oz });
+  }
+
+  /**
+   * Engine-wide pinned/stranded rescue (Fjord round 4, reviewers B and E: the wall rule could leave a
+   * skier in a pocket at the foot of a cave mouth — before the cave trigger, so no Yeti came — that
+   * they could not skate out of). If the skier has been in touch with a wall within the last second,
+   * or has been trying to move (tuck/skate or steer held) off the piste the whole time, and has not
+   * got 3 m away from where they were 4 s ago, they are put back on the piste. A skier who stops on
+   * purpose (no input) or on the piste is never moved.
+   */
+  private pinWatchdog(input: SkierInput) {
+    const s = this.s;
+    if (!(input.tuck > 0.5 || Math.abs(input.steer) > 0.5)) s.pushSince = s.time;
+    if (s.crashed || !s.grounded || Math.hypot(s.pos.x - s.pinAnchorX, s.pos.z - s.pinAnchorZ) > PIN_WATCH.escape) {
+      s.pinAnchorX = s.pos.x;
+      s.pinAnchorZ = s.pos.z;
+      s.pinAnchorT = s.time;
+      return;
+    }
+    if (s.time - s.pinAnchorT <= PIN_WATCH.window) return;
+    const z = s.pos.z;
+    const rx = this.mountain.routeX(z);
+    const walled = s.time - s.wallContactT < PIN_WATCH.contact;
+    const stranded = s.time - s.pushSince > PIN_WATCH.window && Math.abs(s.pos.x - rx) > PIN_WATCH.offPiste;
+    if (walled || stranded) {
+      this.relocate(rx, z, 'pinned against the rock');
+      s.pinAnchorX = s.pos.x;
+      s.pinAnchorZ = s.pos.z;
+      s.pinAnchorT = s.time;
+    }
+  }
+
+  /** Put the skier back on the piste at (x, z), stopped and crashed (they get up facing downhill), keeping the run's stats. */
+  relocate(x: number, z: number, reason: string) {
+    const s = this.s;
+    s.pos.set(x, this.mountain.heightAt(x, z), z);
+    s.vel.set(0, 0, 0);
+    s.grounded = true;
+    s.airTime = 0;
+    s.airSpin = 0;
+    s.pathSlope = 0;
+    s.crashFalling = false;
+    s.touching.clear();
+    this.emit({ type: 'relocate', reason, x, z });
+    s.crashed = false;
+    this.crash(reason, 0.6);
+    s.heading = 0;
   }
 
   /** Struck by something (a Yeti snowball): keep `keep` of the speed and stagger. */

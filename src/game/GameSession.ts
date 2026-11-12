@@ -561,6 +561,13 @@ export class GameSession implements Stage {
         break;
       case 'recover':
         break;
+      case 'relocate':
+        // boxed in against the rock (SkierPhysics.pinWatchdog): back on the piste, with a clear cue
+        this.prevPos.copy(s.pos);
+        this.follow.snap(this.followTarget());
+        this.hud.title('BACK ON THE PISTE', 'You were boxed in against the rock. Back to the run.', 'intro', 3);
+        this.hud.caption('[you scramble out from under the rock — back on the piste]', 3);
+        break;
       case 'trick':
         this.style += Math.round(e.points * this.multiplier);
         this.hud.popTrick(e.name, Math.round(e.points * this.multiplier));
