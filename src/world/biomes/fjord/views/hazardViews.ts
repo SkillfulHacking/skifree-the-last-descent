@@ -108,7 +108,7 @@ function gateSkins(G: { x: number; z: number; r: number }, m: Mountain, seed: nu
   skin(G.x - G.r - 11, G.x - 0.25 * G.r, G.z - GATE_BEFORE, G.z + G.r + GATE_AFTER, 20, 36, (x, z, u, v) => {
     const streak = Math.max(0, Math.sin(z * 1.35 + Math.sin(x * 0.18 + seed) * 1.4) * 0.5 + 0.5 * Math.sin(z * 0.43 + 1.7));
     const nearRib = Math.pow(u, 1.5);
-    const e = Math.max(0, edge(u, v, 0.25));
+    const e = Math.pow(Math.max(0, edge(u, v, 0.35)), 1.5);
     const glaze = 0.35 + 0.65 * streak;
     const c: [number, number, number, number] = [0.3 - 0.1 * nearRib, 0.38 - 0.1 * nearRib, 0.48 - 0.08 * nearRib, (0.3 + 0.6 * glaze * (0.6 + 0.4 * nearRib)) * e];
     return { lift: 0.01, c };

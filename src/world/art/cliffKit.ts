@@ -35,7 +35,7 @@ import { CliffModel, DS, type Column } from './cliffModel';
  * Only forms the vertex grid can carry (≥ ~15 m): high-frequency noise here aliases against the
  * grid into a regular hatch (the baked normal map does the small scale).
  */
-function relief(x: number, y: number, z: number, s: number, faceK: number, H: number): number {
+function relief(x: number, y: number, z: number, s: number, faceK: number, H: number, ledgeLod = 1): number {
   const A = clamp(H / 60, 1, 2.4);
   // big blocks: terraced noise → steps and ledges
   const blocks = terraced(0.5 + 0.5 * fbm3(x / 110, y / 60, z / 110, s + 601, 3), 4, 0.3) - 0.5;
@@ -45,7 +45,7 @@ function relief(x: number, y: number, z: number, s: number, faceK: number, H: nu
   const fr = bedY - Math.floor(bedY);
   const ledge = (fr < 0.6 ? fr / 0.6 : (1 - fr) / 0.4) - 0.5;
   const ledgeK = 0.5 + 0.5 * smoothstep(-0.2, 0.4, noise3(x / 220, y / 90, z / 220, s + 613));
-  return faceK * A * (8 * blocks + 3.2 * ledge * ledgeK);
+  return faceK * A * (8 * blocks + 3.2 * ledge * ledgeK * ledgeLod);
 }
 
 export interface CliffSegmentOptions {
@@ -120,7 +120,9 @@ export function* cliffSegmentSteps(model: CliffModel, o: CliffSegmentOptions, ov
       faceK *= 1 - c.hm * smoothstep(c.H - 45, c.H - 4, dz);
       faceKs[j * nr + i] = faceK;
       const x0 = c.xr - t;
-      const r = faceK > 0 ? relief(x0, y, z, s, faceK, c.H) : 0;
+      // (the 9–22 m strata ledges only where the rows resolve them: on coarse LODs they alias into a
+      // regular hatch at distance)
+      const r = faceK > 0 ? relief(x0, y, z, s, faceK, c.H, o.dr <= 3 ? 1 : o.dr <= 6 ? 0.45 : 0) : 0;
       // snow benches (review p1): where the profile lies back (a bench), the snow has body: lift the
       // surface up to ~1.3 m and round its outer edge into a soft lip over the band below
       const sA = (model.offsetAt(c, dz + 2) - model.offsetAt(c, dz - 2)) / 4;

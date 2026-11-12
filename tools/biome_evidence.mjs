@@ -398,7 +398,9 @@ if (biome === 'fjord' && (want('gate') || want('gap') || want('viewpoint') || wa
   if (want('viewpoint')) {
     await ev(() => window.__skifree.freeCam(null));
     const co = await ev(() => window.__skifree.coast(0, 100000));
-    const lk = co.lookouts.find((l) => !l.chase) ?? co.lookouts[0];
+    // the viewpoint farthest from any cave (a sea cave's hill rises between some run-in viewpoints and the sea)
+    const caveZs = await P(`(w, m) => m.profile.encounters(-Infinity, ${G.L}).map((e) => e.caveZ)`);
+    const lk = [...co.lookouts].sort((a, b) => Math.min(...caveZs.map((z) => Math.abs(b.z - z))) - Math.min(...caveZs.map((z) => Math.abs(a.z - z))))[0];
     if (lk) {
       await goTo(lk.z - 100, 0);
       await ev(() => { window.__skifree.hold(true); window.__skifree.hud(false); });
@@ -426,10 +428,14 @@ if (biome === 'fjord' && want('arm')) {
   await settle(3000);
   await ev(() => { window.__skifree.hold(true); window.__skifree.skipCave?.(); window.__skifree.toChase(); window.__skifree.hud(true); });
   const co = await ev(() => window.__skifree.coast(0, 100000));
-  const arms = co.reaches.filter((r) => r.z1 !== null && r.z0 > 1000);
-  const arm = arms[Math.min(arms.length - 1, 2)] ?? co.reaches[1];
-  const za = Math.round((arm.z0 + (arm.z1 ?? arm.z0 + 3000)) / 2);
+  // an arm inside the first chase (between the first cave's trigger and the first refuge), so the
+  // teleport triggers no encounter
+  const span = await P(`(w, m) => { const e = m.profile.encounters(-Infinity, m.finishZ)[0]; const cp = m.profile.checkpoints(e.triggerZ, m.finishZ)[0] ?? m.finishZ; return [e.triggerZ, cp]; }`);
+  const arms = co.reaches.filter((r) => r.z1 !== null && (r.z0 + r.z1) / 2 > span[0] + 400 && (r.z0 + r.z1) / 2 < span[1] - 400);
+  const arm = arms[0] ?? co.reaches.find((r) => r.z1 !== null && r.z1 > span[0] + 800) ?? co.reaches[1];
+  const za = Math.round(Math.min(Math.max((arm.z0 + (arm.z1 ?? arm.z0 + 3000)) / 2, span[0] + 400), span[1] - 400));
   await goTo(za, 22);
+  await ev(() => { if (window.__skifree.state().session?.phase === 'caveCinematic') window.__skifree.skipCave(); });
   await ev(() => { window.__skifree.hold(true); window.__skifree.autopilot('skilled'); window.__skifree.hud(true); });
   await framesUntil(`(s) => s.phase === 'chase'`, 300);
   await ev(() => window.__skifree.placeYeti(22));
