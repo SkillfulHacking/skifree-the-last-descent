@@ -56,3 +56,11 @@ server: HMR reloads kill a running capture when sources change).
 - freeze: tsc, vitest, build, full Playwright (PW_PORT=4472) → TESTS.md; candidate SHA
 - evidence from the candidate (fresh build + preview 4471): 1920 all + 1366/2560 menu,summit,finish
 - frames harness on the candidate → EVIDENCE.md
+8. Perf fix (`fjord high 24 km` CPU replay: >16 ms 129 → 2, >33 ms 44 → 0): cliff backing on a 4 m
+   column grid (column cache thrash), per-ray slices in the sea framing.
+9. Poly Haven CC0 scans (product owner's download, converted outside the repo): packed with
+   `tools/artbake/pack_scans.py` (1K albedo+AO / NHR). Rock Face 03 → cave shell (regraded dark,
+   4 m tiles; in-game crop medians shell 42/36, columns 45, chamber 2 at 1280×720) and cliff kit
+   (regraded cold grey, 9 m tiles). Cliff Side tried on the cliffs: regular bedding tiled into a
+   pinstripe → not used, not committed. Aerial Rocks 02 / Coast Sand Rocks 02 not used (no mesh in
+   the game takes the rock material there). Interim `basalt_massive` bake removed.

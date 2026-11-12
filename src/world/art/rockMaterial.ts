@@ -21,13 +21,14 @@
 import * as THREE from 'three';
 import { ATMOSPHERE_GLSL, addAtmosphereUniforms } from '../look/atmosphere';
 
-export type RockKind = 'gneiss' | 'basalt' | 'basalt_massive';
+export type RockKind = 'gneiss' | 'basalt' | 'rock_face_03';
 
 const URLS: Record<RockKind, { albedo: string; nhr: string; tile: number }> = {
   gneiss: { albedo: new URL('./textures/gneiss_albedo.webp', import.meta.url).href, nhr: new URL('./textures/gneiss_nhr.webp', import.meta.url).href, tile: 8 },
   basalt: { albedo: new URL('./textures/basalt_albedo.webp', import.meta.url).href, nhr: new URL('./textures/basalt_nhr.webp', import.meta.url).href, tile: 4 },
-  // round 4 integration (review P-M2): the sea cave's rock mass — fractured lava, no column joints
-  basalt_massive: { albedo: new URL('./textures/basalt_massive_albedo.webp', import.meta.url).href, nhr: new URL('./textures/basalt_massive_nhr.webp', import.meta.url).href, tile: 6 },
+  // round 4 integration: photo-scanned CC0 sets from Poly Haven (docs/ASSETS_AND_LICENSES.md), packed
+  // into the same layout (1K; AO from the displacement). Regraded in the shader (RockGrade).
+  rock_face_03: { albedo: new URL('./textures/rock_face_03_albedo.webp', import.meta.url).href, nhr: new URL('./textures/rock_face_03_nhr.webp', import.meta.url).href, tile: 4 },
 };
 
 interface SetEntry {
@@ -127,6 +128,22 @@ export function rockSetsReady(): Promise<void> {
  */
 export const ROCK_ORIGIN = { value: new THREE.Vector3() };
 
+/** mean linear albedo (channel average) of the scanned sets: the macro term and the regrade divide by it */
+const SCAN_LUM: Partial<Record<RockKind, number>> = { rock_face_03: 0.154 };
+
+/**
+ * Regrade of a scanned set toward cold Nordic rock (the scans are warm sandstone / brown rock):
+ * luminance-based — keep the scan's structure (its luminance), drop most of its colour, scale its
+ * mean to `lum` (linear) and tint cold.
+ */
+export interface RockGrade {
+  /** target mean linear albedo */
+  lum: number;
+  /** 0..1 how much of the scan's own colour is removed */
+  desat: number;
+  tint: [number, number, number];
+}
+
 export interface RockMaterialOptions {
   kind?: RockKind;
   /** water level for the wet band / ice foot (world y); -1e9 = none */
@@ -151,6 +168,10 @@ export interface RockMaterialOptions {
   snowFrom?: number;
   /** the mesh carries the shared cave's baked `aCave` (sky visibility, AO): darken the chamber */
   caveAttr?: boolean;
+  /** regrade (scanned sets) */
+  grade?: RockGrade;
+  /** world size of one texture tile (m); default: the set's own */
+  tile?: number;
 }
 
 export interface RockUniforms {
@@ -166,7 +187,7 @@ export interface RockUniforms {
 export function createRockMaterial(o: RockMaterialOptions = {}): THREE.MeshStandardMaterial & { userData: { rock: RockUniforms; kind: RockKind } } {
   const kind = o.kind ?? 'gneiss';
   const set = acquireRockSet(kind);
-  const tile = URLS[kind].tile;
+  const tile = o.tile ?? URLS[kind].tile;
   const m = new THREE.MeshStandardMaterial({ color: o.tint ?? 0xffffff, roughness: 1, metalness: 0, vertexColors: !!o.vertexColors });
   const U: RockUniforms = {
     uWater: { value: o.water ?? -1e9 },
@@ -178,7 +199,7 @@ export function createRockMaterial(o: RockMaterialOptions = {}): THREE.MeshStand
   };
   const macro = o.macro ?? 7.3;
   const hq = o.hq !== false;
-  const lumRef = kind === 'basalt' ? 0.045 : kind === 'basalt_massive' ? 0.05 : 0.075;
+  const lumRef = SCAN_LUM[kind] ?? (kind === 'basalt' ? 0.045 : 0.075);
   if (o.caveAttr) m.defines = { ...(m.defines ?? {}), RK_CAVE: '' };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, U, { tAlb: { value: set.albedo }, tNhr: { value: set.nhr } });
@@ -250,6 +271,14 @@ vec4 rkAlb = rkA.alb * vec4(vec3(clamp(0.35 + 0.65 * rkLumB / ${lumRef.toFixed(3
 vec4 rkNhr = rkA.nhr;`
     : `vec4 rkAlb = rkA.alb; vec4 rkNhr = rkA.nhr;`
 }
+${
+  o.grade
+    ? `{
+  float gl = dot(rkAlb.rgb, vec3(0.2126, 0.7152, 0.0722));
+  rkAlb.rgb = mix(rkAlb.rgb, vec3(gl), ${o.grade.desat.toFixed(3)}) * vec3(${o.grade.tint.map((v) => v.toFixed(3)).join(', ')}) * ${(o.grade.lum / (SCAN_LUM[kind] ?? 0.1)).toFixed(4)};
+}`
+    : ''
+}
 // macro: dipping strata bands and broad tone patches (read at a kilometre)
 float rkY = rkP.y + 0.035 * rkP.x - 0.02 * rkP.z + 9.0 * rk_fbm(rkP.xz * 0.004);
 float rkBand = rk_fbm(vec2(rkY * 0.09, rkP.x * 0.0015 + rkP.z * 0.0015));
@@ -315,7 +344,7 @@ reflectedLight.indirectDiffuse += uFill * diffuseColor.rgb * vec3(0.55, 0.68, 0.
       )
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vRkW);');
   };
-  m.customProgramCacheKey = () => `art-rock-${kind}-${hq ? 2 : 1}-${macro}-${o.vertexColors ? 1 : 0}-${o.caveAttr ? 1 : 0}-${o.snowFrom ?? 0.6}`;
+  m.customProgramCacheKey = () => `art-rock-${kind}-${hq ? 2 : 1}-${macro}-${o.vertexColors ? 1 : 0}-${o.caveAttr ? 1 : 0}-${o.snowFrom ?? 0.6}-${o.grade ? JSON.stringify(o.grade) : ''}-${tile}`;
   m.userData = { rock: U, kind };
   return m as THREE.MeshStandardMaterial & { userData: { rock: RockUniforms; kind: RockKind } };
 }

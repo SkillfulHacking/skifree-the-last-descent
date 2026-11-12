@@ -95,6 +95,12 @@ function foamGeometry(foam: Float32Array, water: number): THREE.BufferGeometry |
 }
 
 export const CLIFF_SEG = 256;
+/**
+ * The scanned Rock Face 03 set, enlarged (9 m tiles: fracture blocks read at cliff scale) and regraded
+ * to cold grey gneiss-like rock. (Cliff Side was tried first: its regular sandstone bedding tiled into
+ * a pinstripe across a kilometre of wall.)
+ */
+const CLIFF_GRADE = { lum: 0.085, desat: 0.94, tint: [0.92, 0.98, 1.08] as [number, number, number] };
 /** LOD by distance from the skier (m): < LOD_NEAR → 0, < LOD_MID → 1, else 2 */
 const LOD_NEAR = 520;
 const LOD_MID = 1400;
@@ -154,7 +160,7 @@ export class CliffStream {
     const key = Math.round(water * 10) / 10;
     let mt = this.mats.get(key);
     if (!mt) {
-      mt = createRockMaterial({ kind: 'gneiss', vertexColors: true, water: key, snow: 1, strata: 1, tint: 0xc2cad4, hq: this.quality !== 'low', snowFrom: 0.8 });
+      mt = createRockMaterial({ kind: 'rock_face_03', tile: 9, vertexColors: true, water: key, snow: 1, strata: 0.8, hq: this.quality !== 'low', snowFrom: 0.8, grade: CLIFF_GRADE });
       this.mats.set(key, mt);
     }
     return mt;

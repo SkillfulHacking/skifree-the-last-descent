@@ -278,7 +278,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   };
   const shell = cave.group.getObjectByName('cave-rock') as THREE.Mesh | undefined;
   const shellPrev = shell ? shell.material : null;
-  const shellMat = createRockMaterial({ kind: 'basalt_massive', snow: 1, strata: 0.25, macro: 6, wet: 0, fill: FILL, hq: hi, caveAttr: !!shell?.geometry.getAttribute('aCave') });
+  const shellMat = createRockMaterial({ kind: 'rock_face_03', snow: 1, strata: 0.25, macro: 6, wet: 0, fill: FILL, hq: hi, caveAttr: !!shell?.geometry.getAttribute('aCave'), grade: { lum: 0.06, desat: 0.9, tint: [0.94, 0.98, 1.05] } });
   partial.rock.push(shellMat);
   if (shell) {
     shell.material = shellMat;

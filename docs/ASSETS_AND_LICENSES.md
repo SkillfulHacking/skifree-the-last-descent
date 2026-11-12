@@ -87,3 +87,29 @@ Heerden), `rock_face_03` (https://polyhaven.com/a/rock_face_03 — photography D
 Rico Cilliers), `coast_sand_rocks_02` and `aerial_rocks_02` (authors to be recorded from their pages;
 those pages could not be fetched from this session). If any of them is added to the repository, add a
 row above with the file, the page URL, the authors and "CC0 1.0".
+
+## Round 4 Fjord integration (branch `pass4-fjord`, 2026-11-11) — in the game build
+
+The product owner downloaded Poly Haven scanned texture sets (originals: 4K zips with .blend, kept
+outside the repository) and converted them outside the repository to WebP (OpenGL normal maps from
+the EXR). The set used in the game was packed into the rock material's two-texture layout at
+1K (`tools/artbake/pack_scans.py <dir> <name> src/world/art/textures/<name>`): albedo = scan
+diffuse (sRGB) + cavity AO derived from the displacement in A; NHR = normal X/Y (OpenGL), the
+displacement as height, roughness. Only these packed files are committed (no 4K, EXR or .blend).
+Authors and licence verified on each asset page on 2026-11-11 (WebFetch of polyhaven.com).
+
+| File (committed) | Asset | Source URL | Authors (from the page) | Licence | Used for |
+|---|---|---|---|---|---|
+| — (converted, tried, not committed, not used) | Cliff Side (1.8 m wide) | https://polyhaven.com/a/cliff_side | Dario Barresi, James Ray Cock (photography); Jenelle van Heerden (processing) | CC0 | tried on the cliff kit: its regular sandstone bedding tiled into a pinstripe across the wall; not used |
+| `src/world/art/textures/rock_face_03_albedo.webp`, `rock_face_03_nhr.webp` | Rock Face 03 (2.7 m wide) | https://polyhaven.com/a/rock_face_03 | Dario Barresi (photography); Rico Cilliers (processing) | CC0 | Fjord sea-cave rock mass (regraded dark basalt-grey, 4 m tiles) and the sea-cliff kit (regraded cold grey, 9 m tiles) |
+| — (converted, not committed, not used) | Aerial Rocks 02 | https://polyhaven.com/a/aerial_rocks_02 | Rob Tuytel | CC0 | not used this round (the scoured-rock hazard views use their own vertex-colour material) |
+| — (converted, not committed, not used) | Coast Sand Rocks 02 | https://polyhaven.com/a/coast_sand_rocks_02 | Rob Tuytel | CC0 | not used this round (no wet-shore mesh takes the rock material) |
+
+Poly Haven licence: CC0 1.0 (public-domain dedication; no attribution required — credited here anyway).
+The baked `basalt` set (columns) stays; the baked `basalt_massive` set (an interim cave-shell bake in
+this round) was replaced by Rock Face 03 and removed. The baked `gneiss` set remains for the art test
+scene and the (unused in game) island meshes.
+
+Authors above match the Poly Haven API `/info/{slug}` records relayed by the coordinator. Later in the
+session `api.polyhaven.com` / `dl.polyhaven.org` were allowed (build-time only, with a tool User-Agent);
+nothing further was downloaded this round — the game never calls the API.
