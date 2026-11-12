@@ -755,7 +755,7 @@ export class Coast {
   /**
    * The islands of one cluster cell (deterministic, cached). Round 4 (F-009, "repeated loaves"):
    * the main island is no longer one tall dome per cluster. Glacial archipelagos are mostly LOW:
-   *  - whaleback (most): a long, low (50–105 m) scoured hump, gentle up-ice, plucked cliffs at the
+   *  - whaleback (most): a long, low (65–125 m) scoured hump, gentle up-ice, plucked cliffs at the
    *    down-ice end, benches along the grain;
    *  - peak island (two clusters in five): a steep multi-summit island (130–250 m) — two or
    *    three tops along a ridge, not a dome;
@@ -775,7 +775,7 @@ export class Coast {
       // drawn by them): nothing main smaller than ~150 m across
       const peak = r.float() < 0.4;
       const a = peak ? r.range(200, 340) : r.range(200, 460);
-      const main: IslandBlob = { kind: peak ? 2 : 1, x: cx, z: cz, a, b: a * (peak ? r.range(0.55, 0.8) : r.range(0.32, 0.55)), c: Math.cos(ang), s: Math.sin(ang), h: peak ? r.range(130, 250) : r.range(50, 105), k: r.range(0, 50) };
+      const main: IslandBlob = { kind: peak ? 2 : 1, x: cx, z: cz, a, b: a * (peak ? r.range(0.55, 0.8) : r.range(0.32, 0.55)), c: Math.cos(ang), s: Math.sin(ang), h: peak ? r.range(130, 250) : r.range(65, 125), k: r.range(0, 50) };
       out.push(main);
       // satellite skerries along the grain, off the ends and one side
       const n = r.int(2, 5);

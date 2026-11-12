@@ -326,7 +326,9 @@ rkCol *= 0.82 + 0.36 * rk_fbm(rkP.xz * 0.011 + rkP.y * 0.006);
   vec4 m2 = texture(tMac, mP.zy * mt * 0.37 + 0.31, 1.5) * rkBw.x + texture(tMac, mat2(0.6, -0.8, 0.8, 0.6) * mP.xz * mt * 0.37, 1.5) * rkBw.y + texture(tMac, mP.xy * mt * 0.37 + 0.53, 1.5) * rkBw.z;
   float ml = dot(m1.rgb, vec3(0.2126, 0.7152, 0.0722)) / ${msLum.toFixed(4)};
   float ml2 = dot(m2.rgb, vec3(0.2126, 0.7152, 0.0722)) / ${msLum.toFixed(4)};
-  float mod1 = clamp(0.3 + 0.7 * ml * mix(1.0, m1.a, 0.8), 0.35, 1.75);
+  // (round 4b: the 85 m layer still banded into fine stripes at a kilometre: it fades out with distance)
+  float mFar = smoothstep(250.0, 700.0, length(vRkW - cameraPosition));
+  float mod1 = mix(clamp(0.3 + 0.7 * ml * mix(1.0, m1.a, 0.8), 0.35, 1.75), 1.0, mFar);
   float mod2 = clamp(0.45 + 0.55 * ml2 * m2.a, 0.5, 1.5);
   rkCol *= mix(1.0, mod1 * mod2, ${msK.toFixed(3)});
 }
@@ -364,8 +366,16 @@ rkSnow *= mix(1.0, smoothstep(2.5, 8.0, rkAbove), step(-1e8, uWater));
 rkSnow *= smoothstep(0.55, 0.85, vRkCave.x) * (1.0 - step(0.5, vRkCave.z));
 #endif
 rkSnow = max(rkSnow, rkIce * 0.55);
+// surf (round 4b, A r4 M7: "no foam where the cliffs meet the water"): a broken white wash line at
+// the waterline, widening with distance so it still reads from far out on the fjord
+float rkFoam = 0.0;
+if (uWater > -1e8) {
+  float fw = max(0.6, length(vRkW - cameraPosition) * 0.003);
+  float fn = rk_n(rkP.xz * 0.12 + rkP.y * 0.05) * 0.6 + rk_n(rkP.xz * 0.6) * 0.4;
+  rkFoam = (1.0 - smoothstep(0.15 * fw, (0.6 + 0.8 * fn) * fw, rkAbove)) * smoothstep(-0.3 * fw, 0.0, rkAbove) * smoothstep(0.25, 0.55, fn);
+}
 vec3 rkSnowCol = vec3(0.86, 0.9, 0.955) * (0.94 + 0.06 * rk_n(rkP.xz * 1.7));
-diffuseColor.rgb *= mix(rkCol, rkSnowCol, rkSnow);
+diffuseColor.rgb *= mix(mix(rkCol, rkSnowCol, rkSnow), vec3(0.88, 0.92, 0.95), rkFoam);
 `,
       )
       .replace(
