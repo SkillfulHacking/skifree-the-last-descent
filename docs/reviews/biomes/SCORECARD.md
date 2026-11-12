@@ -84,5 +84,29 @@ is mostly a time tax (thin decision), Sprint ladder thin, Relaxed hazard intensi
 difficulty, summed per-frame streaming spikes (156 frames >16 ms per 24 km vs Alpine 34), cave-wall
 launch bug (engine-wide, also Alpine), menu/HUD not scaling at 1440p+, minor caption throttling.
 
+### Round 4 — build `8d19542` (code = `c0ea8ae`) — **FAIL** (all six; Critical found; PR #5 stays draft)
+
+| Category | A | B | C | D | E | F | Gate |
+|---|---|---|---|---|---|---|---|
+| Visual art direction | **7** | 7 (lc) | 7.5 | 7.5 (lc) | 8 (lc) | 7 | ✗ (< 8 preview bar) |
+| Environmental uniqueness | **7.5** | 8.5 | 8 | 8.5 (lc) | 8.5 (lc) | 8 | ✗ |
+| Skiing and hazard mechanics | 6 (lc) | **6.5** | 7 (lc) | 8.5 (lc) | 7 | 7.5 | ✗ |
+| Difficulty and fairness | 7 (lc) | **7** | 7 (lc) | 8 (lc) | 7 | 7.5 | ✗ |
+| Cinematics | 7 | 7 (lc) | **8** | 8 (lc) | 8 (lc) | 7 | ✗ |
+| Performance and stability | 7 (lc) | 7 (lc) | 7 (lc) | **8.5** | 7 | 7 (lc) | ✗ |
+| Accessibility and controls | 7.5 (lc) | 7.5 (lc) | 7 (lc) | 8 (lc) | **8** | 7.5 (lc) | ✗ |
+| Overall player experience | 7 | 7 | 7.5 | 8 (lc) | 7 | **7.5** | ✗ (< 8 preview bar) |
+
+Fixed (verified): black cave (F-003), plunge water (F-005), cliff-wall launch itself (0/2,880 >3 s air),
+cornice trap (0/1,630), wind gates a real choice (+2.4 s blind / +4.3 s wrong on 10/10 seeds), Relaxed ladder,
+menu scale at 1440p, squall caption throttle, Scenic Route real journey, every finite length finishes,
+Endless memory flat. **Critical (B, confirmed by E):** the wall rule leaves a skier pinned in a pocket at a
+cave mouth (Alpine and Fjord, ~2.5 %), no rescue. Major: Hard (1.2) step from Alpine too steep (B, E);
+islands still saucers/loaves (A, F); cliff detail tiling lattice (A, D, F); cave dressing reads as blockout
+(lintel blocks floating, net, prism grid: A, C, F); needle crest in the reveal (A); harbour headland snow
+streaks (A); sea framing only on Sprint caves (C); catch shot faces inland (C); no candidate perf from the
+production build (D). Evidence gaps: res-1366/res-2560 and perf were late (rendering on a 2-CPU box).
+Remediation → round 5 (branch `fjord-r4b`).
+
 ## Whiteout Ridge, Frozen Frontier, Volcanic Expanse
 Not started.
