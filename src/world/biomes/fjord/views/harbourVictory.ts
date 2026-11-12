@@ -202,18 +202,41 @@ export class HarbourVictory implements VictoryScript {
     tl.shot({ start: B.revealEnd, end: B.results + 0.2, from: () => pose(endPos, endLook, 46), to: () => pose(endPos.clone().add(new THREE.Vector3(0, 1.5, 4)), endLook, 46) });
     // the beacon on the start's shoulder: lit as the reveal begins, so the eye finds the summit
     {
+      // round-3 C #6: additive orange over sunlit snow clipped to a white disc. A fire instead:
+      // normal blending, a dark smoke plume above an opaque orange flame with a hot core and a
+      // dark rim, so it reads against both snow and sky
       const c = document.createElement('canvas');
-      c.width = c.height = 64;
+      c.width = 64;
+      c.height = 128;
       const g = c.getContext('2d')!;
-      const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-      grd.addColorStop(0, 'rgba(255,214,150,1)');
-      grd.addColorStop(0.18, 'rgba(255,140,40,0.8)');
-      grd.addColorStop(1, 'rgba(255,120,40,0)');
-      g.fillStyle = grd;
-      g.fillRect(0, 0, 64, 64);
+      // smoke plume (upper half), drifting a little to one side
+      for (let i = 0; i < 7; i++) {
+        const y = 66 - i * 9;
+        const x = 32 + i * 1.6;
+        const r = 7 + i * 1.8;
+        const sg = g.createRadialGradient(x, y, 0, x, y, r);
+        sg.addColorStop(0, `rgba(48,44,42,${0.55 - i * 0.06})`);
+        sg.addColorStop(1, 'rgba(48,44,42,0)');
+        g.fillStyle = sg;
+        g.fillRect(0, 0, 64, 128);
+      }
+      // flame: a teardrop, dark-rimmed
+      const flame = (scale: number, fill: string) => {
+        g.beginPath();
+        g.moveTo(32, 96 - 30 * scale);
+        g.bezierCurveTo(32 + 14 * scale, 96 - 12 * scale, 32 + 13 * scale, 96 + 10 * scale, 32, 96 + 12 * scale);
+        g.bezierCurveTo(32 - 13 * scale, 96 + 10 * scale, 32 - 14 * scale, 96 - 12 * scale, 32, 96 - 30 * scale);
+        g.fillStyle = fill;
+        g.fill();
+      };
+      flame(1.12, 'rgba(70,24,8,0.9)');
+      flame(1, 'rgb(236,96,22)');
+      flame(0.62, 'rgb(255,170,60)');
+      flame(0.3, 'rgb(255,226,150)');
       this.beaconTex = new THREE.CanvasTexture(c);
-      this.beacon = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.beaconTex, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, sizeAttenuation: false, toneMapped: false }));
+      this.beacon = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.beaconTex, transparent: true, depthWrite: false, depthTest: false, sizeAttenuation: false, toneMapped: false }));
       this.beacon.position.set(xs, m.heightAt(xs, 0) + 12, 0);
+      this.beacon.center.set(0.5, 0.2);
       this.beacon.scale.setScalar(0);
       this.beacon.renderOrder = 10;
       st.world.scene.add(this.beacon);
@@ -242,7 +265,7 @@ export class HarbourVictory implements VictoryScript {
     tl.at(6.45, () => {
       this.yetiState = 'disgust';
       this.yetiT = 0;
-      st.setYetiMode('disgust');
+      st.setYetiMode('gag');
       st.audio.playYetiGrowl(st.yetiAI.pos, false);
       st.hud.caption('[the Yeti gags on a dried cod]', 1.8);
     });
@@ -266,6 +289,7 @@ export class HarbourVictory implements VictoryScript {
         // he holds the lighthouse in both hands by its plinth as the shot opens
         h.presenter.hold = 1;
         h.presenter.holdLift = 0;
+        h.presenter.holdSide = 0;
         h.presenter.update(0, 0, 0, null, 0);
         h.presenter.handWorld('R', this.trophyFrom);
       } else r.trophy.getWorldPosition(this.trophyFrom);
@@ -297,7 +321,11 @@ export class HarbourVictory implements VictoryScript {
     // the presentation: the lighthouse in his two hands, by the plinth; he lifts it toward the skier
     if (this.presentT >= 0 && h.presenter) {
       this.presentT += dt;
-      h.presenter.holdLift = Math.min(1, Math.max(0, (this.presentT - 0.6) / 0.6)) * 0.55;
+      // round-3 C #5: held at chest height and off to his side, so his face stays clear of the
+      // lighthouse (it used to rise to head height, straight in front of his face)
+      const lift = Math.min(1, Math.max(0, (this.presentT - 0.6) / 0.6));
+      h.presenter.holdLift = lift * 0.12;
+      h.presenter.holdSide = lift * 0.14;
       h.presenter.handWorld('R', this.hand);
       h.presenter.handWorld('L', this.hand2);
       const grip = this.hand.add(this.hand2).multiplyScalar(0.5);
@@ -323,19 +351,32 @@ export class HarbourVictory implements VictoryScript {
       const tb = t - HARBOUR_BEATS.reveal;
       const on = Math.min(1, Math.max(0, tb / 1.5)) * (t < HARBOUR_BEATS.results ? 1 : 0);
       const flick = 0.85 + 0.15 * Math.sin(t * 9.1) * Math.sin(t * 5.3 + 1);
-      this.beacon.scale.setScalar(0.03 * on * flick);
+      // constant on-screen size (sizeAttenuation off); 1:2 canvas → 1:2 sprite; only the flame flickers
+      this.beacon.scale.set(0.022 * on, 0.044 * on * (0.94 + 0.4 * (flick - 0.85)), 1);
     }
     // the fish prop: in his fist; at his mouth for the bite
     if (this.fishState === 'held') {
       st.yeti.getHandWorldPosition('right', this.hand);
+      const hd = st.yetiAI.heading;
+      // round-3 C #4: the stockfish is a flat, split body (local XY plane, long axis local Y). In
+      // the fist it hangs tail-down with its flat side to the lens (he faces the camera for the
+      // gag); for the bite it is clamped crosswise between the teeth, the head end in the mouth and
+      // the tail sticking out of the side of the mouth (not up the nose)
       if (this.yetiState === 'bite') {
         const mouth = new THREE.Vector3();
         st.yeti.getMouthWorldPosition(mouth);
         const k = Math.min(1, this.yetiT / 0.25);
-        this.hand.lerp(mouth.add(new THREE.Vector3(Math.cos(st.yetiAI.heading) * 0.22, -0.18, -Math.sin(st.yetiAI.heading) * 0.22)), k);
+        // fish centre: half a fish to his left of the mouth, a little in front of the lips
+        const side = 0.24;
+        mouth.add(new THREE.Vector3(Math.sin(hd) * 0.07 - Math.cos(hd) * side, -0.02, Math.cos(hd) * 0.07 + Math.sin(hd) * side));
+        this.hand.lerp(mouth, k);
+        this.fish.position.copy(this.hand);
+        // long axis across the mouth (Rz first), flat side forward (yaw = heading)
+        this.fish.rotation.set(0, hd, Math.PI / 2 + 0.12 * k);
+      } else {
+        this.fish.position.copy(this.hand).add(new THREE.Vector3(0, -0.22, 0));
+        this.fish.rotation.set(0.15, hd, 0.25);
       }
-      this.fish.position.copy(this.hand);
-      this.fish.rotation.set(0.3, st.yetiAI.heading + Math.PI / 2, 0.5);
     } else if (this.fishState === 'flying') {
       this.fishVel.y -= 9.81 * dt;
       this.fish.position.addScaledVector(this.fishVel, dt);

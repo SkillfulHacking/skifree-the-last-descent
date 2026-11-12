@@ -62,6 +62,7 @@ export type YetiMode =
   | 'grab' // lunges and grabs with right hand
   | 'eat' // comedic: lifts held object to mouth, gulps, pats belly
   | 'disgust' // stops, recoils, shakes head
+  | 'gag' // comedic: hunches, left hand to the throat, retches with the jaw wide, shudders
   | 'turnAway'; // turns around and walks off
 
 export interface YetiAnimState {
