@@ -278,6 +278,16 @@ vec3 rkBw = pow(abs(rkN), vec3(5.0));
 rkBw /= dot(rkBw, vec3(1.0));
 RkS rkA = rk_tri(rkP, rkBw, ${(1 / tile).toFixed(5)}, 0.0);
 vec3 rkDN = rk_dN;
+// round 4 (D r4 #2: the 9 m detail tile read as a regular dot lattice across a wall at ~1 km): the
+// detail's contrast fades out with distance into its own blurred mean, ~25–70 tiles away, where the
+// macro layers carry the look; the detail normals fade with it
+{
+  float rkDist = length(vRkW - cameraPosition);
+  float rkFar = smoothstep(${(tile * 25).toFixed(1)}, ${(tile * 70).toFixed(1)}, rkDist);
+  vec4 rkMean = texture(tAlb, rkP.xz * 0.0001, 12.0);
+  rkA.alb = mix(rkA.alb, vec4(rkMean.rgb, mix(rkA.alb.a, 1.0, 0.7)), rkFar);
+  rkDN *= 1.0 - rkFar;
+}
 ${
   hq
     ? `// macro: the same set ~7× larger, read only as soft luminance from a blurred mip (no second
