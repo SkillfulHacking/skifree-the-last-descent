@@ -32,7 +32,8 @@ const URLS: Record<ModelId, string> = {
 
 /** archetype → candidate scans (picked per island by its seed) */
 const BY_KIND: Record<0 | 1 | 2, ModelId[]> = {
-  0: ['namaqualand_boulders_01', 'namaqualand_boulder_06'],
+  // (round 8: not the stone-cluster scan — scaled up its thin flat stones read as folded white paper)
+  0: ['namaqualand_boulder_06', 'boulder_01'],
   1: ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'],
   2: ['mountainside', 'namaqualand_cliff_02'],
 };

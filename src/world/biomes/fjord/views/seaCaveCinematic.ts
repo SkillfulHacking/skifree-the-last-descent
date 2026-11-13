@@ -23,7 +23,7 @@ import type { CaveCinematicContext, CaveCinematicExtras } from '../../../present
 import { CAVE_CAMS } from '../../../../cinematic/CaveCinematic';
 import { ease, pose } from '../../../../cinematic/Timeline';
 import type { SeaCavePerch, SeaShots } from './seaCave';
-import { framedLook } from './seaFraming';
+import { coastalReveal, framedLook } from './seaFraming';
 
 interface Gull {
   o: THREE.Group;
@@ -159,7 +159,16 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
   // 2.4 s: tight on the brow, the gulls on the portal and the lintel against the black rock
   const brow = cave.lipTop.clone();
   const browLook = brow.clone().addScaledVector(O, 1.2).add(new THREE.Vector3(0, -1.2, 0));
-  tl.shot({ start: 2.4, end: 3.8, from: () => pose(at(...CAVE_CAMS.slough0), browLook.clone().add(new THREE.Vector3(0, 0.6, 0)), 30), to: () => pose(at(...CAVE_CAMS.slough1), browLook.clone().add(new THREE.Vector3(0, 1.6, 0)), 34), handheld: 0.03 });
+  if (gulls.length && !tops.some((t) => t.brow)) {
+    // round 8 (F r7 #2): the gulls now perch on the boulders in front of the cave, not on the brow —
+    // the scatter beat frames them (from the slope, the cave's dark mouth behind)
+    const c = new THREE.Vector3();
+    for (const g of gulls) c.add(g.home);
+    c.divideScalar(gulls.length);
+    const camG = c.clone().addScaledVector(O, 9).addScaledVector(T, 3).add(new THREE.Vector3(0, 1.6, 0));
+    tl.shot({ start: 2.4, end: 3.8, from: () => pose(camG, c.clone().add(new THREE.Vector3(0, 1.2, 0)), 44), to: () => pose(camG.clone().addScaledVector(O, -0.8), c.clone().add(new THREE.Vector3(0, 2.6, 0)), 48), handheld: 0.03 });
+  } else
+    tl.shot({ start: 2.4, end: 3.8, from: () => pose(at(...CAVE_CAMS.slough0), browLook.clone().add(new THREE.Vector3(0, 0.6, 0)), 30), to: () => pose(at(...CAVE_CAMS.slough1), browLook.clone().add(new THREE.Vector3(0, 1.6, 0)), 34), handheld: 0.03 });
   // 7.9 s: the emergence from inside the cave
   if (mouthToSea) {
     const camIn = pathAt(3.6);
@@ -195,22 +204,18 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
     // fjord lies far below behind its hill — C r5 #1): a coastal reveal first — from out over the
     // water at the cliff's crest height, looking back along the cliffs at the cave's hill as the
     // gulls burst off it and the growl rolls out — then the three-quarter angle on the emergence
-    if (coast) {
-      // (round 7, C r6 #1: the first version hung 240–710 m above the sea and aimed into the hill)
-      // low over the water off the cliff's foot, looking back up the face to the rim above the cave
-      const water = coast.seaLevelAt(M.z);
-      const rx = coast.rimX(M.z);
-      const cl = st.world.mountain.cliff;
-      const footX = cl ? rx - cl.footOffset(cl.column(M.z)) : rx - 120;
-      const sea0 = new THREE.Vector3(footX - 170, water + 22, M.z - 110);
-      const sea1 = new THREE.Vector3(footX - 160, water + 26, M.z - 80);
-      const rim = new THREE.Vector3(rx - 10, 0, M.z + 30);
-      // tilted up only ~5°: the face fills the frame, the water its lower quarter
-      rim.y = water + 22 + Math.tan(THREE.MathUtils.degToRad(5)) * Math.hypot(rim.x - (footX - 170), rim.z - (M.z - 110));
-      tl.shot({ start: 7.9, end: 9.2, from: () => pose(sea0, rim, 50), to: () => pose(sea1, rim.clone().add(new THREE.Vector3(0, 6, 0)), 48), easing: ease.inOut });
+    // (round 7, C r6 #1: the first version hung 240–710 m above the sea and aimed into the hill;
+    // round 8, C r7 #1: never inside the terrain — step out over the water until the camera is clear
+    // and the frame holds open water, else no reveal)
+    const reveal = coast ? coastalReveal(st.world.mountain, M) : null;
+    {
+      if (reveal) {
+        const r = reveal;
+        tl.shot({ start: 7.9, end: 9.2, from: () => pose(r.sea0, r.rim, 50), to: () => pose(r.sea1, r.rim.clone().add(new THREE.Vector3(0, 6, 0)), 48), easing: ease.inOut });
+      }
     }
     tl.shot({
-      start: coast ? 9.2 : 7.9,
+      start: reveal ? 9.2 : 7.9,
       end: 11.0,
       from: () => pose(M.clone().addScaledVector(O, 9).addScaledVector(T, 7).add(new THREE.Vector3(0, 5.5, 0)), yetiAt().add(new THREE.Vector3(0, 1.6, 0)), 46),
       to: () => pose(M.clone().addScaledVector(O, 8.4).addScaledVector(T, 6.2).add(new THREE.Vector3(0, 5.0, 0)), yetiAt().add(new THREE.Vector3(0, 2.0, 0)), 46),

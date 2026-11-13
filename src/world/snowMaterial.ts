@@ -135,7 +135,9 @@ const shoreGlsl = (low: boolean) => /* glsl */ `
   // the water are bare rock; snow only on what is clearly a ledge
   if (dh < 700.0 && dh > 30.0) {
     float bare = (1.0 - smoothstep(450.0, 680.0, dh)) * smoothstep(0.42, 0.62, slope);
-    col = mix(col, rock * mix(0.62, 0.85, smoothstep(30.0, 300.0, dh)), bare);
+    // (round 8: rock already carries the clinging-snow streaks — the bare face takes a plain dark
+    // gneiss tone instead, with a little of the rock's own variation)
+    col = mix(col, mix(vec3(0.15, 0.16, 0.18), rock * 0.6, 0.35) * mix(0.75, 1.0, smoothstep(30.0, 300.0, dh)), bare);
     sf_rock = max(sf_rock, bare);
   }
   if (dh < 200.0) {
