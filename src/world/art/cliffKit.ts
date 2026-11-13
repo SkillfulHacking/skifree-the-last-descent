@@ -127,9 +127,10 @@ export function* cliffSegmentSteps(model: CliffModel, o: CliffSegmentOptions, ov
       faceK *= 1 - c.hm * smoothstep(c.H - 45, c.H - 4, dz);
       faceKs[j * nr + i] = faceK;
       const x0 = c.xr - t;
-      // (the 9–22 m strata ledges only where the rows resolve them: on coarse LODs they alias into a
+      // (the 9–22 m strata ledges only on the finest LOD — round 7: at the middle LOD they still read as a
+      // pinstripe across the hero wall from a kilometre out; on coarse LODs they alias into a
       // regular hatch at distance)
-      const r = faceK > 0 ? relief(x0, y, z, s, faceK, c.H, o.dr <= 3 ? 1 : o.dr <= 6 ? 0.45 : 0) : 0;
+      const r = faceK > 0 ? relief(x0, y, z, s, faceK, c.H, o.dr <= 3 ? 1 : 0) : 0;
       // snow benches (review p1): where the profile lies back (a bench), the snow has body: lift the
       // surface up to ~1.3 m and round its outer edge into a soft lip over the band below
       const sA = (model.offsetAt(c, dz + 2) - model.offsetAt(c, dz - 2)) / 4;
