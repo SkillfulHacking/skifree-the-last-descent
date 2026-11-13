@@ -1029,7 +1029,7 @@ export class SkierPhysics {
     const walled = s.time - s.wallContactT < PIN_WATCH.contact;
     const stranded = s.time - s.pushSince > PIN_WATCH.window && Math.abs(s.pos.x - rx) > PIN_WATCH.offPiste;
     if (walled || stranded) {
-      this.relocate(rx, z, 'pinned against the rock');
+      this.relocate(rx, z, 'pinned against the rock', false);
       s.pinAnchorX = s.pos.x;
       s.pinAnchorZ = s.pos.z;
       s.pinAnchorT = s.time;
@@ -1040,7 +1040,7 @@ export class SkierPhysics {
    * Out of bounds (the location's rule, e.g. over a sea cliff's crest): put the skier back on the
    * piste at (x, z), stopped and crashed (they get up facing downhill), keeping the run's stats.
    */
-  relocate(x: number, z: number, reason: string) {
+  relocate(x: number, z: number, reason: string, crash = true) {
     const s = this.s;
     s.pos.set(x, this.mountain.heightAt(x, z), z);
     s.vel.set(0, 0, 0);
@@ -1052,7 +1052,9 @@ export class SkierPhysics {
     s.touching.clear();
     this.emit({ type: 'relocate', reason, x, z });
     s.crashed = false;
-    this.crash(reason, 0.6);
+    // (round 9, E r8 #1: being boxed in by the terrain is not the player's mistake — the pin rescue
+    // puts them back standing, with no wipeout and no multiplier loss)
+    if (crash) this.crash(reason, 0.6);
     s.heading = 0;
   }
 
