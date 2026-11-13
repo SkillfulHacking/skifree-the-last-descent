@@ -19,10 +19,9 @@ import * as THREE from 'three';
 import type { Mountain } from '../course';
 import { createRockMaterial, disposeRockMaterial } from './rockMaterial';
 
-type ModelId = 'mountainside' | 'namaqualand_boulder_02' | 'namaqualand_boulder_06' | 'boulder_01';
+type ModelId = 'namaqualand_boulder_02' | 'namaqualand_boulder_06' | 'boulder_01';
 
 const URLS: Record<ModelId, string> = {
-  mountainside: new URL('./models/mountainside.skm', import.meta.url).href,
   namaqualand_boulder_02: new URL('./models/namaqualand_boulder_02.skm', import.meta.url).href,
   namaqualand_boulder_06: new URL('./models/namaqualand_boulder_06.skm', import.meta.url).href,
   boulder_01: new URL('./models/boulder_01.skm', import.meta.url).href,
@@ -33,10 +32,10 @@ const BY_KIND: Record<0 | 1 | 2, ModelId[]> = {
   // (round 8: not the stone-cluster scan — scaled up its thin flat stones read as folded white paper)
   0: ['namaqualand_boulder_06', 'boulder_01'],
   1: ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'],
-  // (round 8: not the cliff-slab scan either — stretched to an island its sunlit top read as a white
-  // folded slab in 06 and the menu, A7-M1; the big islands are the mountainside scan, turned and
-  // proportioned per island)
-  2: ['mountainside'],
+  // (round 8: no terrain-patch scans — the cliff slab and the mountainside, stretched to island size,
+  // read as white folded slabs and crumpled ribbons on the sea in 06 and the menu, A7-M1; a pixel
+  // probe named each. The big islands are the boulder scans, kept rounder: ≤ 1:3)
+  2: ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'],
 };
 
 /** Decode an .skm (see the tool) into a unit geometry: footprint x,z in [-0.5, 0.5], y in [0, 1]. */
@@ -154,8 +153,9 @@ export class ScanIslands {
       const f = b.kind === 0 ? 0.9 : 2.4;
       // never flatter than 1:4 (round 7, A r6 M1: a scan stretched far wider than tall read as a flat
       // white slab with a dark disc under it)
-      const sx = Math.min(f * b.a, 4 * h);
-      const sz = Math.min(f * b.b, 4 * h);
+      const cap = b.kind === 2 ? 3 : 4;
+      const sx = Math.min(f * b.a, cap * h);
+      const sz = Math.min(f * b.b, cap * h);
       mesh.scale.set(sx, h, sz);
       mesh.position.set(b.x, water - sink * h, b.z);
       mesh.castShadow = false;
