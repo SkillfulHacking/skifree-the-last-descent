@@ -181,6 +181,9 @@ const LOOKS: Array<{ look: GuestLook; beh: GuestBehaviour }> = (() => {
 })();
 
 /** The "fjord-harbour" finish environment. */
+/** waterfront roof finishes (tar paper, mossy turf, red tile, slate) */
+const WATERFRONT_ROOFS = [0x2a2624, 0x4a4a2c, 0x6e2a1e, 0x3b4148, 0x2a2624, 0x55503a] as const;
+
 export class Harbour implements FinishEnvironment {
   readonly group = new THREE.Group();
   readonly trophy: THREE.Object3D;
@@ -484,13 +487,18 @@ export class Harbour implements FinishEnvironment {
         const cx = x + (dir * w) / 2;
         const px = F.x + cx;
         const d = kind === 'warehouse' ? rnd.range(13, 17) : rnd.range(11, 14);
-        const hz = zq + 0.6 - d / 2;
+        // (round 8, F r6/r7 D8 "regimented waterfront", F-032: the gables stood in one ruler line at
+        // one height under one roof colour — the fronts now step back off the quay edge, every fourth
+        // building turns its eaves to the sea, and the roofs are tar, turf-moss, tile or slate)
+        const hz = zq + 0.6 - d / 2 - (i % 2 === 0 ? rnd.range(0, 1.2) : rnd.range(1.5, 4.5));
         let gy = Infinity;
         for (const ex of [-w / 2, w / 2]) for (const ez of [-d / 2, d / 2]) gy = Math.min(gy, H(px + ex, hz + ez));
         gy = Math.max(gy, deckY);
         const col = PAINT[(i * 3 + (dir > 0 ? 1 : 0)) % PAINT.length]!;
-        if (kind === 'warehouse') warehouse(b, px, gy + 0.05, hz, -Math.PI / 2, { w: d, d: w, h: rnd.range(8.5, 11), color: col }, rnd);
-        else house(b, px, gy + 0.05, hz, -Math.PI / 2, { w: d, d: w, h: rnd.range(6.8, 8), roofH: w * 0.5, color: col, door: 'side', chimney: true, dormer: i % 2 === 0 }, rnd);
+        const roof = WATERFRONT_ROOFS[(i * 2 + (dir > 0 ? 1 : 0)) % WATERFRONT_ROOFS.length]!;
+        const eaves = i % 4 === 3;
+        if (kind === 'warehouse') warehouse(b, px, gy + 0.05, hz, eaves ? 0 : -Math.PI / 2, eaves ? { w, d, h: rnd.range(6.5, 8), color: col, roof } : { w: d, d: w, h: rnd.range(7.5, 12), color: col, roof }, rnd);
+        else house(b, px, gy + 0.05, hz, -Math.PI / 2, { w: d, d: w, h: rnd.range(5.6, 8.4), roofH: w * rnd.range(0.4, 0.62), color: col, door: 'side', chimney: true, dormer: i % 2 === 0, roof }, rnd);
         for (let cxx = -w / 2 + 1.6; cxx < w / 2; cxx += 3.2) this.cols.push({ x: px + cxx, z: hz - d / 2 + 1.6, r: 2.0 }, { x: px + cxx, z: hz, r: 2.2 }, { x: px + cxx, z: hz + d / 2 - 1.6, r: 2.0 });
         x += dir * (w + rnd.range(1.2, 3.5));
         i++;

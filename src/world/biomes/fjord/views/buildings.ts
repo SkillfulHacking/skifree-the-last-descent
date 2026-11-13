@@ -203,9 +203,9 @@ export function house(b: Batch, x: number, y: number, z: number, yaw: number, o:
  * loading doors with white frames up the gable, a hoist beam, small windows, on piles over the water
  * (`stilts`) or on the quay. Gable to local +x.
  */
-export function warehouse(b: Batch, x: number, y: number, z: number, yaw: number, o: { w: number; d: number; h: number; color: number; stilts?: number }, rnd: Rand): void {
+export function warehouse(b: Batch, x: number, y: number, z: number, yaw: number, o: { w: number; d: number; h: number; color: number; stilts?: number; roof?: number }, rnd: Rand): void {
   const M = mat(x, y, z, 0, yaw, 0);
-  house(b, x, y, z, yaw, { w: o.w, d: o.d, h: o.h, color: o.color, roofH: o.d * 0.62, stilts: o.stilts, windows: false, door: undefined, roof: 0x2a2624 }, rnd);
+  house(b, x, y, z, yaw, { w: o.w, d: o.d, h: o.h, color: o.color, roofH: o.d * 0.62, stilts: o.stilts, windows: false, door: undefined, roof: o.roof ?? 0x2a2624 }, rnd);
   const gx = o.w / 2 + 0.05;
   // stacked loading doors up the water gable
   for (let f = 0; f < 3; f++) {

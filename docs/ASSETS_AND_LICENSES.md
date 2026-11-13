@@ -125,10 +125,10 @@ Poly Haven. Licence CC0 1.0. Authors from the API `/info/{slug}` records (2026-1
 
 | File (committed) | Asset | Source URL | Authors | Used for |
 |---|---|---|---|---|
-| `src/world/art/models/mountainside.skm` | Mountainside | https://polyhaven.com/a/mountainside | Dario Barresi; Rico Cilliers | high "peak" islands |
-| `src/world/art/models/namaqualand_boulder_02.skm` | Namaqualand Boulder 02 | https://polyhaven.com/a/namaqualand_boulder_02 | Greg Zaal; Rico Cilliers | whaleback islands |
+| `src/world/art/models/namaqualand_boulder_02.skm` | Namaqualand Boulder 02 | https://polyhaven.com/a/namaqualand_boulder_02 | Greg Zaal; Rico Cilliers | whaleback and high islands |
 | `src/world/art/models/namaqualand_boulder_06.skm` | Namaqualand Boulder 06 | https://polyhaven.com/a/namaqualand_boulder_06 | Greg Zaal; Jenelle van Heerden | whalebacks, skerries |
 | `src/world/art/models/boulder_01.skm` | Boulder 01 | https://polyhaven.com/a/boulder_01 | Rico Cilliers | whaleback islands, skerries, cave boulders |
 
-Removed in round 8 (no longer shipped): Namaqualand Cliff 02 and Namaqualand Boulders 01. Scaled to
-island size, their thin, flat tops read as white folded slabs (review A7-M1).
+Removed in round 8 (no longer shipped): Mountainside, Namaqualand Cliff 02 and Namaqualand Boulders 01
+(all Poly Haven, CC0). Scaled to island size, these terrain-patch and stone-cluster scans read as white
+folded slabs and crumpled ribbons on the sea (review A7-M1; identified with a pixel probe).

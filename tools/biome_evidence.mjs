@@ -123,12 +123,37 @@ const geo = () =>
     return { L, finite: Number.isFinite(m.finishZ), caveZ: enc.caveZ, trigger: enc.triggerZ, coast: !!m.coast };
   });
 
+// diagnostic: which object draws given pixels of the long-distance frame (PROBE="x,y;x,y" in 0..1)
+async function probe(tag) {
+  const pts = (process.env.PROBE ?? '0.5,0.5').split(';').map((s) => s.split(',').map(Number));
+  const res = await ev((pts) => {
+    const api = window.__skifree;
+    const cam = api.camera;
+    let scene = cam; while (scene.parent) scene = scene.parent;
+    if (scene === cam) scene = api.world?.()?.scene ?? scene;
+    const THREE_ = cam.constructor;
+    const out = [];
+    const rc = new (window.__THREE?.Raycaster ?? Object)();
+    if (!rc.setFromCamera) return 'no raycaster';
+    for (const [x, y] of pts) {
+      rc.setFromCamera({ x: x * 2 - 1, y: 1 - y * 2 }, cam);
+      const vis = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; }; const hits = rc.intersectObject(scene, true).filter((h) => vis(h.object)).slice(0, 3);
+      out.push({ x, y, hits: hits.map((h) => { const chain = []; let o = h.object; while (o && chain.length < 5) { chain.push(o.name || o.type); o = o.parent; } return { d: Math.round(h.distance), chain: chain.join('<'), mat: h.object.material?.name || h.object.material?.type, ud: JSON.stringify(h.object.material?.userData ?? {}).slice(0, 80), key: (h.object.material?.customProgramCacheKey?.() ?? '').slice(0, 90), geo: h.object.geometry?.type + ':' + (h.object.geometry?.getAttribute?.('position')?.count ?? 0), inst: !!h.object.isInstancedMesh, p: h.point.toArray().map(Math.round) }; }) });
+    }
+    return out;
+  }, pts);
+  const segs = await ev(() => { const c = window.__skifree.world()?.scenery?.cliffs; if (!c) return null; const cam = window.__skifree.camera.position; return { cam: cam.toArray().map(Math.round), focus: c ? null : null, jobs: c.jobs.length, segs: [...c.segs].map(([i, s]) => ({ i, lod: s.lod, v: s.mesh.geometry.getAttribute('position').count, name: s.mesh.name })) }; });
+  writeFileSync(`${outDir}/probe-${tag}.json`, JSON.stringify({ res, segs }, null, 1));
+}
+
+
 // 1) menu with the Location row focused
 if (want('menu')) {
   await ev(() => window.__skifree.menuFocus('Location') || window.__skifree.menuFocus('Start'));
   await settle(3000);
   await shot('01_menu', 'Main menu, Location row focused; the location preview runs behind the menu');
 }
+if (want('menuprobe')) await probe('menu');
 await ev(() => window.__skifree.startRun(true));
 await settle(1500);
 const G = await geo();
@@ -225,28 +250,7 @@ if (want('long')) {
   await shot('06_long_distance', 'Long-distance composition across the valley / fjord');
 }
 
-// diagnostic: which object draws given pixels of the long-distance frame (PROBE="x,y;x,y" in 0..1)
-if (want('probe')) {
-  const pts = (process.env.PROBE ?? '0.5,0.5').split(';').map((s) => s.split(',').map(Number));
-  const res = await ev((pts) => {
-    const api = window.__skifree;
-    const cam = api.camera;
-    let scene = cam; while (scene.parent) scene = scene.parent;
-    if (scene === cam) scene = api.world?.()?.scene ?? scene;
-    const THREE_ = cam.constructor;
-    const out = [];
-    const rc = new (window.__THREE?.Raycaster ?? Object)();
-    if (!rc.setFromCamera) return 'no raycaster';
-    for (const [x, y] of pts) {
-      rc.setFromCamera({ x: x * 2 - 1, y: 1 - y * 2 }, cam);
-      const vis = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; }; const hits = rc.intersectObject(scene, true).filter((h) => vis(h.object)).slice(0, 3);
-      out.push({ x, y, hits: hits.map((h) => { const chain = []; let o = h.object; while (o && chain.length < 5) { chain.push(o.name || o.type); o = o.parent; } return { d: Math.round(h.distance), chain: chain.join('<'), mat: h.object.material?.name || h.object.material?.type, ud: JSON.stringify(h.object.material?.userData ?? {}).slice(0, 80), key: (h.object.material?.customProgramCacheKey?.() ?? '').slice(0, 90), geo: h.object.geometry?.type + ':' + (h.object.geometry?.getAttribute?.('position')?.count ?? 0), inst: !!h.object.isInstancedMesh, p: h.point.toArray().map(Math.round) }; }) });
-    }
-    return out;
-  }, pts);
-  const segs = await ev(() => { const c = window.__skifree.world().scenery.cliffs; const cam = window.__skifree.camera.position; return { cam: cam.toArray().map(Math.round), focus: c ? null : null, jobs: c.jobs.length, segs: [...c.segs].map(([i, s]) => ({ i, lod: s.lod, v: s.mesh.geometry.getAttribute('position').count, name: s.mesh.name })) }; });
-  writeFileSync(`${outDir}/probe.json`, JSON.stringify({ res, segs }, null, 1));
-}
+if (want('probe')) await probe('long');
 
 // 7) the Yeti cave (before the cinematic) and 8) the cinematic
 if (want('cave') || want('cinematic') || want('pursuit')) {
