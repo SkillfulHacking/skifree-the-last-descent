@@ -715,7 +715,7 @@ export class Coast {
     }
     // the headland ridge between two arms (and the fjord head): hides where the levels change
     if (ridge.bell > 0.002) {
-      const top = ridge.level + RIDGE_CLEAR + (260 + 260 * (0.5 + 0.5 * gnoise(z / 400, x / 900, s + 75))) * smoothstep(0, 900, t) + (ridged(x / 260, z / 260, s + 76, 2) - 0.3) * 70 * smoothstep(60, 400, t);
+      const top = ridge.level + RIDGE_CLEAR + (260 + 260 * (0.5 + 0.5 * gnoise(z / 400, x / 900, s + 75))) * smoothstep(0, 900, t) + (ridged(x / 260, z / 260, s + 76, 3) - 0.3) * 70 * smoothstep(60, 400, t);
       const base = ridge.level - p.depth;
       out = Math.max(out, base + (top - base) * ridge.bell * smoothstep(0, 22, t));
     }

@@ -265,6 +265,7 @@ if (want('cave') || want('cinematic') || want('pursuit')) {
     await P(`(w) => { const c = w.cave; const o = c.outward; const p = [c.mouth.x + o.x * 26 + o.z * 9, c.mouth.y + 7, c.mouth.z + o.z * 26 - o.x * 9 - 8]; window.__skifree.freeCam(p, [c.mouth.x, c.mouth.y + 3, c.mouth.z], 50); }`);
     await settle(3500);
     await shot('07_yeti_cave', 'The Yeti cave with the location dressing, before the encounter');
+    if (want('cprobe')) await probe('cave');
     if (biome === 'fjord') {
       // the sea cave from inside its mouth: the basalt portal framing the run and the fjord beyond
       await P(`(w) => { const c = w.cave; const o = c.outward; const i = Math.min(c.exitPath.length - 1, Math.round((14 - 4.5) / 0.75)); const q = c.exitPath[i]; window.__skifree.freeCam([q.x, q.y + 1.6, q.z], [c.mouth.x + o.x * 60, c.mouth.y - 14, c.mouth.z + o.z * 60], 62); }`);
