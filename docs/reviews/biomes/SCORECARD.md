@@ -131,5 +131,27 @@ art category has now moved only 6.5 → 7 → 7.5 over three rounds of heightfie
 7 → 7.5 → 7.5). Per the brief, the methodology changes before the next round (authored meshes for islands,
 cave dressing and the harbour headland instead of further heightfield/shader tuning).
 
+### Round 6 — build `5c28419` — **FAIL** at the gate (A, C, F; methodology change: scanned CC0 rock)
+
+| Category | A | C | F | Gate |
+|---|---|---|---|---|
+| Visual art direction | **7.5** | 7.5 | 7.5 | ✗ (< 8) |
+| Environmental uniqueness | **8** | 8 | 8.5 | ✗ |
+| Skiing and hazard mechanics | 6.5 (lc) | 7 (lc) | 7.5 | ✗ |
+| Difficulty and fairness | 7 (lc) | 7 (lc) | 7.5 | ✗ |
+| Cinematics | 6.5 | **7.5** | 7.5 | ✗ |
+| Performance and stability | 7 (lc) | 7 (lc) | 7 (lc) | ✗ |
+| Accessibility and controls | 7 (lc) | 7 (lc) | 7.5 (lc) | ✗ |
+| Overall player experience | 7 | 7.5 | **7.5** | ✗ (< 8) |
+
+Verified: the islands are fixed — scanned rock replaced the loaves/saucers on screen (A, F); the hex
+causeway and floating wreckage are gone. New faults: a lone portal column ("monolith"), drums and bones
+left in the cave dressing, boulders not bedded, icicles on bare rock; the coastal reveal for non-Sprint caves
+showed no coast (camera too high, aimed into the hill); the Sprint emergence got smaller (30° stations);
+the catch shot still/again faced inland (the sea lies along the skier→presenter line); a stretched island
+scan read as a flat slab (06); the menu lost its islands (scans loaded after its only `want()`). F expects
+Overall 8 once the cave props, the catch shot and the hero cliff are fixed on screen. B/D/E not run (gate
+already failed). Round-6 capture stopped after the main 1080 set.
+
 ## Whiteout Ridge, Frozen Frontier, Volcanic Expanse
 Not started.
