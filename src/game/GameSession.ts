@@ -224,7 +224,7 @@ export class GameSession implements Stage {
     this.follow.idealPose(this.followTarget(), fp, fl);
     tl.shot({ start: 0, end: 4.2, from: () => pose(P.clone().add(new THREE.Vector3(18, 9, 22)), P.clone().add(new THREE.Vector3(0, 1.2, 0)), 46), via: () => pose(P.clone().add(new THREE.Vector3(10, 4, -8)), P.clone().add(new THREE.Vector3(0, 1.4, 4)), 52), to: () => pose(fp, fl, 64), easing: ease.inOutCubic });
     const goal = this.endless ? 'Survive as far as you can. Bank your run at the refuges.' : `Reach the ${this.world.finishDef.goal ?? 'resort'}, ${(this.world.mountain.finishZ / 1000).toFixed(0)} km down the mountain.`;
-    tl.at(0.2, () => this.hud.title('THE LAST DESCENT', goal, 'intro', 3.4));
+    tl.at(0.2, () => this.hud.title('THE LAST DESCENT', goal, 'intro notice', 3.4));
     tl.at(4.2, () => {});
     this.intro = tl;
     this.hud.letterbox(true);
@@ -491,8 +491,8 @@ export class GameSession implements Stage {
     this.yetiAnim.mode = 'hidden';
     this.world.focusEncounter = null;
     this.audio.setMusicMode('explore');
-    if (this.endless) this.hud.title(`REFUGE ${this.run.checkpointsReached}`, `Run banked: ${this.banked.toLocaleString('en-US')} pts. Retire from the pause menu, or push on.`, 'intro', 4);
-    else this.hud.title(`REFUGE ${this.run.checkpointsReached}`, `${this.refugeName} reached. The Yeti lost your trail… for now. The ${this.world.finishDef.goal ?? 'resort'} is still a long way down.`, 'intro', 4);
+    if (this.endless) this.hud.title(`REFUGE ${this.run.checkpointsReached}`, `Run banked: ${this.banked.toLocaleString('en-US')} pts. Retire from the pause menu, or push on.`, 'intro notice', 4);
+    else this.hud.title(`REFUGE ${this.run.checkpointsReached}`, `${this.refugeName} reached. The Yeti lost your trail… for now. The ${this.world.finishDef.goal ?? 'resort'} is still a long way down.`, 'intro notice', 4);
     this.hud.caption('[a furious howl fades behind you]', 3);
     this.audio.playUiMove();
   }
@@ -595,13 +595,13 @@ export class GameSession implements Stage {
         this.prevPos.copy(s.pos);
         this.follow.snap(this.followTarget());
         if (e.reason === 'pinned against the rock') {
-          this.hud.title('BACK ON THE PISTE', 'You were boxed in against the rock. Back to the run.', 'intro', 3);
+          this.hud.title('BACK ON THE PISTE', 'You were boxed in against the rock. Back to the run.', 'intro notice', 3);
           this.hud.caption('[you scramble out from under the rock — back on the piste]', 3);
         } else if (e.reason === 'stuck in the cornice') {
-          this.hud.title('BACK ON THE PISTE', 'You bogged down in the deep cornice snow. Keep inside the cairns along the cliff.', 'intro', 3);
+          this.hud.title('BACK ON THE PISTE', 'You bogged down in the deep cornice snow. Keep inside the cairns along the cliff.', 'intro notice', 4);
           this.hud.caption('[you flounder out of the cornice — back on the piste]', 3);
         } else {
-          this.hud.title('BACK ON THE PISTE', 'You went over the cornice. Keep inside the cairns along the cliff.', 'intro', 3);
+          this.hud.title('BACK ON THE PISTE', 'You went over the cornice. Keep inside the cairns along the cliff.', 'intro notice', 4);
           this.hud.caption('[you tumble over the cornice — back on the piste]', 3);
         }
         break;
