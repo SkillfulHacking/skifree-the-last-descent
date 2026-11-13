@@ -153,5 +153,25 @@ scan read as a flat slab (06); the menu lost its islands (scans loaded after its
 Overall 8 once the cave props, the catch shot and the hero cliff are fixed on screen. B/D/E not run (gate
 already failed). Round-6 capture stopped after the main 1080 set.
 
+### Round 7 — build `7b0a5bc` — **FAIL** (A art 7.5 < 8); **critic Overall 8 — the critic gate is met for the first time**
+
+| Category | A | C | F | Gate |
+|---|---|---|---|---|
+| Visual art direction | **7.5** | 7.5 | 7.5 | ✗ (< 8) |
+| Environmental uniqueness | **8** | 8 | 8.5 | ✗ |
+| Skiing and hazard mechanics | 6.5 (lc) | 7 (lc) | 7.5 | ✗ |
+| Difficulty and fairness | 7 (lc) | 7 (lc) | 7.5 | ✗ |
+| Cinematics | 7 | **8** | 8 | ✗ |
+| Performance and stability | 7 (lc) | 7 (lc) | 7 (lc) | ✗ |
+| Accessibility and controls | 7 (lc) | 7 (lc) | 7.5 (lc) | ✗ |
+| Overall player experience | 7.5 | 7.5 | **8** | ✓ critic ≥ 8 |
+
+Verified: cave props cleared (monolith, drums, bones, icicles), `08` the best cave frame so far (Yeti, sea,
+islands, harbour), catch shot faces the sea, menu islands back, Sprint emergence close again, far leap
+specks gone. Open: white folded slab (a scaled stone-cluster scan) in `06` and the menu; harbour headland
+streaks (F-028); summit sugarloaf (F-029); no foam/wet band on the island scans; repeated wall chips; the
+gull beat framed the brow after the gulls moved to the boulders; coastal reveal partial (inside terrain on 3
+Endurance caves, no mouth in frame); Sprint ladder within seed noise (F). B/D/E not run.
+
 ## Whiteout Ridge, Frozen Frontier, Volcanic Expanse
 Not started.
