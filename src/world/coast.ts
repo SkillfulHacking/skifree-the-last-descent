@@ -704,13 +704,18 @@ export class Coast {
       const peaks = a + (b - a) * massif;
       // a steep wall from the water (dark rock with snow on its benches), then the summits
       const rise = smoothstep(-120, 720 + 260 * (0.5 + 0.5 * gnoise(z / 900, 6.6, s + 88)), ef);
-      const summit = (ridged(x / 760, z / 760, s + 79, 4) - 0.32) * 520 * smoothstep(250, 1300, ef);
+      // (round 9, A r8 M6 "needle crests on the far massif": the 4th ridged octave, ~95 m, is one or
+      // two vertices of the far tiles — single-vertex spires. Three octaves, the crest compressed
+      // above 0.55 into shoulders, as on the far ranges)
+      let sr = ridged(x / 760, z / 760, s + 79, 3);
+      if (sr > 0.55) sr = 0.55 + (sr - 0.55) * 0.45;
+      const summit = (sr - 0.32 + 0.1 * (0.5 + 0.5 * fbm(x / 420, z / 420, s + 80, 2))) * 520 * smoothstep(250, 1300, ef);
       const couloir = (ridged(x / 160, z / 70, s + 74, 2) - 0.4) * 150 * smoothstep(60, 500, ef) * (1 - smoothstep(900, 1600, ef));
       out = Math.max(out, lvS - p.depth + (peaks + p.depth) * (1 - Math.pow(1 - rise, 1.6)) + summit + couloir);
     }
     // the headland ridge between two arms (and the fjord head): hides where the levels change
     if (ridge.bell > 0.002) {
-      const top = ridge.level + RIDGE_CLEAR + (260 + 260 * (0.5 + 0.5 * gnoise(z / 400, x / 900, s + 75))) * smoothstep(0, 900, t) + (ridged(x / 260, z / 260, s + 76, 3) - 0.3) * 70 * smoothstep(60, 400, t);
+      const top = ridge.level + RIDGE_CLEAR + (260 + 260 * (0.5 + 0.5 * gnoise(z / 400, x / 900, s + 75))) * smoothstep(0, 900, t) + (ridged(x / 260, z / 260, s + 76, 2) - 0.3) * 70 * smoothstep(60, 400, t);
       const base = ridge.level - p.depth;
       out = Math.max(out, base + (top - base) * ridge.bell * smoothstep(0, 22, t));
     }
