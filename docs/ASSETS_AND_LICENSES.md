@@ -126,8 +126,9 @@ Poly Haven. Licence CC0 1.0. Authors from the API `/info/{slug}` records (2026-1
 | File (committed) | Asset | Source URL | Authors | Used for |
 |---|---|---|---|---|
 | `src/world/art/models/mountainside.skm` | Mountainside | https://polyhaven.com/a/mountainside | Dario Barresi; Rico Cilliers | high "peak" islands |
-| `src/world/art/models/namaqualand_cliff_02.skm` | Namaqualand Cliff 02 | https://polyhaven.com/a/namaqualand_cliff_02 | Dario Barresi; Rico Cilliers | high "peak" islands |
 | `src/world/art/models/namaqualand_boulder_02.skm` | Namaqualand Boulder 02 | https://polyhaven.com/a/namaqualand_boulder_02 | Greg Zaal; Rico Cilliers | whaleback islands |
 | `src/world/art/models/namaqualand_boulder_06.skm` | Namaqualand Boulder 06 | https://polyhaven.com/a/namaqualand_boulder_06 | Greg Zaal; Jenelle van Heerden | whalebacks, skerries |
-| `src/world/art/models/boulder_01.skm` | Boulder 01 | https://polyhaven.com/a/boulder_01 | Rico Cilliers | whaleback islands |
-| `src/world/art/models/namaqualand_boulders_01.skm` | Namaqualand Boulders 01 | https://polyhaven.com/a/namaqualand_boulders_01 | Greg Zaal; Jenelle van Heerden | skerry chains |
+| `src/world/art/models/boulder_01.skm` | Boulder 01 | https://polyhaven.com/a/boulder_01 | Rico Cilliers | whaleback islands, skerries, cave boulders |
+
+Removed in round 8 (no longer shipped): Namaqualand Cliff 02 and Namaqualand Boulders 01. Scaled to
+island size, their thin, flat tops read as white folded slabs (review A7-M1).

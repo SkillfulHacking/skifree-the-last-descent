@@ -1067,6 +1067,7 @@ export class App {
       cameraPose: () => ({ pos: this.camera.position.toArray(), fov: this.camera.fov }),
     };
     (window as unknown as { __skifree: typeof api }).__skifree = api;
+    (window as unknown as { __THREE: unknown }).__THREE = { Raycaster: THREE.Raycaster };
   }
 }
 
