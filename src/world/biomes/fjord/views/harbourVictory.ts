@@ -145,8 +145,8 @@ export class HarbourVictory implements VictoryScript {
     };
     tl.shot({ start: B.present, end: B.toss + 0.4, from: ots(1.9, 1.05, 0.1), to: ots(1.6, 0.95, 0.05) });
     // 3b) the catch, in profile: the skier and the harbourmaster side by side as the lighthouse lands
-    //    in the skier's hands — from up the slope on the skier's side, so the quay and the open fjord
-    //    fill the background (round 4b, C r4 #3: the old reverse angle looked inland, up the run-out)
+    //    in the skier's hands — from up the slope on the land side (−right; round 5: +right looked at
+    //    the houses), so the quay and the open fjord fill the background (round 4b, C r4 #3: the old reverse angle looked inland, up the run-out)
     const toPres = () => presentAt.clone().sub(sk()).setY(0).normalize();
     tl.shot({
       start: B.toss + 0.4,
@@ -155,13 +155,13 @@ export class HarbourVictory implements VictoryScript {
         const d2 = toPres();
         const right = new THREE.Vector3(d2.z, 0, -d2.x);
         const mid = sk().addScaledVector(d2, 1.4).add(new THREE.Vector3(0, 1.35, 0));
-        return pose(mid.clone().addScaledVector(right, 5.4).addScaledVector(d2, -2.2).add(new THREE.Vector3(0, 0.6, 0)), mid, 44);
+        return pose(mid.clone().addScaledVector(right, -5.4).addScaledVector(d2, -2.2).add(new THREE.Vector3(0, 0.6, 0)), mid, 44);
       },
       to: () => {
         const d2 = toPres();
         const right = new THREE.Vector3(d2.z, 0, -d2.x);
         const mid = sk().addScaledVector(d2, 1.4).add(new THREE.Vector3(0, 1.4, 0));
-        return pose(mid.clone().addScaledVector(right, 5.0).addScaledVector(d2, -2.6).add(new THREE.Vector3(0, 0.7, 0)), mid, 44);
+        return pose(mid.clone().addScaledVector(right, -5.0).addScaledVector(d2, -2.6).add(new THREE.Vector3(0, 0.7, 0)), mid, 44);
       },
       easing: ease.inOut,
     });
