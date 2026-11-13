@@ -80,7 +80,7 @@ describe('Fjord sea cave: props keep out of the cave-cinematic cameras', () => {
       // no lintel of column ends any more (round 4b: they read as loose hex blocks floating over the
       // mouth); the portal columns still give the gulls brow perches
       expect(props.filter((p) => p.kind === 'lintel').length).toBe(0);
-      expect((d.group.userData['perches'] as Array<{ brow?: boolean }>).some((q) => q.brow)).toBe(true);
+      expect((d.group.userData['perches'] as Array<{ brow?: boolean }>).length).toBeGreaterThan(2); // round 7: on the boulders
       const lines = caveCameraSightlines(cave.mouth, cave.outward, cave.lipTop);
       for (const p of props) expect(clearOfCaveCameras(lines, p.p, p.r), `${p.kind} at ${p.p.toArray().map((v) => v.toFixed(1))}`).toBe(true);
       // and off the Yeti's exit path / ledge (the lintel's column ends stand overhead, above the

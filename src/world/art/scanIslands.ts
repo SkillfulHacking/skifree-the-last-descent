@@ -85,7 +85,7 @@ export class ScanIslands {
     const key = Math.round(water * 10) / 10;
     let mt = this.mats.get(key);
     if (!mt) {
-      mt = createRockMaterial({ kind: 'rock_face_03', tile: 14, water: key, snow: 1, strata: 0.6, snowFrom: 0.62, hq: this.quality !== 'low', grade: { lum: 0.07, desat: 0.94, tint: [0.92, 0.98, 1.08] }, macroSet: { kind: 'cliff_side', tile: 120, strength: 0.4 }, streaks: 0.8 });
+      mt = createRockMaterial({ kind: 'rock_face_03', tile: 14, water: key, snow: 0.85, strata: 0.6, snowFrom: 0.7, hq: this.quality !== 'low', grade: { lum: 0.07, desat: 0.94, tint: [0.92, 0.98, 1.08] }, macroSet: { kind: 'cliff_side', tile: 120, strength: 0.4 }, streaks: 0.8 });
       this.mats.set(key, mt);
     }
     return mt;

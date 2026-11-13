@@ -391,6 +391,8 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       p.y = gy - r * 0.5; // bedded: half the boulder is under the snow
       picks.push({ id: ids[i % ids.length]!, p, sx: 2 * r * rnd.range(0.9, 1.3), sy: r * rnd.range(0.9, 1.4), sz: 2 * r * rnd.range(0.7, 1.0), yaw: rnd.range(0, 6.28) });
       props.push({ p: p.clone().setY(gy + r * 0.3), r, kind: 'boulder' });
+      // the gulls perch on the boulders' crowns (round 7: the columns that carried them are gone)
+      perches.push({ p: p.clone().setY(p.y + picks[picks.length - 1]!.sy * 0.92), brow: false });
     }
     const bmat = createRockMaterial({ kind: 'rock_face_03', tile: 2.5, snow: 1, strata: 0.2, snowFrom: 0.62, fill: FILL, hq: hi, grade: { lum: 0.05, desat: 0.9, tint: [0.94, 0.98, 1.05] } });
     partial.rock.push(bmat);
@@ -450,12 +452,6 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     const hw = 4.6;
     // just above the opening's top (a lower line hung the icicles inside the mouth, in the air)
     const yUp = Math.max(6.1, cave.lipTop.y - mouth.y + 0.3);
-    // gull perches along the brow rock (round 7: the portal columns that carried them are gone)
-    for (let al = -4.4; al <= 4.4; al += 1.45) {
-      const f = face(al, yUp);
-      if (f === null) continue;
-      perches.push({ p: mouth.clone().addScaledVector(tan, al).add(new THREE.Vector3(0, yUp + 0.1, 0)).addScaledVector(out, f + 0.35), brow: true });
-    }
     // (round 7: no brow icicles — hung on bare rock above the mouth they floated: A r6)
     for (let al = -hw; al <= (PORTAL ? hw : -hw - 1); al += 0.7) {
       if (rnd.next() < (hi ? 0.45 : 0.65)) continue;
