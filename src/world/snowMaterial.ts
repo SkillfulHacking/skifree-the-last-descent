@@ -81,7 +81,9 @@ const coastRockGlsl = (T: Biome['terrainLook'], low: boolean) => /* glsl */ `
     // tone, a few vertical master joints, and rare, discrete frozen seeps instead of many streaks.
     float zone = sf_fbmBL(vec2(wp.x * 0.004 + wp.z * 0.003, wp.y * 0.006) + 4.0, sf_fp(sf_fY, vec2(0.006)));
     vec3 gneiss = mix(${v3(T.rockA)}, ${v3(T.rockC)}, smoothstep(0.35, 0.7, zone)) * (0.75 + 0.5 * M);
-    float fol = sf_sideN(vec2(0.011, 0.075), 31.0);
+    // (round 8: a 13 m foliation period drew the "pinstripe" across the hero wall from far out: the
+    // bands are broader now, ~40 m)
+    float fol = sf_sideN(vec2(0.011, 0.025), 31.0);
     float blk2 = sf_triN(vec2(0.021), 43.0);${
       low
         ? `
@@ -105,8 +107,14 @@ ${
         : `    float mj = abs(sf_sideN(vec2(0.03, 0.016), 47.0) - 0.5);
     rock *= 1.0 - 0.18 * sf_aa(0.47, 0.5, mj) * (1.0 - farA) * smoothstep(0.6, 0.85, slope);`
     }
-    float seep = smoothstep(0.92, 0.965, sf_sideN(vec2(0.03, 0.003), 21.0)) * smoothstep(0.7, 0.95, slope);
-    rock = mix(rock, vec3(0.72, 0.84, 0.93), seep * 0.85);
+    // (round 8: the frozen seeps were the last white pinstripes down the harbour headland from the
+    // finish — rarer, and grey-blue ice rather than snow white)
+    float seep = smoothstep(0.95, 0.985, sf_sideN(vec2(0.03, 0.003), 21.0)) * smoothstep(0.7, 0.95, slope);
+    rock = mix(rock, vec3(0.36, 0.42, 0.47), seep * 0.5);
+    // round 8 (A r5–r7 M "white streaks down the harbour headland", F-028): on the coast's steep
+    // faces the snow/rock split no longer flickers along the heightfield's stretched facets — anything
+    // steeper than ~30° is rock, with snow only where the face lies back
+    sf_rock = max(sf_rock, smoothstep(0.5, 0.62, slope));
   }
 `;
 

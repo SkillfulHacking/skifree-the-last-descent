@@ -309,7 +309,11 @@ ${
 }
 // macro: dipping strata bands and broad tone patches (read at a kilometre)
 float rkY = rkP.y + 0.035 * rkP.x - 0.02 * rkP.z + 9.0 * rk_fbm(rkP.xz * 0.004);
-float rkBand = rk_fbm(vec2(rkY * 0.09, rkP.x * 0.0015 + rkP.z * 0.0015));
+// (round 8, A r5–r7 m "ripple pinstripe on the upper cliff": this ~11 m band was never faded — at
+// 1–2 km it is one or two pixels a period and aliased into fine horizontal lines across the whole
+// wall. Past ~300 m it hands over to the same field at a ~70 m period.)
+float rkBandD = smoothstep(300.0, 800.0, length(vRkW - cameraPosition));
+float rkBand = mix(rk_fbm(vec2(rkY * 0.09, rkP.x * 0.0015 + rkP.z * 0.0015)), rk_fbm(vec2(rkY * 0.014 + 3.7, rkP.x * 0.0015 + rkP.z * 0.0015)), rkBandD);
 // (round 7: a 3 m band read as a pinstripe across the whole hero wall from far out — it fades out
 // with distance, and its period is ~8 m)
 float rkBand2 = mix(rk_n(vec2(rkY * 0.12, (rkP.x + rkP.z) * 0.01)), 0.5, smoothstep(120.0, 400.0, length(vRkW - cameraPosition)));
@@ -362,7 +366,9 @@ float rkIce = smoothstep(0.03, 0.1, rkAbove) * (1.0 - smoothstep(0.22, 0.35, rkA
 float rkSnowT = rkN.y + 0.1 * (0.5 - rkH) + 0.2 * (rk_fbm(rkP.xz * 0.06 + rkP.y * 0.03) - 0.5) + 0.14 * (rk_fbm(rkP.xz * 0.012) - 0.5);
 float rkSnow = smoothstep(${(o.snowFrom ?? 0.6).toFixed(3)}, ${((o.snowFrom ?? 0.6) + 0.14).toFixed(3)}, rkSnowT) * uSnow * (1.0 - rkWetK);
 // spray zone: no snow lies on the wave-washed foot (the notch's lip and talus just above the sea)
-rkSnow *= mix(1.0, smoothstep(2.5, 8.0, rkAbove), step(-1e8, uWater));
+// (round 8, A r7: the cliff kit's wave-cut bench ~9 m up read as a white sheet floating at the
+// cliff foot in 06 — the salt-washed band is ~20 m deep now)
+rkSnow *= mix(1.0, smoothstep(8.0, 22.0, rkAbove), step(-1e8, uWater));
 #ifdef RK_CAVE
 // no snow in the chamber; the floor (kind 1) is grit
 rkSnow *= smoothstep(0.55, 0.85, vRkCave.x) * (1.0 - step(0.5, vRkCave.z));

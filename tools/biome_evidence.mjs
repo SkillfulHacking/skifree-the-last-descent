@@ -96,7 +96,23 @@ await page.evaluate(() => {
     return raw(p, l, f);
   };
 });
-const settle = (ms = 2500) => page.waitForTimeout(ms);
+/** let the frame after a camera move run (it re-LODs the cliff segments for the new viewpoint), then
+ *  finish the queued scenery builds at once — on a GPU they complete within ~1 s of streaming, but
+ *  SwiftShader's 5–7 s frames would otherwise leave the old LOD on screen (round 8: the "pinstripe"
+ *  in 06 was the skier-side finest LOD seen from 1.3 km) */
+const settle = async (ms = 2500) => {
+  await ev(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+  // (the debug free camera is applied after the world update, so the scenery LODs for the chase
+  // camera near the skier: hand it the real viewpoint first — gameplay and cinematic cameras are set
+  // before the update and need none of this)
+  await ev(() => {
+    const w = window.__skifree.world?.();
+    if (!w?.scenery) return;
+    w.scenery.update(0, 0, { focus: window.__skifree.camera.position, camPos: window.__skifree.camera.position, origin: w.origin });
+    w.scenery.flush?.();
+  });
+  await page.waitForTimeout(ms);
+};
 /** terrain/vegetation around z built at full detail (teleport flushes them) */
 const goTo = (z, speed = 0) => ev(([z, v]) => window.__skifree.teleport(z, v), [z, speed]);
 const geo = () =>
@@ -207,6 +223,29 @@ if (want('long')) {
   await P(`(w, m, c) => { const z = ${z}; const lv = c ? c.seaLevelAt(z) : m.heightAt(m.routeX(z), z) - 300; const x = m.routeX(z); window.__skifree.freeCam([x - 1500, lv + 340, z - 1300], [x + 150, m.heightAt(x, z + 900) - 60, z + 1300], 55); }`);
   await settle(4000);
   await shot('06_long_distance', 'Long-distance composition across the valley / fjord');
+}
+
+// diagnostic: which object draws given pixels of the long-distance frame (PROBE="x,y;x,y" in 0..1)
+if (want('probe')) {
+  const pts = (process.env.PROBE ?? '0.5,0.5').split(';').map((s) => s.split(',').map(Number));
+  const res = await ev((pts) => {
+    const api = window.__skifree;
+    const cam = api.camera;
+    let scene = cam; while (scene.parent) scene = scene.parent;
+    if (scene === cam) scene = api.world?.()?.scene ?? scene;
+    const THREE_ = cam.constructor;
+    const out = [];
+    const rc = new (window.__THREE?.Raycaster ?? Object)();
+    if (!rc.setFromCamera) return 'no raycaster';
+    for (const [x, y] of pts) {
+      rc.setFromCamera({ x: x * 2 - 1, y: 1 - y * 2 }, cam);
+      const vis = (o) => { for (; o; o = o.parent) if (!o.visible) return false; return true; }; const hits = rc.intersectObject(scene, true).filter((h) => vis(h.object)).slice(0, 3);
+      out.push({ x, y, hits: hits.map((h) => { const chain = []; let o = h.object; while (o && chain.length < 5) { chain.push(o.name || o.type); o = o.parent; } return { d: Math.round(h.distance), chain: chain.join('<'), mat: h.object.material?.name || h.object.material?.type, ud: JSON.stringify(h.object.material?.userData ?? {}).slice(0, 80), key: (h.object.material?.customProgramCacheKey?.() ?? '').slice(0, 90), geo: h.object.geometry?.type + ':' + (h.object.geometry?.getAttribute?.('position')?.count ?? 0), inst: !!h.object.isInstancedMesh, p: h.point.toArray().map(Math.round) }; }) });
+    }
+    return out;
+  }, pts);
+  const segs = await ev(() => { const c = window.__skifree.world().scenery.cliffs; const cam = window.__skifree.camera.position; return { cam: cam.toArray().map(Math.round), focus: c ? null : null, jobs: c.jobs.length, segs: [...c.segs].map(([i, s]) => ({ i, lod: s.lod, v: s.mesh.geometry.getAttribute('position').count, name: s.mesh.name })) }; });
+  writeFileSync(`${outDir}/probe.json`, JSON.stringify({ res, segs }, null, 1));
 }
 
 // 7) the Yeti cave (before the cinematic) and 8) the cinematic

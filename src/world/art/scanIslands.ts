@@ -19,15 +19,13 @@ import * as THREE from 'three';
 import type { Mountain } from '../course';
 import { createRockMaterial, disposeRockMaterial } from './rockMaterial';
 
-type ModelId = 'mountainside' | 'namaqualand_cliff_02' | 'namaqualand_boulder_02' | 'namaqualand_boulder_06' | 'boulder_01' | 'namaqualand_boulders_01';
+type ModelId = 'mountainside' | 'namaqualand_boulder_02' | 'namaqualand_boulder_06' | 'boulder_01';
 
 const URLS: Record<ModelId, string> = {
   mountainside: new URL('./models/mountainside.skm', import.meta.url).href,
-  namaqualand_cliff_02: new URL('./models/namaqualand_cliff_02.skm', import.meta.url).href,
   namaqualand_boulder_02: new URL('./models/namaqualand_boulder_02.skm', import.meta.url).href,
   namaqualand_boulder_06: new URL('./models/namaqualand_boulder_06.skm', import.meta.url).href,
   boulder_01: new URL('./models/boulder_01.skm', import.meta.url).href,
-  namaqualand_boulders_01: new URL('./models/namaqualand_boulders_01.skm', import.meta.url).href,
 };
 
 /** archetype → candidate scans (picked per island by its seed) */
@@ -35,7 +33,10 @@ const BY_KIND: Record<0 | 1 | 2, ModelId[]> = {
   // (round 8: not the stone-cluster scan — scaled up its thin flat stones read as folded white paper)
   0: ['namaqualand_boulder_06', 'boulder_01'],
   1: ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'],
-  2: ['mountainside', 'namaqualand_cliff_02'],
+  // (round 8: not the cliff-slab scan either — stretched to an island its sunlit top read as a white
+  // folded slab in 06 and the menu, A7-M1; the big islands are the mountainside scan, turned and
+  // proportioned per island)
+  2: ['mountainside'],
 };
 
 /** Decode an .skm (see the tool) into a unit geometry: footprint x,z in [-0.5, 0.5], y in [0, 1]. */
@@ -86,7 +87,7 @@ export class ScanIslands {
     const key = Math.round(water * 10) / 10;
     let mt = this.mats.get(key);
     if (!mt) {
-      mt = createRockMaterial({ kind: 'rock_face_03', tile: 14, water: key, snow: 0.85, strata: 0.6, snowFrom: 0.7, hq: this.quality !== 'low', grade: { lum: 0.07, desat: 0.94, tint: [0.92, 0.98, 1.08] }, macroSet: { kind: 'cliff_side', tile: 120, strength: 0.4 }, streaks: 0.8 });
+      mt = createRockMaterial({ kind: 'rock_face_03', tile: 14, water: key, snow: 0.6, strata: 0.6, snowFrom: 0.8, hq: this.quality !== 'low', grade: { lum: 0.07, desat: 0.94, tint: [0.92, 0.98, 1.08] }, macroSet: { kind: 'cliff_side', tile: 120, strength: 0.4 }, streaks: 0.8 });
       this.mats.set(key, mt);
     }
     return mt;

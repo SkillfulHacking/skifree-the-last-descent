@@ -7,15 +7,13 @@
 import * as THREE from 'three';
 import { decodeSkm } from './scanIslands';
 
-export type ScanId = 'mountainside' | 'namaqualand_cliff_02' | 'namaqualand_boulder_02' | 'namaqualand_boulder_06' | 'boulder_01' | 'namaqualand_boulders_01';
+export type ScanId = 'mountainside' | 'namaqualand_boulder_02' | 'namaqualand_boulder_06' | 'boulder_01';
 
 const URLS: Record<ScanId, string> = {
   mountainside: new URL('./models/mountainside.skm', import.meta.url).href,
-  namaqualand_cliff_02: new URL('./models/namaqualand_cliff_02.skm', import.meta.url).href,
   namaqualand_boulder_02: new URL('./models/namaqualand_boulder_02.skm', import.meta.url).href,
   namaqualand_boulder_06: new URL('./models/namaqualand_boulder_06.skm', import.meta.url).href,
   boulder_01: new URL('./models/boulder_01.skm', import.meta.url).href,
-  namaqualand_boulders_01: new URL('./models/namaqualand_boulders_01.skm', import.meta.url).href,
 };
 
 const cache = new Map<ScanId, Promise<THREE.BufferGeometry | null>>();
