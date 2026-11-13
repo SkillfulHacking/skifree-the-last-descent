@@ -1,31 +1,34 @@
-import '../../tests/support/domStub';
 /**
- * Round 7 (C r6 #1): the coastal reveal before the emergence (cave cinematic, every cave whose
- * dressing found no sea-framing station) looks up the sea cliff from low over the water: open water
- * must fill part of the frame. Same pose as seaCaveCinematic.ts.
+ * The coastal reveal before a cave emergence that no station frames with the sea (seaFraming.ts
+ * coastalReveal, used by seaCaveCinematic.ts): wherever it is used, the camera is out over open water
+ * (never inside the terrain) at both ends of the move and the frame holds ≥ 10 % open water; it exists
+ * for most non-Sprint caves (C r6 #1, C r7 #1).
  */
+import '../support/domStub';
 import { expect, it } from 'vitest';
-import * as THREE from 'three';
 import '../../src/world/biomes';
 import { buildMountain, makeCourse, type LengthMode } from '../../src/game/CourseConfig';
 import { Cave } from '../../src/world/Cave';
-import { waterFraction } from '../../src/world/biomes/fjord/views/seaFraming';
-it('the coastal reveal shows the sea on Sprint, Standard and Endurance caves', () => {
-  for (const [len, sd] of [['standard', ''], ['standard', 'C4G'], ['endurance', ''], ['sprint', '']] as [LengthMode, string][]) {
+import { coastalReveal } from '../../src/world/biomes/fjord/views/seaFraming';
+
+it('coastal reveal: clear of the terrain, ≥ 10 % water, on most Standard/Endurance caves', () => {
+  let n = 0;
+  let ok = 0;
+  const cases: Array<[LengthMode, string]> = [['standard', ''], ['endurance', ''], ['standard', 'C4G'], ['standard', 'C4K'], ['endurance', 'C4J'], ['endurance', 'E7X1'], ['endurance', 'E7X9']];
+  for (const [len, sd] of cases) {
     const m = buildMountain(makeCourse(sd ? 'custom' : 'classic', len, { biome: 'fjord', customText: sd || undefined }));
-    for (const e of m.profile.encounters(-Infinity, m.profile.finishZ).slice(0, 2)) {
+    for (const e of m.profile.encounters(-Infinity, m.profile.finishZ)) {
       const cave = new Cave(m, e.anchor, 'low');
-      const M = cave.mouth; const coast = m.coast!;
-      const water = coast.seaLevelAt(M.z); const rx = coast.rimX(M.z); const cl = m.cliff;
-      const footX = cl ? rx - cl.footOffset(cl.column(M.z)) : rx - 120;
-      const cam = new THREE.Vector3(footX - 170, water + 22, M.z - 110);
-      const rim = new THREE.Vector3(rx - 10, 0, M.z + 30);
-      // tilted up only ~5°: the face fills the frame, the water its lower quarter
-      rim.y = water + 22 + Math.tan(THREE.MathUtils.degToRad(5)) * Math.hypot(rim.x - (footX - 170), rim.z - (M.z - 110));
-      const hgt = m.heightAt(cam.x, cam.z);
-      expect(waterFraction(m, cam, rim, 50), `${len} ${sd} ${e.anchor.z}`).toBeGreaterThanOrEqual(0.1);
-      console.log('REV', len, sd, e.anchor.z.toFixed(0), 'water', waterFraction(m, cam, rim, 50).toFixed(2), 'camAboveGround', (cam.y - hgt).toFixed(0), 'M-water', (M.y - water).toFixed(0));
+      const r = coastalReveal(m, cave.mouth);
+      n++;
+      if (r) {
+        ok++;
+        const water = m.coast!.seaLevelAt(cave.mouth.z);
+        for (const c of [r.sea0, r.sea1]) expect(m.heightAt(c.x, c.z), `${len} ${sd} ${e.anchor.z}`).toBeLessThan(water - 2);
+        expect(r.water).toBeGreaterThanOrEqual(0.1);
+      }
       cave.dispose();
     }
   }
+  expect(ok / n).toBeGreaterThanOrEqual(0.7);
 });

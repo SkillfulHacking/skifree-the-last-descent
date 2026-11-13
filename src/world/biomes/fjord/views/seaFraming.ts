@@ -178,3 +178,29 @@ export function leapStations(ledge: THREE.Vector3, out: THREE.Vector3, tan: THRE
       }
   return s;
 }
+
+/**
+ * The coastal reveal before a cave emergence that no station frames with the sea (C r6/r7): low over
+ * the water off the cliff's foot, looking back up the face to the rim above the cave, tilted ~5° so
+ * the water fills the lower part of the frame. Stepped out over the water until the camera is clear
+ * of the terrain and the frame holds ≥ 10 % open water; null when no such pose exists.
+ */
+export function coastalReveal(m: Mountain, mouth: THREE.Vector3): { sea0: THREE.Vector3; sea1: THREE.Vector3; rim: THREE.Vector3; water: number } | null {
+  const coast = m.coast;
+  if (!coast) return null;
+  const water = coast.seaLevelAt(mouth.z);
+  const rx = coast.rimX(mouth.z);
+  const cl = m.cliff;
+  const footX = cl ? rx - cl.footOffset(cl.column(mouth.z)) : rx - 120;
+  for (let k = 0; k < 6; k++) {
+    const off = 170 + 60 * k;
+    const sea0 = new THREE.Vector3(footX - off, water + 22, mouth.z - 110);
+    const sea1 = new THREE.Vector3(footX - off + 10, water + 26, mouth.z - 80);
+    if (m.heightAt(sea0.x, sea0.z) > water - 2 || m.heightAt(sea1.x, sea1.z) > water - 2) continue;
+    const rim = new THREE.Vector3(rx - 10, 0, mouth.z + 30);
+    rim.y = water + 22 + Math.tan(THREE.MathUtils.degToRad(5)) * Math.hypot(rim.x - sea0.x, rim.z - sea0.z);
+    const w = waterFraction(m, sea0, rim, 50);
+    if (w >= 0.1) return { sea0, sea1, rim, water: w };
+  }
+  return null;
+}
