@@ -196,11 +196,18 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
     // water at the cliff's crest height, looking back along the cliffs at the cave's hill as the
     // gulls burst off it and the growl rolls out — then the three-quarter angle on the emergence
     if (coast) {
+      // (round 7, C r6 #1: the first version hung 240–710 m above the sea and aimed into the hill)
+      // low over the water off the cliff's foot, looking back up the face to the rim above the cave
+      const water = coast.seaLevelAt(M.z);
       const rx = coast.rimX(M.z);
-      const sea0 = new THREE.Vector3(rx - 150, M.y + 18, M.z - 70);
-      const sea1 = new THREE.Vector3(rx - 138, M.y + 20, M.z - 40);
-      const hill = new THREE.Vector3((rx + M.x) / 2, M.y + 6, M.z);
-      tl.shot({ start: 7.9, end: 9.2, from: () => pose(sea0, hill, 44), to: () => pose(sea1, hill.clone().add(new THREE.Vector3(0, 1.5, 0)), 42), easing: ease.inOut });
+      const cl = st.world.mountain.cliff;
+      const footX = cl ? rx - cl.footOffset(cl.column(M.z)) : rx - 120;
+      const sea0 = new THREE.Vector3(footX - 170, water + 22, M.z - 110);
+      const sea1 = new THREE.Vector3(footX - 160, water + 26, M.z - 80);
+      const rim = new THREE.Vector3(rx - 10, 0, M.z + 30);
+      // tilted up only ~5°: the face fills the frame, the water its lower quarter
+      rim.y = water + 22 + Math.tan(THREE.MathUtils.degToRad(5)) * Math.hypot(rim.x - (footX - 170), rim.z - (M.z - 110));
+      tl.shot({ start: 7.9, end: 9.2, from: () => pose(sea0, rim, 50), to: () => pose(sea1, rim.clone().add(new THREE.Vector3(0, 6, 0)), 48), easing: ease.inOut });
     }
     tl.shot({
       start: coast ? 9.2 : 7.9,

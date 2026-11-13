@@ -75,12 +75,12 @@ describe('Fjord sea cave: props keep out of the cave-cinematic cameras', () => {
       const mountain = { heightAt: (x: number) => 50 + (x - 100) * 0.08 * -outX };
       const d = dressSeaCave({ cave: cave as never, mountain: mountain as never, anchor: { z: 400 } as never, quality: 'high', biome: {} as never });
       const props = d.group.userData['props'] as Array<{ p: THREE.Vector3; r: number; kind: string }>;
-      expect(props.length).toBeGreaterThan(12); // round 6: no free-standing causeway or wreckage; portal columns + scanned boulders
-      expect(props.some((p) => p.kind === 'column')).toBe(true);
+      expect(props.length).toBeGreaterThan(5); // round 7: scanned boulders (no causeway, portal, drums, wreckage)
+      expect(props.some((p) => p.kind === 'boulder')).toBe(true);
       // no lintel of column ends any more (round 4b: they read as loose hex blocks floating over the
       // mouth); the portal columns still give the gulls brow perches
       expect(props.filter((p) => p.kind === 'lintel').length).toBe(0);
-      expect((d.group.userData['perches'] as Array<{ brow?: boolean }>).some((q) => q.brow)).toBe(true);
+      expect((d.group.userData['perches'] as Array<{ brow?: boolean }>).length).toBeGreaterThan(2); // round 7: on the boulders
       const lines = caveCameraSightlines(cave.mouth, cave.outward, cave.lipTop);
       for (const p of props) expect(clearOfCaveCameras(lines, p.p, p.r), `${p.kind} at ${p.p.toArray().map((v) => v.toFixed(1))}`).toBe(true);
       // and off the Yeti's exit path / ledge (the lintel's column ends stand overhead, above the

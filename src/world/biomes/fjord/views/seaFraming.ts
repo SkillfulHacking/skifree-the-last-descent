@@ -156,7 +156,7 @@ export function emergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: TH
   // stations far out on the slope, low: their frame is near-level, so its upper rays clear the
   // cave's hill and reach the fjord far below and behind it)
   for (const ang of [-60, -35, -15, 15, 35, 60])
-    for (const [d, h] of [[14, 6], [14, 16], [14, 30], [26, 6], [26, 16], [26, 30], [55, 5], [80, 6], [110, 8], [45, 22], [70, 34]] as const) {
+    for (const [d, h] of [[14, 6], [14, 16], [14, 30], [26, 6], [26, 16], [26, 30], [55, 5], [80, 6], [110, 8]] as const) {
       {
         const r = THREE.MathUtils.degToRad(ang);
         const p = mouth.clone().addScaledVector(out, d * Math.cos(r)).addScaledVector(tan, d * Math.sin(r));
@@ -169,7 +169,7 @@ export function emergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: TH
 
 export function leapStations(ledge: THREE.Vector3, out: THREE.Vector3, tan: THREE.Vector3, ground?: (x: number, z: number) => number): THREE.Vector3[] {
   const s: THREE.Vector3[] = [];
-  for (const a of [12, 22, 60, 90])
+  for (const a of [12, 22])
     for (const b of [-16, -12, -6, 6, 12, 16])
       for (const h of [3, 9, 22, 55, 80]) {
         const p = ledge.clone().addScaledVector(out, a).addScaledVector(tan, b);

@@ -144,27 +144,25 @@ export class HarbourVictory implements VictoryScript {
       return pose(cam, ph.clone().add(new THREE.Vector3(0, 0.15, 0)), fov);
     };
     tl.shot({ start: B.present, end: B.toss + 0.4, from: ots(1.9, 1.05, 0.1), to: ots(1.6, 0.95, 0.05) });
-    // 3b) the catch, in profile: the skier and the harbourmaster side by side as the lighthouse lands
-    //    in the skier's hands — from up the slope on the land side (−right; round 5: +right looked at
-    //    the houses), so the quay and the open fjord fill the background (round 4b, C r4 #3: the old reverse angle looked inland, up the run-out)
+    // 3b) the catch: from up the slope behind the skier's shoulder, looking down at the pair with the
+    //    harbour and the open fjord behind the harbourmaster (the sea lies down the fall line, +z).
+    //    Round 7: both profile sides framed land (C r5 #2, F r6 #2) — the sea is not to either side
+    //    here, it is ahead, beyond the quay.
     const toPres = () => presentAt.clone().sub(sk()).setY(0).normalize();
     tl.shot({
       start: B.toss + 0.4,
       end: B.apres,
       from: () => {
-        const d2 = toPres();
-        const right = new THREE.Vector3(d2.z, 0, -d2.x);
-        const mid = sk().addScaledVector(d2, 1.4).add(new THREE.Vector3(0, 1.35, 0));
-        return pose(mid.clone().addScaledVector(right, -5.4).addScaledVector(d2, -2.2).add(new THREE.Vector3(0, 0.6, 0)), mid, 44);
+        const mid = sk().lerp(presentAt, 0.5).add(new THREE.Vector3(0, 1.3, 0));
+        return pose(sk().add(new THREE.Vector3(1.6, 2.6, -4.6)), mid.clone().add(new THREE.Vector3(0, 0.2, 6)), 46);
       },
       to: () => {
-        const d2 = toPres();
-        const right = new THREE.Vector3(d2.z, 0, -d2.x);
-        const mid = sk().addScaledVector(d2, 1.4).add(new THREE.Vector3(0, 1.4, 0));
-        return pose(mid.clone().addScaledVector(right, -5.0).addScaledVector(d2, -2.6).add(new THREE.Vector3(0, 0.7, 0)), mid, 44);
+        const mid = sk().lerp(presentAt, 0.5).add(new THREE.Vector3(0, 1.3, 0));
+        return pose(sk().add(new THREE.Vector3(1.9, 2.4, -4.1)), mid.clone().add(new THREE.Vector3(0, 0.2, 6)), 44);
       },
       easing: ease.inOut,
     });
+    void toPres;
     // 4) après: from the water side of the bathing pier (tub near, bonfire and sauna behind); the
     //    camera drifts to keep the bather's run across the deck in frame
     const hb = r as Harbour;

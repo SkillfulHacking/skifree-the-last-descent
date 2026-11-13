@@ -38,6 +38,8 @@ import { bestSeaPose, emergeStations, leapStations, type SeaPose } from './seaFr
  * as blocks, planks and a card floating in front of the cave (A r5 M5, C r5 #4, F r5 #1).
  */
 const WRECKAGE = false as boolean;
+/** the portal colonnade and the brow icicles (off since round 7) */
+const PORTAL = false as boolean;
 /** the torn net prop (off since round 4b: it read as a floating black sheet) */
 const NET_PLACED = false as boolean;
 
@@ -386,9 +388,11 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       const r = rnd.range(1.1, 2.6);
       if (!ok(p.clone().setY(p.y + r * 0.4), r)) continue;
       const gy = seat(p, r * 0.7);
-      p.y = gy - r * 0.35;
+      p.y = gy - r * 0.5; // bedded: half the boulder is under the snow
       picks.push({ id: ids[i % ids.length]!, p, sx: 2 * r * rnd.range(0.9, 1.3), sy: r * rnd.range(0.9, 1.4), sz: 2 * r * rnd.range(0.7, 1.0), yaw: rnd.range(0, 6.28) });
       props.push({ p: p.clone().setY(gy + r * 0.3), r, kind: 'boulder' });
+      // the gulls perch on the boulders' crowns (round 7: the columns that carried them are gone)
+      perches.push({ p: p.clone().setY(p.y + picks[picks.length - 1]!.sy * 0.92), brow: false });
     }
     const bmat = createRockMaterial({ kind: 'rock_face_03', tile: 2.5, snow: 1, strata: 0.2, snowFrom: 0.62, fill: FILL, hq: hi, grade: { lum: 0.05, desat: 0.9, tint: [0.94, 0.98, 1.05] } });
     partial.rock.push(bmat);
@@ -408,7 +412,8 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       });
   }
   // fallen drums from the collapsed side lying in the snow (column sections on their sides)
-  for (let i = 0; i < (hi ? 5 : 3); i++) {
+  // (round 7: off — lit, they read as grey hex drums lying on the snow: A r6 M3, F r6 #1)
+  for (let i = 0; i < 0; i++) {
     const p = place(-big * rnd.range(7, 14), -rnd.range(7, 12));
     const r = rnd.range(0.45, 0.62);
     const len = rnd.range(0.9, 2.2);
@@ -422,7 +427,9 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   if (tick.over()) yield;
   // the portal: tall columns flanking the mouth, standing on the face line, rising to the brow
   const brow = cave.lipTop.y - mouth.y;
-  for (const s of [-1, 1]) {
+  // (round 7: off — most of the colonnade sits inside the shell, so the one column left standing
+  // read as a lone monolith against the face: A r6 M2, F r6 #1)
+  for (const s of PORTAL ? [-1, 1] : []) {
     let al = 5.0;
     let n = 0;
     while (al < (s === big ? 9.5 : 8.0) && n < 8) {
@@ -445,7 +452,8 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     const hw = 4.6;
     // just above the opening's top (a lower line hung the icicles inside the mouth, in the air)
     const yUp = Math.max(6.1, cave.lipTop.y - mouth.y + 0.3);
-    for (let al = -hw; al <= hw; al += 0.7) {
+    // (round 7: no brow icicles — hung on bare rock above the mouth they floated: A r6)
+    for (let al = -hw; al <= (PORTAL ? hw : -hw - 1); al += 0.7) {
       if (rnd.next() < (hi ? 0.45 : 0.65)) continue;
       const f = face(al, yUp);
       if (f === null) continue;
@@ -592,8 +600,8 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       prev = p;
     }
   }
-  // fish bones by the mouth (the Yeti's meals)
-  for (let i = 0; i < 5; i++) {
+  // fish bones by the mouth (the Yeti's meals) — round 7: off (stick-like props on the snow)
+  for (let i = 0; i < 0; i++) {
     const p = place(rnd.range(-6, 6), -rnd.range(5, 9));
     if (!ok(p.clone().setY(p.y + 0.05), 0.5)) continue;
     const yaw = rnd.range(0, 6.28);
@@ -667,7 +675,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       }
       return r.value;
     };
-    const emerge = yield* run(bestSeaPose(m, mouth.clone().addScaledVector(out, 1.0).add(new THREE.Vector3(0, 1.7, 0)), emergeStations(mouth, out, tan, (x, z) => m.heightAt(x, z)), props, 52, 0.05, 30));
+    const emerge = yield* run(bestSeaPose(m, mouth.clone().addScaledVector(out, 1.0).add(new THREE.Vector3(0, 1.7, 0)), emergeStations(mouth, out, tan, (x, z) => m.heightAt(x, z)), props, 52, 0.05, 24));
     const leap = yield* run(bestSeaPose(m, cave.ledge.clone().addScaledVector(out, 5).add(new THREE.Vector3(0, 2.2, 0)), leapStations(cave.ledge, out, tan, (x, z) => m.heightAt(x, z)), props, 56, 0.05, 32));
     group.userData['seaShots'] = { emerge, leap } satisfies SeaShots;
   }

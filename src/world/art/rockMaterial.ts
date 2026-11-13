@@ -310,7 +310,9 @@ ${
 // macro: dipping strata bands and broad tone patches (read at a kilometre)
 float rkY = rkP.y + 0.035 * rkP.x - 0.02 * rkP.z + 9.0 * rk_fbm(rkP.xz * 0.004);
 float rkBand = rk_fbm(vec2(rkY * 0.09, rkP.x * 0.0015 + rkP.z * 0.0015));
-float rkBand2 = rk_n(vec2(rkY * 0.33, (rkP.x + rkP.z) * 0.01));
+// (round 7: a 3 m band read as a pinstripe across the whole hero wall from far out — it fades out
+// with distance, and its period is ~8 m)
+float rkBand2 = mix(rk_n(vec2(rkY * 0.12, (rkP.x + rkP.z) * 0.01)), 0.5, smoothstep(120.0, 400.0, length(vRkW - cameraPosition)));
 vec3 rkCol = rkAlb.rgb * (1.0 + uStrata * (0.55 * (rkBand - 0.5) + 0.22 * (rkBand2 - 0.5)));
 rkCol *= 0.82 + 0.36 * rk_fbm(rkP.xz * 0.011 + rkP.y * 0.006);
 #ifdef RK_MACRO
