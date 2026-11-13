@@ -70,6 +70,7 @@ export class ScanIslands {
   private mats = new Map<number, THREE.MeshStandardMaterial>();
   private live = new Map<string, THREE.Mesh>();
   private win: [number, number] = [1, 0];
+  private lastWant: [number, number] | null = null;
   private disposed = false;
 
   constructor(
@@ -100,7 +101,9 @@ export class ScanIslands {
         .then((b) => {
           if (this.disposed) return;
           this.geos.set(id, decodeSkm(b));
-          this.win = [1, 0]; // rebuild the window with the new model
+          // rebuild the window with the new model now (the menu calls want() once)
+          this.win = [1, 0];
+          if (this.lastWant) this.want(this.lastWant[0], this.lastWant[1]);
         })
         .catch((e) => console.warn('island scan failed to load', id, e));
     }
@@ -109,6 +112,7 @@ export class ScanIslands {
 
   /** keep the islands of z in [z0, z1] (every x) in the scene */
   want(z0: number, z1: number): void {
+    this.lastWant = [z0, z1];
     if (this.disposed || (z0 >= this.win[0] - 200 && z1 <= this.win[1] + 200 && this.win[1] > this.win[0])) return;
     this.win = [z0 - 1500, z1 + 1500];
     const c = this.m.coast;
@@ -146,7 +150,11 @@ export class ScanIslands {
       // (skerries: a smaller footprint — stretched to the cluster's ellipse they flattened into white
       // snow-topped plates)
       const f = b.kind === 0 ? 0.9 : 2.4;
-      mesh.scale.set(f * b.a, h, f * b.b);
+      // never flatter than 1:4 (round 7, A r6 M1: a scan stretched far wider than tall read as a flat
+      // white slab with a dark disc under it)
+      const sx = Math.min(f * b.a, 4 * h);
+      const sz = Math.min(f * b.b, 4 * h);
+      mesh.scale.set(sx, h, sz);
       mesh.position.set(b.x, water - sink * h, b.z);
       mesh.castShadow = false;
       mesh.receiveShadow = true;
