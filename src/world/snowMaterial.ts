@@ -130,6 +130,14 @@ const shoreGlsl = (low: boolean) => /* glsl */ `
     if (vNPos.z >= r.x && vNPos.z < r.y) W = r.z;
   }
   float dh = vNPos.y - W;
+  // round 6 (A r5 M1: white streaks down the harbour headland — snow clinging in strips to a face
+  // that is near-vertical where the heightfield stretches): steep sea-facing walls up to ~650 m above
+  // the water are bare rock; snow only on what is clearly a ledge
+  if (dh < 700.0 && dh > 30.0) {
+    float bare = (1.0 - smoothstep(450.0, 680.0, dh)) * smoothstep(0.42, 0.62, slope);
+    col = mix(col, rock * mix(0.62, 0.85, smoothstep(30.0, 300.0, dh)), bare);
+    sf_rock = max(sf_rock, bare);
+  }
   if (dh < 200.0) {
     float sn2 = sf_vn(vNPos.xz * 0.06 + 4.0);
     // round 3 (D9): the wash, spray and surf terms are all zero more than ~28 m above the water;

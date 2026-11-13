@@ -19,6 +19,8 @@ export interface SeaPose {
   fov: number;
   /** the frame is turned this far (rad, about +Y) from the subject: the subject sits off-centre, the sea fills the other side */
   yaw: number;
+  /** and tilted up this far (rad): the subject sits low in the frame, the sea beyond it */
+  pitch: number;
   /** share of the frame's sample rays that end on open water */
   water: number;
 }
@@ -112,23 +114,27 @@ export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THRE
     const vf = THREE.MathUtils.degToRad(fovS) / 2;
     const hfovS = Math.atan(Math.tan(vf) * (16 / 9));
     for (const [yaw, pitch] of [[0, 0], [0.42 * hfovS, 0], [-0.42 * hfovS, 0], [0, 0.55 * vf], [0.42 * hfovS, 0.55 * vf], [-0.42 * hfovS, 0.55 * vf]] as const) {
-      const look = turnedLook(cam, subject, yaw);
-      if (pitch !== 0) {
-        const dl = look.clone().sub(cam);
-        const hl = Math.hypot(dl.x, dl.z);
-        const a = Math.atan2(dl.y, hl) + pitch;
-        look.copy(cam).add(new THREE.Vector3((dl.x / hl) * Math.cos(a), Math.sin(a), (dl.z / hl) * Math.cos(a)).multiplyScalar(dl.length()));
-      }
+      const look = framedLook(cam, subject, yaw, pitch);
       const w = yield* waterFractionSteps(m, cam, look, fovS);
       // (closer stations win a near tie: the Yeti must stay large in frame)
       const score = w - 0.0015 * dist;
       if (w >= minWater && (!best || score > bestScore + 1e-9)) {
-        best = { cam: cam.clone(), look, fov: fovS, water: w, yaw };
+        best = { cam: cam.clone(), look, fov: fovS, water: w, yaw, pitch };
         bestScore = score;
       }
     }
   }
   return best;
+}
+
+/** the look point turned `yaw` about +Y and tilted up `pitch` (rad) around the camera from the subject */
+export function framedLook(cam: THREE.Vector3, subject: THREE.Vector3, yaw: number, pitch: number): THREE.Vector3 {
+  const look = turnedLook(cam, subject, yaw);
+  if (pitch === 0) return look;
+  const dl = look.clone().sub(cam);
+  const hl = Math.max(1e-6, Math.hypot(dl.x, dl.z));
+  const a = Math.atan2(dl.y, hl) + pitch;
+  return look.copy(cam).add(new THREE.Vector3((dl.x / hl) * Math.cos(a), Math.sin(a), (dl.z / hl) * Math.cos(a)).multiplyScalar(dl.length()));
 }
 
 /** the look point turned `yaw` rad about +Y around the camera from the subject */
@@ -150,7 +156,7 @@ export function emergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: TH
   // stations far out on the slope, low: their frame is near-level, so its upper rays clear the
   // cave's hill and reach the fjord far below and behind it)
   for (const ang of [-60, -35, -15, 15, 35, 60])
-    for (const [d, h] of [[14, 6], [14, 16], [14, 30], [26, 6], [26, 16], [26, 30], [55, 5], [80, 6], [110, 8]] as const) {
+    for (const [d, h] of [[14, 6], [14, 16], [14, 30], [26, 6], [26, 16], [26, 30], [55, 5], [80, 6], [110, 8], [45, 22], [70, 34]] as const) {
       {
         const r = THREE.MathUtils.degToRad(ang);
         const p = mouth.clone().addScaledVector(out, d * Math.cos(r)).addScaledVector(tan, d * Math.sin(r));

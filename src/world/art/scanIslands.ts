@@ -124,7 +124,18 @@ export class ScanIslands {
       const water = c.seaLevelAt(b.z);
       // only where the coast keeps an island (its low base stands out of the water there: not in the
       // harbour lane, the cliff-foot band or on land)
-      if (this.m.heightAt(b.x, b.z) < water - 1) continue;
+      const hc = this.m.heightAt(b.x, b.z);
+      if (hc < water - 1 || hc > water + 2.5) continue;
+      // and clear of the land all round (the finish's headlands: a scan beside one read as a giant
+      // boulder parked in the harbour mouth)
+      let landy = false;
+      for (let k = 0; k < 10 && !landy; k++) {
+        const a = (k / 10) * Math.PI * 2;
+        const rx = Math.cos(a) * b.a * 1.6;
+        const rz = Math.sin(a) * b.b * 1.6;
+        if (this.m.heightAt(b.x + rx * b.c - rz * b.s, b.z + rx * b.s + rz * b.c) > water + 4) landy = true;
+      }
+      if (landy) continue;
       const mesh = new THREE.Mesh(g, this.material(water));
       // long axis along the cluster's grain; the scans' long axis is x
       mesh.rotation.y = -Math.atan2(b.s, b.c) + (b.k % 1 > 0.5 ? Math.PI : 0);

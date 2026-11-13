@@ -23,7 +23,7 @@ import type { CaveCinematicContext, CaveCinematicExtras } from '../../../present
 import { CAVE_CAMS } from '../../../../cinematic/CaveCinematic';
 import { ease, pose } from '../../../../cinematic/Timeline';
 import type { SeaCavePerch, SeaShots } from './seaCave';
-import { turnedLook } from './seaFraming';
+import { framedLook } from './seaFraming';
 
 interface Gull {
   o: THREE.Group;
@@ -184,15 +184,26 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
       start: 7.9,
       end: 11.0,
       // (the frame turned by the station's yaw: the Yeti off-centre, the fjord on the open side)
-      from: () => pose(e.cam, turnedLook(e.cam, yetiAt().add(new THREE.Vector3(0, 1.6, 0)), e.yaw), e.fov),
-      to: () => pose(e.cam.clone().addScaledVector(toward, 1.2), turnedLook(e.cam.clone().addScaledVector(toward, 1.2), yetiAt().add(new THREE.Vector3(0, 1.9, 0)), e.yaw), e.fov - 2),
+      // (and tilted as the station search chose: C r5 #1 — the tilt that put the sea in frame was dropped)
+      from: () => pose(e.cam, framedLook(e.cam, yetiAt().add(new THREE.Vector3(0, 1.6, 0)), e.yaw, e.pitch), e.fov),
+      to: () => pose(e.cam.clone().addScaledVector(toward, 1.2), framedLook(e.cam.clone().addScaledVector(toward, 1.2), yetiAt().add(new THREE.Vector3(0, 1.9, 0)), e.yaw, e.pitch), e.fov - 2),
       easing: ease.inOut,
       handheld: 0.015,
     });
   } else {
-    // no station sees the sea: a high three-quarter angle across the portal
+    // no station sees the sea (on Standard and longer the cave sits in an ordinary valley side and the
+    // fjord lies far below behind its hill — C r5 #1): a coastal reveal first — from out over the
+    // water at the cliff's crest height, looking back along the cliffs at the cave's hill as the
+    // gulls burst off it and the growl rolls out — then the three-quarter angle on the emergence
+    if (coast) {
+      const rx = coast.rimX(M.z);
+      const sea0 = new THREE.Vector3(rx - 150, M.y + 18, M.z - 70);
+      const sea1 = new THREE.Vector3(rx - 138, M.y + 20, M.z - 40);
+      const hill = new THREE.Vector3((rx + M.x) / 2, M.y + 6, M.z);
+      tl.shot({ start: 7.9, end: 9.2, from: () => pose(sea0, hill, 44), to: () => pose(sea1, hill.clone().add(new THREE.Vector3(0, 1.5, 0)), 42), easing: ease.inOut });
+    }
     tl.shot({
-      start: 7.9,
+      start: coast ? 9.2 : 7.9,
       end: 11.0,
       from: () => pose(M.clone().addScaledVector(O, 9).addScaledVector(T, 7).add(new THREE.Vector3(0, 5.5, 0)), yetiAt().add(new THREE.Vector3(0, 1.6, 0)), 46),
       to: () => pose(M.clone().addScaledVector(O, 8.4).addScaledVector(T, 6.2).add(new THREE.Vector3(0, 5.0, 0)), yetiAt().add(new THREE.Vector3(0, 2.0, 0)), 46),
@@ -206,11 +217,13 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
   // (mouth facing inland: the dressing's sea-framing station, out on the slope looking back up at him)
   const ledgeCam = !mouthToSea && sea?.leap ? sea.leap.cam.clone() : cave.ledge.clone().addScaledVector(O, -2.6).addScaledVector(T, 1.4).add(new THREE.Vector3(0, 2.7, 0));
   const leapYaw = !mouthToSea && sea?.leap ? sea.leap.yaw : 0;
+  const leapPitch = !mouthToSea && sea?.leap ? sea.leap.pitch : 0;
+  const leapFov = !mouthToSea && sea?.leap ? sea.leap.fov : 56;
   // (from the sea-framing station out on the slope the camera faces the cave: it holds the Yeti
   // leaping toward it — the skier is behind the lens — instead of a point between the two)
   const leapK = !mouthToSea && sea?.leap ? 0 : 0.42;
-  const leapLook = () => turnedLook(ledgeCam, yetiAt().add(new THREE.Vector3(0, 1.6, 0)).lerp(P.clone().add(new THREE.Vector3(0, 1.0, 0)), leapK), leapYaw);
-  tl.shot({ start: 14.6, end: 16.95, from: () => pose(ledgeCam, leapLook(), 56), to: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), 60) });
+  const leapLook = () => framedLook(ledgeCam, yetiAt().add(new THREE.Vector3(0, 1.6, 0)).lerp(P.clone().add(new THREE.Vector3(0, 1.0, 0)), leapK), leapYaw, leapPitch);
+  tl.shot({ start: 14.6, end: 16.95, from: () => pose(ledgeCam, leapLook(), leapFov), to: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), leapFov + 4) });
   const followPos = new THREE.Vector3();
   const followLook = new THREE.Vector3();
   const followPose = () => {
