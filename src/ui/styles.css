@@ -131,6 +131,10 @@ kbd {
 .hud-sub.scrim { color: #fff; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.95), 0 0 14px rgba(0,0,0,0.7), 0 0 34px rgba(0,0,0,0.45); }
 .hud-center.scrim { text-shadow: 0 0 40px rgba(255, 196, 90, 0.35), 0 2px 4px rgba(0,0,0,0.7), 0 6px 30px rgba(0,0,0,0.6); }
 .hud-sub.intro { top: calc(18% + clamp(40px, 6vw, 80px)); letter-spacing: 0.1em; font-size: 16px; }
+/* an instruction the player must read (round 8, F r8: "Keep inside the cairns" was white on a pale
+   sky, ~1.1:1): on a dark pill, whatever the scenery behind it */
+.hud-sub.notice { left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: min(90vw, 760px); padding: 8px 18px; border-radius: 12px; background: rgba(8, 14, 22, 0.72); color: #fff; font-weight: 600; font-size: calc(17px * var(--ui-scale, 1)); line-height: 1.35; letter-spacing: 0.04em; white-space: normal; }
+.hud-center.notice { text-shadow: 0 2px 4px rgba(0,0,0,0.75), 0 6px 30px rgba(0,0,0,0.6); }
 .hud-skip { position: absolute; right: 32px; bottom: calc(11vh + 18px); font-size: 13px; color: var(--ink-dim); letter-spacing: 0.1em; }
 .hud-fps { position: absolute; left: 12px; bottom: 10px; font: 11px ui-monospace, monospace; color: #cfe; background: rgba(0,0,0,0.45); padding: 4px 8px; border-radius: 6px; }
 @media (max-width: 900px) {

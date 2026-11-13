@@ -1011,7 +1011,10 @@ export class SkierPhysics {
    */
   private pinWatchdog(input: SkierInput) {
     const s = this.s;
-    if (!(input.tuck > 0.5 || Math.abs(input.steer) > 0.5)) s.pushSince = s.time;
+    // (round 9, B r8 #1: a held steer key alone counted as pushing — a player standing still on open
+    // snow, turning or holding brake plus a direction, was teleported and given a crash. Only skating
+    // forward (tuck, no brake) is trying to get going)
+    if (!(input.tuck > 0.5 && input.brake < 0.3)) s.pushSince = s.time;
     if (s.crashed || !s.grounded || Math.hypot(s.pos.x - s.pinAnchorX, s.pos.z - s.pinAnchorZ) > PIN_WATCH.escape) {
       s.pinAnchorX = s.pos.x;
       s.pinAnchorZ = s.pos.z;

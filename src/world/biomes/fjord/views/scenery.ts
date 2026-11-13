@@ -125,6 +125,8 @@ export class FjordScenery implements SceneryView {
     // the cliff segments take what is left of this consumer's slice (at least a sliver per frame,
     // so a stalled chunk queue never starves the cliffs)
     if (this.cliffs?.pending) this.cliffs.pump(Math.max(performance.now() + 0.25, t0 + budgetMs));
+    // then the islands (round 9: placed in slices, not all in the frame the window moved)
+    if (this.islands.pending) this.islands.pump(Math.max(performance.now() + 0.25, t0 + budgetMs));
   }
 
   flush(): void {
@@ -133,11 +135,12 @@ export class FjordScenery implements SceneryView {
       while (!j.job.next().done);
     }
     this.cliffs?.flush();
+    this.islands.flush();
   }
 
   /** pending chunk and cliff builds (tests, World's starvation guard) */
   get pending(): number {
-    return this.jobs.length + (this.cliffs?.pending ?? 0);
+    return this.jobs.length + (this.cliffs?.pending ?? 0) + this.islands.pending;
   }
 
   private dropChunk(v: ChunkView) {

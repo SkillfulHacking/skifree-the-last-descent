@@ -357,7 +357,10 @@ float rkH = rkNhr.z;
 float rkRough = rkNhr.w;
 // sea: wet dark glossy band, thin pale ice foot at the waterline
 float rkAbove = rkP.y - uWater;
-float rkWetK = max(uWet, 1.0 - smoothstep(0.6, 4.0 + 3.0 * rk_n(rkP.xz * 0.05 + rkP.y * 0.1), rkAbove));
+// (round 9, A r8 M3 "no wet rock at any waterline": the 4 m band was under two pixels from out on
+// the fjord — the dark, wave-wetted zone widens with distance like the foam line, ~12 m at 1 km)
+float rkWetH = 4.0 + 3.0 * rk_n(rkP.xz * 0.05 + rkP.y * 0.1) + 0.008 * length(vRkW - cameraPosition);
+float rkWetK = max(uWet, 1.0 - smoothstep(0.6, rkWetH, rkAbove));
 rkCol *= 1.0 - 0.45 * rkWetK;
 rkRough = mix(rkRough, 0.32, rkWetK);
 // (review p2: a thin, broken rime line ≤ ~0.35 m, not white patches clinging to vertical rock)

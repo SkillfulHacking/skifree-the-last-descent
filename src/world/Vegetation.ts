@@ -54,6 +54,8 @@ export class Vegetation {
   /** band index → cells */
   private bands = new Map<number, Cell[]>();
   private queue: Array<{ band: number; list: readonly Obstacle[] }> = [];
+  /** the band being built in slices, if any */
+  private job: { band: number; gen: Generator<void, void, void> } | null = null;
   readonly uTime = { value: 0 };
   private geos: THREE.BufferGeometry[] = [];
   private mats: THREE.Material[] = [];
@@ -109,6 +111,10 @@ export class Vegetation {
 
   /** Build every queued band now (loading screen). */
   flush() {
+    if (this.job) {
+      while (!this.job.gen.next().done);
+      this.job = null;
+    }
     while (this.queue.length) {
       const q = this.queue.shift()!;
       this.buildBand(q.band, q.list);
@@ -116,15 +122,23 @@ export class Vegetation {
   }
 
   get pending() {
-    return this.queue.length;
+    return this.queue.length + (this.job ? 1 : 0);
   }
   get bandCount() {
     return this.bands.size;
   }
 
   private dropBand(band: number) {
+    if (this.job && this.job.band === band) {
+      this.job.gen.return(undefined);
+      this.job = null;
+    }
     const qi = this.queue.findIndex((q) => q.band === band);
     if (qi >= 0) this.queue.splice(qi, 1);
+    this.dropCells(band);
+  }
+
+  private dropCells(band: number) {
     const cells = this.bands.get(band);
     if (!cells) return;
     for (const c of cells)
@@ -135,8 +149,19 @@ export class Vegetation {
     this.bands.delete(band);
   }
 
+  /** build a band at once (loading screen, tests) */
   private buildBand(band: number, obstacles: readonly Obstacle[]) {
-    if (this.bands.has(band)) this.dropBand(band);
+    const g = this.buildBandSteps(band, obstacles);
+    while (!g.next().done);
+  }
+
+  /**
+   * One band, in slices (round 8, perf: on the coast a whole band cost 18–26 ms CPU in one frame —
+   * the decor and talus placement probes the coast height ~10× per candidate — and was the largest
+   * spike left in the frame replay). Yields every 48 candidates; installs the meshes at the end.
+   */
+  private *buildBandSteps(band: number, obstacles: readonly Obstacle[]): Generator<void, void, void> {
+    this.dropCells(band);
     const mountain = this.mountain;
     const seed = this.seed;
     const buckets = new Map<number, Bucket>();
@@ -146,7 +171,9 @@ export class Vegetation {
       if (!v) buckets.set(b, (v = { trees: [[], [], []], rocks: Array.from({ length: ROCK_VARIANTS }, () => []), pebbles: [], logs: [], stumps: [], farTrees: [[], [], []] }));
       return v;
     };
+    let tick = 0;
     for (const o of obstacles) {
+      if ((++tick & 47) === 0) yield;
       const b = get(o.x);
       const base: Inst = { x: o.x, y: o.y, z: o.z, rot: o.rot, sx: o.scale, sy: o.scale, sz: o.scale };
       switch (o.kind) {
@@ -203,6 +230,7 @@ export class Vegetation {
     if (zA + BAND > -300) {
       const rng = new Rng((seed ^ 0xf0e57 ^ Math.imul(band + 101, 0x27d4eb2d)) >>> 0);
       for (let i = 0; i < this.decorPerBand; i++) {
+        if ((++tick & 47) === 0) yield;
         const z = zA + rng.float() * BAND;
         const side = rng.chance(0.5) ? 1 : -1;
         const cx = mountain.centerX(z);
@@ -235,6 +263,7 @@ export class Vegetation {
       // (cliff bases); sizes follow a power law, so a few big blocks and many small ones
       const talus = Math.round(this.decorPerBand * 0.08);
       for (let i = 0; i < talus; i++) {
+        if ((++tick & 15) === 0) yield;
         const z = zA + rng.float() * BAND;
         const side = rng.chance(0.5) ? 1 : -1;
         const cx = mountain.centerX(z);
@@ -300,6 +329,7 @@ export class Vegetation {
       return im;
     };
     const cells: Cell[] = [];
+    yield;
     for (const [bx, b] of buckets) {
       const cell: Cell = { x0: bx * CELL, z0: zA, near: [], far: [], shadowCasters: [], mid: [] };
       b.trees.forEach((list, v) => {
@@ -346,14 +376,17 @@ export class Vegetation {
   update(camPos: THREE.Vector3, time: number, budgetMs = 2) {
     this.uTime.value = time;
     // (budgetMs ≤ 0: World's shared frame budget is spent — build nothing this frame, round 4)
-    if (this.queue.length && budgetMs > 0) {
+    if ((this.queue.length || this.job) && budgetMs > 0) {
       // nearest band first
       this.queue.sort((a, b) => Math.abs(a.band * BAND + BAND / 2 - camPos.z) - Math.abs(b.band * BAND + BAND / 2 - camPos.z));
       const t0 = performance.now();
       do {
-        const q = this.queue.shift()!;
-        this.buildBand(q.band, q.list);
-      } while (this.queue.length && performance.now() - t0 < budgetMs);
+        if (!this.job) {
+          const q = this.queue.shift()!;
+          this.job = { band: q.band, gen: this.buildBandSteps(q.band, q.list) };
+        }
+        if (this.job.gen.next().done) this.job = null;
+      } while ((this.queue.length || this.job) && performance.now() - t0 < budgetMs);
     }
     for (const cells of this.bands.values())
       for (const b of cells) {
@@ -371,6 +404,10 @@ export class Vegetation {
   }
 
   dispose() {
+    if (this.job) {
+      this.job.gen.return(undefined);
+      this.job = null;
+    }
     for (const band of [...this.bands.keys()]) this.dropBand(band);
     for (const g of this.geos) g.dispose();
     for (const m of this.mats) m.dispose();

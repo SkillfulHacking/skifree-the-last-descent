@@ -157,7 +157,8 @@ const shoreGlsl = (low: boolean) => /* glsl */ `
     vec3 wet = vec3(0.045, 0.05, 0.055);
     if (dh < 30.0) {
       float sn = sf_vnBL(vNPos.xz * 0.35, sf_fp(sf_fY, vec2(0.35)));
-      wash = 1.0 - smoothstep(1.2 + 2.2 * sn2, 3.4 + 3.0 * sn2, dh);
+      // (round 9, A r8 M3: the wet band widens with distance so it still reads from out on the fjord)
+      wash = 1.0 - smoothstep(1.2 + 2.2 * sn2 + sf_dist * 0.003, 3.4 + 3.0 * sn2 + sf_dist * 0.007, dh);
       wet = mix(vec3(0.045, 0.05, 0.055), vec3(0.09, 0.085, 0.075), sn);
       vec3 weed = vec3(0.075, 0.07, 0.035);
       vec3 shore = mix(wet, weed, (1.0 - smoothstep(0.2, 1.4, dh)) * smoothstep(-0.2, 0.3, dh) * (0.5 + 0.5 * sn));

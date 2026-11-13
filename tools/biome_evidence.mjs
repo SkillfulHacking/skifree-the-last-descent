@@ -265,6 +265,7 @@ if (want('cave') || want('cinematic') || want('pursuit')) {
     await P(`(w) => { const c = w.cave; const o = c.outward; const p = [c.mouth.x + o.x * 26 + o.z * 9, c.mouth.y + 7, c.mouth.z + o.z * 26 - o.x * 9 - 8]; window.__skifree.freeCam(p, [c.mouth.x, c.mouth.y + 3, c.mouth.z], 50); }`);
     await settle(3500);
     await shot('07_yeti_cave', 'The Yeti cave with the location dressing, before the encounter');
+    if (want('cprobe')) await probe('cave');
     if (biome === 'fjord') {
       // the sea cave from inside its mouth: the basalt portal framing the run and the fjord beyond
       await P(`(w) => { const c = w.cave; const o = c.outward; const i = Math.min(c.exitPath.length - 1, Math.round((14 - 4.5) / 0.75)); const q = c.exitPath[i]; window.__skifree.freeCam([q.x, q.y + 1.6, q.z], [c.mouth.x + o.x * 60, c.mouth.y - 14, c.mouth.z + o.z * 60], 62); }`);
@@ -450,6 +451,7 @@ if (biome === 'fjord' && (want('gate') || want('gap') || want('viewpoint') || wa
       await P(`(w, m, c) => { const l = ${JSON.stringify(lk)}; const y = m.heightAt(l.x, l.z); const cx = l.x + 16, cz = l.z - 14; window.__skifree.freeCam([cx, Math.max(m.heightAt(cx, cz), y) + 6, cz], [l.x - 500, y - 70, l.z + 220], 58); }`);
       await settle(3000);
       await shot('14_viewpoint', `Scenic viewpoint at z≈${Math.round(lk.z)} (${lk.chase ? 'chase stretch' : 'free stretch'}): the platform and the view over the fjord`);
+      if (want('vprobe')) await probe('viewpoint');
     }
   }
   if (want('cornice')) {

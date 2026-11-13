@@ -18,14 +18,9 @@
 import * as THREE from 'three';
 import type { Mountain } from '../course';
 import { createRockMaterial, disposeRockMaterial } from './rockMaterial';
+import { loadScan, type ScanId } from './scanModels';
 
-type ModelId = 'namaqualand_boulder_02' | 'namaqualand_boulder_06' | 'boulder_01';
-
-const URLS: Record<ModelId, string> = {
-  namaqualand_boulder_02: new URL('./models/namaqualand_boulder_02.skm', import.meta.url).href,
-  namaqualand_boulder_06: new URL('./models/namaqualand_boulder_06.skm', import.meta.url).href,
-  boulder_01: new URL('./models/boulder_01.skm', import.meta.url).href,
-};
+type ModelId = ScanId;
 
 /** archetype → candidate scans (picked per island by its seed) */
 const BY_KIND: Record<0 | 1 | 2, ModelId[]> = {
@@ -38,40 +33,37 @@ const BY_KIND: Record<0 | 1 | 2, ModelId[]> = {
   2: ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'],
 };
 
-/** Decode an .skm (see the tool) into a unit geometry: footprint x,z in [-0.5, 0.5], y in [0, 1]. */
-export function decodeSkm(buf: ArrayBuffer): THREE.BufferGeometry {
-  const dv = new DataView(buf);
-  const magic = String.fromCharCode(dv.getUint8(0), dv.getUint8(1), dv.getUint8(2), dv.getUint8(3));
-  if (magic !== 'SKM1') throw new Error('not an SKM1 mesh');
-  const vc = dv.getUint32(4, true);
-  const ic = dv.getUint32(8, true);
-  const q = new Uint16Array(buf, 36, vc * 3);
-  const pos = new Float32Array(vc * 3);
-  for (let i = 0; i < vc * 3; i++) {
-    const a = i % 3;
-    const t = q[i]! / 65535;
-    pos[i] = a === 1 ? t : t - 0.5;
-  }
-  let o = 36 + vc * 6;
-  const big = vc >= 65536;
-  if (big && o % 4) o += 4 - (o % 4);
-  const idx = big ? new Uint32Array(buf.slice(o, o + ic * 4)) : new Uint16Array(buf.slice(o, o + ic * 2));
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  g.setIndex(new THREE.BufferAttribute(idx, 1));
-  g.computeVertexNormals();
-  g.computeBoundingSphere();
-  return g;
+export { decodeSkm } from './scanModels';
+
+/** one island blob, decided once: where it stands and as which model (null: rejected) */
+interface Placement {
+  id: ModelId;
+  x: number;
+  y: number;
+  z: number;
+  sx: number;
+  sy: number;
+  sz: number;
+  yaw: number;
+  water: number;
 }
 
+/**
+ * The scanned islands of the coast. Round 9 (D r8 #1: want() placed the whole window in one frame,
+ * 45–66 ms CPU every ~4 km, outside the frame budget): want() only queues the blobs that came into
+ * the window; pump() places them under the scenery's slice; each blob's decision (11 coast-height
+ * probes) is made once and remembered; the scans come from the shared loader (one fetch each, D r8
+ * #5) and are session-lifetime (never disposed here); materials no live island uses are freed
+ * (D r8 #4: they grew 5 → 15 over 40 km of Endless).
+ */
 export class ScanIslands {
   readonly group = new THREE.Group();
   private geos = new Map<ModelId, THREE.BufferGeometry>();
-  private loading = new Set<ModelId>();
   private mats = new Map<number, THREE.MeshStandardMaterial>();
   private live = new Map<string, THREE.Mesh>();
+  private decided = new Map<string, Placement | null>();
+  private queue: Array<{ key: string; b: ReturnType<NonNullable<Mountain['coast']>['islandBlobs']>[number] }> = [];
   private win: [number, number] = [1, 0];
-  private lastWant: [number, number] | null = null;
   private disposed = false;
 
   constructor(
@@ -79,7 +71,14 @@ export class ScanIslands {
     private readonly quality: string,
   ) {
     this.group.name = 'fjord-scan-islands';
-    for (const id of Object.keys(URLS) as ModelId[]) this.load(id);
+    const ids = new Set<ModelId>(([0, 1, 2] as const).flatMap((k) => BY_KIND[k]));
+    for (const id of ids)
+      void loadScan(id).then((g) => {
+        if (this.disposed || !g) return;
+        this.geos.set(id, g);
+        // islands decided for this model but not yet shown: show them now
+        for (const [key, pl] of this.decided) if (pl && pl.id === id && !this.live.has(key) && pl.z >= this.win[0] && pl.z <= this.win[1]) this.show(key, pl);
+      });
   }
 
   private material(water: number): THREE.MeshStandardMaterial {
@@ -92,82 +91,111 @@ export class ScanIslands {
     return mt;
   }
 
-  private load(id: ModelId): THREE.BufferGeometry | null {
-    const g = this.geos.get(id);
-    if (g) return g;
-    if (!this.loading.has(id) && typeof fetch !== 'undefined' && typeof document !== 'undefined') {
-      this.loading.add(id);
-      fetch(URLS[id])
-        .then((r) => r.arrayBuffer())
-        .then((b) => {
-          if (this.disposed) return;
-          this.geos.set(id, decodeSkm(b));
-          // rebuild the window with the new model now (the menu calls want() once)
-          this.win = [1, 0];
-          if (this.lastWant) this.want(this.lastWant[0], this.lastWant[1]);
-        })
-        .catch((e) => console.warn('island scan failed to load', id, e));
-    }
-    return null;
-  }
-
-  /** keep the islands of z in [z0, z1] (every x) in the scene */
+  /** keep the islands of z in [z0, z1] (every x) in the scene: queues new ones, drops far ones */
   want(z0: number, z1: number): void {
-    this.lastWant = [z0, z1];
     if (this.disposed || (z0 >= this.win[0] - 200 && z1 <= this.win[1] + 200 && this.win[1] > this.win[0])) return;
     this.win = [z0 - 1500, z1 + 1500];
     const c = this.m.coast;
     if (!c) return;
     const want = new Set<string>();
+    this.queue = [];
     for (const b of c.islandBlobs(this.win[0], this.win[1])) {
       const key = `${b.x.toFixed(1)}:${b.z.toFixed(1)}`;
       want.add(key);
       if (this.live.has(key)) continue;
-      const list = BY_KIND[b.kind];
-      const id = list[Math.floor(b.k * 7.31) % list.length]!;
-      const g = this.load(id);
-      if (!g) continue;
-      const water = c.seaLevelAt(b.z);
-      // only where the coast keeps an island (its low base stands out of the water there: not in the
-      // harbour lane, the cliff-foot band or on land)
-      const hc = this.m.heightAt(b.x, b.z);
-      // (the coast leaves a shoal ~8 m under the water where an island stands)
-      if (hc < water - 11 || hc > water + 1) continue;
-      // and clear of the land all round (the finish's headlands: a scan beside one read as a giant
-      // boulder parked in the harbour mouth)
-      let landy = false;
-      for (let k = 0; k < 10 && !landy; k++) {
-        const a = (k / 10) * Math.PI * 2;
-        const rx = Math.cos(a) * b.a * 1.25;
-        const rz = Math.sin(a) * b.b * 1.25;
-        if (this.m.heightAt(b.x + rx * b.c - rz * b.s, b.z + rx * b.s + rz * b.c) > water + 15) landy = true;
+      if (this.decided.has(key)) {
+        const pl = this.decided.get(key)!;
+        if (pl && this.geos.has(pl.id)) this.queue.push({ key, b });
+        continue;
       }
-      if (landy) continue;
-      const mesh = new THREE.Mesh(g, this.material(water));
-      // long axis along the cluster's grain; the scans' long axis is x
-      mesh.rotation.y = -Math.atan2(b.s, b.c) + (b.k % 1 > 0.5 ? Math.PI : 0);
-      const sink = b.kind === 0 ? 0.35 : 0.18;
-      const h = b.h * (b.kind === 0 ? 2.5 : b.kind === 1 ? 1.6 : 1.3);
-      // (skerries: a smaller footprint — stretched to the cluster's ellipse they flattened into white
-      // snow-topped plates)
-      const f = b.kind === 0 ? 0.9 : 2.4;
-      // never flatter than 1:4 (round 7, A r6 M1: a scan stretched far wider than tall read as a flat
-      // white slab with a dark disc under it)
-      const cap = b.kind === 2 ? 3 : 4;
-      const sx = Math.min(f * b.a, cap * h);
-      const sz = Math.min(f * b.b, cap * h);
-      mesh.scale.set(sx, h, sz);
-      mesh.position.set(b.x, water - sink * h, b.z);
-      mesh.castShadow = false;
-      mesh.receiveShadow = true;
-      mesh.name = `island-${id}`;
-      this.group.add(mesh);
-      this.live.set(key, mesh);
+      this.queue.push({ key, b });
     }
+    let dropped = false;
     for (const [k, mesh] of this.live)
       if (!want.has(k)) {
         mesh.removeFromParent();
         this.live.delete(k);
+        dropped = true;
+      }
+    // forget decisions far outside the window (bounded memory over a long Endless run)
+    if (this.decided.size > 600) for (const k of this.decided.keys()) if (!want.has(k)) this.decided.delete(k);
+    if (dropped) this.freeMaterials();
+  }
+
+  /** place queued islands until `deadlineMs` (performance.now() value) */
+  pump(deadlineMs: number): void {
+    while (this.queue.length && performance.now() < deadlineMs) {
+      const { key, b } = this.queue.shift()!;
+      if (this.live.has(key)) continue;
+      let pl = this.decided.get(key);
+      if (pl === undefined) {
+        pl = this.decide(b);
+        this.decided.set(key, pl);
+      }
+      if (pl && this.geos.has(pl.id)) this.show(key, pl);
+    }
+  }
+
+  /** place every queued island now (loading screen, tests) */
+  flush(): void {
+    this.pump(Infinity);
+  }
+
+  get pending(): number {
+    return this.queue.length;
+  }
+
+  private decide(b: ReturnType<NonNullable<Mountain['coast']>['islandBlobs']>[number]): Placement | null {
+    const c = this.m.coast!;
+    const list = BY_KIND[b.kind];
+    const id = list[Math.floor(b.k * 7.31) % list.length]!;
+    const water = c.seaLevelAt(b.z);
+    // only where the coast keeps an island (its low base stands out of the water there: not in the
+    // harbour lane, the cliff-foot band or on land)
+    const hc = this.m.heightAt(b.x, b.z);
+    // (the coast leaves a shoal ~8 m under the water where an island stands)
+    if (hc < water - 11 || hc > water + 1) return null;
+    // and clear of the land all round (the finish's headlands: a scan beside one read as a giant
+    // boulder parked in the harbour mouth)
+    for (let k = 0; k < 10; k++) {
+      const a = (k / 10) * Math.PI * 2;
+      const rx = Math.cos(a) * b.a * 1.25;
+      const rz = Math.sin(a) * b.b * 1.25;
+      if (this.m.heightAt(b.x + rx * b.c - rz * b.s, b.z + rx * b.s + rz * b.c) > water + 15) return null;
+    }
+    // long axis along the cluster's grain; the scans' long axis is x
+    const yaw = -Math.atan2(b.s, b.c) + (b.k % 1 > 0.5 ? Math.PI : 0);
+    const sink = b.kind === 0 ? 0.35 : 0.18;
+    const h = b.h * (b.kind === 0 ? 2.5 : b.kind === 1 ? 1.6 : 1.3);
+    // (skerries: a smaller footprint — stretched to the cluster's ellipse they flattened into white
+    // snow-topped plates)
+    const f = b.kind === 0 ? 0.9 : 2.4;
+    // never flatter than 1:4 (round 7, A r6 M1), the big ones 1:3 (round 8)
+    const cap = b.kind === 2 ? 3 : 4;
+    return { id, x: b.x, y: water - sink * h, z: b.z, sx: Math.min(f * b.a, cap * h), sy: h, sz: Math.min(f * b.b, cap * h), yaw, water };
+  }
+
+  private show(key: string, pl: Placement): void {
+    const g = this.geos.get(pl.id);
+    if (!g || this.disposed) return;
+    const mesh = new THREE.Mesh(g, this.material(pl.water));
+    mesh.rotation.y = pl.yaw;
+    mesh.scale.set(pl.sx, pl.sy, pl.sz);
+    mesh.position.set(pl.x, pl.y, pl.z);
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    mesh.name = `island-${pl.id}`;
+    this.group.add(mesh);
+    this.live.set(key, mesh);
+  }
+
+  private freeMaterials(): void {
+    const used = new Set<THREE.Material>();
+    for (const mesh of this.live.values()) used.add(mesh.material as THREE.Material);
+    for (const [k, mt] of this.mats)
+      if (!used.has(mt)) {
+        disposeRockMaterial(mt);
+        this.mats.delete(k);
       }
   }
 
@@ -179,8 +207,9 @@ export class ScanIslands {
     this.disposed = true;
     for (const mesh of this.live.values()) mesh.removeFromParent();
     this.live.clear();
-    for (const g of this.geos.values()) g.dispose();
+    // (the scan geometries are shared and session-lifetime: scanModels.ts)
     this.geos.clear();
+    this.queue = [];
     for (const mt of this.mats.values()) disposeRockMaterial(mt);
     this.mats.clear();
   }

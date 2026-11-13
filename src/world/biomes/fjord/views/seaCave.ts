@@ -237,7 +237,7 @@ export function* dressSeaCaveSteps(c: CaveDressingContext, budgetMs = 3): Genera
   } finally {
     if (!done) {
       partial.group?.traverse((o) => {
-        if (o instanceof THREE.Mesh) o.geometry.dispose();
+        if (o instanceof THREE.Mesh && !o.userData['sharedGeometry']) o.geometry.dispose();
       });
       partial.group?.removeFromParent();
       for (const m of partial.mats) m.dispose();
@@ -278,6 +278,8 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   const mouth = cave.mouth;
   const lines = caveCameraSightlines(cave.mouth, cave.outward, cave.lipTop);
   const props: Array<{ p: THREE.Vector3; r: number; kind: string }> = [];
+  /** colliders the skier hits (the scanned boulders) */
+  const solids: Array<{ x: number; z: number; r: number }> = [];
   const perches: SeaCavePerch[] = [];
   const clearOfPath = (x: number, z: number, r: number) => cave.exitPath.every((p) => Math.hypot(p.x - x, p.z - z) > r + 4.5) && Math.hypot(cave.ledge.x - x, cave.ledge.z - z) > r + 5;
   /** the full placement test: path, ledge and every cinematic lens (prop centre p, radius r) */
@@ -382,15 +384,21 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   // added when the shared scans arrive.
   {
     const ids: ScanId[] = ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'];
-    const picks: Array<{ id: ScanId; p: THREE.Vector3; sx: number; sy: number; sz: number; yaw: number }> = [];
+    // (round 9: the boulders are solid — World.extraColliders)
+    const picks: Array<{ id: ScanId; p: THREE.Vector3; sx: number; sy: number; sz: number; yaw: number; gy: number }> = [];
     for (let i = 0; i < (hi ? 14 : 9); i++) {
       const p = place(rnd.range(-16, 16), -rnd.range(2.5, 13));
       const r = rnd.range(1.1, 2.6);
       if (!ok(p.clone().setY(p.y + r * 0.4), r)) continue;
       const gy = seat(p, r * 0.7);
-      p.y = gy - r * 0.5; // bedded: half the boulder is under the snow
-      picks.push({ id: ids[i % ids.length]!, p, sx: 2 * r * rnd.range(0.9, 1.3), sy: r * rnd.range(0.9, 1.4), sz: 2 * r * rnd.range(0.7, 1.0), yaw: rnd.range(0, 6.28) });
+      // bedded (round 9, A r8 M1 / F-040: at half depth the scans' widest girth stood above the snow
+      // and their undersides showed — they read as hovering): two thirds under the snow, so the snow
+      // line cuts them at their broad waist
+      const sy = r * rnd.range(1.2, 1.8);
+      p.y = gy - sy * 0.62;
+      picks.push({ id: ids[i % ids.length]!, p, sx: 2 * r * rnd.range(0.9, 1.3), sy, sz: 2 * r * rnd.range(0.7, 1.0), yaw: rnd.range(0, 6.28), gy });
       props.push({ p: p.clone().setY(gy + r * 0.3), r, kind: 'boulder' });
+      solids.push({ x: p.x, z: p.z, r: r * 0.85 });
       // the gulls perch on the boulders' crowns (round 7: the columns that carried them are gone)
       perches.push({ p: p.clone().setY(p.y + picks[picks.length - 1]!.sy * 0.92), brow: false });
     }
@@ -406,6 +414,8 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
         mesh.position.copy(pk.p);
         mesh.scale.set(pk.sx, pk.sy, pk.sz);
         mesh.rotation.y = pk.yaw;
+        // (the scan geometry is shared and session-lifetime: never disposed with the dressing, D r8 #6)
+        mesh.userData['sharedGeometry'] = true;
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         bg.add(mesh);
@@ -695,9 +705,10 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       }
       P.needsUpdate = true;
     },
+    colliders: () => solids,
     dispose() {
       group.traverse((o) => {
-        if (o instanceof THREE.Mesh) o.geometry.dispose();
+        if (o instanceof THREE.Mesh && !o.userData['sharedGeometry']) o.geometry.dispose();
       });
       for (const mt of new Set(Object.values(M))) mt.dispose();
       disposeRockMaterial(basalt);
@@ -710,6 +721,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       iceTex.dispose();
       hullMat.dispose();
       iceMesh?.dispose();
+      for (const mt of partial.mats) mt.dispose();
       group.removeFromParent();
     },
   };
