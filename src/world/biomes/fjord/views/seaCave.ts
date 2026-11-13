@@ -391,98 +391,16 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       const r = rnd.range(1.1, 2.6);
       if (!ok(p.clone().setY(p.y + r * 0.4), r)) continue;
       const gy = seat(p, r * 0.7);
-      p.y = gy - r * 0.5; // bedded: half the boulder is under the snow
-      picks.push({ id: ids[i % ids.length]!, p, sx: 2 * r * rnd.range(0.9, 1.3), sy: r * rnd.range(0.9, 1.4), sz: 2 * r * rnd.range(0.7, 1.0), yaw: rnd.range(0, 6.28), gy });
+      // bedded (round 9, A r8 M1 / F-040: at half depth the scans' widest girth stood above the snow
+      // and their undersides showed — they read as hovering): two thirds under the snow, so the snow
+      // line cuts them at their broad waist
+      const sy = r * rnd.range(1.2, 1.8);
+      p.y = gy - sy * 0.62;
+      picks.push({ id: ids[i % ids.length]!, p, sx: 2 * r * rnd.range(0.9, 1.3), sy, sz: 2 * r * rnd.range(0.7, 1.0), yaw: rnd.range(0, 6.28), gy });
       props.push({ p: p.clone().setY(gy + r * 0.3), r, kind: 'boulder' });
       solids.push({ x: p.x, z: p.z, r: r * 0.85 });
       // the gulls perch on the boulders' crowns (round 7: the columns that carried them are gone)
       perches.push({ p: p.clone().setY(p.y + picks[picks.length - 1]!.sy * 0.92), brow: false });
-    }
-    // round 9 (A r8 M1, C r8 #5, F r7 D4 — F-040: the boulders sat on a smooth snow plane with no
-    // collar or contact shade, so they read as hovering): each sits in a drift collar — a low snow
-    // apron banked against the rock, shaded where it meets the stone and feathered into the slope
-    if (picks.length) {
-      const parts: THREE.BufferGeometry[] = [];
-      const seg = 22;
-      for (const pk of picks) {
-        const gy = pk.gy;
-        const pos: number[] = [];
-        const col: number[] = [];
-        const idx: number[] = [];
-        // rings: inside the rock (hidden) → banked lip → feathered edge under the snow surface
-        // (the scans fill most of their unit footprint at the snow line, so the bank starts at its
-        // edge and climbs the stone)
-        const rings = [
-          { k: 0.8, h: 0.62, c: 0.74 },
-          { k: 0.95, h: 0.5, c: 0.82 },
-          { k: 1.1, h: 0.32, c: 0.9 },
-          { k: 1.3, h: 0.14, c: 0.96 },
-          { k: 1.55, h: 0.03, c: 1.0 },
-          { k: 1.8, h: -0.08, c: 1.0 },
-        ];
-        const ax = pk.sx * 0.5;
-        const az = pk.sz * 0.5;
-        const cy = Math.cos(pk.yaw);
-        const sy = Math.sin(pk.yaw);
-        for (const rg of rings)
-          for (let j = 0; j < seg; j++) {
-            const a = (j / seg) * Math.PI * 2;
-            const wob = 1 + 0.12 * Math.sin(a * 3 + pk.yaw * 5) + 0.06 * Math.sin(a * 7 + pk.p.x);
-            const lx = Math.cos(a) * ax * rg.k * wob;
-            const lz = Math.sin(a) * az * rg.k * wob;
-            const x = pk.p.x + lx * cy + lz * sy;
-            const z = pk.p.z - lx * sy + lz * cy;
-            const y = Math.max(gy, c.mountain.heightAt(x, z)) + rg.h * Math.min(1.4, pk.sy * 0.6);
-            pos.push(x, y, z);
-            col.push(rg.c, rg.c, rg.c * 1.02);
-          }
-        for (let r = 0; r < rings.length - 1; r++)
-          for (let j = 0; j < seg; j++) {
-            const a0 = r * seg + j;
-            const a1 = r * seg + ((j + 1) % seg);
-            const b0 = a0 + seg;
-            const b1 = a1 + seg;
-            idx.push(a0, b0, a1, a1, b0, b1);
-          }
-        const g = new THREE.BufferGeometry();
-        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-        g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-        g.setIndex(idx);
-        parts.push(g);
-      }
-      const merged = new THREE.BufferGeometry();
-      {
-        let n = 0;
-        let m = 0;
-        for (const g of parts) {
-          n += g.getAttribute('position').count;
-          m += g.getIndex()!.count;
-        }
-        const P = new Float32Array(n * 3);
-        const C = new Float32Array(n * 3);
-        const I = new Uint32Array(m);
-        let o = 0;
-        let q = 0;
-        for (const g of parts) {
-          P.set(g.getAttribute('position').array as Float32Array, o * 3);
-          C.set(g.getAttribute('color').array as Float32Array, o * 3);
-          const gi = g.getIndex()!.array;
-          for (let k = 0; k < gi.length; k++) I[q++] = gi[k]! + o;
-          o += g.getAttribute('position').count;
-          g.dispose();
-        }
-        merged.setAttribute('position', new THREE.BufferAttribute(P, 3));
-        merged.setAttribute('color', new THREE.BufferAttribute(C, 3));
-        merged.setIndex(new THREE.BufferAttribute(I, 1));
-        merged.computeVertexNormals();
-      }
-      const sn = c.mountain.biome?.terrainLook?.snow ?? c.biome?.terrainLook?.snow ?? [0.88, 0.92, 0.975];
-      const collarMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(sn[0], sn[1], sn[2]), roughness: 0.92, metalness: 0, vertexColors: true });
-      partial.mats.push(collarMat);
-      const collars = new THREE.Mesh(merged, collarMat);
-      collars.name = 'fjord-cave-boulder-collars';
-      collars.receiveShadow = true;
-      group.add(collars);
     }
     const bmat = createRockMaterial({ kind: 'rock_face_03', tile: 2.5, snow: 1, strata: 0.2, snowFrom: 0.62, fill: FILL, hq: hi, grade: { lum: 0.05, desat: 0.9, tint: [0.94, 0.98, 1.05] } });
     partial.rock.push(bmat);

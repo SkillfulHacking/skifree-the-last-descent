@@ -450,6 +450,7 @@ if (biome === 'fjord' && (want('gate') || want('gap') || want('viewpoint') || wa
       await P(`(w, m, c) => { const l = ${JSON.stringify(lk)}; const y = m.heightAt(l.x, l.z); const cx = l.x + 16, cz = l.z - 14; window.__skifree.freeCam([cx, Math.max(m.heightAt(cx, cz), y) + 6, cz], [l.x - 500, y - 70, l.z + 220], 58); }`);
       await settle(3000);
       await shot('14_viewpoint', `Scenic viewpoint at z≈${Math.round(lk.z)} (${lk.chase ? 'chase stretch' : 'free stretch'}): the platform and the view over the fjord`);
+      if (want('vprobe')) await probe('viewpoint');
     }
   }
   if (want('cornice')) {

@@ -522,6 +522,21 @@ export class TerrainRenderer {
         for (let j = 1; j < n; j += 2) H[j * vs + i] = (H[(j - 1) * vs + i]! + H[(j + 1) * vs + i]!) / 2;
       }
     }
+    // (round 9, A r8 M6 "needle crests on the far massif": on the coast's 64 m far tiles a summit
+    // narrower than the grid is one vertex — a spire. Interior vertices are low-passed (one [1 2 1]
+    // pass each way; tile edges untouched, so neighbours still weld exactly) where a vertex stands
+    // well above its neighbours)
+    if (!fine && m.coast) {
+      const src = H.slice();
+      for (let j = 1; j < n; j++)
+        for (let i = 1; i < n; i++) {
+          const k = j * vs + i;
+          const nb = (src[k - 1]! + src[k + 1]! + src[k - vs]! + src[k + vs]!) / 4;
+          const sm = 0.25 * src[k]! + 0.75 * (0.25 * (src[k - 1]! + src[k + 1]!) + 0.25 * (src[k - vs]! + src[k + vs]!));
+          // only peaks (convex): valleys and slopes keep their shape
+          if (src[k]! > nb + 6) H[k] = sm;
+        }
+    }
     const y0 = Math.round(H[(vs >> 1) * vs + (vs >> 1)]!);
     const pos = new Float32Array(vs * vs * 3);
     const surf = new Float32Array(vs * vs * 3);
