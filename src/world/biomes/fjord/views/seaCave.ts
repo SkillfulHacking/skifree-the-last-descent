@@ -278,6 +278,8 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   const mouth = cave.mouth;
   const lines = caveCameraSightlines(cave.mouth, cave.outward, cave.lipTop);
   const props: Array<{ p: THREE.Vector3; r: number; kind: string }> = [];
+  /** colliders the skier hits (the scanned boulders) */
+  const solids: Array<{ x: number; z: number; r: number }> = [];
   const perches: SeaCavePerch[] = [];
   const clearOfPath = (x: number, z: number, r: number) => cave.exitPath.every((p) => Math.hypot(p.x - x, p.z - z) > r + 4.5) && Math.hypot(cave.ledge.x - x, cave.ledge.z - z) > r + 5;
   /** the full placement test: path, ledge and every cinematic lens (prop centre p, radius r) */
@@ -382,6 +384,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   // added when the shared scans arrive.
   {
     const ids: ScanId[] = ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'];
+    // (round 9: the boulders are solid — World.extraColliders)
     const picks: Array<{ id: ScanId; p: THREE.Vector3; sx: number; sy: number; sz: number; yaw: number; gy: number }> = [];
     for (let i = 0; i < (hi ? 14 : 9); i++) {
       const p = place(rnd.range(-16, 16), -rnd.range(2.5, 13));
@@ -391,6 +394,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       p.y = gy - r * 0.5; // bedded: half the boulder is under the snow
       picks.push({ id: ids[i % ids.length]!, p, sx: 2 * r * rnd.range(0.9, 1.3), sy: r * rnd.range(0.9, 1.4), sz: 2 * r * rnd.range(0.7, 1.0), yaw: rnd.range(0, 6.28), gy });
       props.push({ p: p.clone().setY(gy + r * 0.3), r, kind: 'boulder' });
+      solids.push({ x: p.x, z: p.z, r: r * 0.85 });
       // the gulls perch on the boulders' crowns (round 7: the columns that carried them are gone)
       perches.push({ p: p.clone().setY(p.y + picks[picks.length - 1]!.sy * 0.92), brow: false });
     }
@@ -406,12 +410,15 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
         const col: number[] = [];
         const idx: number[] = [];
         // rings: inside the rock (hidden) → banked lip → feathered edge under the snow surface
+        // (the scans fill most of their unit footprint at the snow line, so the bank starts at its
+        // edge and climbs the stone)
         const rings = [
-          { k: 0.42, h: 0.42, c: 0.62 },
-          { k: 0.56, h: 0.36, c: 0.72 },
-          { k: 0.74, h: 0.2, c: 0.88 },
-          { k: 0.95, h: 0.06, c: 0.97 },
-          { k: 1.18, h: -0.06, c: 1.0 },
+          { k: 0.8, h: 0.62, c: 0.74 },
+          { k: 0.95, h: 0.5, c: 0.82 },
+          { k: 1.1, h: 0.32, c: 0.9 },
+          { k: 1.3, h: 0.14, c: 0.96 },
+          { k: 1.55, h: 0.03, c: 1.0 },
+          { k: 1.8, h: -0.08, c: 1.0 },
         ];
         const ax = pk.sx * 0.5;
         const az = pk.sz * 0.5;
@@ -780,6 +787,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       }
       P.needsUpdate = true;
     },
+    colliders: () => solids,
     dispose() {
       group.traverse((o) => {
         if (o instanceof THREE.Mesh && !o.userData['sharedGeometry']) o.geometry.dispose();

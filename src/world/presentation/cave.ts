@@ -25,6 +25,8 @@ export interface CaveDressing {
   readonly group: THREE.Object3D;
   /** per frame while the cave exists (optional animation: steam, flicker) */
   update?(dt: number, time: number): void;
+  /** solid props the skier collides with (world x, z, radius), if any */
+  colliders?(): ReadonlyArray<{ x: number; z: number; r: number }>;
   dispose(): void;
 }
 

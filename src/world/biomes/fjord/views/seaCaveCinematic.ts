@@ -186,8 +186,8 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
     // in the cave before his growl and eyes — the camera now stands beside the group and looks out
     // past it toward the sea, the cave mouth well outside the frame behind the camera's shoulder)
     const side = c.clone().sub(M).dot(T) >= 0 ? 1 : -1;
-    const camG = c.clone().addScaledVector(T, 11 * side).addScaledVector(O, -2);
-    camG.y = Math.max(camG.y, st.world.mountain.heightAt(camG.x, camG.z) + 1.4) + 0.4;
+    const camG = c.clone().addScaledVector(T, 15 * side).addScaledVector(O, -2);
+    camG.y = Math.max(camG.y, st.world.mountain.heightAt(camG.x, camG.z) + 1.4) + 1.4;
     const lookG = (lift: number) => c.clone().addScaledVector(O, 5).add(new THREE.Vector3(0, lift, 0));
     tl.shot({ start: 2.4, end: 3.8, from: () => pose(camG, lookG(1.0), 44), to: () => pose(camG.clone().addScaledVector(T, 0.8 * side), lookG(2.6), 48), handheld: 0.03 });
   } else
