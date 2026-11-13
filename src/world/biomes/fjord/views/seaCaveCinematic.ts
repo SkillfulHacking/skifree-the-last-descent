@@ -162,11 +162,34 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
   if (gulls.length && !tops.some((t) => t.brow)) {
     // round 8 (F r7 #2): the gulls now perch on the boulders in front of the cave, not on the brow —
     // the scatter beat frames them (from the slope, the cave's dark mouth behind)
+    // (round 8b, C r8 #2: on Standard caves the gulls sit in two groups and the mean of all of them
+    // fell between the groups, with no gull in frame — frame the biggest group)
+    let best = gulls[0]!.home;
+    let bestN = -1;
+    for (const g of gulls) {
+      let n = 0;
+      for (const h of gulls) if (h.home.distanceTo(g.home) < 9) n++;
+      if (n > bestN) {
+        bestN = n;
+        best = g.home;
+      }
+    }
     const c = new THREE.Vector3();
-    for (const g of gulls) c.add(g.home);
-    c.divideScalar(gulls.length);
-    const camG = c.clone().addScaledVector(O, 9).addScaledVector(T, 3).add(new THREE.Vector3(0, 1.6, 0));
-    tl.shot({ start: 2.4, end: 3.8, from: () => pose(camG, c.clone().add(new THREE.Vector3(0, 1.2, 0)), 44), to: () => pose(camG.clone().addScaledVector(O, -0.8), c.clone().add(new THREE.Vector3(0, 2.6, 0)), 48), handheld: 0.03 });
+    let n = 0;
+    for (const g of gulls)
+      if (g.home.distanceTo(best) < 9) {
+        c.add(g.home);
+        n++;
+      }
+    c.divideScalar(n);
+    // (round 8b, C r8 #1: looking back at the gulls with the mouth behind them showed the whole Yeti
+    // in the cave before his growl and eyes — the camera now stands beside the group and looks out
+    // past it toward the sea, the cave mouth well outside the frame behind the camera's shoulder)
+    const side = c.clone().sub(M).dot(T) >= 0 ? 1 : -1;
+    const camG = c.clone().addScaledVector(T, 11 * side).addScaledVector(O, -2);
+    camG.y = Math.max(camG.y, st.world.mountain.heightAt(camG.x, camG.z) + 1.4) + 0.4;
+    const lookG = (lift: number) => c.clone().addScaledVector(O, 5).add(new THREE.Vector3(0, lift, 0));
+    tl.shot({ start: 2.4, end: 3.8, from: () => pose(camG, lookG(1.0), 44), to: () => pose(camG.clone().addScaledVector(T, 0.8 * side), lookG(2.6), 48), handheld: 0.03 });
   } else
     tl.shot({ start: 2.4, end: 3.8, from: () => pose(at(...CAVE_CAMS.slough0), browLook.clone().add(new THREE.Vector3(0, 0.6, 0)), 30), to: () => pose(at(...CAVE_CAMS.slough1), browLook.clone().add(new THREE.Vector3(0, 1.6, 0)), 34), handheld: 0.03 });
   // 7.9 s: the emergence from inside the cave
