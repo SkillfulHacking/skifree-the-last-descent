@@ -77,6 +77,7 @@ export class ScanIslands {
     private readonly quality: string,
   ) {
     this.group.name = 'fjord-scan-islands';
+    for (const id of Object.keys(URLS) as ModelId[]) this.load(id);
   }
 
   private material(water: number): THREE.MeshStandardMaterial {
@@ -125,23 +126,27 @@ export class ScanIslands {
       // only where the coast keeps an island (its low base stands out of the water there: not in the
       // harbour lane, the cliff-foot band or on land)
       const hc = this.m.heightAt(b.x, b.z);
-      if (hc < water - 1 || hc > water + 2.5) continue;
+      // (the coast leaves a shoal ~8 m under the water where an island stands)
+      if (hc < water - 11 || hc > water + 1) continue;
       // and clear of the land all round (the finish's headlands: a scan beside one read as a giant
       // boulder parked in the harbour mouth)
       let landy = false;
       for (let k = 0; k < 10 && !landy; k++) {
         const a = (k / 10) * Math.PI * 2;
-        const rx = Math.cos(a) * b.a * 1.6;
-        const rz = Math.sin(a) * b.b * 1.6;
-        if (this.m.heightAt(b.x + rx * b.c - rz * b.s, b.z + rx * b.s + rz * b.c) > water + 4) landy = true;
+        const rx = Math.cos(a) * b.a * 1.25;
+        const rz = Math.sin(a) * b.b * 1.25;
+        if (this.m.heightAt(b.x + rx * b.c - rz * b.s, b.z + rx * b.s + rz * b.c) > water + 15) landy = true;
       }
       if (landy) continue;
       const mesh = new THREE.Mesh(g, this.material(water));
       // long axis along the cluster's grain; the scans' long axis is x
       mesh.rotation.y = -Math.atan2(b.s, b.c) + (b.k % 1 > 0.5 ? Math.PI : 0);
       const sink = b.kind === 0 ? 0.35 : 0.18;
-      const h = b.h * (b.kind === 0 ? 1.8 : b.kind === 1 ? 1.6 : 1.3);
-      mesh.scale.set(2.4 * b.a, h, 2.4 * b.b);
+      const h = b.h * (b.kind === 0 ? 2.5 : b.kind === 1 ? 1.6 : 1.3);
+      // (skerries: a smaller footprint — stretched to the cluster's ellipse they flattened into white
+      // snow-topped plates)
+      const f = b.kind === 0 ? 0.9 : 2.4;
+      mesh.scale.set(f * b.a, h, f * b.b);
       mesh.position.set(b.x, water - sink * h, b.z);
       mesh.castShadow = false;
       mesh.receiveShadow = true;

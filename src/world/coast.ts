@@ -135,9 +135,9 @@ const SEA_CAVE_RIM_NEAR = 150;
 const SEA_CAVE_RIM_FAR = 260;
 /** rim cache grid (m) */
 const RIM_CELL = 8;
-/** round 6: islands are drawn as scanned rock meshes; the heightfield keeps a low base (m above the water) */
+/** round 6: islands are drawn as scanned rock meshes; the heightfield keeps a shoal (m relative to the water) */
 export const MESH_ISLANDS = true;
-const ISLAND_BASE = 0.8;
+const ISLAND_BASE = -8;
 /** viewpoints: free stretches start this far down the run-in / past a refuge, end this far before a trigger */
 const LOOKOUT_RUNIN = 90;
 const LOOKOUT_AFTER_REFUGE = 170;
@@ -685,7 +685,8 @@ export class Coast {
       const bedDrop = smoothstep(flat, flat + 420, tf);
       out = foot - (p.depth - 5 + 9.5 * hm) * bedDrop;
       // rocks and skerries at the cliff foot
-      out += Math.max(0, gnoise(x / 23, z / 23, s + 69) - 0.45) * 30 * smoothstep(0, 25, tf) * (1 - smoothstep(30, 240, tf)) * (1 - hm);
+      // (round 6: off with the scanned islands — the flat-topped lumps read as white slabs beside them)
+      if (!MESH_ISLANDS) out += Math.max(0, gnoise(x / 23, z / 23, s + 69) - 0.45) * 30 * smoothstep(0, 25, tf) * (1 - smoothstep(30, 240, tf)) * (1 - hm);
       // islands in the fjord (smooth rounded skerries and a few bigger wooded islets)
       const k = smoothstep(380, 720, tf);
       if (k > 0) {
@@ -747,8 +748,8 @@ export class Coast {
           if (q > 1.25) continue;
           const shore = 1 - smoothstep(0.92, 1.25, q);
           // round 6: the islands themselves are scanned rock meshes (art/scanIslands.ts); the
-          // heightfield keeps a low, rocky base under each (its shore band and foam ring the island,
-          // and it marks where an island stands)
+          // heightfield keeps only a shoal just under the water (it marks where an island stands; a
+          // base above the water showed as a white plate wherever a mesh was not drawn)
           const top = (MESH_ISLANDS ? Math.min(ISLAND_BASE, islandProfile(b, u, v, q, sd)) : islandProfile(b, u, v, q, sd)) * shore;
           const hgt = lv - this.p.depth + (this.p.depth + top) * smoothstep(1.25, 0.98, q);
           if (hgt > best) best = hgt;
