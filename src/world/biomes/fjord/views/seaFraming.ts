@@ -25,7 +25,14 @@ export interface SeaPose {
   water: number;
 }
 
-/** fraction of a 7×4 grid of rays through the frame that reach open water first */
+/**
+ * The part of the frame's height a cinematic shows between its letterbox bars (11vh each,
+ * src/ui/styles.css). Pass 5 (own render check of F-055): water found only in the top tenth of the
+ * frame sat behind the top bar, so rays are cast through the visible band only.
+ */
+export const CINE_VISIBLE_HEIGHT = 0.78;
+
+/** fraction of a 7×4 grid of rays through the frame's visible (letterboxed) band that reach open water first */
 export function waterFraction(m: Mountain, cam: THREE.Vector3, look: THREE.Vector3, fov: number, aspect = 16 / 9): number {
   const job = waterFractionSteps(m, cam, look, fov, aspect);
   let r = job.next();
@@ -48,7 +55,7 @@ export function* waterFractionSteps(m: Mountain, cam: THREE.Vector3, look: THREE
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
       const sx = ((i + 0.5) / nx) * 2 - 1;
-      const sy = ((j + 0.5) / ny) * 2 - 1;
+      const sy = (((j + 0.5) / ny) * 2 - 1) * CINE_VISIBLE_HEIGHT;
       d.copy(fwd).addScaledVector(right, sx * tx).addScaledVector(up, sy * ty).normalize();
       let t = 2;
       while (t < 7000) {
@@ -60,7 +67,11 @@ export function* waterFractionSteps(m: Mountain, cam: THREE.Vector3, look: THREE
           break;
         }
         if (d.y > 0 && p.y > cam.y + 1500) break;
-        t += 2 + t * 0.11;
+        // (Pass 5: 11 % steps tunnelled through the cave's hill crest from the far stations — 50 m
+        // at 450 m — and counted the fjord behind it. Now a step is ≤ 0.4 × the ray's height above
+        // the ground and the sea (terrain up to ~68° cannot rise into it within one step), and fine
+        // (1 m + 1.5 %) near the surface)
+        t += Math.max(1 + t * 0.015, 0.4 * (p.y - Math.max(h, lv)));
       }
       // (a long ray over the fjord costs ~a hundred height samples: yield after each)
       if (j < ny - 1 || i < nx - 1) yield;
@@ -74,8 +85,10 @@ export function clearShot(m: Mountain, cam: THREE.Vector3, subject: THREE.Vector
   if (cam.y < m.heightAt(cam.x, cam.z) + 1.6) return false;
   const seg = subject.clone().sub(cam);
   const len = seg.length();
-  for (let k = 1; k < 12; k++) {
-    const q = cam.clone().addScaledVector(seg, k / 12);
+  // (a sample every ≤ 3 m: Pass 5's far stations are 200–500 m out, where 12 samples skipped crests)
+  const n = Math.max(12, Math.ceil(len / 3));
+  for (let k = 1; k < n; k++) {
+    const q = cam.clone().addScaledVector(seg, k / n);
     if (q.y < m.heightAt(q.x, q.z) + 0.3) return false;
   }
   const dir = seg.clone().divideScalar(len);
@@ -117,7 +130,11 @@ export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THRE
     // lies beyond and below the hill's crest, near the top of a frame centred on the mouth)
     const vf = THREE.MathUtils.degToRad(fovS) / 2;
     const hfovS = Math.atan(Math.tan(vf) * (16 / 9));
-    for (const [yaw, pitch] of [[0, 0], [0.42 * hfovS, 0], [-0.42 * hfovS, 0], [0, 0.55 * vf], [0.42 * hfovS, 0.55 * vf], [-0.42 * hfovS, 0.55 * vf]] as const) {
+    // (Pass 5: a far telephoto station may put the Yeti lower, the fjord filling the frame above the
+    // hill's crest — but his whole body stays inside the letterbox's visible band: render check, at
+    // 0.68 of the half-height his feet were under the bottom bar)
+    const pitches = telephoto ? [0, 0.3 * vf, 0.48 * vf] : [0, 0.55 * vf];
+    for (const [yaw, pitch] of pitches.flatMap((pt) => [[0, pt], [0.42 * hfovS, pt], [-0.42 * hfovS, pt]] as const)) {
       const look = framedLook(cam, subject, yaw, pitch);
       const w = yield* waterFractionSteps(m, cam, look, fovS);
       // (closer stations win a near tie: the Yeti must stay large in frame)
@@ -180,9 +197,9 @@ export function emergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: TH
  */
 export function farEmergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: THREE.Vector3, ground?: (x: number, z: number) => number): THREE.Vector3[] {
   const s: THREE.Vector3[] = [];
-  for (const ang of [-75, -60, -45, -30, 30, 45, 60, 75])
-    for (const d of [200, 260, 320, 400])
-      for (const h of [40, 60, 90, 130]) {
+  for (const ang of [-80, -65, -50, -35, -20, 20, 35, 50, 65, 80])
+    for (const d of [200, 300, 420, 560])
+      for (const h of [40, 80, 130, 190]) {
         const r = THREE.MathUtils.degToRad(ang);
         const p = mouth.clone().addScaledVector(out, d * Math.cos(r)).addScaledVector(tan, d * Math.sin(r));
         p.y = Math.max(p.y, ground ? ground(p.x, p.z) : p.y) + h;

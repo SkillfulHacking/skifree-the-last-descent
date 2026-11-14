@@ -693,7 +693,7 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
     };
     const emerge = yield* run(bestSeaPose(m, mouth.clone().addScaledVector(out, 1.0).add(new THREE.Vector3(0, 1.7, 0)), emergeStations(mouth, out, tan, (x, z) => m.heightAt(x, z)), props, 52, 0.05, 24));
     // (Pass 5: where no near station sees the sea — Standard and longer — a far telephoto station)
-    const emergeFar = emerge ? null : yield* run(bestSeaPose(m, mouth.clone().addScaledVector(out, 1.0).add(new THREE.Vector3(0, 1.7, 0)), farEmergeStations(mouth, out, tan, (x, z) => m.heightAt(x, z)), props, 12, 0.08, 42, { subjectShare: 0.07, minFov: 7, maxFov: 16 }));
+    const emergeFar = emerge ? null : yield* run(bestSeaPose(m, mouth.clone().addScaledVector(out, 1.0).add(new THREE.Vector3(0, 1.7, 0)), farEmergeStations(mouth, out, tan, (x, z) => m.heightAt(x, z)), props, 12, 0.08, 42, { subjectShare: 0.05, minFov: 5.8, maxFov: 20 }));
     const leap = yield* run(bestSeaPose(m, cave.ledge.clone().addScaledVector(out, 5).add(new THREE.Vector3(0, 2.2, 0)), leapStations(cave.ledge, out, tan, (x, z) => m.heightAt(x, z)), props, 56, 0.05, 32));
     group.userData['seaShots'] = { emerge, emergeFar, leap } satisfies SeaShots;
   }

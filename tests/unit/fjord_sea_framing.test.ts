@@ -2,6 +2,9 @@
  * Pass 5 (C r8–r9, F r9): on the default course (Classic · Standard) and the longer ones the sea cave
  * sits ~300 m above the water with its hill between, so no near camera station sees the fjord. The
  * dressing then finds a far telephoto station: the Yeti at the mouth and open water in one frame.
+ * Water is counted only inside the letterbox's visible band, with rays and the line of sight
+ * sampled finely enough not to tunnel through the cave's hill (render check: the first version
+ * counted water hidden behind the top bar and behind the crest).
  */
 import '../support/domStub';
 import { describe, expect, it } from 'vitest';
@@ -9,7 +12,7 @@ import '../../src/world/biomes';
 import { buildMountain, makeCourse } from '../../src/game/CourseConfig';
 import { Cave } from '../../src/world/Cave';
 import { dressSeaCave, type SeaShots } from '../../src/world/biomes/fjord/views/seaCave';
-import { clearShot, waterFraction } from '../../src/world/biomes/fjord/views/seaFraming';
+import { CINE_VISIBLE_HEIGHT, clearShot, waterFraction } from '../../src/world/biomes/fjord/views/seaFraming';
 
 describe('Fjord cave emergence shares a frame with the sea', () => {
   for (const len of ['standard', 'endurance', 'expedition'] as const)
@@ -23,6 +26,7 @@ describe('Fjord cave emergence shares a frame with the sea', () => {
       expect(pose).not.toBeNull();
       const subject = cave.mouth.clone().add({ x: 0, y: 1.7, z: 0 } as never);
       expect(clearShot(m, pose!.cam, subject, [])).toBe(true);
+      expect(CINE_VISIBLE_HEIGHT).toBeCloseTo(0.78, 6); // 11vh bars (styles.css .letterbox.on)
       expect(waterFraction(m, pose!.cam, pose!.look, pose!.fov)).toBeGreaterThanOrEqual(0.08);
       // the Yeti (2.5 m) stays readable: ≥ 4 % of the frame's height
       const dist = pose!.cam.distanceTo(subject);
