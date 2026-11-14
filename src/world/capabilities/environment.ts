@@ -217,7 +217,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       gust *= ex;
       gustK *= ex;
     }
-    // a steady breeze into the skier's face (grounded, upright): extra drag
+    // the breeze costs a grounded, upright skier speed whatever their heading (extra drag × its strength)
     if (this.headwind && q.grounded && !q.crashed) S.dragAdd += this.headwind * gustK;
     // 3) hazards
     let px = 0;

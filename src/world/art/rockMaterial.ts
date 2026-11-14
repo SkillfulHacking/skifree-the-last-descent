@@ -1,7 +1,7 @@
 /**
  * Triplanar PBR rock material for authored/sculpted geology (cliff kit, islands, sea-cave basalt).
  *
- * - Detail: a baked, tileable PBR set (./textures, made by tools/artbake/bake.mjs): albedo + cavity
+ * - Detail: a baked, tileable PBR set (./textures, made by tools/assets/bake_procedural.mjs): albedo + cavity
  *   AO, and normal XY + height + roughness. Sampled triplanar in absolute world space, at two scales
  *   (the detail tile and a rotated macro tile ~7× larger) so neither the tiling nor any UV stretch
  *   shows — vertical faces are textured exactly like flat ones (the "vertical smearing" of the

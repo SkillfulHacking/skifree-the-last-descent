@@ -1,7 +1,7 @@
 {
   "name": "skifree-the-last-descent",
   "version": "0.1.0",
-  "description": "SkiFree \u2014 The Last Descent: a 3D skiing survival game built with Three.js",
+  "description": "SkiFree — The Last Descent: a 3D skiing survival game built with Three.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

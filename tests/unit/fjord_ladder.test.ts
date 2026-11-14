@@ -2,7 +2,7 @@
  * F-039: the Alpine → Fjord difficulty step on Normal Sprint must be larger than seed noise.
  *
  * Fjord's onshore breeze now costs a grounded skier speed (WeatherCoupling.headwind: extra drag ×
- * gusts × the difficulty's hazard intensity). It never pushes a grounded skier sideways and does
+ * gusts, per difficulty: Normal and Hard; none on Relaxed). It never pushes a grounded skier sideways and does
  * not touch the Yeti. Alpine stays physics-identity.
  *
  * Seeds P5S01..P5S08 are the first eight of the 20-seed measurement used to tune the coupling

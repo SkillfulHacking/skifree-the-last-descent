@@ -243,7 +243,8 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
         from: () => pose(far.cam, framedLook(far.cam, yetiAt().add(new THREE.Vector3(0, 1.4, 0)), far.yaw, far.pitch), far.fov),
         to: () => pose(far.cam.clone().addScaledVector(toward, 3), framedLook(far.cam.clone().addScaledVector(toward, 3), yetiAt().add(new THREE.Vector3(0, 1.7, 0)), far.yaw, far.pitch), far.fov * 0.94),
         easing: ease.inOut,
-        handheld: 0.004,
+        // (review: on a 6° lens any shake is magnified ~8×: hold it steady, as on a tripod)
+        handheld: 0,
       });
     }
     {
