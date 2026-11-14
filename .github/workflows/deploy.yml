@@ -22,6 +22,11 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      # keep the previous builds' hashed assets for 14 days: a browser holding a cached index.html
+      # (Pages: max-age=600) must still find the bundle it names (tools/pages/retain_assets.mjs)
+      - id: pages
+        uses: actions/configure-pages@v5
+      - run: node tools/pages/retain_assets.mjs "${{ steps.pages.outputs.base_url }}/" dist 14
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
