@@ -1,11 +1,12 @@
-// Offline texture baker for the Fjord art pipeline (round 4 experiment).
+// Offline baker for the procedural rock texture sets (original code; no third-party art).
+// Part of the reproducible asset pipeline: tools/assets/README.md, `npm run assets:build`.
 //
 // Bakes tileable 1024² rock material sets from original procedural code (no third-party art), so
 // the runtime gets photographic-scale detail (fracture blocks, foliation, vesicles, lichen, cavity
 // AO and a matching normal map) without paying for it per pixel every frame.
 //
-//   npm i --no-save sharp          (or point SHARP_FROM at a directory that has it installed)
-//   node tools/artbake/bake.mjs [outDir=src/world/art/textures] [size=1024]
+//   node tools/assets/bake_procedural.mjs [outDir=src/world/art/textures] [size=1024]
+//   (sharp is a pinned devDependency; SETS=basalt,... picks sets — only `basalt` ships in the game)
 //
 // Output per set <name>:
 //   <name>_albedo.webp  sRGB colour in RGB, cavity AO in A
@@ -366,7 +367,7 @@ function basaltMassive() {
 }
 
 const t0 = Date.now();
-const only = process.env.SETS ? process.env.SETS.split(',') : ['gneiss', 'basalt', 'basalt_massive'];
+const only = process.env.SETS ? process.env.SETS.split(',') : ['basalt'];
 if (only.includes('gneiss')) await writeSet('gneiss', gneiss());
 if (only.includes('basalt')) await writeSet('basalt', basalt());
 if (only.includes('basalt_massive')) await writeSet('basalt_massive', basaltMassive());

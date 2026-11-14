@@ -28,6 +28,13 @@ export interface WeatherCoupling {
   airborne: number;
   /** grounded balance: wobble = balance × gust (0..1). 0 = none. Keep ≤ ~0.5. */
   balance: number;
+  /**
+   * grounded headwind, per game difficulty: extra quadratic drag (TUNING.dragUpright units) =
+   * headwind[difficulty] × gust factor (wind speed / its mean) × the location's long-course easing.
+   * Slows a skier into a steady breeze without pushing them sideways. Absent/0 = none.
+   * Keep ≤ ~0.003.
+   */
+  headwind?: Readonly<Record<'relaxed' | 'normal' | 'hard', number>>;
 }
 
 export interface WeatherModel {
@@ -113,6 +120,7 @@ export function validateWeather(m: WeatherModel, seed = 1): string[] {
   const c = m.coupling;
   if (!(c.airborne >= 0 && c.airborne <= 0.3)) out.push(`coupling.airborne=${c.airborne} outside [0, 0.3]`);
   if (!(c.balance >= 0 && c.balance <= 1)) out.push(`coupling.balance=${c.balance} outside [0, 1]`);
+  for (const [d, v] of Object.entries(c.headwind ?? {})) if (!(v >= 0 && v <= 0.004)) out.push(`coupling.headwind.${d}=${v} outside [0, 0.004]`);
   const s = makeWeatherSample();
   for (let t = 0; t < 600; t += 37)
     for (let z = 0; z < 6000; z += 1300) {

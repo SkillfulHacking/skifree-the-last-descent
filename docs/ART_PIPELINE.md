@@ -1,7 +1,12 @@
+> **Pass 5:** the build-time tools now live in `tools/assets/` (reproducible pipeline, manifest and
+> licences: `tools/assets/README.md`). The art test scene (`tools/artscene/`, `/artscene.html`), the
+> experiment coast and the baked gneiss set described below were removed. This document is kept as
+> the Pass 4 record.
+
 # Fjord Coast art pipeline — round 4 investigation (experiment branch `fjord-art-r4`)
 
 Status: **experiment, not integrated.** Everything here lives in `src/world/art/**`,
-`tools/artbake/`, `tools/artscene/` and `/artscene.html`; the game does not import any of it.
+`tools/assets/`, `tools/artscene/` and `/artscene.html`; the game does not import any of it.
 Captures: `docs/reviews/biomes/fjord/round-4/artscene/` (see §7).
 
 ## 1. Why the Fjord art plateaued at 6–7/10
@@ -44,7 +49,7 @@ remove the heightfield's one-height-per-(x, z) limit.
   are blocked from this sandbox (§3); the exact files to fetch are listed in §3.2. The material
   (`rockMaterial.ts`) takes them unchanged: albedo (sRGB) + an NHR texture (normal XY, height,
   roughness), with AO in the albedo alpha — a 2-texture set.
-- **Offline-baked procedural PBR** (adopted for now, `tools/artbake/bake.mjs`): original code bakes
+- **Offline-baked procedural PBR** (adopted for now, `tools/assets/bake_procedural.mjs`): original code bakes
   tileable 1024² sets (gneiss: jointed blocks, folded felsic lenses, rust seeps, crustose lichen,
   speckle; basalt: column joints, cross joints, vesicles, rime) with height → normal and cavity AO.
   Quality is below a photo scan but far above per-pixel shader noise, and costs nothing per frame.
@@ -112,7 +117,7 @@ while the Fjord loading screen runs, never on the menu of another location.
 ### 3.2 Recommended downloads (for the user; not downloaded here)
 All CC0 (Poly Haven licence page: "Licensed as CC0 … You do not need to give credit … in a product
 you sell"; checked 2026-11-11). Download the **2K** zip, maps *Diffuse*, *Normal (GL)*, *Rough*,
-*AO*, *Displacement*; convert with `tools/artbake` (pack to albedo+AO / NHR, resize to 1024²,
+*AO*, *Displacement*; convert with `tools/assets` (pack to albedo+AO / NHR, resize to 1024²,
 encode KTX2) and record each file in `docs/ASSETS_AND_LICENSES.md`.
 
 | Use | Asset page | Authors (from the page) | Licence |

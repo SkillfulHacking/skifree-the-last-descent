@@ -1,0 +1,23 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      # every art file listed with source, licence and SHA-256; nothing unlisted (offline)
+      - run: npm run assets:verify
+      - run: npm run build
+      # the built site loads every asset under the Pages base path, and the art is the committed bytes
+      - run: npm run check:dist

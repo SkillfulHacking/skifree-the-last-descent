@@ -1,7 +1,7 @@
 /**
  * Triplanar PBR rock material for authored/sculpted geology (cliff kit, islands, sea-cave basalt).
  *
- * - Detail: a baked, tileable PBR set (./textures, made by tools/artbake/bake.mjs): albedo + cavity
+ * - Detail: a baked, tileable PBR set (./textures, made by tools/assets/bake_procedural.mjs): albedo + cavity
  *   AO, and normal XY + height + roughness. Sampled triplanar in absolute world space, at two scales
  *   (the detail tile and a rotated macro tile ~7× larger) so neither the tiling nor any UV stretch
  *   shows — vertical faces are textured exactly like flat ones (the "vertical smearing" of the
@@ -21,10 +21,9 @@
 import * as THREE from 'three';
 import { ATMOSPHERE_GLSL, addAtmosphereUniforms } from '../look/atmosphere';
 
-export type RockKind = 'gneiss' | 'basalt' | 'rock_face_03' | 'cliff_side';
+export type RockKind = 'basalt' | 'rock_face_03' | 'cliff_side';
 
 const URLS: Record<RockKind, { albedo: string; nhr: string; tile: number }> = {
-  gneiss: { albedo: new URL('./textures/gneiss_albedo.webp', import.meta.url).href, nhr: new URL('./textures/gneiss_nhr.webp', import.meta.url).href, tile: 8 },
   basalt: { albedo: new URL('./textures/basalt_albedo.webp', import.meta.url).href, nhr: new URL('./textures/basalt_nhr.webp', import.meta.url).href, tile: 4 },
   // round 4 integration: photo-scanned CC0 sets from Poly Haven (docs/ASSETS_AND_LICENSES.md), packed
   // into the same layout (1K; AO from the displacement). Regraded in the shader (RockGrade).
@@ -196,7 +195,7 @@ export interface RockUniforms {
 
 /** A triplanar rock material. Dispose with disposeRockMaterial (releases the shared textures). */
 export function createRockMaterial(o: RockMaterialOptions = {}): THREE.MeshStandardMaterial & { userData: { rock: RockUniforms; kind: RockKind; macroKind?: RockKind } } {
-  const kind = o.kind ?? 'gneiss';
+  const kind = o.kind ?? 'rock_face_03';
   const set = acquireRockSet(kind);
   const tile = o.tile ?? URLS[kind].tile;
   const m = new THREE.MeshStandardMaterial({ color: o.tint ?? 0xffffff, roughness: 1, metalness: 0, vertexColors: !!o.vertexColors });

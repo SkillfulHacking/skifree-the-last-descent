@@ -1,31 +1,17 @@
 /**
- * Round-4 art experiment (src/world/art): determinism, gameplay invariance and the hidden-backing
- * contract of the cliff kit; deterministic island layout; bounded sizes.
+ * Sea-cliff kit (src/world/art): determinism and the hidden-backing contract of the shipped cliff
+ * model (the Fjord mountain's own), bounded segment size. (The round-4 experiment coast that these
+ * tests first ran on, artCoast.ts, was never part of the game and has been removed.)
  */
 import { describe, expect, it } from 'vitest';
 import '../../src/world/biomes';
 import { buildMountain, makeCourse } from '../../src/game/CourseConfig';
-import { ArtCoastMountain, islandSpecs } from '../../src/world/art/artCoast';
 import { buildCliffSegment, CliffModel } from '../../src/world/art/cliffKit';
-import { buildIsland } from '../../src/world/art/islands';
 
-const base = buildMountain(makeCourse('classic', 'sprint', { biome: 'fjord' }));
-const art = () => new ArtCoastMountain(base.profile, base.seed, base.biome);
+// a fresh mountain per call: its cliff model has its own column cache
+const art = () => buildMountain(makeCourse('classic', 'sprint', { biome: 'fjord' })) as unknown as { cliff: CliffModel | null };
 
-describe('art r4: proposed coast', () => {
-  it('leaves every land-side height (gameplay) unchanged', () => {
-    const a = art();
-    const c = base.coast!;
-    let n = 0;
-    for (let z = -200; z < 2900; z += 37) {
-      for (let x = c.rimX(z) + 0.6; x < c.rimX(z) + 400; x += 23) {
-        expect(a.heightAt(x, z)).toBe(base.heightAt(x, z));
-        n++;
-      }
-    }
-    expect(n).toBeGreaterThan(1000);
-  });
-
+describe('sea-cliff kit', () => {
   it('builds identical cliff segments regardless of query order', () => {
     const a = art();
     const b = art();
@@ -59,13 +45,4 @@ describe('art r4: proposed coast', () => {
     expect(worst).toBeLessThan(0.5);
   });
 
-  it('lays out islands deterministically, with several archetypes', () => {
-    const r = { x0: -3000, x1: -250, z0: 0, z1: 3400 };
-    const s1 = islandSpecs(art(), r);
-    const s2 = islandSpecs(art(), r);
-    expect(s1).toEqual(s2);
-    expect(new Set(s1.map((s) => s.kind)).size).toBeGreaterThanOrEqual(3);
-    const g = buildIsland(s1[0]!);
-    expect(g.geometry.getAttribute('position').count).toBeLessThan(40_000);
-  });
 });

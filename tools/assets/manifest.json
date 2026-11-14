@@ -1,0 +1,303 @@
+{
+  "pipelineVersion": 1,
+  "userAgent": "SkiFree-TheLastDescent-dev/1.0 (build-time asset pipeline)",
+  "assetDirs": [
+    "src/world/art/textures",
+    "src/world/art/models"
+  ],
+  "sources": {
+    "rock_face_03": {
+      "provider": "polyhaven",
+      "type": "texture",
+      "name": "Rock Face 03",
+      "page": "https://polyhaven.com/a/rock_face_03",
+      "authors": {
+        "Dario Barresi": "Photography",
+        "Rico Cilliers": "Processing"
+      },
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://polyhaven.com/license",
+        "note": "Poly Haven assets are CC0 1.0 (public domain dedication): free to use, modify and redistribute, attribution not required (credited anyway)."
+      },
+      "usedFor": "sea-cave rock mass, sea-cliff kit, island scans (detail layer)",
+      "files": [
+        {
+          "map": "Diffuse",
+          "res": "4k",
+          "format": "jpg",
+          "md5": "50105980b509029b9040f43b1f6ddc71",
+          "bytes": 15319503,
+          "dest": "textures/rock_face_03_diff_4k.jpg"
+        },
+        {
+          "map": "Displacement",
+          "res": "4k",
+          "format": "png",
+          "md5": "95aee779596494f8cf578575530314ed",
+          "bytes": 21772279,
+          "dest": "textures/rock_face_03_disp_4k.png"
+        },
+        {
+          "map": "nor_gl",
+          "res": "4k",
+          "format": "exr",
+          "md5": "1fec0b4d0471cf6fb6c1545f017ac36f",
+          "bytes": 33121866,
+          "dest": "textures/rock_face_03_nor_gl_4k.exr"
+        },
+        {
+          "map": "Rough",
+          "res": "4k",
+          "format": "exr",
+          "md5": "0b1369c9b6b36bf52d147612545c73cd",
+          "bytes": 10087132,
+          "dest": "textures/rock_face_03_rough_4k.exr"
+        }
+      ],
+      "verified": "2026-11-14"
+    },
+    "cliff_side": {
+      "provider": "polyhaven",
+      "type": "texture",
+      "name": "Cliff Side",
+      "page": "https://polyhaven.com/a/cliff_side",
+      "authors": {
+        "James Ray Cock": "Photography",
+        "Jenelle van Heerden": "Processing",
+        "Dario Barresi": "Photography"
+      },
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://polyhaven.com/license",
+        "note": "Poly Haven assets are CC0 1.0 (public domain dedication): free to use, modify and redistribute, attribution not required (credited anyway)."
+      },
+      "usedFor": "macro layer of the island rock material",
+      "files": [
+        {
+          "map": "Diffuse",
+          "res": "4k",
+          "format": "jpg",
+          "md5": "e2bc41b9fc4d1811da6d1d45c9e5d316",
+          "bytes": 12787052,
+          "dest": "textures/cliff_side_diff_4k.jpg"
+        },
+        {
+          "map": "Displacement",
+          "res": "4k",
+          "format": "png",
+          "md5": "369a4b92644887de409855b51ab74f63",
+          "bytes": 18074269,
+          "dest": "textures/cliff_side_disp_4k.png"
+        },
+        {
+          "map": "nor_gl",
+          "res": "4k",
+          "format": "exr",
+          "md5": "f861f0f1d05d16782a33937710add4c9",
+          "bytes": 27377304,
+          "dest": "textures/cliff_side_nor_gl_4k.exr"
+        },
+        {
+          "map": "Rough",
+          "res": "4k",
+          "format": "exr",
+          "md5": "35d96d46860cfcdddd213c990c761474",
+          "bytes": 6778907,
+          "dest": "textures/cliff_side_rough_4k.exr"
+        }
+      ],
+      "verified": "2026-11-14"
+    },
+    "boulder_01": {
+      "provider": "polyhaven",
+      "type": "model",
+      "name": "Boulder 01",
+      "page": "https://polyhaven.com/a/boulder_01",
+      "authors": {
+        "Rico Cilliers": "All"
+      },
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://polyhaven.com/license",
+        "note": "Poly Haven assets are CC0 1.0 (public domain dedication): free to use, modify and redistribute, attribution not required (credited anyway)."
+      },
+      "usedFor": "whaleback islands, skerries, sea-cave boulders",
+      "triangles": 5000,
+      "files": [
+        {
+          "map": "gltf",
+          "res": "1k",
+          "format": "gltf",
+          "md5": "26e2eef4a1f68c9557c65cd375b21d6c",
+          "bytes": 2773,
+          "dest": "boulder_01_1k.gltf"
+        },
+        {
+          "map": "gltf",
+          "res": "1k",
+          "format": "gltf",
+          "include": "boulder_01.bin",
+          "md5": "27a19fa031d8b4c3a09261f19c444dc5",
+          "bytes": 2938808,
+          "dest": "boulder_01.bin"
+        }
+      ],
+      "note": "only the geometry is used (positions welded, simplified, quantised); the scan's own textures are not used",
+      "verified": "2026-11-14"
+    },
+    "namaqualand_boulder_02": {
+      "provider": "polyhaven",
+      "type": "model",
+      "name": "Namaqualand Boulder 02",
+      "page": "https://polyhaven.com/a/namaqualand_boulder_02",
+      "authors": {
+        "Greg Zaal": "Photography",
+        "Rico Cilliers": "modeling"
+      },
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://polyhaven.com/license",
+        "note": "Poly Haven assets are CC0 1.0 (public domain dedication): free to use, modify and redistribute, attribution not required (credited anyway)."
+      },
+      "usedFor": "whaleback and high islands",
+      "triangles": 5000,
+      "files": [
+        {
+          "map": "gltf",
+          "res": "1k",
+          "format": "gltf",
+          "md5": "0730814e31f50e85defd7b8833a02070",
+          "bytes": 2818,
+          "dest": "namaqualand_boulder_02_1k.gltf"
+        },
+        {
+          "map": "gltf",
+          "res": "1k",
+          "format": "gltf",
+          "include": "namaqualand_boulder_02.bin",
+          "md5": "aa8f2212633a07a7e9a805e90977f4fd",
+          "bytes": 2297768,
+          "dest": "namaqualand_boulder_02.bin"
+        }
+      ],
+      "note": "only the geometry is used (positions welded, simplified, quantised); the scan's own textures are not used",
+      "verified": "2026-11-14"
+    },
+    "namaqualand_boulder_06": {
+      "provider": "polyhaven",
+      "type": "model",
+      "name": "Namaqualand Boulder 06",
+      "page": "https://polyhaven.com/a/namaqualand_boulder_06",
+      "authors": {
+        "Greg Zaal": "Photography",
+        "Jenelle van Heerden": "modeling"
+      },
+      "license": {
+        "spdx": "CC0-1.0",
+        "url": "https://polyhaven.com/license",
+        "note": "Poly Haven assets are CC0 1.0 (public domain dedication): free to use, modify and redistribute, attribution not required (credited anyway)."
+      },
+      "usedFor": "whalebacks, skerries, sea-cave boulders",
+      "triangles": 5000,
+      "files": [
+        {
+          "map": "gltf",
+          "res": "1k",
+          "format": "gltf",
+          "md5": "64791b0352526beffa233116758ef9a6",
+          "bytes": 2880,
+          "dest": "namaqualand_boulder_06_1k.gltf"
+        },
+        {
+          "map": "gltf",
+          "res": "1k",
+          "format": "gltf",
+          "include": "namaqualand_boulder_06.bin",
+          "md5": "1643b528fa072dc3bf5bc5ad6add1933",
+          "bytes": 2463356,
+          "dest": "namaqualand_boulder_06.bin"
+        }
+      ],
+      "note": "only the geometry is used (positions welded, simplified, quantised); the scan's own textures are not used",
+      "verified": "2026-11-14"
+    },
+    "basalt": {
+      "provider": "procedural",
+      "type": "texture",
+      "name": "Columnar basalt (procedural)",
+      "code": "tools/assets/bake_procedural.mjs",
+      "license": {
+        "spdx": "LicenseRef-original-work",
+        "url": "tools/assets/README.md",
+        "note": "original work generated by code in this repository (no third-party rights); distributed with the project"
+      },
+      "usedFor": "sea-cave basalt columns"
+    }
+  },
+  "outputs": [
+    {
+      "path": "src/world/art/textures/rock_face_03_albedo.webp",
+      "from": "rock_face_03",
+      "recipe": "convert_textures.py 1024 → pack_scans.py",
+      "bytes": 569054,
+      "sha256": "7087aa0cdf6af803d55e735f261e91498f5fe7fcbc791f94f3a3d7b5d1406a13"
+    },
+    {
+      "path": "src/world/art/textures/rock_face_03_nhr.webp",
+      "from": "rock_face_03",
+      "recipe": "convert_textures.py 1024 → pack_scans.py",
+      "bytes": 898886,
+      "sha256": "9dd3635b308fbbe73fd36a4a3eda9ee55923d5e6c1eba3c172e46b6883a603c7"
+    },
+    {
+      "path": "src/world/art/textures/cliff_side_albedo.webp",
+      "from": "cliff_side",
+      "recipe": "convert_textures.py 1024 → pack_scans.py",
+      "bytes": 482522,
+      "sha256": "ed19e9ed63b5d5fe1704181394fd3b273906920420cdf813797185e968c7f3e4"
+    },
+    {
+      "path": "src/world/art/textures/cliff_side_nhr.webp",
+      "from": "cliff_side",
+      "recipe": "convert_textures.py 1024 → pack_scans.py",
+      "bytes": 493666,
+      "sha256": "9ec02e2e97a0c921721f931e8933ad1d348c79e3b944a501d6dee5eb441748ef"
+    },
+    {
+      "path": "src/world/art/textures/basalt_albedo.webp",
+      "from": "basalt",
+      "recipe": "bake_procedural.mjs SETS=basalt 1024",
+      "bytes": 210514,
+      "sha256": "835fc81b96dea5399fb000d379d216066818ecf28ff9cf83ddced68adfe465e1"
+    },
+    {
+      "path": "src/world/art/textures/basalt_nhr.webp",
+      "from": "basalt",
+      "recipe": "bake_procedural.mjs SETS=basalt 1024",
+      "bytes": 489114,
+      "sha256": "8b74a7fd9e125d86042e671ac1e86b8e0b955214b569a9b171720d15d071b261"
+    },
+    {
+      "path": "src/world/art/models/boulder_01.skm",
+      "from": "boulder_01",
+      "recipe": "scan_to_skm.mjs 5000 triangles",
+      "bytes": 45048,
+      "sha256": "b1c2e7797455ce26906efbe4f3d2384000a32bea62708ab47c1d6220d5102e4c"
+    },
+    {
+      "path": "src/world/art/models/namaqualand_boulder_02.skm",
+      "from": "namaqualand_boulder_02",
+      "recipe": "scan_to_skm.mjs 5000 triangles",
+      "bytes": 45234,
+      "sha256": "a5568454f63babf7bea501d055ef98e6f61688a9cc09a70de82692f07d4f35f2"
+    },
+    {
+      "path": "src/world/art/models/namaqualand_boulder_06.skm",
+      "from": "namaqualand_boulder_06",
+      "recipe": "scan_to_skm.mjs 5000 triangles",
+      "bytes": 45048,
+      "sha256": "dfee511e857f725ccb447e8ba539f897fb9f73d1647d1b8087ee8762d2afe523"
+    }
+  ]
+}

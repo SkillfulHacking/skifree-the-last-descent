@@ -132,7 +132,7 @@ interface SurfaceModifiers {
 ```ts
 interface WeatherModel {
   id: string; static?: boolean;
-  coupling: { airborne: number /* 1/s, ≤ 0.3 */; balance: number /* ≤ 1 */ };
+  coupling: { airborne: number /* 1/s, ≤ 0.3 */; balance: number /* ≤ 1 */; headwind?: { relaxed; normal; hard } /* drag, ≤ 0.004 */ };
   sample(x, z, t, seed, out: WeatherSample): WeatherSample;   // { windX, windZ (m/s), visibility (× fog), snowfall (× flakes), gust 0..1 }
 }
 ```
@@ -141,7 +141,10 @@ interface WeatherModel {
   (`environment.clock`). It calls `Environment.applyWeather(visibility × hazard visibility,
   snowfall)` and drifts the flakes with `windX`.
 - **Physics**: only through `coupling`. Airborne acceleration is `airborne × wind`. Grounded
-  wobble is `≥ balance × gust`. Keep wind skill-based: gusts telegraphed by particles and audio,
+  wobble is `≥ balance × gust`. Grounded headwind drag (Pass 5, F-039) adds
+  `headwind[difficulty] × (wind speed / its mean)` to `dragAdd` (× the hazards' long-course
+  easing); it never moves the skier sideways. `BiomeEnvironment(…, { headwind: false })` leaves it
+  out for tests that measure another mechanic alone. Keep wind skill-based: gusts telegraphed by particles and audio,
   bounded, never strong enough to throw the skier off a kicker line unannounced.
 - **Must**: be a pure function of `(x, z, t, seed)` and pass `validateWeather` (finite, visibility
   in (0, 12], snowfall in [0, 4], wind ≤ 40 m/s, coupling in range). Fjord-style light crosswinds

@@ -11,7 +11,7 @@
  * invariant, so a 2 m boulder scan reads as a 300 m glaciated island. The heightfield keeps only
  * the fjord bed there (Coast.MESH_ISLANDS).
  *
- * Models: src/world/art/models/*.skm, made by tools/artbake/scan_to_skm.mjs from the Poly Haven glTF
+ * Models: src/world/art/models/*.skm, made by tools/assets/scan_to_skm.mjs from the Poly Haven glTF
  * (simplified to 5k triangles, quantised). Provenance: docs/ASSETS_AND_LICENSES.md.
  * Loaded lazily (one small fetch each), shared by every island, disposed with the set.
  */

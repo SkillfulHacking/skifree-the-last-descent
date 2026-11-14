@@ -110,9 +110,14 @@ export const FJORD_SURFACE: SurfaceModel = {
 
 /**
  * Fjord weather: clear and crisp, a steady onshore breeze (+X, off the sea) with gusts, a few
- * flakes blowing off the ridges. Coupled to physics only while airborne (≤ ~0.6 m/s² from the
- * breeze; squalls add more), so grounded skiing is never pushed.
+ * flakes blowing off the ridges. Airborne it is a crosswind (≤ ~0.6 m/s² from the breeze; squalls
+ * add more). Grounded skiing is never pushed sideways, but on Normal and Hard the breeze costs speed
+ * (headwind drag × gusts), so the coast is consistently the slower, harder mountain than sheltered
+ * Alpine (F-039). Relaxed has no headwind: an upright skier must still outrun its Yeti.
  */
+/** Fjord's grounded headwind drag (WeatherCoupling.headwind) */
+export const FJORD_HEADWIND = 0.0007;
+
 export const FJORD_WEATHER = parametricWeather({
   id: 'fjord',
   wind: [3.4, 0.5],
@@ -121,7 +126,7 @@ export const FJORD_WEATHER = parametricWeather({
   frontPeriod: 260,
   visibility: [0.85, 1.12],
   snowfall: [0.2, 0.6],
-  coupling: { airborne: 0.12, balance: 0 },
+  coupling: { airborne: 0.12, balance: 0, headwind: { relaxed: 0, normal: FJORD_HEADWIND, hard: FJORD_HEADWIND } },
 });
 
 export function makeFjordBiome(): Biome {

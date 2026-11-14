@@ -25,7 +25,14 @@ export interface SeaPose {
   water: number;
 }
 
-/** fraction of a 7×4 grid of rays through the frame that reach open water first */
+/**
+ * The part of the frame's height a cinematic shows between its letterbox bars (11vh each,
+ * src/ui/styles.css). Pass 5 (own render check of F-055): water found only in the top tenth of the
+ * frame sat behind the top bar, so rays are cast through the visible band only.
+ */
+export const CINE_VISIBLE_HEIGHT = 0.78;
+
+/** fraction of a 7×4 grid of rays through the frame's visible (letterboxed) band that reach open water first */
 export function waterFraction(m: Mountain, cam: THREE.Vector3, look: THREE.Vector3, fov: number, aspect = 16 / 9): number {
   const job = waterFractionSteps(m, cam, look, fov, aspect);
   let r = job.next();
@@ -48,7 +55,7 @@ export function* waterFractionSteps(m: Mountain, cam: THREE.Vector3, look: THREE
   for (let j = 0; j < ny; j++) {
     for (let i = 0; i < nx; i++) {
       const sx = ((i + 0.5) / nx) * 2 - 1;
-      const sy = ((j + 0.5) / ny) * 2 - 1;
+      const sy = (((j + 0.5) / ny) * 2 - 1) * CINE_VISIBLE_HEIGHT;
       d.copy(fwd).addScaledVector(right, sx * tx).addScaledVector(up, sy * ty).normalize();
       let t = 2;
       while (t < 7000) {
@@ -60,7 +67,11 @@ export function* waterFractionSteps(m: Mountain, cam: THREE.Vector3, look: THREE
           break;
         }
         if (d.y > 0 && p.y > cam.y + 1500) break;
-        t += 2 + t * 0.11;
+        // (Pass 5: 11 % steps tunnelled through the cave's hill crest from the far stations — 50 m
+        // at 450 m — and counted the fjord behind it. Now a step is ≤ 0.4 × the ray's height above
+        // the ground and the sea (terrain up to ~68° cannot rise into it within one step), and fine
+        // (1 m + 1.5 %) near the surface)
+        t += Math.max(1 + t * 0.015, 0.4 * (p.y - Math.max(h, lv)));
       }
       // (a long ray over the fjord costs ~a hundred height samples: yield after each)
       if (j < ny - 1 || i < nx - 1) yield;
@@ -74,8 +85,10 @@ export function clearShot(m: Mountain, cam: THREE.Vector3, subject: THREE.Vector
   if (cam.y < m.heightAt(cam.x, cam.z) + 1.6) return false;
   const seg = subject.clone().sub(cam);
   const len = seg.length();
-  for (let k = 1; k < 12; k++) {
-    const q = cam.clone().addScaledVector(seg, k / 12);
+  // (a sample every ≤ 3 m: Pass 5's far stations are 200–500 m out, where 12 samples skipped crests)
+  const n = Math.max(12, Math.ceil(len / 3));
+  for (let k = 1; k < n; k++) {
+    const q = cam.clone().addScaledVector(seg, k / n);
     if (q.y < m.heightAt(q.x, q.z) + 0.3) return false;
   }
   const dir = seg.clone().divideScalar(len);
@@ -93,7 +106,7 @@ export function clearShot(m: Mountain, cam: THREE.Vector3, subject: THREE.Vector
  * Best sea-framing pose among `stations` (time-sliced: yields after each station). Returns null when
  * no station both sees the subject and shows at least `minWater` of open water.
  */
-export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THREE.Vector3[], props: Array<{ p: THREE.Vector3; r: number }>, fov: number, minWater = 0.05, maxDropDeg = 24): Generator<void, SeaPose | null, void> {
+export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THREE.Vector3[], props: Array<{ p: THREE.Vector3; r: number }>, fov: number, minWater = 0.05, maxDropDeg = 24, telephoto?: { subjectShare: number; minFov: number; maxFov: number }): Generator<void, SeaPose | null, void> {
   let best: SeaPose | null = null;
   let bestScore = -Infinity;
   // the subject in the centre, or a third of the way in from either side (the frame turned toward the sea)
@@ -108,12 +121,20 @@ export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THRE
     // emergence, ≤ 32° for the leap, which looks down the slope at him anyway)
     const drop = cam.y - subject.y;
     if (drop > Math.tan(THREE.MathUtils.degToRad(maxDropDeg)) * Math.hypot(cam.x - subject.x, cam.z - subject.z)) continue;
-    const fovS = dist > 45 ? Math.max(26, fov * Math.min(1, 70 / dist)) : fov;
+    // (Pass 5, telephoto: a far station's lens keeps the subject at `subjectShare` of the frame's height —
+    // a 2.5 m Yeti — so the distant fjord compresses up behind the cave's hill)
+    const fovS = telephoto
+      ? THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(2.5 / (2 * telephoto.subjectShare * dist))), telephoto.minFov, telephoto.maxFov)
+      : dist > 45 ? Math.max(26, fov * Math.min(1, 70 / dist)) : fov;
     // (round 4b: also tilted up, the subject in the lower third — from above the cave's hill the sea
     // lies beyond and below the hill's crest, near the top of a frame centred on the mouth)
     const vf = THREE.MathUtils.degToRad(fovS) / 2;
     const hfovS = Math.atan(Math.tan(vf) * (16 / 9));
-    for (const [yaw, pitch] of [[0, 0], [0.42 * hfovS, 0], [-0.42 * hfovS, 0], [0, 0.55 * vf], [0.42 * hfovS, 0.55 * vf], [-0.42 * hfovS, 0.55 * vf]] as const) {
+    // (Pass 5: a far telephoto station may put the Yeti lower, the fjord filling the frame above the
+    // hill's crest — but his whole body stays inside the letterbox's visible band: render check, at
+    // 0.68 of the half-height his feet were under the bottom bar)
+    const pitches = telephoto ? [0, 0.3 * vf, 0.48 * vf] : [0, 0.55 * vf];
+    for (const [yaw, pitch] of pitches.flatMap((pt) => [[0, pt], [0.42 * hfovS, pt], [-0.42 * hfovS, pt]] as const)) {
       const look = framedLook(cam, subject, yaw, pitch);
       const w = yield* waterFractionSteps(m, cam, look, fovS);
       // (closer stations win a near tie: the Yeti must stay large in frame)
@@ -164,6 +185,26 @@ export function emergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: TH
         s.push(p);
       }
     }
+  return s;
+}
+
+/**
+ * Far stations for the emergence where no near station sees the sea (Pass 5, C r8–r9: on Standard
+ * and longer the cave is ~300 m above the water with its hill between: the fjord is hidden from
+ * everywhere within ~100 m of the mouth at a character-shot angle). Out on the slope 200–300 m away
+ * and up to the side, a long lens frames the Yeti at the mouth with the distant fjord rising behind
+ * the hill's crest.
+ */
+export function farEmergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: THREE.Vector3, ground?: (x: number, z: number) => number): THREE.Vector3[] {
+  const s: THREE.Vector3[] = [];
+  for (const ang of [-80, -65, -50, -35, -20, 20, 35, 50, 65, 80])
+    for (const d of [200, 300, 420, 560])
+      for (const h of [40, 80, 130, 190]) {
+        const r = THREE.MathUtils.degToRad(ang);
+        const p = mouth.clone().addScaledVector(out, d * Math.cos(r)).addScaledVector(tan, d * Math.sin(r));
+        p.y = Math.max(p.y, ground ? ground(p.x, p.z) : p.y) + h;
+        s.push(p);
+      }
   return s;
 }
 

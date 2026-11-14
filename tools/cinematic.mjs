@@ -14,8 +14,8 @@ p.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
 await p.addInitScript(() => localStorage.setItem('skifree-tld.settings.v1', JSON.stringify({ quality: 'high' })));
 await p.goto(base + '/?debug');
 await p.waitForFunction(() => window.__ready === true, null, { timeout: 600000, polling: 1000 });
-const [mode, len] = course.split(':');
-await p.evaluate(([m, l]) => window.__skifree.setCourse(m, l), [mode, len]);
+const [mode, len, biome] = course.split(':');
+await p.evaluate(([m, l, bi]) => window.__skifree.setCourse(m, l, bi ? { biome: bi } : {}), [mode, len, biome]);
 await p.evaluate(() => window.__skifree.startRun(true));
 await p.evaluate(() => { window.__skifree.seenCave(false); window.__skifree.hold(true); window.__skifree.toCave(); });
 // step until the cinematic starts

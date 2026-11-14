@@ -80,7 +80,7 @@ describe('Fjord round 3: the airborne squall carries a skier onto the landing ro
             tA = t;
             break;
           }
-          const p = new SkierPhysics(m, null, () => [], blowing ? new BiomeEnvironment(m, ws) : null);
+          const p = new SkierPhysics(m, null, () => [], blowing ? new BiomeEnvironment(m, ws, { headwind: false }) : null); // the squall alone
           const z0 = lip - 60;
           p.reset(kx + (m.routeX(z0) - m.routeX(lip)), z0, Math.atan2(m.routeX(lip) - m.routeX(z0), 60), 21);
           p.s.time = tA + 0.3 * SQUALL_TIMING.active - 60 / 21; // round 4: take off in the body of the (longer) gust

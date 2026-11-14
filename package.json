@@ -8,7 +8,13 @@
     "preview": "vite preview --port 4173",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "assets:fetch": "node tools/assets/pipeline.mjs fetch",
+    "assets:build": "node tools/assets/pipeline.mjs build",
+    "assets:check": "node tools/assets/pipeline.mjs check",
+    "assets:verify": "node tools/assets/pipeline.mjs verify",
+    "assets:licenses": "node tools/assets/pipeline.mjs licenses",
+    "check:dist": "node tools/pages/check_dist.mjs dist"
   },
   "author": "",
   "license": "ISC",
@@ -18,6 +24,8 @@
   "devDependencies": {
     "@playwright/test": "^1.65.0",
     "@types/three": "^0.187.0",
+    "meshoptimizer": "0.22.0",
+    "sharp": "0.35.5",
     "typescript": "^7.0.2",
     "vite": "^8.3.6",
     "vitest": "^5.1.0"

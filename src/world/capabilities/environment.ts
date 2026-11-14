@@ -91,11 +91,15 @@ export class BiomeEnvironment implements PhysicsEnvironment {
 
   /** × hazard effect strength for the game difficulty (HazardSetup.intensity) */
   readonly intensity: number;
+  /** the weather's mean wind speed over a run (m/s), the reference for the headwind's gust factor */
+  private readonly meanWind: number;
+  /** this course's headwind drag coefficient (0 = none; WeatherCoupling.headwind) */
+  readonly headwind: number;
 
   constructor(
     readonly mountain: Mountain,
     readonly seed: number,
-    opts: { difficulty?: GameDifficulty } = {},
+    opts: { difficulty?: GameDifficulty; /** leave the headwind out (to measure the other mechanics alone) */ headwind?: boolean } = {},
   ) {
     this.caps = capabilitiesOf(mountain.biome);
     const long = !Number.isFinite(mountain.finishZ) || mountain.finishZ >= 20000;
@@ -103,7 +107,16 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     this.kinds = this.caps.hazards.kinds.map(getHazardKind);
     this.hazards = new HazardField(mountain, seed, this.kinds, this.caps.hazards.density);
     const cpl = this.caps.weather.coupling;
-    this.physicsIdentity = !!this.caps.surface.identity && cpl.airborne === 0 && cpl.balance === 0 && this.hazards.empty;
+    this.headwind = opts.headwind === false ? 0 : (cpl.headwind?.[opts.difficulty ?? 'normal'] ?? 0) * (long ? (this.caps.hazards.longCourse ?? 1) : 1);
+    this.physicsIdentity = !!this.caps.surface.identity && cpl.airborne === 0 && cpl.balance === 0 && !this.headwind && this.hazards.empty;
+    let mw = 0;
+    if (this.headwind) {
+      for (let t = 0; t < 600; t += 3) {
+        const ws = this.caps.weather.sample(0, 0, t, seed, this.w);
+        mw += Math.hypot(ws.windX, ws.windZ) / 200;
+      }
+    }
+    this.meanWind = mw;
     const m = mountain;
     const sq = {
       biomeId: m.biome.id,
@@ -186,12 +199,17 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     let wx = 0;
     let wz = 0;
     let gust = 0;
-    if (cpl.airborne !== 0 || cpl.balance !== 0) {
+    let gustK = 1;
+    if (cpl.airborne !== 0 || cpl.balance !== 0 || this.headwind) {
       const w = caps.weather.sample(q.x, q.z, q.t, this.seed, this.w);
       wx = w.windX;
       wz = w.windZ;
       gust = w.gust;
+      // the breeze's strength relative to its mean (gusts above 1, lulls below)
+      gustK = this.meanWind > 0 ? Math.hypot(wx, wz) / this.meanWind : 1;
     }
+    // the breeze costs a grounded, upright skier speed whatever their heading (extra drag × its strength)
+    if (this.headwind && q.grounded && !q.crashed) S.dragAdd += this.headwind * gustK;
     // 3) hazards
     let px = 0;
     let pz = 0;

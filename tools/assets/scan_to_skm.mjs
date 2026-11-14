@@ -1,5 +1,6 @@
-// Poly Haven glTF scan -> compact simplified mesh for the game (build-time, outside the repo's runtime).
-// usage: node convert.mjs <in.gltf> <out.bin> <targetTris> [upAxisFix]
+// Poly Haven glTF scan -> compact simplified mesh for the game (build-time only; the game never
+// calls Poly Haven). Part of the reproducible asset pipeline: tools/assets/README.md.
+// usage: node tools/assets/scan_to_skm.mjs <in.gltf> <out.skm> <targetTris>
 // Output layout (little-endian): u32 magic 'SKM1', u32 vertexCount, u32 indexCount,
 //   f32 bbox min[3], f32 bbox max[3], u16 quantized positions [3*vc] (0..65535 over the bbox),
 //   u16|u32 indices (u16 when vc < 65536).
