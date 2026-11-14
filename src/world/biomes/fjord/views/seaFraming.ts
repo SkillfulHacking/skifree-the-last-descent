@@ -93,7 +93,7 @@ export function clearShot(m: Mountain, cam: THREE.Vector3, subject: THREE.Vector
  * Best sea-framing pose among `stations` (time-sliced: yields after each station). Returns null when
  * no station both sees the subject and shows at least `minWater` of open water.
  */
-export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THREE.Vector3[], props: Array<{ p: THREE.Vector3; r: number }>, fov: number, minWater = 0.05, maxDropDeg = 24): Generator<void, SeaPose | null, void> {
+export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THREE.Vector3[], props: Array<{ p: THREE.Vector3; r: number }>, fov: number, minWater = 0.05, maxDropDeg = 24, telephoto?: { subjectShare: number; minFov: number; maxFov: number }): Generator<void, SeaPose | null, void> {
   let best: SeaPose | null = null;
   let bestScore = -Infinity;
   // the subject in the centre, or a third of the way in from either side (the frame turned toward the sea)
@@ -108,7 +108,11 @@ export function* bestSeaPose(m: Mountain, subject: THREE.Vector3, stations: THRE
     // emergence, ≤ 32° for the leap, which looks down the slope at him anyway)
     const drop = cam.y - subject.y;
     if (drop > Math.tan(THREE.MathUtils.degToRad(maxDropDeg)) * Math.hypot(cam.x - subject.x, cam.z - subject.z)) continue;
-    const fovS = dist > 45 ? Math.max(26, fov * Math.min(1, 70 / dist)) : fov;
+    // (Pass 5, telephoto: a far station's lens keeps the subject at `subjectShare` of the frame's height —
+    // a 2.5 m Yeti — so the distant fjord compresses up behind the cave's hill)
+    const fovS = telephoto
+      ? THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(2.5 / (2 * telephoto.subjectShare * dist))), telephoto.minFov, telephoto.maxFov)
+      : dist > 45 ? Math.max(26, fov * Math.min(1, 70 / dist)) : fov;
     // (round 4b: also tilted up, the subject in the lower third — from above the cave's hill the sea
     // lies beyond and below the hill's crest, near the top of a frame centred on the mouth)
     const vf = THREE.MathUtils.degToRad(fovS) / 2;
@@ -164,6 +168,26 @@ export function emergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: TH
         s.push(p);
       }
     }
+  return s;
+}
+
+/**
+ * Far stations for the emergence where no near station sees the sea (Pass 5, C r8–r9: on Standard
+ * and longer the cave is ~300 m above the water with its hill between: the fjord is hidden from
+ * everywhere within ~100 m of the mouth at a character-shot angle). Out on the slope 200–300 m away
+ * and up to the side, a long lens frames the Yeti at the mouth with the distant fjord rising behind
+ * the hill's crest.
+ */
+export function farEmergeStations(mouth: THREE.Vector3, out: THREE.Vector3, tan: THREE.Vector3, ground?: (x: number, z: number) => number): THREE.Vector3[] {
+  const s: THREE.Vector3[] = [];
+  for (const ang of [-75, -60, -45, -30, 30, 45, 60, 75])
+    for (const d of [200, 260, 320, 400])
+      for (const h of [40, 60, 90, 130]) {
+        const r = THREE.MathUtils.degToRad(ang);
+        const p = mouth.clone().addScaledVector(out, d * Math.cos(r)).addScaledVector(tan, d * Math.sin(r));
+        p.y = Math.max(p.y, ground ? ground(p.x, p.z) : p.y) + h;
+        s.push(p);
+      }
   return s;
 }
 

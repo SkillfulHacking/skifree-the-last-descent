@@ -11,6 +11,7 @@
  *
  * Alpine: "alpine-cave" (no extra dressing: the original StoryProps), registered in ./alpine.ts.
  */
+import type { ExtraCollider } from '../../physics/SkierPhysics';
 import { frameBudget } from '../../core/frameBudget';
 import type * as THREE from 'three';
 import type { QualityPreset } from '../../core/types';
@@ -26,7 +27,7 @@ export interface CaveDressing {
   /** per frame while the cave exists (optional animation: steam, flicker) */
   update?(dt: number, time: number): void;
   /** solid props the skier collides with (world x, z, radius), if any */
-  colliders?(): ReadonlyArray<{ x: number; z: number; r: number }>;
+  colliders?(): ReadonlyArray<ExtraCollider>;
   dispose(): void;
 }
 

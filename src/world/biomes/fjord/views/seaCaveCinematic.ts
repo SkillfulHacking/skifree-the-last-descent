@@ -230,7 +230,22 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
     // (round 7, C r6 #1: the first version hung 240–710 m above the sea and aimed into the hill;
     // round 8, C r7 #1: never inside the terrain — step out over the water until the camera is clear
     // and the frame holds open water, else no reveal)
-    const reveal = coast ? coastalReveal(st.world.mountain, M) : null;
+    // (Pass 5, C r8–r9 "on the default course the Yeti never shares a frame with the sea"): where a
+    // far station sees the fjord behind the cave's hill, the beat opens on it instead — the Yeti
+    // stepping out of the mouth, small in a long lens, the fjord rising behind the crest
+    const far = sea?.emergeFar ?? null;
+    const reveal = far ? null : coast ? coastalReveal(st.world.mountain, M) : null;
+    if (far) {
+      const toward = M.clone().sub(far.cam).setY(0).normalize();
+      tl.shot({
+        start: 7.9,
+        end: 9.6,
+        from: () => pose(far.cam, framedLook(far.cam, yetiAt().add(new THREE.Vector3(0, 1.4, 0)), far.yaw, far.pitch), far.fov),
+        to: () => pose(far.cam.clone().addScaledVector(toward, 3), framedLook(far.cam.clone().addScaledVector(toward, 3), yetiAt().add(new THREE.Vector3(0, 1.7, 0)), far.yaw, far.pitch), far.fov * 0.94),
+        easing: ease.inOut,
+        handheld: 0.004,
+      });
+    }
     {
       if (reveal) {
         const r = reveal;
@@ -238,7 +253,7 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
       }
     }
     tl.shot({
-      start: reveal ? 9.2 : 7.9,
+      start: far ? 9.6 : reveal ? 9.2 : 7.9,
       end: 11.0,
       from: () => pose(M.clone().addScaledVector(O, 9).addScaledVector(T, 7).add(new THREE.Vector3(0, 5.5, 0)), yetiAt().add(new THREE.Vector3(0, 1.6, 0)), 46),
       to: () => pose(M.clone().addScaledVector(O, 8.4).addScaledVector(T, 6.2).add(new THREE.Vector3(0, 5.0, 0)), yetiAt().add(new THREE.Vector3(0, 2.0, 0)), 46),

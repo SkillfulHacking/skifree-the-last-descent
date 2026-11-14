@@ -25,6 +25,22 @@ import { clamp, damp, smoothstep, wrapAngle } from '../core/rng';
 import type { ImpactKind, SurfaceType } from '../core/types';
 import type { Mountain } from '../world/course';
 import type { Obstacle, ObstacleField } from './obstacles';
+
+/**
+ * A solid the world adds outside the obstacle field (finish buildings, a cave's boulders). `kind`
+ * picks the response and sounds (default: the finish's solids, as before); `y` and `height` let the
+ * skier clear it in the air.
+ */
+export interface ExtraCollider {
+  x: number;
+  z: number;
+  r: number;
+  kind?: 'boulder';
+  /** the ground at its foot */
+  y?: number;
+  /** how far it stands above `y` */
+  height?: number;
+}
 import { makeEnvQuery, makeEnvSample, type EnvSample, type PhysicsEnvironment } from './environment';
 
 export const PHYS_DT = 1 / 120;
@@ -71,7 +87,7 @@ export const SLIP_EDGE = { base: 1, tuck: 0.6, brake: 0.45, drift: 0.6 } as cons
  *  - Wall impacts use the boulder thresholds (normal speed into the face, m/s).
  */
 /** pinned-against-a-wall rescue (SkierPhysics.pinWatchdog): seconds without getting `escape` m away, wall contact within `contact` s */
-export const PIN_WATCH = { window: 4, escape: 3, contact: 1, offPiste: 10 };
+export const PIN_WATCH = { window: 4, escape: 3, contact: 1, offPiste: 10, backDeg: 70 };
 
 export const TERRAIN_CONTACT = {
   wallDeg: 50,
@@ -206,7 +222,7 @@ export class SkierPhysics {
   constructor(
     private mountain: Mountain,
     private obstacles: ObstacleField | null,
-    private extraColliders: () => ReadonlyArray<{ x: number; z: number; r: number }> = () => [],
+    private extraColliders: () => ReadonlyArray<ExtraCollider> = () => [],
     /** the location's physics hook (surface, wind, hazards); null = original physics */
     readonly env: PhysicsEnvironment | null = null,
   ) {}
@@ -861,7 +877,10 @@ export class SkierPhysics {
       const dx = s.pos.x - c.x;
       const dz = s.pos.z - c.z;
       const d = Math.hypot(dx, dz);
-      if (d < c.r + SKIER_RADIUS && d > 1e-4) this.solidHit(-1 - this.extraIndex(c), dx / d, dz / d, c.r + SKIER_RADIUS - d, 'tree-heavy', c.x, c.z, 9, 4);
+      if (!(d < c.r + SKIER_RADIUS && d > 1e-4)) continue;
+      if (c.height !== undefined && c.y !== undefined && s.pos.y - c.y > c.height + 0.05) continue; // cleared it in the air
+      if (c.kind === 'boulder') this.solidHit(-1 - this.extraIndex(c), dx / d, dz / d, c.r + SKIER_RADIUS - d, 'rock-heavy', c.x, c.z, 9, 3.5);
+      else this.solidHit(-1 - this.extraIndex(c), dx / d, dz / d, c.r + SKIER_RADIUS - d, 'tree-heavy', c.x, c.z, 9, 4);
     }
     // swap buffers (no per-step allocations)
     this.touchB = s.touching;
@@ -1027,7 +1046,13 @@ export class SkierPhysics {
     // boxed in against a face, or trying to get going (pushing/steering the whole window) off the
     // piste and getting nowhere — a pocket at a cave mouth or a cliff foot
     const walled = s.time - s.wallContactT < PIN_WATCH.contact;
-    const stranded = s.time - s.pushSince > PIN_WATCH.window && Math.abs(s.pos.x - rx) > PIN_WATCH.offPiste;
+    // (Pass 5, B/E r9: skating up an open slope, or anywhere away from the piste, also "gets nowhere"
+    // — that is a choice, not a trap.
+    // Stranded needs the skier to be trying to get BACK: skating toward the piste ahead (within
+    // PIN_WATCH.backDeg of the line to it) and getting nowhere)
+    const toPiste = Math.atan2(this.mountain.routeX(z + 20) - s.pos.x, 20);
+    const homeward = Math.abs(wrapAngle(toPiste - s.heading)) < (PIN_WATCH.backDeg * Math.PI) / 180;
+    const stranded = homeward && s.time - s.pushSince > PIN_WATCH.window && Math.abs(s.pos.x - rx) > PIN_WATCH.offPiste;
     if (walled || stranded) {
       this.relocate(rx, z, 'pinned against the rock', false);
       s.pinAnchorX = s.pos.x;

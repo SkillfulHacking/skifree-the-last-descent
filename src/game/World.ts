@@ -16,6 +16,7 @@
  * the whole scene and the camera are shifted by −origin (origin snapped to 1 km steps near the
  * focus), so GPU float32 maths always works with small numbers — no jitter 50 km down the hill.
  */
+import type { ExtraCollider } from '../physics/SkierPhysics';
 import * as THREE from 'three';
 import type { QualityPreset } from '../core/types';
 import type { Encounter, Mountain } from '../world/course';
@@ -425,7 +426,7 @@ export class World {
   /** Colliders that are not part of the procedural obstacle field (resort buildings etc). */
   /** the finish's solid props and the cave dressings' (round 9, B r8 #3: the scanned boulders at
    *  the sea-cave mouth had no collision — skiers passed through them) */
-  extraColliders = (): ReadonlyArray<{ x: number; z: number; r: number }> => {
+  extraColliders = (): ReadonlyArray<ExtraCollider> => {
     const f = this.finish?.colliders() ?? [];
     // (rebuilt only when the finish list or the set of dressed caves changes: called every physics step)
     let n = 0;
@@ -434,12 +435,12 @@ export class World {
       if (c?.length) n += c.length + c[0]!.x * 7.31 + c[0]!.z * 3.17;
     }
     if (this.extraCache && this.extraCache.f === f && this.extraCache.n === n) return this.extraCache.all;
-    const all: Array<{ x: number; z: number; r: number }> = [...f];
+    const all: ExtraCollider[] = [...f];
     for (const slot of this.caves.values()) all.push(...(slot.dressing?.colliders?.() ?? []));
     this.extraCache = { f, n, all };
     return all;
   };
-  private extraCache: { f: ReadonlyArray<unknown>; n: number; all: Array<{ x: number; z: number; r: number }> } | null = null;
+  private extraCache: { f: ReadonlyArray<unknown>; n: number; all: ExtraCollider[] } | null = null;
 
   /** Make everything visible for shader pre-compilation (call update() afterwards to restore). */
   showAllForWarmup() {

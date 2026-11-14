@@ -24,6 +24,7 @@
  */
 import * as THREE from 'three';
 import type { CaveDressing, CaveDressingContext } from '../../../presentation/cave';
+import type { ExtraCollider } from '../../../../physics/SkierPhysics';
 import { Batch, Rand, mat } from '../../../resort/util';
 import { kitMaterials } from './buildings';
 import { PrismSet, clinkerHull, hullKeelY } from './basaltKit';
@@ -31,7 +32,7 @@ import { caveCameraSightlines } from '../../../../cinematic/CaveCinematic';
 import { dressingTicker } from '../../../presentation/cave';
 import { createRockMaterial, disposeRockMaterial } from '../../../art/rockMaterial';
 import { loadScan, type ScanId } from '../../../art/scanModels';
-import { bestSeaPose, emergeStations, leapStations, type SeaPose } from './seaFraming';
+import { bestSeaPose, emergeStations, farEmergeStations, leapStations, type SeaPose } from './seaFraming';
 
 /**
  * The beachcombing hoard (hull, oar, driftwood, lobster pots, floats): off since round 6 — lit, it read
@@ -200,6 +201,8 @@ function faceSampler(cave: CaveDressingContext['cave'], mouth: THREE.Vector3, ou
 /** the cinematic's sea-framing poses (null: no station shows the sea with the subject in view) */
 export interface SeaShots {
   emerge: SeaPose | null;
+  /** a far telephoto station, when no near one sees the sea (Standard and longer) */
+  emergeFar?: SeaPose | null;
   leap: SeaPose | null;
 }
 
@@ -278,8 +281,8 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
   const mouth = cave.mouth;
   const lines = caveCameraSightlines(cave.mouth, cave.outward, cave.lipTop);
   const props: Array<{ p: THREE.Vector3; r: number; kind: string }> = [];
-  /** colliders the skier hits (the scanned boulders) */
-  const solids: Array<{ x: number; z: number; r: number }> = [];
+  /** colliders the skier hits (the scanned boulders, added as each one appears) */
+  const solids: ExtraCollider[] = [];
   const perches: SeaCavePerch[] = [];
   const clearOfPath = (x: number, z: number, r: number) => cave.exitPath.every((p) => Math.hypot(p.x - x, p.z - z) > r + 4.5) && Math.hypot(cave.ledge.x - x, cave.ledge.z - z) > r + 5;
   /** the full placement test: path, ledge and every cinematic lens (prop centre p, radius r) */
@@ -398,7 +401,6 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       p.y = gy - sy * 0.62;
       picks.push({ id: ids[i % ids.length]!, p, sx: 2 * r * rnd.range(0.9, 1.3), sy, sz: 2 * r * rnd.range(0.7, 1.0), yaw: rnd.range(0, 6.28), gy });
       props.push({ p: p.clone().setY(gy + r * 0.3), r, kind: 'boulder' });
-      solids.push({ x: p.x, z: p.z, r: r * 0.85 });
       // the gulls perch on the boulders' crowns (round 7: the columns that carried them are gone)
       perches.push({ p: p.clone().setY(p.y + picks[picks.length - 1]!.sy * 0.92), brow: false });
     }
@@ -419,6 +421,10 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         bg.add(mesh);
+        // solid only once it is seen (Pass 5, D r9 #3: a scan that failed or was still loading left
+        // an invisible rock at the cave mouth). A rock, not a tree: a boulder's response and sounds,
+        // its footprint at the snow line (the scans' broad waist), and it can be jumped (B r9 #2)
+        solids.push({ x: pk.p.x, z: pk.p.z, r: ((pk.sx + pk.sz) / 4) * 0.92, kind: 'boulder', y: pk.gy, height: pk.sy * 0.38 + 0.1 });
       });
   }
   // fallen drums from the collapsed side lying in the snow (column sections on their sides)
@@ -686,8 +692,10 @@ function* buildSeaCave(c: CaveDressingContext, tick: { over(): boolean }, partia
       return r.value;
     };
     const emerge = yield* run(bestSeaPose(m, mouth.clone().addScaledVector(out, 1.0).add(new THREE.Vector3(0, 1.7, 0)), emergeStations(mouth, out, tan, (x, z) => m.heightAt(x, z)), props, 52, 0.05, 24));
+    // (Pass 5: where no near station sees the sea — Standard and longer — a far telephoto station)
+    const emergeFar = emerge ? null : yield* run(bestSeaPose(m, mouth.clone().addScaledVector(out, 1.0).add(new THREE.Vector3(0, 1.7, 0)), farEmergeStations(mouth, out, tan, (x, z) => m.heightAt(x, z)), props, 12, 0.08, 42, { subjectShare: 0.07, minFov: 7, maxFov: 16 }));
     const leap = yield* run(bestSeaPose(m, cave.ledge.clone().addScaledVector(out, 5).add(new THREE.Vector3(0, 2.2, 0)), leapStations(cave.ledge, out, tan, (x, z) => m.heightAt(x, z)), props, 56, 0.05, 32));
-    group.userData['seaShots'] = { emerge, leap } satisfies SeaShots;
+    group.userData['seaShots'] = { emerge, emergeFar, leap } satisfies SeaShots;
   }
   group.userData['props'] = props;
   group.userData['perches'] = perches;
