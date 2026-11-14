@@ -57,9 +57,17 @@ const own = new Set(readdirSync(distAssets));
 
 // 1. what the live site serves now
 const live = new Set();
+// (review: a transient outage must fail the deploy, not silently reset the history; only a 404 means
+// "nothing deployed yet". RETAIN_ALLOW_UNREACHABLE=1 overrides it for a deliberate fresh start.)
+const unreachable = (what, r) => {
+  if (r.status === 404 || process.env.RETAIN_ALLOW_UNREACHABLE === '1') return false;
+  console.error(`retain: ${what} unreachable (status ${r.status}); failing so earlier builds' assets are not dropped`);
+  process.exit(1);
+};
 const index = await get('index.html');
 if (!index.ok) {
-  console.log(`retain: no live index.html (${index.status}) — first deploy or site down; nothing carried over`);
+  unreachable('live index.html', index);
+  console.log(`retain: no live index.html (${index.status}) — first deploy; nothing carried over`);
 } else {
   const queue = [];
   for (const m of index.buf.toString('utf8').matchAll(/assets\/([^"'?#\s)]+)/g)) queue.push(m[1]);
@@ -69,7 +77,10 @@ if (!index.ok) {
     if (seen.has(name)) continue;
     seen.add(name);
     const r = await get(`assets/${name}`);
-    if (!r.ok) continue;
+    if (!r.ok) {
+      unreachable(`live asset ${name}`, r);
+      continue;
+    }
     live.add(name);
     if (!own.has(name)) {
       writeFileSync(join(distAssets, name), r.buf);
@@ -84,10 +95,11 @@ let prev = {};
 if (hist.ok) {
   try {
     prev = JSON.parse(hist.buf.toString('utf8')).files ?? {};
-  } catch {
-    prev = {};
+  } catch (e) {
+    console.error(`retain: ${HISTORY} on the live site is not valid JSON (${e}); failing`);
+    process.exit(1);
   }
-}
+} else unreachable(HISTORY, hist);
 const files = {};
 let carried = 0;
 let dropped = 0;
@@ -99,7 +111,10 @@ for (const [name, e] of Object.entries(prev)) {
     continue;
   }
   const r = await get(`assets/${name}`);
-  if (!r.ok) continue;
+  if (!r.ok) {
+    unreachable(`retained asset ${name}`, r);
+    continue;
+  }
   writeFileSync(join(distAssets, name), r.buf);
   files[name] = { firstSeen: e.firstSeen ?? lastLive.toISOString(), lastLive: lastLive.toISOString(), retained: true };
   carried++;
