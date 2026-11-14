@@ -11,6 +11,7 @@
  * Alpine uses ALPINE_SURFACE, which always returns the identity (tests/unit/capabilities.test.ts).
  */
 import type { SurfaceType } from '../../core/types';
+import type { Mountain } from '../course';
 
 export interface SurfaceWeights {
   ice: number;
@@ -50,6 +51,14 @@ export interface SurfaceQuery {
   readonly kind: SurfaceType;
   /** the continuous weights behind `kind` (Mountain.surfaceWeights) */
   weights(): SurfaceWeights;
+  /** the course being skied (terrain features such as a coast's cornice rim); absent in synthetic tests */
+  readonly mountain?: Mountain;
+  /**
+   * the skier's horizontal velocity (m/s) when the query comes from physics; absent for position-only
+   * queries (renderer, tests). Lets a surface resist some directions of travel more than others.
+   */
+  readonly vx?: number;
+  readonly vz?: number;
 }
 
 export interface SurfaceModel {

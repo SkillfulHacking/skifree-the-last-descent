@@ -333,7 +333,7 @@ export class YetiModel {
     const g = this.ground;
     g.debug = this.debugOn;
     // standing still the yeti keeps a staggered stance rather than shuffling its feet into the authored one
-    g.stepThreshold = curGait ? 0.15 : mode === 'grab' || mode === 'disgust' ? 0.2 : 0.42;
+    g.stepThreshold = curGait ? 0.15 : mode === 'grab' || mode === 'disgust' || mode === 'gag' ? 0.2 : 0.42;
     g.prepare(out, M, dt, snap, this.rebaseLocks);
     this.rebaseLocks = false;
     sv.applyFK(out);

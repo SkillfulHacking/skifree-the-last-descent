@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Fjord Coast (Location 2)
+- **New location: Fjord Coast** (2/5 "Scenic"): a descent along sea cliffs to a fishing harbour.
+  Cornice along the rim (anisotropic friction, stall recovery after 3 s), wind gates (sheltered lee
+  vs. the gusty notch) and squalls over jumps with a windsock telegraph (intensity Relaxed 0.5 /
+  Normal 1 / Hard 1, × 0.85 on runs of 20 km and more; the Yeti is unchanged), gap jumps, scoured rock, a basalt sea cave with its
+  own Yeti emergence, coastal refuges, the harbour finish (trophy, cold plunge, sea-to-summit
+  reveal) and optional viewpoints (*Scenic Route* is now earnable).
+- **Art:** an authored sea-cliff kit streamed in 256 m segments with a triplanar rock material
+  using CC0 Poly Haven scans (Rock Face 03, Cliff Side as a macro layer); islands as whalebacks,
+  peak islands and skerry chains; menus and HUD scale above 1080p.
+- **Engine (PR #6):** steep terrain faces (> 50°, > 0.5 m rise) are walls: slide / bounce / crash
+  by the speed into the face, with energy caps — no more launches off cliff and cave walls
+  (Alpine too).
+- **Saves:** no key or format change; existing achievements, jackets, records and settings carry over.
+
 ## Unreleased — Pass 4 Stage 1: biome capability foundations
 - **Biome capabilities** (`src/world/capabilities/`, `docs/BIOMES.md`): optional modules on a
   biome — surface physics modifiers, deterministic weather (wind/visibility/snowfall + physics

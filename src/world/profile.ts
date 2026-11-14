@@ -10,6 +10,7 @@
  * Every along-course quantity is a piecewise-linear KeyTrack; the base height is the analytic
  * integral of the slope track, so arbitrary distances stay exact and cheap.
  */
+import { RIM_LINE_CLEAR, nearRimDistance, rimOffsetRaw, type CoastParams } from './coast';
 import { Rng, clamp, smoothstep } from '../core/rng';
 import { CAVE_D, type CaveAnchor } from './caveTerrain';
 
@@ -134,6 +135,24 @@ export interface Kicker {
   run: number; // approach length
 }
 
+/**
+ * A gap: a gully cut across an alternate line just past a kicker (Fjord: meltwater gullies running
+ * to the sea cliff, jumped from a take-off on the ridgeline spine). Heights are cut by the location
+ * (Coast.shape); obstacles keep clear of it through the kicker exclusion.
+ */
+export interface GapCut {
+  /** upstream edge of the gully (m) and its length along z */
+  z: number;
+  len: number;
+  /** centre x of the gully where it crosses the line, and its half-width across the slope */
+  x: number;
+  hw: number;
+  /** depth below the surrounding snow (m) */
+  depth: number;
+  /** the take-off kicker's lip z */
+  lipZ: number;
+}
+
 export interface CliffBand {
   z: number; // drop edge
   dMin: number;
@@ -230,6 +249,8 @@ export interface CourseProfile {
   flatten(z: number): number;
   kickersNear(z0: number, z1: number, out: Kicker[]): Kicker[];
   cliffsNear(z0: number, z1: number, out: CliffBand[]): CliffBand[];
+  /** gap jumps (gullies past a take-off) overlapping [z0, z1]; optional (none by default) */
+  gapsNear?(z0: number, z1: number, out: GapCut[]): GapCut[];
   encounters(z0: number, z1: number): Encounter[];
   sightings(z0: number, z1: number): Sighting[];
   checkpoints(z0: number, z1: number): number[];
@@ -252,6 +273,11 @@ export interface AltRoute {
   z1: number;
   /** segment type it belongs to */
   type: SegmentType;
+  /**
+   * A spine: the line bows out by this many metres (signed, +X/−X) at its middle instead of running
+   * as a straight chord (Fjord: the exposed sea-side ridge, see ProfileKnobs.spine).
+   */
+  bow?: number;
 }
 
 function between<T extends { z: number }>(arr: readonly T[], z0: number, z1: number, out: T[]): T[] {
@@ -481,6 +507,36 @@ export interface ProfileKnobs {
   widthScale: number;
   swingScale: number;
   segmentWeights?: Partial<Record<SegmentType, number>>;
+  /**
+   * Segment types that may get an alternate line (default: forest, powder, basin, alpine,
+   * highspeed). A location can add e.g. 'ridgeline' for shortcuts along exposed ridges.
+   */
+  altTypes?: readonly SegmentType[];
+  /**
+   * Floor (degrees, after slopeScale) on the slope of regular segments: a location of "large open
+   * downhill runs" can keep its gentle segment types (basin, powder) from becoming flat run-ins
+   * where a skier who does not tuck loses ground to the Yeti. Omit for none (original courses).
+   */
+  minSlope?: number;
+  /**
+   * Ridgeline spines (Fjord): alternate lines of these segment types are always laid, bowed out by
+   * `bow` × half-width toward `side` (the exposed ridge above the sea cliff), and with `gap` a gully
+   * to jump from a take-off kicker halfway along. Omit for none (original courses).
+   */
+  spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
+  /** slope (degrees) of the run-in at the start gate (default 6): steeper = no stall on a bump */
+  startSlope?: number;
+  /**
+   * A sea coast on −X (see coast.ts): alternate lines, off-route kickers and cliff bands keep
+   * RIM_LINE_CLEAR from the cliff rim, and spines bow inland where the rim is too close.
+   */
+  coast?: CoastParams;
+  /**
+   * Which side of the piste the Yeti caves are cut into (default +1, the original). A coast puts
+   * them on the sea side (−1), in front of the cliff (art request R4); see Mountain.landHeight and
+   * Coast.rimX for the ground around them.
+   */
+  caveSide?: 1 | -1;
 }
 export const DEFAULT_KNOBS: ProfileKnobs = { slopeScale: 1, widthScale: 1, swingScale: 1 };
 
@@ -576,6 +632,7 @@ export class GeneratedProfile implements CourseProfile {
   private steepN = new KeyTrack();
   private kick: Kicker[] = [];
   private cliffs: CliffBand[] = [];
+  private gaps: GapCut[] = [];
   private segs: Segment[] = [];
   private enc: Encounter[] = [];
   private sight: Sighting[] = [];
@@ -603,7 +660,7 @@ export class GeneratedProfile implements CourseProfile {
     const summitEnd = Math.min(330, first - 320);
     this.keys(-400, { slope: 2, width: 70, amp: 0, route: 0, tree: 0, forest: 0.3, rock: 1, setback: 1, steep: 0.8 });
     this.keys(-60, { slope: 3, width: 66, amp: 0, route: 0 });
-    this.keys(0, { slope: 6, width: 62, amp: 0, route: 0 });
+    this.keys(0, { slope: knobs.startSlope ?? 6, width: 62, amp: 0, route: 0 });
     if (summitEnd >= 240) {
       this.keys(60, { slope: 10, width: 60, amp: 10, route: 0 });
       this.keys(240, { slope: 11, width: 56, amp: 30, route: 0.5, tree: 0.4 });
@@ -643,7 +700,7 @@ export class GeneratedProfile implements CourseProfile {
       caveZ,
       triggerZ: caveZ + 22,
       foreshadowZ: foreshadowFor(caveZ),
-      anchor: { z: caveZ, centerX: 0, side: 1, d: CAVE_D }, // centerX resolved once the keys exist
+      anchor: { z: caveZ, centerX: 0, side: this.knobs.caveSide ?? 1, d: CAVE_D }, // centerX resolved once the keys exist
       chaseEndZ: chaseEnd,
       checkpointZ,
       speedMul,
@@ -730,8 +787,12 @@ export class GeneratedProfile implements CourseProfile {
       if (room < len + 250) len = room; // fill exactly up to the special zone
     }
     const z1 = z0 + len;
-    const sA = rng.range(spec.slope[0], spec.slope[1]) * K.slopeScale;
-    const sB = rng.range(spec.slope[0], spec.slope[1]) * K.slopeScale;
+    let sA = rng.range(spec.slope[0], spec.slope[1]) * K.slopeScale;
+    let sB = rng.range(spec.slope[0], spec.slope[1]) * K.slopeScale;
+    if (K.minSlope !== undefined) {
+      sA = Math.max(K.minSlope, sA);
+      sB = Math.max(K.minSlope, sB);
+    }
     const w = rng.range(spec.width[0], spec.width[1]) * K.widthScale;
     const a = rng.range(spec.amp[0], spec.amp[1]) * K.swingScale;
     const steepSide = rng.chance(0.5) ? 1 : -1;
@@ -766,23 +827,90 @@ export class GeneratedProfile implements CourseProfile {
       const hw = this.halfWidth(z);
       const base = this.routeX(z) - this.centerX(z);
       const onRoute = k % 2 === 0;
-      const d = onRoute ? base : clamp(base + rng.pick([-1, 1]) * rng.range(14, 22), -hw * 0.75, hw * 0.75);
+      let d = onRoute ? base : clamp(base + rng.pick([-1, 1]) * rng.range(14, 22), -hw * 0.75, hw * 0.75);
+      // a coast: an off-route kicker never sits in the cornice zone (it moves to the land side)
+      if (K.coast && this.centerX(z) + d - 6 < this.seaBound(z)) d = clamp(base + Math.abs(d - base), -hw * 0.75, hw * 0.75);
       this.kick.push({ z, d, width: rng.range(7, 11), height: rng.range(1.2, type === 'highspeed' ? 2.4 : 2.0), run: rng.range(10, 15) });
     }
+    // a ridgeline spine (see ProfileKnobs.spine) has its gap jump instead of a cliff drop across it
+    const spineSeg = !!K.spine && K.spine.types.includes(type) && len > 380 && (K.altTypes ? K.altTypes.includes(type) : false);
     for (let c = 0; c < spec.cliffs; c++) {
       const z = z0 + len * (0.35 + 0.35 * c) + rng.range(-30, 30);
       const hw = this.halfWidth(z);
       const o = this.routeX(z) - this.centerX(z);
       const band = o > 0 ? { dMin: -(hw - 6), dMax: o - 13 } : { dMin: o + 13, dMax: hw - 6 };
-      if (band.dMax - band.dMin > 8) this.cliffs.push({ z, drop: rng.range(3.5, 6), ...band });
+      if (K.coast) band.dMin = Math.max(band.dMin, this.seaBound(z) - this.centerX(z));
+      if (band.dMax - band.dMin > 8) {
+        const drop = rng.range(3.5, 6);
+        if (!spineSeg) this.cliffs.push({ z, drop, ...band });
+      }
     }
     // an alternate line on wide, flowing segments (decided from this segment's own rng, so the
     // plan does not depend on generation order)
-    if ((type === 'forest' || type === 'powder' || type === 'basin' || type === 'alpine' || type === 'highspeed') && len > 380 && rng.chance(0.65)) {
-      this.alts.push({ z0: z0 + edge + 10, z1: z1 - edge - 10, type });
+    const altOk = K.altTypes ? K.altTypes.includes(type) : type === 'forest' || type === 'powder' || type === 'basin' || type === 'alpine' || type === 'highspeed';
+    if (altOk && len > 380) {
+      const roll = rng.chance(0.65);
+      const sp = K.spine && K.spine.types.includes(type) ? K.spine : null;
+      if (roll || sp) {
+        const a: AltRoute = { z0: z0 + edge + 10, z1: z1 - edge - 10, type };
+        if (sp) {
+          const amount = sp.bow * Math.min(this.halfWidth(z0 + len / 2), w);
+          let side: number = sp.side;
+          if (K.coast) {
+            // the line bows to whichever side keeps it furthest from the racing line (the route
+            // swings too, and the rim and the piste edge clamp it), preferring the knob's side (the
+            // exposed ridge above the sea) unless the other is clearly better
+            const sep = (b: number) => {
+              a.bow = b;
+              let sum = 0;
+              for (let k = 1; k < 8; k++) {
+                const zz = a.z0 + ((a.z1 - a.z0) * k) / 8;
+                sum += Math.min(30, Math.abs(this.altX(a, zz) - this.routeX(zz)));
+              }
+              return sum / 7;
+            };
+            if (sep(-sp.side * amount) > sep(sp.side * amount) + 3) side = -sp.side;
+          }
+          a.bow = side * amount;
+          if (sp.gap) this.addGap(a, rng);
+        }
+        this.alts.push(a);
+      }
     }
     this.kick.sort((p, q) => p.z - q.z);
     this.cliffs.sort((p, q) => p.z - q.z);
+  }
+
+  /** a take-off kicker on a spine and the gully past it, where the spine is furthest from the route */
+  private addGap(a: AltRoute, rng: Rng) {
+    const u = rng.range(0.42, 0.58);
+    // round 3 (B N3): a gap with a stake — cleared in a tuck at racing speed, but a skier who comes
+    // in slow (or stands up into a squall over it) lands on the far ramp and loses a few m/s
+    const height = rng.range(1.4, 1.7);
+    const len = rng.range(9.5, 11.5);
+    const depth = rng.range(2.0, 2.4);
+    // the take-off must be approached at full speed: no cliff drop or other kicker on the spine
+    // just before it (or just after the landing)
+    const clearAt = (lip: number) => {
+      const x = this.altX(a, lip);
+      if (Math.abs(x - this.routeX(lip)) < 18) return false; // too close to the main line to be a separate branch
+      for (const c of this.cliffs) if (c.z > lip - 90 && c.z < lip + 40 && x - this.centerX(c.z) > c.dMin - 8 && x - this.centerX(c.z) < c.dMax + 8) return false;
+      for (const k of this.kick) if (k.z > lip - 70 && k.z < lip + 40 && Math.abs(this.centerX(k.z) + k.d - this.altX(a, k.z)) < k.width * 0.5 + 8) return false;
+      return true;
+    };
+    let lip = NaN;
+    for (const v of [u, u - 0.12, u + 0.12, u - 0.24, u + 0.2]) {
+      const z = a.z0 + (a.z1 - a.z0) * v;
+      if (clearAt(z)) {
+        lip = z;
+        break;
+      }
+    }
+    if (!Number.isFinite(lip)) return;
+    const x = this.altX(a, lip);
+    this.kick.push({ z: lip, d: x - this.centerX(lip), width: 8, height, run: 14 });
+    this.gaps.push({ z: lip + 1.5, len, x: this.altX(a, lip + 1.5 + len / 2), hw: 10, depth, lipZ: lip });
+    this.gaps.sort((p, q) => p.z - q.z);
   }
 
   private buildSpecial(kind: 'encounter' | 'checkpoint' | 'finish', ref: number, z0: number, z1: number, rng: Rng, idx: number) {
@@ -901,6 +1029,10 @@ export class GeneratedProfile implements CourseProfile {
     this.ensure(z1);
     return between(this.cliffs, z0, z1, out);
   }
+  gapsNear(z0: number, z1: number, out: GapCut[]) {
+    this.ensure(z1);
+    return between(this.gaps, z0 - 12, z1, out);
+  }
   encounters(z0: number, z1: number) {
     this.ensure(z1);
     return this.enc.filter((e) => e.chaseEndZ + 50 >= z0 && e.foreshadowZ - 600 <= z1);
@@ -936,10 +1068,24 @@ export class GeneratedProfile implements CourseProfile {
     const x0 = this.routeX(a.z0);
     const x1 = this.routeX(a.z1);
     const t = (z - a.z0) / (a.z1 - a.z0);
-    const chord = x0 + (x1 - x0) * t;
+    let chord = x0 + (x1 - x0) * t;
+    if (a.bow) chord += a.bow * Math.sin(Math.PI * clamp(t, 0, 1));
     const c = this.centerX(z);
     const hw = this.halfWidth(z) - 9;
-    return Math.min(c + hw, Math.max(c - hw, chord));
+    return Math.min(c + hw, Math.max(c - hw, chord, this.seaBound(z)));
+  }
+
+  /**
+   * Coastal locations: the lowest x (sea side) a line may use at z — RIM_LINE_CLEAR inside the rim
+   * crest, wherever Coast.rimX puts it (conservative: ignores where set pieces push the rim back).
+   * −Infinity inland.
+   */
+  seaBound(z: number): number {
+    const c = this.knobs.coast;
+    if (!c) return -Infinity;
+    const edge = this.centerX(z) - this.halfWidth(z) - rimOffsetRaw(c, this.seed, z);
+    const near = this.routeX(z) - nearRimDistance(c, this.seed, z);
+    return Math.max(edge, near) + RIM_LINE_CLEAR;
   }
 
   altRouteX(z: number): number | null {

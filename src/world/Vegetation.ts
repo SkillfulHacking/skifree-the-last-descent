@@ -198,6 +198,7 @@ export class Vegetation {
     // decorative forests on the outer valley walls (render only, no collision)
     const zA = band * BAND;
     const decorK = mountain.biome.trees.decorDensity;
+    const coast = mountain.coast;
     const speciesW = mountain.biome.trees.speciesWeights;
     if (zA + BAND > -300) {
       const rng = new Rng((seed ^ 0xf0e57 ^ Math.imul(band + 101, 0x27d4eb2d)) >>> 0);
@@ -216,6 +217,11 @@ export class Vegetation {
         if (Math.abs(x) < 560) continue; // corridor trees come from the obstacle field
         if (z < -300) continue;
         const y = mountain.heightAt(x, z);
+        // coast: no trees in or at the water, nor on the cornice
+        if (coast && (y < coast.seaLevelAt(z) + 5 || (coast.beyondRim(x, z) > -5 && coast.beyondRim(x, z) < 60))) continue;
+        // cliff kit (round 4): the heightfield under the authored cliffs is a hidden backing, behind
+        // and below the rock mesh: nothing grows on it
+        if (coast && mountain.cliff && coast.beyondRim(x, z) > 0 && mountain.cliffKitWeight(z) > 0 && coast.beyondRim(x, z) < mountain.cliff.footOffset(mountain.cliff.gridColumn(z)) + 40) continue;
         // tree line by altitude relative to the local valley floor
         const rel = y - mountain.heightAt(cx, z);
         const dens = smoothstep(260, 120, rel) * (0.5 + 0.5 * smoothstep(-0.3, 0.3, fbm(x / 140, z / 140, seed + 3, 2))) * (0.35 + 0.65 * mountain.profile.treeLine(z)) * decorK;
@@ -237,6 +243,7 @@ export class Vegetation {
         const seedA = rng.float();
         if (Math.abs(x) < 560 || z < -300) continue;
         const y = mountain.heightAt(x, z);
+        if (coast && y < coast.seaLevelAt(z) + 1) continue;
         const gx = (mountain.heightAt(x + 6, z) - y) / 6;
         const gz = (mountain.heightAt(x, z + 6) - y) / 6;
         const g = Math.hypot(gx, gz);
@@ -254,7 +261,18 @@ export class Vegetation {
           const rz = z + Math.sin(a) * d * 0.6;
           const sz = Math.min(4.0, 0.7 * Math.pow(1 / Math.max(0.06, rng.float()), 0.7));
           const vv = Math.floor(((seedA * 7 + k * 0.37) % 1) * ROCK_VARIANTS);
-          get(rx).rocks[vv]!.push({ x: rx, y: mountain.heightAt(rx, rz) - sz * 0.35, z: rz, rot: rng.float() * 6.28, sx: sz * rng.range(0.85, 1.25), sy: sz * rng.range(0.85, 1.5), sz: sz, rx: rng.range(-0.4, 0.4), rz: rng.range(-0.4, 0.4) });
+          const rotA = rng.float() * 6.28;
+          const sxA = rng.range(0.85, 1.25);
+          const syA = rng.range(0.85, 1.5);
+          const rxA = rng.range(-0.4, 0.4);
+          const rzA = rng.range(-0.4, 0.4);
+          // coast (Fjord art review D9): a block spread off its cluster onto a sheer wall would hang
+          // on the face; keep only blocks whose own ground is below ~45°
+          if (coast) {
+            const yr = mountain.heightAt(rx, rz);
+            if (Math.hypot(mountain.heightAt(rx + 3, rz) - yr, mountain.heightAt(rx, rz + 3) - yr) / 3 > 1.0) continue;
+          }
+          get(rx).rocks[vv]!.push({ x: rx, y: mountain.heightAt(rx, rz) - sz * 0.35, z: rz, rot: rotA, sx: sz * sxA, sy: sz * syA, sz: sz, rx: rxA, rz: rzA });
         }
       }
     }
@@ -327,7 +345,8 @@ export class Vegetation {
 
   update(camPos: THREE.Vector3, time: number, budgetMs = 2) {
     this.uTime.value = time;
-    if (this.queue.length) {
+    // (budgetMs ≤ 0: World's shared frame budget is spent — build nothing this frame, round 4)
+    if (this.queue.length && budgetMs > 0) {
       // nearest band first
       this.queue.sort((a, b) => Math.abs(a.band * BAND + BAND / 2 - camPos.z) - Math.abs(b.band * BAND + BAND / 2 - camPos.z));
       const t0 = performance.now();

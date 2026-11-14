@@ -16,6 +16,7 @@ const CASES = [
   ['alpine', 'B4C3', 'endurance', -60, 28, 0.8],
   ['alpine', 'B4C3', 'endurance', -60, 40, 0.8],
   ['alpine', 'B4C1', 'endurance', -100, 18, 0.4],
+  ['fjord', 'B4C2', 'standard', -60, 40, 0.8],
 ] as const;
 
 describe('no unrecoverable pocket at a cave mouth (engine-wide)', () => {
@@ -23,7 +24,7 @@ describe('no unrecoverable pocket at a cave mouth (engine-wide)', () => {
     it(`${biome} ${sd} ${len}: a skier steered into the cave side gets back to the line`, () => {
       const c = makeCourse('custom', len, { biome, customText: sd });
       const m = buildMountain(c);
-      const side = (biome as string) === 'fjord' ? -1 : 1;
+      const side = biome === 'fjord' ? -1 : 1;
       const e = m.profile.encounters(-Infinity, m.finishZ)[0]!;
       const z0 = e.caveZ + dz0;
       const p = new SkierPhysics(m, null, () => [], new BiomeEnvironment(m, worldSeed(c)));

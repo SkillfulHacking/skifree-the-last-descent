@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { World } from './World';
 import { GameSession } from './GameSession';
+import { autoUiScale } from '../ui/scale';
 import { SkierModel } from '../player/SkierModel';
 import { YetiModel } from '../yeti/YetiModel';
 import { AudioEngine } from '../audio/AudioEngine';
@@ -14,9 +15,11 @@ import { Hud } from '../ui/Hud';
 import { MenuSystem, type Screen, type MenuItem } from '../ui/Menu';
 import { applyRun, loadRecordBook, loadSettings, recordsFor, saveRecordBook, saveSettings, type RecordBook, type RunStats, type Settings, type Records } from '../core/settings';
 import type { QualityPreset } from '../core/types';
-import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
+import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, exampleCodes, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
 import { fmtDistance } from '../ui/Hud';
-import { getBiome, listBiomes } from '../world/biome';
+import { getBiome, hasBiome, listBiomes } from '../world/biome';
+import { capabilitiesOf } from '../world/capabilities';
+import { getHazardKind, hazardPhase } from '../world/hazards/hazard';
 import { locationNoteHtml, locationOptionLabel } from '../ui/location';
 import type { AutopilotStyle } from '../debug/autopilot';
 import { ProgressTracker } from '../progression/tracker';
@@ -134,6 +137,7 @@ export class App {
     this.camera.updateProjectionMatrix();
     this.applyPixelRatio();
     this.world?.particles.setPixelRatio(this.renderer.getPixelRatio(), innerHeight);
+    this.applyUiScale();
   }
 
   private applyVolumes() {
@@ -141,7 +145,7 @@ export class App {
   }
 
   private applyUiScale() {
-    document.documentElement.style.setProperty('--ui-scale', String(this.settings.uiScale));
+    document.documentElement.style.setProperty('--ui-scale', String(this.settings.uiScale * autoUiScale(innerWidth, innerHeight)));
   }
 
   private saveAll() {
@@ -203,7 +207,7 @@ export class App {
     this.world = world;
     // location: exposure and wind character follow the biome (alpine: 0.78 / unchanged)
     this.renderer.toneMappingExposure = world.biome.lighting.exposure;
-    this.audio.setAmbience(world.biome.audio);
+    this.audio.setAmbience(world.biome.audio, capabilitiesOf(world.biome).audio.ambience);
     world.particles.setPixelRatio(this.renderer.getPixelRatio(), innerHeight);
     // warm up shaders to avoid first-frame hitches
     this.placeMenuSkier();
@@ -453,7 +457,7 @@ export class App {
             // keep what was typed and say why, right next to the field (E1)
             this.codeDraft = v.slice(0, 32);
             const esc = this.codeDraft.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
-            this.codeError = `“${esc}” is not a course code (or that day hasn't happened yet). Codes look like DAILY-${today}-STD, CLASSIC-END or SEED-1234-SPR-H.`;
+            this.codeError = `“${esc}” is not a course code (or that day hasn't happened yet). Codes look like ${exampleCodes(today)}.`;
             changed();
             return false;
           }
@@ -508,6 +512,8 @@ export class App {
       onPauseRequest: () => this.pause(),
     }, { skipIntro: retry });
     this.trackSession(this.session);
+    // compile what the session brings (Hard: the snowball glint sprite) now, not at the first throw
+    for (const o of this.session.warmupObjects) this.renderer.compile(o, this.camera, this.world.scene);
     this.session.recordsSeenCave = this.book.seenCaveCinematic;
     this.session.onCaveSeen = () => {
       this.book.seenCaveCinematic = true;
@@ -585,7 +591,7 @@ export class App {
     const html = `<div class="stats">
       ${row('Course', `${courseLabel(this.world!.course)}`)}
       ${row('Course code', `<span class="code">${id}</span> · seed ${stats.seed ?? this.world!.seed}`)}
-      ${row('Result', won ? 'Reached the resort' : stats.banked ? `Retired at refuge ${stats.checkpoints}` : endless ? `Caught after ${stats.checkpoints} refuge${stats.checkpoints === 1 ? '' : 's'}` : 'Caught by the Yeti')}
+      ${row('Result', won ? `Reached the ${this.world!.finishDef.goal ?? 'resort'}` : stats.banked ? `Retired at refuge ${stats.checkpoints}` : endless ? `Caught after ${stats.checkpoints} refuge${stats.checkpoints === 1 ? '' : 's'}` : 'Caught by the Yeti')}
       ${row('Score', stats.score.toLocaleString('en-US') + nb('score'))}
       ${row('Time', fmtTime(stats.time) + (won ? nb('time') : ''))}
       ${row('Distance', fmtDistance(stats.distance) + nb('distance'))}
@@ -792,6 +798,11 @@ export class App {
       this.camera.position.y = Math.max(this.camera.position.y, gy + 3.5);
       this.camera.lookAt(cx + 4, cy + 1.5, 60);
       this.camera.fov = 55;
+      if (w.scenery?.menuCamera?.(this.menuTime, this.menuCam)) {
+        this.camera.position.copy(this.menuCam.pos);
+        this.camera.lookAt(this.menuCam.look);
+        this.camera.fov = this.menuCam.fov;
+      }
       this.camera.updateProjectionMatrix();
       this.skier?.update(dt, { steer: 0, lean: 0, tuck: 0, pizza: 0.25, drift: 0, driftAngle: 0, crouch: 0, airborne: false, airTime: 0, landImpact: 0, crashed: false, crashTime: 0, recover: 0, speed: 0, lookBack: 0, celebrate: 0, wobble: 0, time: this.menuTime });
       w.update(dt, this.menuTime, this.skier?.root.position ?? this.camera.position, this.camera.position, 4);
@@ -825,6 +836,7 @@ export class App {
     });
   }
 
+  private menuCam = { pos: new THREE.Vector3(), look: new THREE.Vector3(), fov: 55 };
   private yetiRim: THREE.PointLight | null = null;
   private rearCam = new THREE.PerspectiveCamera(48, 2.4, 0.2, 2500);
   private rearPose = { pos: new THREE.Vector3(), look: new THREE.Vector3() };
@@ -842,10 +854,12 @@ export class App {
     if (k <= 0.02 || !this.world) return null;
     const W = innerWidth;
     const H = innerHeight;
-    const w = Math.round(Math.min(420, W * 0.3));
+    // (round 4b, E r4: the window and its label scale with the UI, like the HUD around it)
+    const ui = this.settings.uiScale * autoUiScale(W, H);
+    const w = Math.round(Math.min(420 * ui, W * 0.3));
     const h = Math.round(w / 2.4);
     const x = Math.round((W - w) / 2);
-    const top = 78;
+    const top = Math.round(78 * ui);
     this.rearFrame.style.cssText = `left:${x}px;top:${top}px;width:${w}px;height:${h}px;opacity:${k}`;
     this.rearCam.position.copy(this.rearPose.pos);
     this.rearCam.lookAt(this.rearPose.look);
@@ -923,12 +937,13 @@ export class App {
     const api = {
       state: () => ({ mode: this.mode, menu: this.menu.current?.id ?? null, session: this.session?.debugState() ?? null, records: this.records, course: this.world ? { id: this.world.id, label: courseLabel(this.world.course), seed: this.world.seed, finishZ: this.world.mountain.finishZ } : null }),
       /** select a course like the menu does (persists to settings), e.g. setCourse('daily','sprint',{date}) */
-      setCourse: (mode: CourseMode, length: LengthMode, opts: { date?: string | null; custom?: string; difficulty?: Difficulty } = {}) => {
+      setCourse: (mode: CourseMode, length: LengthMode, opts: { date?: string | null; custom?: string; difficulty?: Difficulty; biome?: string } = {}) => {
         this.settings.course = mode;
         this.settings.courseLength = length;
         if (opts.date !== undefined) this.settings.dailyDate = opts.date;
         if (opts.custom) this.settings.customSeed = opts.custom;
         if (opts.difficulty) this.settings.difficulty = opts.difficulty;
+        if (opts.biome && hasBiome(opts.biome)) this.settings.biome = opts.biome;
         this.saveAll();
         if (this.mode === 'menu') this.menu.replace(this.mainScreen());
         return courseId(this.currentCourse());
@@ -948,7 +963,8 @@ export class App {
       },
       startRun: (skipIntro = true) => this.startRun(skipIntro, false),
       toMenu: () => this.toMenu(),
-      teleport: (z: number, speed = 18) => this.session?.debugTeleport(z, speed),
+      /** (evidence captures) optional x and heading (rad, 0 = down the course +Z) */
+      teleport: (z: number, speed = 18, x?: number, heading?: number) => this.session?.debugTeleport(z, speed, x, heading),
       toCave: () => {
         const e = this.session?.run.encounter;
         if (e) this.session?.debugTeleport(e.triggerZ - 12, 16);
@@ -1029,6 +1045,23 @@ export class App {
         return { visible: y.root.visible, phase: s?.run.phase ?? null, mode: s?.yetiAnim.mode ?? null, t: s?.debugState().cinematicTime ?? -1, rootAboveFloor: r.y - floor(r.x, r.z), left: out['left']!, right: out['right']!, handL, handR, headBelowRoof: headRoof, roofClearance: roof, pos: r.toArray().map((v) => +v.toFixed(3)) };
       },
       world: () => this.world,
+      /** evidence captures: hide/show the HUD (letterbox/titles stay under the session's control) */
+      hud: (v: boolean) => this.hud.show(v),
+      /** streamed hazards around the skier with their phase on the physics clock */
+      hazards: (kind?: string) => {
+        const w = this.world;
+        if (!w) return [];
+        const t = w.environment.clock;
+        return [...w.environment.hazards.all()].filter((h) => !kind || h.kind === kind).map((h) => ({ id: h.id, kind: h.kind, x: h.x, y: h.y, z: h.z, r: h.r, phase: hazardPhase(getHazardKind(h.kind), h, t).phase }));
+      },
+      /** a coastal location's features: viewpoints, sea levels, rim (evidence captures / tests) */
+      coast: (z0 = 0, z1 = 60000) => {
+        const c = this.world?.mountain.coast;
+        if (!c) return null;
+        return { lookouts: c.lookouts(z0, z1), reaches: c.reaches(z0, z1).map((r) => ({ ...r, z1: Number.isFinite(r.z1) ? r.z1 : null })), seaLevel: c.seaLevel, discovered: [...(this.session?.discovered ?? [])] };
+      },
+      /** scenery streaming counts (water surfaces, chunks, ships, mist) */
+      scenery: () => this.world?.scenery?.stats?.() ?? null,
       renderer: this.renderer,
       camera: this.camera,
       cameraPose: () => ({ pos: this.camera.position.toArray(), fov: this.camera.fov }),
@@ -1042,3 +1075,4 @@ export function fmtTime(s: number): string {
   const r = s - m * 60;
   return `${m}:${r.toFixed(1).padStart(4, '0')}`;
 }
+

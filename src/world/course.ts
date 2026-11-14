@@ -10,12 +10,21 @@ import type { SurfaceType } from '../core/types';
 import { caveTerrainHeight, CAVE_INFLUENCE_Z, type CaveAnchor } from './caveTerrain';
 import { CLASSIC, foreshadowFor, ClassicProfile, GeneratedProfile, type CliffBand, type CourseProfile, type Kicker } from './profile';
 import { getBiome, type Biome } from './biome';
+import { Coast, FJORD_HEAD_Z } from './coast';
+import { CliffModel } from './art/cliffModel';
 
 export type { Kicker, CliffBand, CourseProfile, Encounter, Sighting, SegmentType, AltRoute } from './profile';
 import type { AltRoute } from './profile';
 export { CAVE_D, CAVE_FLOOR_RAISE } from './caveTerrain';
 
 export const SEED_DEFAULT = 20261106;
+/** coastal locations: share of the valley-wall rise kept on the sea side (a low bank to the rim) */
+const SEA_BANK = 0.22;
+/** coastal locations: share of the valley cross-section's rise kept on the sea side of the piste */
+const SEA_CROSS = 0.4;
+/** a sea-side cave's hillside (Mountain.seaCaveK): full within this z distance, gone beyond the next */
+export const SEA_CAVE_NEAR = 90;
+export const SEA_CAVE_FAR = 170;
 
 /** Classic-course constants (the original 3 km mountain). New code should ask the profile. */
 export const COURSE = {
@@ -42,9 +51,22 @@ export class Mountain {
   private readonly kDrifts: number;
   private readonly kDriftsPowder: number;
   private readonly kRollers: number;
+  private readonly kRangeSoft: number;
   private kTmp: Kicker[] = [];
   private cTmp: CliffBand[] = [];
   private caveCache: { z0: number; z1: number; list: CaveAnchor[] } = { z0: 1, z1: 0, list: [] };
+  /**
+   * The sea coast beside the course (biomes with `terrain.coast`, e.g. Fjord Coast): cliffs, fjord
+   * water levels, islands, the harbour shore. null for inland locations (Alpine): heights unchanged.
+   */
+  readonly coast: Coast | null;
+  /**
+   * Round 4 (art pipeline, `terrain.coast.cliffKit`): the authored sea-cliff model. The cliffs are
+   * meshes (art/cliffKit.ts, streamed by the location's scenery); the heightfield keeps every
+   * land-side height and draws only a hidden backing under them. null without a coast or the flag.
+   */
+  readonly cliff: CliffModel | null = null;
+  private readonly landAt = (x: number, z: number) => this.landHeight(x, z);
 
   /**
    * `new Mountain()` / `new Mountain(seed)` → the classic course; pass a profile for any other.
@@ -62,12 +84,25 @@ export class Mountain {
     this.kDrifts = t.drifts;
     this.kDriftsPowder = t.driftsPowder;
     this.kRollers = t.rollers;
+    this.kRangeSoft = t.rangeSoft ?? 0;
     if (typeof seedOrProfile === 'number') {
       this.seed = seedOrProfile;
       this.profile = new ClassicProfile(seedOrProfile);
     } else {
       this.profile = seedOrProfile;
       this.seed = seed ?? SEED_DEFAULT;
+    }
+    this.coast = t.coast ? new Coast(this.profile, this.seed, t.coast) : null;
+    if (this.coast) this.coast.terrain = (x, z) => this.heightAt(x, z);
+    if (this.coast && t.coast?.cliffKit) {
+      const coast = this.coast;
+      this.cliff = new CliffModel({
+        seed: this.seed,
+        rimX: (z) => coast.rimX(z),
+        landHeight: (x, z) => this.coastHeight(x, z),
+        waterLevel: (z) => coast.seaLevelAt(z),
+        strand: (z) => coast.strandMask(z),
+      });
     }
   }
 
@@ -143,8 +178,95 @@ export class Mountain {
     return this.profile.encounters(-Infinity, Number.isFinite(this.profile.finishZ) ? this.profile.finishZ : 30000).map((e) => e.anchor);
   }
 
+  /**
+   * 0..1: how much a Yeti cave cut into the SEA side (anchor.side −1 on a coast) shapes the ground
+   * at z: the valley side there is the ordinary hillside the cave contract expects (1 within 90 m of
+   * the cave, gone by 170 m).
+   */
+  seaCaveK(z: number): number {
+    let k = 0;
+    for (const c of this.cavesNear(z, z)) if (c.side < 0) k = Math.max(k, 1 - smoothstep(SEA_CAVE_NEAR, SEA_CAVE_FAR, Math.abs(z - c.z)));
+    return k;
+  }
+
   /** Terrain height at world (x, z). */
   heightAt(x: number, z: number): number {
+    const h = this.landHeight(x, z);
+    if (!this.coast) return h;
+    const s = this.coast.shape(x, z, h, this.landAt);
+    return this.cliff ? this.kitHeight(x, z, s) : s;
+  }
+
+  /** the coast's heightfield without the cliff kit (round 3); identical to heightAt on the land side */
+  coastHeight(x: number, z: number): number {
+    const h = this.landHeight(x, z);
+    return this.coast ? this.coast.shape(x, z, h, this.landAt) : h;
+  }
+
+  /**
+   * 0..1: how much of the cliff kit applies at z. None at the headland ridges between fjord arms, the fjord head
+   * (the levels change there; the ridge stays heightfield) nor at the finish harbour. The scenery
+   * builds cliff meshes only where this is 1.
+   */
+  cliffKitWeight(z: number): number {
+    const c = this.coast;
+    if (!c || !this.cliff) return 0;
+    let k = 1;
+    for (const cr of c.crestsIn(z - 600, z + 600)) k = Math.min(k, smoothstep(260, 520, Math.abs(z - cr)));
+    if (c.finite) k *= 1 - smoothstep(c.finishZ - 520, c.finishZ - 300, z);
+    // nor at the fjord head (the ridge closing the first arm)
+    k *= smoothstep(FJORD_HEAD_Z + 260, FJORD_HEAD_Z + 520, z);
+    return k;
+  }
+
+  /**
+   * The sea side under the cliff kit: beyond the rim crest the heightfield becomes the hidden
+   * backing (the face pushed inland and down, so it never pokes through the mesh), the strand flats
+   * of the hamlets, the fjord bed and the round-3 islands (one island language in every frame).
+   * The far shore, the headland ridges and the harbour are unchanged; the land side is untouched.
+   */
+  private kitHeight(x: number, z: number, h: number): number {
+    const c = this.coast!;
+    const t = c.beyondRim(x, z);
+    if (t <= 0.5) return h;
+    const k = this.cliffKitWeight(z);
+    if (k <= 0) return h;
+    const cliff = this.cliff!;
+    let out = cliff.backingHeight(z, t, c.p.depth);
+    const foot = cliff.footOffset(cliff.gridColumn(z));
+    const wI = smoothstep(foot + 260, foot + 560, t);
+    if (wI > 0) {
+      const isl = c.islandHeight(x, z);
+      if (isl > out) out += (isl - out) * wI;
+    }
+    // the far shore (across the fjord) is unchanged
+    const ef = -x - c.farShore(z);
+    if (ef > -760) {
+      const f = smoothstep(-760, -620, ef);
+      out = Math.max(out, h * f + out * (1 - f));
+    }
+    // continuous at the crest: the backing never drops faster than 20 m per m below the round-3 rim
+    // (a step would be a crease for physics; the line stays inside the mesh's rounded lip)
+    // (a 2:1 shoulder over the first 2 m — a skier stopped on the crest slides off and is put back
+    // on the piste, fjord_cornice.test — then at most 20 m per m)
+    out = Math.max(out, h - 2 * (t - 0.5) - 18 * Math.max(0, t - 2.5));
+    return h + (out - h) * k;
+  }
+
+  /**
+   * The far ranges with rounded summits (terrain.rangeSoft, Fjord): the same ridged field without its
+   * two finest octaves (the 32–64 m far tiles sample those as single-vertex needles), its crest
+   * compressed above 0.55 (broad shoulders, not knife edges) and a smooth fbm swell instead.
+   */
+  private softRange(x: number, z: number, s: number): number {
+    const r = ridged(x / 900, z / 900, s + 11, 3);
+    const k = this.kRangeSoft;
+    const crest = r > 0.55 ? 0.55 + (r - 0.55) * (1 - 0.6 * k) : r;
+    return crest + 0.12 * k * (0.5 + 0.5 * fbm(x / 520, z / 520, s + 12, 3));
+  }
+
+  /** Height of the land (everything but a coast's cliffs and sea), at world (x, z). */
+  private landHeight(x: number, z: number): number {
     const P = this.profile;
     const s = this.seed;
     const cx = P.centerX(z);
@@ -159,8 +281,12 @@ export class Mountain {
       h += 0.00022 * b * b + 0.18 * b;
     }
 
-    // valley cross-section
-    h += 0.0016 * d * d * (ad < w ? 1 : w / ad);
+    // valley cross-section (a coast: the sea side is flatter, so the rim and the sea beyond it sit
+    // low in the gameplay view instead of behind a rising bank — art request R1 — except around a
+    // sea-side cave, which is cut into an ordinary valley side: R4)
+    const cross = 0.0016 * d * d * (ad < w ? 1 : w / ad);
+    const seaCave = this.coast && d < 0 ? this.seaCaveK(z) : 0;
+    h += this.coast && d < 0 ? cross * (SEA_CROSS + (1 - SEA_CROSS) * seaCave) : cross;
     // each side of the valley has its own character: banks set back further or closer, steeper or gentler
     const side: 1 | -1 = d >= 0 ? 1 : -1;
     const sideW = w * P.sideSetback(z, side);
@@ -171,12 +297,21 @@ export class Mountain {
       const wall = this.kWall * (1 - Math.exp(-(es * es) / (2 * 230 * 230))) + 0.0025 * es * es * Math.exp(-es / 120) + 0.04 * es;
       // wall relief: ridged noise gives spurs and gullies, but on its own its sharp creases read as
       // "egg-crate" spikes (A30) — blend in smooth fbm and soften the finest octave
-      const rr = ridged(x / 160, z / 160, s + 7, 3);
+      // (round 4b, A r4 M1: on the Fjord the valley walls are seen whole in the summit-to-sea reveal,
+      // where the 32–64 m far tiles turn the finest ridged octave into needle spikes: rangeSoft drops
+      // that octave and compresses the crests into shoulders, like the far ranges)
+      let rr = ridged(x / 160, z / 160, s + 7, this.kRangeSoft > 0 ? 2 : 3);
+      if (this.kRangeSoft > 0 && rr > 0.5) rr = 0.5 + (rr - 0.5) * (1 - 0.6 * this.kRangeSoft);
       const rf = 0.5 + 0.5 * fbm(x / 210, z / 210, s + 17, 3);
       const rough = (0.55 * rr + 0.45 * rf) * this.kRelief * smoothstep(30, 220, e) * (0.6 + 0.4 * P.rockBias(z));
-      h += wall + rough;
-      // distant ranges
-      h += this.kRanges * smoothstep(350, 2600, e) * (0.35 + ridged(x / 900, z / 900, s + 11, 5));
+      if (side < 0 && this.coast) {
+        // a coast: the sea side is only a low bank up to the cliff rim (open views over the fjord)
+        h += (wall + rough) * (SEA_BANK + (1 - SEA_BANK) * seaCave);
+      } else {
+        h += wall + rough;
+        // distant ranges
+        h += this.kRanges * smoothstep(350, 2600, e) * (0.35 + (this.kRangeSoft > 0 ? this.softRange(x, z, s) : ridged(x / 900, z / 900, s + 11, 5)));
+      }
     }
 
     // rolling large-scale undulation

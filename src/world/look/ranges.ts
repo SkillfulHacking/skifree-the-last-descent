@@ -7,7 +7,7 @@
  * Cost: 3 ridge rings (~2.3k triangles each) + 1 band = 4 draw calls.
  */
 import * as THREE from 'three';
-import { Rng, gnoise, ridged } from '../../core/rng';
+import { Rng, gnoise, ridged, smoothstep } from '../../core/rng';
 import { GLSL_NOISE } from '../snowMaterial';
 import { ATMOSPHERE_GLSL, addAtmosphereUniforms } from './atmosphere';
 import { getBiome, glslVec3, type BiomeRangesLook } from '../biome';
@@ -49,7 +49,27 @@ function ridgeHeight(a: number, L: Layer): number {
   return L.h0 + (L.h1 - L.h0) * t;
 }
 
-function ringGeometry(L: Layer): THREE.BufferGeometry {
+/** angular distance (radians, 0..π) */
+function angDist(a: number, b: number): number {
+  let d = Math.abs(a - b) % (Math.PI * 2);
+  if (d > Math.PI) d = Math.PI * 2 - d;
+  return d;
+}
+
+/**
+ * Far-plane guard. The haze band (r = 11.6 km) and the outer ridge ring (up to ~11.6 km with its
+ * lean-back) sit just inside the camera's 12 km far plane, so with any pitch their lower parts
+ * cross it: the GPU clips them and the raw sky dome shows through as a hard-edged block (the Fjord
+ * round-1 "peach rectangle" in 04b/06: the clipped region of the band in front of the warm
+ * low-sun sky). Where a fragment would lie beyond the far plane it is pinned just inside it instead
+ * (depth order with everything nearer is unchanged). Only for looks with an open sector (Fjord):
+ * there no ridge stands behind the band to hide the hole, and the Alpine shaders stay unchanged.
+ */
+function FAR_CLAMP(look: BiomeRangesLook): string {
+  return look.openSector ? '\n  gl_Position.z = min(gl_Position.z, gl_Position.w * 0.99999);' : '';
+}
+
+function ringGeometry(L: Layer, open?: BiomeRangesLook['openSector'], rot = 0): THREE.BufferGeometry {
   const rng = new Rng(L.seed * 977);
   const nR = ROWS.length;
   const pos = new Float32Array((SEG + 1) * nR * 3);
@@ -58,7 +78,12 @@ function ringGeometry(L: Layer): THREE.BufferGeometry {
   for (let i = 0; i <= SEG; i++) jit.push(i === SEG ? jit[0]! : rng.range(-0.25, 0.25));
   for (let i = 0; i <= SEG; i++) {
     const a = ((i + jit[i]! * 0.5) / SEG) * Math.PI * 2;
-    const h = ridgeHeight(a, L);
+    let h = ridgeHeight(a, L);
+    if (open) {
+      // the mesh is rotated by `rot` about Y: local angle a points at world angle a − rot
+      const m = 1 - smoothstep(open.halfWidth * 0.55, open.halfWidth, angDist(a - rot, open.center));
+      h *= 1 - m * (1 - open.floor);
+    }
     // sub-ridges: spurs running down the face
     for (let r = 0; r < nR; r++) {
       const [f, back] = ROWS[r]!;
@@ -126,7 +151,7 @@ void main() {
   vL = position;
   vN = normalize(mat3(modelMatrix) * normal);
   vH = aH;
-  gl_Position = projectionMatrix * viewMatrix * w;
+  gl_Position = projectionMatrix * viewMatrix * w;${FAR_CLAMP(look)}
 }`,
     fragmentShader: /* glsl */ `
 uniform vec3 uSun;
@@ -195,7 +220,7 @@ void main() {
   });
 }
 
-function hazeBand(): { mesh: THREE.Mesh; mat: THREE.ShaderMaterial } {
+function hazeBand(look: BiomeRangesLook): { mesh: THREE.Mesh; mat: THREE.ShaderMaterial } {
   const R = 11600;
   const g = new THREE.CylinderGeometry(R, R, 9000, 64, 1, true);
   g.translate(0, 1500, 0);
@@ -210,7 +235,7 @@ void main() {
   vec4 w = modelMatrix * vec4(position, 1.0);
   vW = w.xyz;
   vY = position.y;
-  gl_Position = projectionMatrix * viewMatrix * w;
+  gl_Position = projectionMatrix * viewMatrix * w;${FAR_CLAMP(look)}
 }`,
     fragmentShader: /* glsl */ `
 varying vec3 vW;
@@ -223,7 +248,7 @@ void main() {
   float a = 1.0 - smoothstep(-0.02, 0.16, el);
   a = a * a * (3.0 - 2.0 * a);
   // fog colour is a display-space value (as with three's built-in fog, mixed after tone mapping)
-  gl_FragColor = vec4(sf_fogColor(v), a * 0.92);
+  gl_FragColor = vec4(sf_fogColor(v), a * ${look.horizonHaze === undefined ? '0.92' : look.horizonHaze.toFixed(3)});
 }`,
     transparent: true,
     depthWrite: false,
@@ -246,7 +271,7 @@ export class DistantRanges {
   constructor(sunDir: THREE.Vector3, sunColor: THREE.Color, skyColor: THREE.Color, look: BiomeRangesLook = getBiome().ranges) {
     this.group.name = 'DistantRanges';
     for (const L of LAYERS) {
-      const g = ringGeometry(L);
+      const g = look.openSector ? ringGeometry(L, look.openSector, L.seed * 0.71) : ringGeometry(L);
       const m = ridgeMaterial(L, sunDir, sunColor, skyColor, look);
       const mesh = new THREE.Mesh(g, m);
       mesh.frustumCulled = false;
@@ -257,7 +282,7 @@ export class DistantRanges {
       this.geos.push(g);
       this.mats.push(m);
     }
-    const band = hazeBand();
+    const band = hazeBand(look);
     this.group.add(band.mesh);
     this.geos.push(band.mesh.geometry);
     this.mats.push(band.mat);

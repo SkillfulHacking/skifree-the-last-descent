@@ -26,6 +26,7 @@ export class AudioEngine {
   private disposed = false;
   private unlocking: Promise<void> | null = null;
   private wind = { gain: 1, pitch: 1 };
+  private beds: readonly string[] = ['wind'];
 
   constructor() {}
 
@@ -56,6 +57,7 @@ export class AudioEngine {
         if (this.mode !== 'none') this.core.setMusicMode(this.mode);
         this.core.ambience.windGain = this.wind.gain;
         this.core.ambience.windPitch = this.wind.pitch;
+        if (this.beds.some((b) => b !== 'wind')) this.core.ambience.setBeds(this.beds);
         this.startScheduler();
       }
       if (this.ctx.state !== 'running') await this.ctx.resume();
@@ -95,13 +97,21 @@ export class AudioEngine {
   }
 
   /** Location ambience (biome audio): wind gain / pitch multipliers. Remembered if called before unlock. */
-  setAmbience(a: { windGain: number; windPitch: number }): void {
+  setAmbience(a: { windGain: number; windPitch: number }, beds: readonly string[] = ['wind']): void {
     this.wind = { gain: a.windGain, pitch: a.windPitch };
+    const changed = beds.join() !== this.beds.join();
+    this.beds = beds;
     this.safe(() => {
       if (!this.core) return;
       this.core.ambience.windGain = a.windGain;
       this.core.ambience.windPitch = a.windPitch;
+      if (changed) this.core.ambience.setBeds(beds);
     });
+  }
+
+  /** A location cue by id (hazard telegraph/active/hit, viewpoints), optionally positional. */
+  playCue(id: string, pos: THREE.Vector3 | null): void {
+    this.safe(() => this.core?.playCue(id, pos));
   }
 
   /** Per-frame continuous state (wind, skis, yeti breathing, chase intensity, crowd, listener). */

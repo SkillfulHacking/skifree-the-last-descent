@@ -93,6 +93,10 @@ export interface HazardContact {
   heightAbove: number;
   /** physics time (s) */
   t: number;
+  /** × effect strength for the game difficulty (HazardSetup.intensity; 1 when not set) */
+  intensity?: number;
+  /** how far the skier is tucked, 0..1 (undefined when the caller does not know) */
+  tuck?: number;
 }
 
 /** What touching a hazard does this step (everything optional; null = nothing). */
@@ -103,9 +107,24 @@ export interface HazardEffect {
   knock?: { keep: number; wobble: number };
   /** crash the skier. Fired once per contact. */
   crash?: { reason: string; intensity: number };
-  /** extra wind (m/s) at the skier, e.g. a vent's updraft or a funnelled gust */
+  /** extra wind (m/s) at the skier, e.g. a vent's updraft or a funnelled gust (airborne coupling) */
   windX?: number;
   windZ?: number;
+  /**
+   * Side-slip a gust forces on a GROUNDED skier (m/s, world axes; +X is the skier's left when
+   * facing downhill): the snow surface is blown out from under the skis, so the skier slides that
+   * way without gaining or losing speed. How much of it takes hold depends on the edge (more when
+   * tucked or drifting, less when the skis bite: SkierPhysics). Counter it by steering against it.
+   * Keep |slip| ≤ 4.
+   */
+  slipX?: number;
+  slipZ?: number;
+  /**
+   * Horizontal push on an AIRBORNE skier (m/s², world axes), applied directly (not through the
+   * weather's airborne coupling): a gust funnelled over a jump that carries a skier a few metres
+   * sideways before they land. Keep |push| ≤ 8.
+   */
+  airPushX?: number;
   /** × fog density for the renderer (steam, fog bank) */
   visibility?: number;
 }

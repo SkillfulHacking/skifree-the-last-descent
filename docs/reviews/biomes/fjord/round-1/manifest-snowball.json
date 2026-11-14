@@ -1,0 +1,43 @@
+{
+  "biome": "fjord",
+  "course": "classic:sprint",
+  "viewport": "1920x1080",
+  "sha": "cb87428",
+  "date": "2026-11-10T08:03:36.539Z",
+  "shots": [
+    {
+      "name": "09b_hard_snowball",
+      "note": "Hard: the Yeti winds up / releases a snowball during ordinary chase gameplay (rear view + landing marker)",
+      "camera": {
+        "pos": [
+          17.487210473805376,
+          -120.0059424213953,
+          583.5453018321443
+        ],
+        "fov": 69.03970927023947
+      },
+      "phase": "chase",
+      "z": 589.461329220515,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR-H@FJORD"
+    },
+    {
+      "name": "09c_hard_snowball_marker",
+      "note": "Hard: snowball in flight, landing marker on the snow",
+      "camera": {
+        "pos": [
+          18.68079526102491,
+          -121.19252264946175,
+          589.4802691631076
+        ],
+        "fov": 69.34188357636432
+      },
+      "phase": "chase",
+      "z": 595.4229916484596,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR-H@FJORD"
+    }
+  ],
+  "errors": [],
+  "seconds": 810
+}

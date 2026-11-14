@@ -33,7 +33,8 @@ import { buildMountain, courseId, worldSeed, type CourseConfig } from './CourseC
 import type { Biome } from '../world/biome';
 import { BiomeEnvironment } from '../world/capabilities/environment';
 import { makeWeatherSample } from '../world/capabilities/weather';
-import { HazardLayer, presentationOf, type BiomePresentation, type CaveDressing, type FinishDefinition, type FinishEnvironment, type RefugeView } from '../world/presentation';
+import { frameBudget } from '../core/frameBudget';
+import { HazardLayer, presentationOf, type BiomePresentation, type CaveDressing, type FinishDefinition, type FinishEnvironment, type RefugeView, type SceneryView } from '../world/presentation';
 
 export interface CaveSlot {
   enc: Encounter;
@@ -44,6 +45,21 @@ export interface CaveSlot {
 }
 
 const ORIGIN_STEP = 1024;
+
+/**
+ * One streaming budget per frame (ms of main-thread time), shared by every streaming consumer in
+ * priority order (round 4, Reviewer D r3 defect 1: terrain 3.5 + caves 4 + dressing 3 + scenery 3 +
+ * hazard views 2 + vegetation 2 ms each ran in the same frame, and each overshot by one unit).
+ */
+export const STREAM_BUDGET_MS = 6;
+/** a consumer with work pending that has had no turn for this many frames gets one minimal slice */
+export const STREAM_STARVE_FRAMES = 8;
+/** streaming consumers, highest priority first */
+const STREAM_ORDER = ['terrain', 'obstacles', 'vegetation', 'hazards', 'caves', 'scenery', 'lodges', 'far'] as const;
+type StreamConsumer = (typeof STREAM_ORDER)[number];
+
+/** hazard bands (and their views) are streamed this far ahead of the skier, m */
+export const HAZARD_VIEW_AHEAD = 1100;
 
 export class World {
   readonly scene = new THREE.Scene();
@@ -66,6 +82,8 @@ export class World {
   readonly hazardViews: HazardLayer;
   /** finish / refuge / cave presentation of this location */
   readonly presentation: BiomePresentation;
+  /** the location's streamed set dressing (Fjord: water, mist, hamlets, boats …); null for Alpine */
+  readonly scenery: SceneryView | null;
   /** weather at the focus this frame (physics clock) */
   readonly weather = makeWeatherSample();
   readonly particles: Particles;
@@ -80,11 +98,17 @@ export class World {
   private caves = new Map<number, CaveSlot>();
   /** caves being built in time slices (one step per frame) */
   private caveJobs = new Map<number, { enc: Encounter; job: Generator<void, Cave, void> }>();
+  /** location dressings being built in time slices after their cave (round 3, D2) */
+  private dressJobs = new Map<number, Generator<void, CaveDressing | null, void>>();
   private lodges = new Map<number, RefugeView>();
+  /** refuges being built in time slices */
+  private lodgeJobs = new Map<number, Generator<void, RefugeView, void>>();
   private markers = new Map<number, AltMarkers>();
   /** the encounter the session cares about now (set by GameSession) */
   focusEncounter: Encounter | null = null;
   private streamZ = -Infinity;
+  /** focus z of the last stream() (the visual obstacle window starts here) */
+  private streamZ0 = 0;
 
   private constructor(renderer: THREE.WebGLRenderer, quality: QualityPreset, course: CourseConfig) {
     this.quality = quality;
@@ -96,7 +120,7 @@ export class World {
     this.obstacles = new ObstacleField(this.mountain, this.seed);
     this.presentation = presentationOf(this.biome);
     this.finishDef = this.presentation.finish;
-    this.environment = new BiomeEnvironment(this.mountain, this.seed);
+    this.environment = new BiomeEnvironment(this.mountain, this.seed, { difficulty: course.difficulty });
     this.terrain = new TerrainRenderer(this.mountain, quality);
     this.scene.add(this.terrain.group);
     this.env = new Environment(this.scene, renderer, quality, this.biome);
@@ -116,7 +140,9 @@ export class World {
     } else this.finish = null;
     this.hazardViews = new HazardLayer(this.environment, { mountain: this.mountain, quality, biome: this.biome });
     this.scene.add(this.hazardViews.group);
-    this.start = new StartArea(this.mountain);
+    this.scenery = this.presentation.scenery?.build({ mountain: this.mountain, quality, biome: this.biome, terrain: this.terrain.uniforms, sunDir: this.env.sunDir }) ?? null;
+    if (this.scenery) this.scene.add(this.scenery.group);
+    this.start = new StartArea(this.mountain, quality);
     this.scene.add(this.start.group);
     const cap = { low: 2500, medium: 4500, high: 7000, ultra: 10000 }[quality];
     this.particles = new Particles(cap, renderer.getPixelRatio());
@@ -152,22 +178,33 @@ export class World {
     // physics-critical window: always complete
     this.obstacles.ensure(z - 80, z + 400);
     this.environment.stream(z);
-    // visual window: nearest missing band first, one per frame
-    if (all) this.obstacles.ensure(z - 600, z + ahead);
-    else {
-      for (let d = 0; d <= ahead; d += BAND) {
-        const before = this.obstacles.bandCount;
-        this.obstacles.ensure(z + d, z + d);
-        if (this.obstacles.bandCount !== before) break;
+    // hazard views further out (a windsock or a rock patch should not pop in 400 m ahead): one
+    // more band per call, out to HAZARD_VIEW_AHEAD
+    if (!this.environment.hazards.empty) {
+      if (all) {
+        this.environment.hazards.ensure(z - 80, z + HAZARD_VIEW_AHEAD);
+        this.hazardViews.flush();
       }
+      else
+        for (let d = 400; d <= HAZARD_VIEW_AHEAD; d += BAND) {
+          const before = this.environment.hazards.bandCount;
+          this.environment.hazards.ensure(z + d, z + d);
+          if (this.environment.hazards.bandCount !== before) break;
+        }
     }
+    // visual window (trees and rocks seen ahead): time-sliced on the frame's streaming budget
+    // (round 4: a coastal band was 16–25 ms in one frame); the physics window above is always whole
+    this.streamZ0 = z;
+    if (all) this.obstacles.ensure(z - 600, z + ahead);
     if (all || Math.abs(z - this.streamZ) > 64) {
       this.streamZ = z;
       this.obstacles.release(z - 900, z + ahead + 400);
       this.environment.release(z - 900, z + ahead + 400);
+      this.scenery?.stream(z);
+      if (all) this.scenery?.flush?.();
       this.syncCaves(z);
       if (all) for (const j of [...this.caveJobs.values()]) this.buildCave(j.enc);
-      this.syncLodges(z);
+      this.syncLodges(z, all);
     }
   }
 
@@ -198,8 +235,12 @@ export class World {
     });
   }
 
-  /** Advance pending cave builds by one slice (called every frame). */
+  /** Advance pending cave builds by one slice (called every frame): dressings first, then caves. */
   private stepCaves() {
+    for (const i of this.dressJobs.keys()) {
+      this.stepDressing(i, false);
+      return; // one slice per frame
+    }
     for (const [i, j] of this.caveJobs) {
       const r = j.job.next();
       if (r.done) {
@@ -220,20 +261,59 @@ export class World {
       cave = r.value;
       this.caveJobs.delete(e.index);
     } else cave = new Cave(this.mountain, e.anchor, this.quality);
-    return this.installCave(e, cave);
+    return this.installCave(e, cave, true);
   }
 
-  private installCave(e: Encounter, cave: Cave): CaveSlot {
+  private installCave(e: Encounter, cave: Cave, sync = false): CaveSlot {
     const story = new StoryProps(this.mountain, this.footprints, e.anchor);
     this.scene.add(cave.group, story.group);
-    const dressing = this.presentation.cave.dress?.({ mountain: this.mountain, anchor: e.anchor, cave, quality: this.quality, biome: this.biome }) ?? null;
-    if (dressing) this.scene.add(dressing.group);
-    const slot = { enc: e, cave, story, dressing };
+    const slot: CaveSlot = { enc: e, cave, story, dressing: null };
     this.caves.set(e.index, slot);
+    // the location's dressing: built in slices of its own after the cave (never in the frame that
+    // finishes the cave); a presentation without `dressSteps` still gets a frame of its own
+    const P = this.presentation.cave;
+    const ctx = { mountain: this.mountain, anchor: e.anchor, cave, quality: this.quality, biome: this.biome };
+    const job = P.dressSteps
+      ? P.dressSteps(ctx)
+      : P.dress
+        ? (function* (): Generator<void, CaveDressing | null, void> {
+            yield;
+            return P.dress!(ctx);
+          })()
+        : null;
+    if (job) {
+      this.dressJobs.set(e.index, job);
+      if (sync) this.stepDressing(e.index, true);
+    }
     return slot;
   }
 
+  /** advance (or with `all`, finish) the dressing job of a cave; attach it when done */
+  private stepDressing(i: number, all: boolean) {
+    const job = this.dressJobs.get(i);
+    if (!job) return;
+    let r = job.next();
+    while (all && !r.done) r = job.next();
+    if (!r.done) return;
+    this.dressJobs.delete(i);
+    const slot = this.caves.get(i);
+    const d = r.value;
+    if (!d) return;
+    if (!slot) {
+      d.dispose();
+      return;
+    }
+    slot.dressing = d;
+    this.scene.add(d.group);
+  }
+
   private disposeCave(s: CaveSlot) {
+    const job = this.dressJobs.get(s.enc.index);
+    if (job) {
+      // abandon a half-built dressing (a generator's finally blocks dispose its partial work)
+      this.dressJobs.delete(s.enc.index);
+      job.return(null);
+    }
     this.scene.remove(s.cave.group, s.story.group);
     s.cave.dispose();
     s.story.dispose();
@@ -243,20 +323,44 @@ export class World {
     }
   }
 
-  private syncLodges(z: number) {
+  private addLodge(cz: number, c: RefugeView) {
+    this.scene.add(c.group);
+    this.lodges.set(cz, c);
+  }
+
+  /** one slice of a pending refuge build (called every frame) */
+  private stepLodges() {
+    for (const [cz, job] of this.lodgeJobs) {
+      const r = job.next();
+      if (r.done) {
+        this.lodgeJobs.delete(cz);
+        this.addLodge(cz, r.value);
+      }
+      return;
+    }
+  }
+
+  private syncLodges(z: number, all = false) {
     const cps = this.mountain.profile.checkpoints(z - 400, z + 1600);
     const want = new Set(cps);
     cps.forEach((cz) => {
-      if (this.lodges.has(cz)) return;
+      if (this.lodges.has(cz) || this.lodgeJobs.has(cz)) return;
       const idx = this.mountain.profile.encounters(cz - 1, cz + 1).find((e) => e.checkpointZ === cz)?.index ?? 0;
-      const c = this.presentation.refuge.build({ mountain: this.mountain, z: cz, index: idx, quality: this.quality, biome: this.biome });
-      this.scene.add(c.group);
-      this.lodges.set(cz, c);
+      const ctx = { mountain: this.mountain, z: cz, index: idx, quality: this.quality, biome: this.biome };
+      const R = this.presentation.refuge;
+      // sliced when the location offers it and the refuge is still well ahead (round 3, D6)
+      if (R.buildSteps && !all && cz - z > 600) this.lodgeJobs.set(cz, R.buildSteps(ctx));
+      else this.addLodge(cz, R.build(ctx));
     });
     for (const [cz, c] of this.lodges) {
       if (want.has(cz)) continue;
       c.dispose();
       this.lodges.delete(cz);
+    }
+    for (const [cz, job] of this.lodgeJobs) {
+      if (want.has(cz)) continue;
+      this.lodgeJobs.delete(cz);
+      job.return(undefined as unknown as RefugeView);
     }
     // trail markers along alternate lines
     const alts = this.mountain.profile.altRoutes(z - 300, z + 1600);
@@ -276,7 +380,10 @@ export class World {
 
   /** Cave for an encounter (built on demand). */
   caveFor(e: Encounter): CaveSlot {
-    return this.caves.get(e.index) ?? this.buildCave(e);
+    const slot = this.caves.get(e.index) ?? this.buildCave(e);
+    // the cinematic needs the dressing (perches, clearance): finish it if still in slices
+    this.stepDressing(e.index, true);
+    return slot;
   }
 
   /** The cave of the focus encounter (or the nearest built one). */
@@ -321,19 +428,117 @@ export class World {
   /** Make everything visible for shader pre-compilation (call update() afterwards to restore). */
   showAllForWarmup() {
     this.vegetation.group.traverse((o) => (o.visible = true));
+    // one view of every hazard kind (disposed again on the next update)
+    this.hazardViews.warmup();
   }
 
-  update(dt: number, time: number, focus: THREE.Vector3, camPos: THREE.Vector3, terrainBudgetMs: number) {
-    this.stream(focus.z);
-    this.stepCaves();
-    this.terrain.update(focus.x, focus.z, terrainBudgetMs, time);
-    this.vegetation.update(camPos, time);
+  /** frames each streaming consumer has waited with work pending (starvation guard) */
+  private starved: Record<StreamConsumer, number> = { terrain: 0, obstacles: 0, vegetation: 0, hazards: 0, caves: 0, scenery: 0, lodges: 0, far: 0 };
+  /** per-frame streaming diagnostics (tests, perf harness): which consumers ran last frame */
+  readonly streamStats = { served: [] as StreamConsumer[], starvedTurns: 0 };
+
+  private pendingOf(c: StreamConsumer): boolean {
+    switch (c) {
+      case 'terrain':
+        return this.terrain.pendingNear > 0;
+      case 'obstacles':
+        return this.obstacles.missing(this.streamZ0, this.streamZ0 + this.vegetation.farDist);
+      case 'vegetation':
+        return this.vegetation.pending > 0;
+      case 'hazards':
+        return this.hazardViews.pendingCount > 0;
+      case 'caves':
+        return this.caveJobs.size + this.dressJobs.size > 0;
+      case 'scenery':
+        return (this.scenery?.pending ?? 0) > 0;
+      case 'lodges':
+        return this.lodgeJobs.size > 0;
+      case 'far':
+        return this.terrain.pendingFar > 0;
+    }
+  }
+
+  private runConsumer(c: StreamConsumer, ms: number, focus: THREE.Vector3, camPos: THREE.Vector3) {
+    switch (c) {
+      case 'terrain':
+        return this.terrain.pumpNear(focus.x, focus.z, ms);
+      case 'obstacles':
+        return this.obstacles.prefetch(this.streamZ0, this.streamZ0 + this.vegetation.farDist, ms);
+      case 'vegetation':
+        return this.vegetation.update(camPos, this.frameTime, ms);
+      case 'hazards':
+        return this.hazardViews.pump(ms, focus.z, false);
+      case 'caves':
+        return this.stepCaves();
+      case 'scenery':
+        return this.scenery?.pump?.(ms);
+      case 'lodges':
+        return this.stepLodges();
+      case 'far':
+        return this.terrain.pumpFar(ms);
+    }
+  }
+  private frameTime = 0;
+
+  /**
+   * The streaming work of one frame on one shared budget, in priority order (STREAM_ORDER): each
+   * consumer runs only while the budget lasts (its own slices also end with it: core/frameBudget),
+   * so at most one unit overruns; a consumer starved for STREAM_STARVE_FRAMES gets one minimal
+   * slice (one starved consumer per frame), so nothing waits for ever behind higher priorities.
+   */
+  private stepStreaming(focus: THREE.Vector3, camPos: THREE.Vector3) {
+    const served = this.streamStats.served;
+    served.length = 0;
+    let rescued = false;
+    for (const c of STREAM_ORDER) {
+      const pending = this.pendingOf(c);
+      const left = frameBudget.remaining();
+      if (c === 'vegetation') {
+        // vegetation also updates its LOD visibility every frame: always called, building only on budget
+        const rescue = !(left > 0) && pending && !rescued && this.starved[c] >= STREAM_STARVE_FRAMES;
+        if (rescue) {
+          rescued = true;
+          this.streamStats.starvedTurns++;
+        }
+        this.vegetation.update(camPos, this.frameTime, left > 0 ? left : rescue ? 0.5 : 0);
+        if (pending && (left > 0 || rescue)) served.push(c);
+        this.starved[c] = pending && !(left > 0) && !rescue ? this.starved[c] + 1 : 0;
+        continue;
+      }
+      if (left > 0 && pending) {
+        this.runConsumer(c, left, focus, camPos);
+        if (pending) served.push(c);
+        this.starved[c] = 0;
+      } else if (pending && !rescued && this.starved[c] >= STREAM_STARVE_FRAMES) {
+        rescued = true;
+        this.streamStats.starvedTurns++;
+        this.runConsumer(c, 0.5, focus, camPos);
+        served.push(c);
+        this.starved[c] = 0;
+      } else if (pending) this.starved[c]++;
+      else this.starved[c] = 0;
+    }
+  }
+
+  update(dt: number, time: number, focus: THREE.Vector3, camPos: THREE.Vector3, streamBudgetMs: number = STREAM_BUDGET_MS) {
+    this.frameTime = time;
+    frameBudget.begin(streamBudgetMs);
+    try {
+      // physics-critical streaming first (obstacles and hazards near the skier: bounded, one band)
+      this.stream(focus.z);
+      // terrain bookkeeping every frame (window, LOD wishes, time uniform), even with no budget left
+      this.terrain.syncLod(focus.x, focus.z, time);
+      this.stepStreaming(focus, camPos);
+    } finally {
+      frameBudget.end();
+    }
     // weather on the physics clock (Alpine: constant; fog, flakes exactly as before)
     const env = this.environment;
     env.weatherAt(focus.x, focus.z, env.clock, this.weather);
     this.env.applyWeather(this.weather.visibility * env.hazardVisibility(focus.x, focus.z, env.clock), this.weather.snowfall);
     this.env.update(dt, focus, camPos, time, this.weather.windX);
-    this.hazardViews.update(dt);
+    this.hazardViews.update(dt, focus.z);
+    this.scenery?.update(dt, time, { focus, camPos, origin: this.origin });
     for (const s of this.caves.values()) s.dressing?.update?.(dt, time);
     this.particles.update(dt);
   }
@@ -396,6 +601,7 @@ export class World {
     this.yetiPrints.dispose();
     this.finish?.dispose();
     this.hazardViews.dispose();
+    this.scenery?.dispose();
     this.environment.dispose();
     this.particles.dispose();
     this.tracks.dispose();

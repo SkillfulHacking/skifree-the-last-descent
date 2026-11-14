@@ -62,6 +62,7 @@ export type YetiMode =
   | 'grab' // lunges and grabs with right hand
   | 'eat' // comedic: lifts held object to mouth, gulps, pats belly
   | 'disgust' // stops, recoils, shakes head
+  | 'gag' // comedic: hunches, left hand to the throat, retches with the jaw wide, shudders
   | 'turnAway'; // turns around and walks off
 
 export interface YetiAnimState {
@@ -102,6 +103,8 @@ export interface AudioFrameState {
   chaseIntensity: number;
   /** 0..1 resort crowd ambience level. */
   crowdLevel: number;
+  /** 0..1 closeness to the sea (coastal locations: surf/gull beds); absent/0 inland */
+  coast?: number;
   /** 0..1 how deep the player is inside the "eerie" zone before the cave (ducks wind/music). */
   eerie: number;
 }

@@ -8,10 +8,11 @@
  * event bus (achievements, stats, audio cues) can subscribe without the environment knowing about
  * it. Alpine produces surface-change events only (it has no hazards and calm physics).
  */
+import { smoothstep } from '../../core/rng';
 import type { SurfaceType } from '../../core/types';
 import type { Mountain } from '../course';
 import type { EnvQuery, EnvSample, PhysicsEnvironment } from '../../physics/environment';
-import { capabilitiesOf, type BiomeCapabilities } from './index';
+import { capabilitiesOf, type BiomeCapabilities, type GameDifficulty } from './index';
 import { combineSurface, resetSurface, type SurfaceQuery, type SurfaceWeights } from './surface';
 import { makeWeatherSample, type WeatherSample } from './weather';
 import { HazardField } from '../hazards/field';
@@ -36,6 +37,22 @@ export type EnvironmentEvent =
   | { type: 'hazard-passed'; hazard: HazardInstance; kind: string; hit: boolean; entered: boolean; closest: number; t: number };
 
 export type EnvironmentListener = (e: EnvironmentEvent) => void;
+
+/**
+ * Sea-cliff rim guard (coastal locations): the onshore updraft (m/s², airborne) over the last
+ * `reach` metres before the crest; past the crest by `over` m (grounded, or `drop` m below the
+ * crest in the air) the skier is out of bounds and goes back to the route `back` m upslope.
+ */
+export const RIM_GUARD = { reach: 16, updraft: 30, over: 1.5, drop: 10, back: 6 } as const;
+
+/**
+ * Cornice stall recovery (coastal locations): a grounded skier who spends more than `time` s (net of
+ * time spent faster) slower than `speed` m/s within `zone` m of the crest (where the cornice is at
+ * ≥ 84 % strength — the cairns stand 7 m in — or past the crest short of RIM_GUARD.over) is put back
+ * on the piste like the out-of-bounds rule, with its own cue. The cornice snow does not resist
+ * heading inland, so this is a backstop (an idle or floundering skier), not the way out.
+ */
+export const CORNICE_STALL = { zone: 18, speed: 1, time: 3 } as const;
 
 /** how far ahead (m) a periodic hazard's telegraph/active transitions are reported */
 export const HAZARD_ALERT_RANGE = 150;
@@ -67,13 +84,22 @@ export class BiomeEnvironment implements PhysicsEnvironment {
   private near: HazardInstance[] = [];
   private lastSurface: SurfaceType | null = null;
   private w = makeWeatherSample();
-  private sq: SurfaceQuery & { kind: SurfaceType; x: number; z: number; cached: SurfaceWeights | null };
+  private sq: SurfaceQuery & { kind: SurfaceType; x: number; z: number; vx: number; vz: number; cached: SurfaceWeights | null };
+  /** seconds the skier has been stalled in the cornice band (CORNICE_STALL), and the last sample time */
+  private stall = 0;
+  private stallT = 0;
+
+  /** × hazard effect strength for the game difficulty (HazardSetup.intensity) */
+  readonly intensity: number;
 
   constructor(
     readonly mountain: Mountain,
     readonly seed: number,
+    opts: { difficulty?: GameDifficulty } = {},
   ) {
     this.caps = capabilitiesOf(mountain.biome);
+    const long = !Number.isFinite(mountain.finishZ) || mountain.finishZ >= 20000;
+    this.intensity = (this.caps.hazards.intensity?.[opts.difficulty ?? 'normal'] ?? 1) * (long ? (this.caps.hazards.longCourse ?? 1) : 1);
     this.kinds = this.caps.hazards.kinds.map(getHazardKind);
     this.hazards = new HazardField(mountain, seed, this.kinds, this.caps.hazards.density);
     const cpl = this.caps.weather.coupling;
@@ -81,9 +107,12 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     const m = mountain;
     const sq = {
       biomeId: m.biome.id,
+      mountain: m,
       x: 0,
       z: 0,
       kind: 'snow' as SurfaceType,
+      vx: 0,
+      vz: 0,
       cached: null as SurfaceWeights | null,
       weights(): SurfaceWeights {
         return (sq.cached ??= m.surfaceWeights(sq.x, sq.z));
@@ -120,6 +149,8 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     this.clock = 0;
     this.tracks.clear();
     this.lastSurface = null;
+    this.stall = 0;
+    this.stallT = 0;
   }
 
   sample(q: EnvQuery, out: EnvSample): void {
@@ -131,6 +162,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     }
     out.knock = null;
     out.crash = null;
+    out.relocate = null;
     if (this.physicsIdentity) {
       // Alpine: leave the sample at identity (it never changes from makeEnvSample)
       return;
@@ -143,6 +175,8 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       const sq = this.sq;
       sq.x = q.x;
       sq.z = q.z;
+      sq.vx = q.vx;
+      sq.vz = q.vz;
       sq.kind = q.surface;
       sq.cached = null;
       caps.surface.modifiers(sq, S);
@@ -159,29 +193,68 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       gust = w.gust;
     }
     // 3) hazards
+    let px = 0;
+    let pz = 0;
+    let push = 0;
     if (!this.hazards.empty) {
       const hw = this.sampleHazards(q, out);
       wx += hw[0];
       wz += hw[1];
+      px = hw[2];
+      pz = hw[3];
+      push = hw[4];
     }
-    out.airAccelX = q.grounded ? 0 : cpl.airborne * wx;
+    out.airAccelX = q.grounded ? 0 : cpl.airborne * wx + push;
     out.airAccelZ = q.grounded ? 0 : cpl.airborne * wz;
+    out.groundSlipX = q.grounded && !q.crashed ? px : 0;
+    out.groundSlipZ = q.grounded && !q.crashed ? pz : 0;
     out.balance = q.grounded ? cpl.balance * gust : 0;
+    // 4) a sea coast's rim: the cornice (surface model) stops a grounded skier; in the air, the
+    //    updraft off the cliff pushes back onshore, and anyone who still ends up over the crest is
+    //    put back on the piste (crashed, with a cue) — never stranded on the cliff
+    //    — and never stuck in it: a skier who stalls in the cornice band goes back too (CORNICE_STALL)
+    const coast = this.mountain.coast;
+    const dt = Math.min(0.1, Math.max(0, q.t - this.stallT));
+    this.stallT = q.t;
+    if (coast && !q.crashed) {
+      const b = coast.beyondRim(q.x, q.z);
+      if (!q.grounded && b > -RIM_GUARD.reach) out.airAccelX += RIM_GUARD.updraft * smoothstep(-RIM_GUARD.reach, 0, b);
+      if (b > RIM_GUARD.over && (q.grounded || q.y < this.mountain.heightAt(coast.rimX(q.z), q.z) - RIM_GUARD.drop)) {
+        const z = q.z - RIM_GUARD.back;
+        out.relocate = { x: this.mountain.routeX(z), z, reason: 'over the cornice' };
+        this.stall = 0;
+      } else if (q.grounded && b > -CORNICE_STALL.zone) {
+        // slow time counts up, faster time counts down at the same rate: dithering at a walking pace
+        // (a little faster now and then) still adds up; skiing or skating out does not
+        this.stall = Math.max(0, this.stall + (q.speed < CORNICE_STALL.speed ? dt : -dt));
+        if (this.stall > CORNICE_STALL.time) {
+          const z = q.z - RIM_GUARD.back;
+          out.relocate = { x: this.mountain.routeX(z), z, reason: 'stuck in the cornice' };
+          this.stall = 0;
+        }
+      } else this.stall = 0;
+    } else this.stall = 0;
   }
 
-  private hw: [number, number] = [0, 0];
+  /** wind x/z (m/s, airborne coupling), grounded side-slip x/z (m/s) and airborne push x (m/s²) from hazards this step */
+  private hw: [number, number, number, number, number] = [0, 0, 0, 0, 0];
 
-  private sampleHazards(q: EnvQuery, out: EnvSample): [number, number] {
+  private sampleHazards(q: EnvQuery, out: EnvSample): [number, number, number, number, number] {
     const hw = this.hw;
     hw[0] = 0;
     hw[1] = 0;
+    hw[2] = 0;
+    hw[3] = 0;
+    hw[4] = 0;
     // physics-critical band must exist even if the caller did not stream (simulations)
     this.hazards.ensure(q.z - 1, q.z + 1);
     const near = this.hazards.near(q.x, q.z + HAZARD_ALERT_RANGE * 0.5, HAZARD_ALERT_RANGE * 0.5 + HAZARD_PASS_RANGE, this.near);
-    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t };
+    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity, tuck: q.tuck };
     for (const h of near) {
       let tr = this.tracks.get(h.id);
       const k = tr?.k ?? getHazardKind(h.kind);
+      // markers (e.g. the poles at a gap jump) have no physics and no gameplay events
+      if (k.severity === 'cosmetic') continue;
       const dx = q.x - h.x;
       const dz = q.z - h.z;
       const dist = Math.hypot(dx, dz);
@@ -219,6 +292,9 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       if (e.surface) combineSurface(out.surface, e.surface);
       if (e.windX) hw[0] += e.windX;
       if (e.windZ) hw[1] += e.windZ;
+      if (e.slipX) hw[2] += e.slipX;
+      if (e.slipZ) hw[3] += e.slipZ;
+      if (e.airPushX) hw[4] += e.airPushX;
       if (!tr.struck && (e.crash || e.knock)) {
         tr.struck = true;
         tr.hit = true;
@@ -241,7 +317,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
   hazardVisibility(x: number, z: number, t: number): number {
     if (this.hazards.empty) return 1;
     let v = 1;
-    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: 0, grounded: true, heightAbove: 0, t };
+    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: 0, grounded: true, heightAbove: 0, t, intensity: this.intensity };
     for (const h of this.hazards.near(x, z, 60, [])) {
       const k = getHazardKind(h.kind);
       contact.dx = x - h.x;

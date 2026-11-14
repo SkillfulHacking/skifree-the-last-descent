@@ -7,6 +7,7 @@ import type { AudioFrameState } from '../core/types';
 import { crowdTargets, gustValue, skiTargets, windTargets, yetiBreathTargets } from './logic';
 import { type Mix, createPanner, setPannerPosition, target } from './graph';
 import { laugh, yetiBreath } from './sfx';
+import { CoastBeds } from './coastal';
 
 export class Ambience {
   private nodes: AudioNode[] = [];
@@ -41,6 +42,16 @@ export class Ambience {
   /** location (biome) wind character: gain and filter-frequency multipliers (1 = alpine) */
   windGain = 1;
   windPitch = 1;
+  /** location beds beyond the wind (Fjord: surf + gulls); null = wind only (Alpine) */
+  private coast: CoastBeds | null = null;
+
+  /** Location ambience beds (ids from KNOWN_AMBIENCE); 'wind' always plays. */
+  setBeds(beds: readonly string[]): void {
+    const surf = beds.includes('surf');
+    const gulls = beds.includes('gulls');
+    this.coast?.dispose();
+    this.coast = surf || gulls ? new CoastBeds(this.mix, surf, gulls) : null;
+  }
 
   constructor(private readonly mix: Mix) {
     const ctx = mix.ctx;
@@ -151,6 +162,7 @@ export class Ambience {
       this.applyParams(s, now);
     }
     if (s.yetiPos) setPannerPosition(this.yetiPanner, s.yetiPos, now, 0.03);
+    this.coast?.update(step, s.coast ?? 0, now, paused);
     if (paused) return;
 
     const yb = yetiBreathTargets(s.yetiDistance, s.yetiRunning);
@@ -204,6 +216,8 @@ export class Ambience {
   }
 
   dispose(): void {
+    this.coast?.dispose();
+    this.coast = null;
     for (const s of this.sources) {
       try {
         s.stop();

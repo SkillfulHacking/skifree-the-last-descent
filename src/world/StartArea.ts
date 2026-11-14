@@ -10,6 +10,7 @@
  * used as colour and bump), rounded posts with snow caps, a framed banner board.
  */
 import * as THREE from 'three';
+import type { QualityPreset } from '../core/types';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { Rng } from '../core/rng';
 import type { Mountain } from './course';
@@ -62,11 +63,34 @@ function woodTexture(seed: number): THREE.CanvasTexture {
   return t;
 }
 
+/**
+ * Location hook: a biome can register its own start dressing (built into `group`, returning what to
+ * dispose). Without one (Alpine) the shared start below is built, unchanged.
+ */
+export type StartDressing = (m: Mountain, group: THREE.Group, wood: typeof woodTexture, opts: StartDressingOptions) => Array<{ dispose(): void }>;
+
+/**
+ * What a start dressing is told about the build (round 3, D5 plumbing): the graphics preset, so a
+ * dense dressing can merge more / drop small props on 'low'. Optional to use.
+ */
+export interface StartDressingOptions {
+  quality: QualityPreset;
+}
+const startDressings = new Map<string, StartDressing>();
+export function registerStartDressing(biomeId: string, f: StartDressing): void {
+  startDressings.set(biomeId, f);
+}
+
 export class StartArea {
   readonly group = new THREE.Group();
   private disposables: Array<{ dispose(): void }> = [];
 
-  constructor(m: Mountain) {
+  constructor(m: Mountain, quality: QualityPreset = 'high') {
+    const custom = startDressings.get(m.biome.id);
+    if (custom) {
+      this.disposables.push(...custom(m, this.group, woodTexture, { quality }));
+      return;
+    }
     const grain = woodTexture(77);
     const wood = new THREE.MeshStandardMaterial({ color: 0xc9a27e, map: grain, bumpMap: grain, bumpScale: 1.2, roughness: 0.82 });
     const darkWood = new THREE.MeshStandardMaterial({ color: 0x8a6a52, map: grain, bumpMap: grain, bumpScale: 1.2, roughness: 0.85 });

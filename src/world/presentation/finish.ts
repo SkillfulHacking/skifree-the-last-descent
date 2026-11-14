@@ -82,6 +82,8 @@ export interface VictoryScript {
 export interface FinishDefinition {
   readonly id: string;
   readonly label: string;
+  /** what the intro calls the goal ("Reach the <goal>, N km down the mountain"); default "resort" */
+  readonly goal?: string;
   build(ctx: FinishBuildContext): FinishEnvironment;
   /** the victory cinematic + trophy/celebration for this finish */
   victory(st: Stage, finish: FinishEnvironment, d: VictoryDirector): VictoryScript;

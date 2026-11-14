@@ -67,12 +67,15 @@ describe('achievement definitions', () => {
     expect(ids).toEqual(expect.arrayContaining(['first-descent', 'not-today-yeti', 'pizza-party', 'airborne', 'long-haul', 'daily-ritual', 'scenic-route', 'whiteout-survivor', 'ice-dancer', 'steam-runner']));
   });
 
-  it('location achievements are marked as needing their biome', () => {
-    for (const id of ['scenic-route', 'whiteout-survivor', 'ice-dancer', 'steam-runner']) {
+  it('location achievements are marked as needing their biome (Fjord Coast ships: Scenic Route no longer does)', () => {
+    for (const id of ['whiteout-survivor', 'ice-dancer', 'steam-runner']) {
       const a = ACHIEVEMENTS.find((x) => x.id === id)!;
       expect(a.requires).toBeTruthy();
       expect(a.biome).toBeTruthy();
     }
+    const scenic = ACHIEVEMENTS.find((x) => x.id === 'scenic-route')!;
+    expect(scenic.biome).toBe('fjord');
+    expect(scenic.requires).toBeUndefined();
   });
 });
 

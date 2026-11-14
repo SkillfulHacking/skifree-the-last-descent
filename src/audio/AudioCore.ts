@@ -8,6 +8,7 @@ import { type Dest, Mix, type MixOptions, type Vec3Like, setListenerPose } from 
 import { VoiceLimiter, clamp, musicDuck } from './logic';
 import { MusicEngine, defeatSting, scheduleFanfare } from './music';
 import * as sfx from './sfx';
+import { coastCue } from './coastal';
 
 export interface AudioVolumes {
   master: number;
@@ -134,6 +135,10 @@ export class AudioCore {
   }
   playSnowSlide(): void {
     this.go('snow', 1.5, () => sfx.snowSlide(this.dst, this.t));
+  }
+  /** location cue by id (hazard telegraph/active/hit cues, viewpoints; see coastal.ts) */
+  playCue(id: string, pos: Vec3Like | null): void {
+    this.go(`cue:${id}`, 1.2, () => coastCue(this.dst, this.t, id, pos));
   }
   playBranchSnap(pos: Vec3Like | null): void {
     this.go('branch', 0.65, () => sfx.branchSnap(this.dst, this.t, pos));

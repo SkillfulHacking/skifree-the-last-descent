@@ -56,6 +56,9 @@ export const TUNING = {
   landCrash: 11.5,
 };
 
+/** How a grounded side-slip (EnvSample.groundSlip*) takes hold, by what the skier is doing. */
+export const SLIP_EDGE = { base: 1, tuck: 0.6, brake: 0.45, drift: 0.6 } as const;
+
 /**
  * Terrain-contact limits (engine-wide, every location).
  *  - wallDeg: terrain the skier would have to climb more steeply than this in one step is a wall.
@@ -67,7 +70,7 @@ export const TUNING = {
  *    snapping is g·snapExcessTol ≈ 0.25 J/kg.
  *  - Wall impacts use the boulder thresholds (normal speed into the face, m/s).
  */
-/** pinned-against-a-wall rescue (SkierPhysics.pinWatchdog): seconds without getting `escape` m away, wall contact within `contact` s, `offPiste` m from the line */
+/** pinned-against-a-wall rescue (SkierPhysics.pinWatchdog): seconds without getting `escape` m away, wall contact within `contact` s */
 export const PIN_WATCH = { window: 4, escape: 3, contact: 1, offPiste: 10 };
 
 export const TERRAIN_CONTACT = {
@@ -129,9 +132,9 @@ export type SkierEvent =
   | { type: 'crash'; reason: string; intensity: number }
   | { type: 'pop' }
   | { type: 'recover' }
-  | { type: 'trick'; name: string; points: number }
-  /** put back on the piste (see SkierPhysics.relocate) */
-  | { type: 'relocate'; reason: string; x: number; z: number };
+  /** put back on the piste after going out of bounds (see SkierPhysics.relocate) */
+  | { type: 'relocate'; reason: string; x: number; z: number }
+  | { type: 'trick'; name: string; points: number };
 
 export class SkierState {
   pos = new THREE.Vector3();
@@ -321,8 +324,10 @@ export class SkierPhysics {
       q.crashed = s.crashed;
       q.surface = s.surface;
       q.t = s.time;
+      q.tuck = s.tuck;
       this.env.sample(q, E);
-      if (E.crash && !s.crashed) this.crash(E.crash.reason, E.crash.intensity);
+      if (E.relocate) this.relocate(E.relocate.x, E.relocate.z, E.relocate.reason);
+      else if (E.crash && !s.crashed) this.crash(E.crash.reason, E.crash.intensity);
       else if (E.knock) this.knock(E.knock.keep, E.knock.wobble);
     }
     this.pinWatchdog(input);
@@ -467,6 +472,14 @@ export class SkierPhysics {
     for (let attempt = 0; ; attempt++) {
       const prevY = s.pos.y;
       tmpA.copy(s.pos).addScaledVector(s.vel, dt);
+      // a location's side-slip (a squall blowing the snow out from under the skis): moves the skier
+      // without changing their speed. Biting edges (pizza) resist it; a tuck or a drift gives it more.
+      const E = this.envOut;
+      if (E.groundSlipX !== 0 || E.groundSlipZ !== 0) {
+        const k = SLIP_EDGE.base * (1 + SLIP_EDGE.tuck * s.tuck) * (1 - SLIP_EDGE.brake * s.brake) * (1 + SLIP_EDGE.drift * s.driftAmount);
+        tmpA.x += E.groundSlipX * k * dt;
+        tmpA.z += E.groundSlipZ * k * dt;
+      }
       const hNew = this.mountain.heightAt(tmpA.x, tmpA.z);
       const hd = Math.hypot(tmpA.x - s.pos.x, tmpA.z - s.pos.z);
       // a face too steep to ski up: collide with it instead of climbing it (one retry along the face)
@@ -476,8 +489,8 @@ export class SkierPhysics {
         const hs = Math.hypot(s.vel.x, s.vel.z);
         s.pathSlope = hs > 1e-3 ? s.vel.y / hs : 0;
         if (attempt === 0) continue;
-        // still against the face: stay put this step, and stop (a skier left here kept a non-zero
-        // velocity while not moving — frozen, unable to skate away)
+        // still against the face: stay put this step, and stop (round 4, B r4 #1: a skier left
+        // here kept a non-zero velocity while not moving — frozen, unable to skate away)
         s.vel.set(0, 0, 0);
         return true;
       }
@@ -989,12 +1002,12 @@ export class SkierPhysics {
   }
 
   /**
-   * Engine-wide pinned/stranded rescue (Fjord round 4, reviewers B and E: the wall rule could leave a
-   * skier in a pocket at the foot of a cave mouth — before the cave trigger, so no Yeti came — that
-   * they could not skate out of). If the skier has been in touch with a wall within the last second,
-   * or has been trying to move (tuck/skate or steer held) off the piste the whole time, and has not
-   * got 3 m away from where they were 4 s ago, they are put back on the piste. A skier who stops on
-   * purpose (no input) or on the piste is never moved.
+   * Engine-wide pinned-against-a-wall rescue (round 4, reviewer B r4 #1: the wall rule can leave a
+   * skier in a pocket at the foot of a steep face — a cave mouth, a cliff foot — that they cannot
+   * skate out of, before any Yeti comes). Like the Fjord cornice stall: if the skier has been in
+   * touch with a wall within the last second and has not got 3 m away from where they were 4 s
+   * ago, they are put back on the piste. A skier who stops deliberately on open snow is never moved
+   * (no wall contact), and anyone skating along or away from a face gets clear of the window.
    */
   private pinWatchdog(input: SkierInput) {
     const s = this.s;
@@ -1008,6 +1021,8 @@ export class SkierPhysics {
     if (s.time - s.pinAnchorT <= PIN_WATCH.window) return;
     const z = s.pos.z;
     const rx = this.mountain.routeX(z);
+    // boxed in against a face, or trying to get going (pushing/steering the whole window) off the
+    // piste and getting nowhere — a pocket at a cave mouth or a cliff foot
     const walled = s.time - s.wallContactT < PIN_WATCH.contact;
     const stranded = s.time - s.pushSince > PIN_WATCH.window && Math.abs(s.pos.x - rx) > PIN_WATCH.offPiste;
     if (walled || stranded) {
@@ -1018,7 +1033,10 @@ export class SkierPhysics {
     }
   }
 
-  /** Put the skier back on the piste at (x, z), stopped and crashed (they get up facing downhill), keeping the run's stats. */
+  /**
+   * Out of bounds (the location's rule, e.g. over a sea cliff's crest): put the skier back on the
+   * piste at (x, z), stopped and crashed (they get up facing downhill), keeping the run's stats.
+   */
   relocate(x: number, z: number, reason: string) {
     const s = this.s;
     s.pos.set(x, this.mountain.heightAt(x, z), z);

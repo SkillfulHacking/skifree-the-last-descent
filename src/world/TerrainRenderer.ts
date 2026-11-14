@@ -17,6 +17,8 @@ export const CHUNK = 128;
 export const CORRIDOR_X = { x0: -512, x1: 512 } as const;
 const FAR_TILE = 2048;
 const FAR_STEP = 64;
+/** coastal looks: far tiles within |x| ≤ this use FAR_STEP / 2 (art request R3) */
+const FAR_FINE_X = 3072;
 const FAR_X = 7168;
 const STEPS = [1, 2, 4, 8, 16] as const;
 
@@ -66,6 +68,10 @@ export class TerrainRenderer {
   private ahead: number;
   private farBehind = 4096;
   private farAhead: number;
+  /** coastal looks: finer far-field tiles beside the corridor (see buildFar) */
+  private readonly fineFar: boolean;
+  /** coastal looks: low-pass the vertex normals of coarse LODs (see buildGeometry) */
+  private smoothNormals: boolean;
   /** Points that always get full terrain detail (e.g. cave notches). */
   pinned: Array<{ x: number; z: number; r: number }> = [];
 
@@ -77,6 +83,10 @@ export class TerrainRenderer {
     this.material = m.material;
     this.uniforms = m.uniforms;
     this.ranges = lodRanges(quality);
+    this.smoothNormals = !!mountain.coast;
+    // round 4 (D r3 defect 2): the finer coastal far tiles only on medium and above (on low the
+    // walls are farther and hazier, and low is where triangles count most)
+    this.fineFar = !!mountain.coast && quality !== 'low';
     this.ahead = { low: 2400, medium: 3000, high: 3600, ultra: 4200 }[quality];
     this.farAhead = { low: 8192, medium: 10240, high: 12288, ultra: 14336 }[quality];
   }
@@ -183,6 +193,24 @@ export class TerrainRenderer {
 
   /** Per-frame streaming. budgetMs limits CPU time spent building. */
   update(px: number, pz: number, budgetMs: number, time: number): void {
+    const t0 = performance.now();
+    this.updateNear(px, pz, budgetMs, time);
+    // far tiles: whatever budget is left, but always at least a small guaranteed slice so the
+    // distant ranges can never starve behind a long corridor queue
+    this.pumpFar(budgetMs * 1.2 - (performance.now() - t0), 0.75);
+  }
+
+  /**
+   * Corridor chunks only (round 4: World hands the frame's shared streaming budget out in priority
+   * order — the corridor first, the far field last). Nearest first; stops once `budgetMs` is spent.
+   */
+  updateNear(px: number, pz: number, budgetMs: number, time: number): void {
+    this.syncLod(px, pz, time);
+    this.pumpNear(px, pz, budgetMs);
+  }
+
+  /** Window and LOD bookkeeping (every frame; cheap): queue the chunks whose wanted LOD changed. */
+  syncLod(px: number, pz: number, time: number): void {
     this.uniforms.uTime.value = time;
     this.syncWindow(pz);
     for (const c of this.chunks.values()) {
@@ -193,29 +221,34 @@ export class TerrainRenderer {
         if (!this.queue.includes(c)) this.queue.push(c);
       }
     }
+  }
+
+  /** Build queued corridor chunks, nearest first, for up to `budgetMs`. */
+  pumpNear(px: number, pz: number, budgetMs: number): void {
     const t0 = performance.now();
-    if (this.queue.length) {
-      // nearest first
-      this.queue.sort((a, b) => Math.hypot(a.cx - px, a.cz - pz) - Math.hypot(b.cx - px, b.cz - pz));
-      while (this.queue.length && performance.now() - t0 < budgetMs) {
-        const c = this.queue[0]!;
-        if (!c.job) {
-          this.queue.shift();
-          continue;
-        }
-        const r = c.job.next();
-        if (r.done) {
-          this.swap(c, r.value, c.building);
-          c.job = null;
-          c.building = 0;
-          this.queue.shift();
-        }
+    if (!this.queue.length || budgetMs <= 0) return;
+    // nearest first
+    this.queue.sort((a, b) => Math.hypot(a.cx - px, a.cz - pz) - Math.hypot(b.cx - px, b.cz - pz));
+    while (this.queue.length && performance.now() - t0 < budgetMs) {
+      const c = this.queue[0]!;
+      if (!c.job) {
+        this.queue.shift();
+        continue;
+      }
+      const r = c.job.next();
+      if (r.done) {
+        this.swap(c, r.value, c.building);
+        c.job = null;
+        c.building = 0;
+        this.queue.shift();
       }
     }
-    // far tiles: whatever budget is left, but always at least a small guaranteed slice so the
-    // distant ranges can never starve behind a long corridor queue
-    const tf = performance.now();
-    while (this.farQueue.length && (performance.now() - t0 < budgetMs * 1.2 || performance.now() - tf < 0.75)) {
+  }
+
+  /** Far-field tiles for up to `budgetMs` (at least `minMs` when any are pending). */
+  pumpFar(budgetMs: number, minMs = 0): void {
+    const t0 = performance.now();
+    while (this.farQueue.length && performance.now() - t0 < Math.max(budgetMs, minMs)) {
       const t = this.farQueue[0]!;
       const r = t.job!.next();
       if (r.done) {
@@ -223,6 +256,15 @@ export class TerrainRenderer {
         this.farQueue.shift();
       }
     }
+  }
+
+  /** corridor chunks waiting to be (re)built */
+  get pendingNear(): number {
+    return this.queue.length;
+  }
+  /** far tiles waiting to be built */
+  get pendingFar(): number {
+    return this.farQueue.length;
   }
 
   /** Build every missing far tile now (after a teleport; loading screens). */
@@ -303,37 +345,86 @@ export class TerrainRenderer {
     const vs = n + 1;
     const x0 = c.ix * CHUNK;
     const z0 = c.iz * CHUNK;
-    // heights with a 1-vertex ring for normals
-    const hs = vs + 2;
+    // heights with a 1-vertex ring for normals (2 on smoothed coastal LODs, see below)
+    const R = this.smoothNormals && step >= 2 ? 2 : 1;
+    const hs = vs + 2 * R;
     const H = new Float64Array(hs * hs);
+    // round 4 (D r3 defect 1): slices of ~256–384 terrain samples, not 4 rows of any width (a
+    // 1 m chunk's 4 rows were ~520 samples, plus the whole vertex/index pass in one slice)
+    const hRows = Math.max(1, Math.floor(384 / hs));
     for (let j = 0; j < hs; j++) {
-      const z = z0 + (j - 1) * step;
-      for (let i = 0; i < hs; i++) H[j * hs + i] = m.heightAt(x0 + (i - 1) * step, z);
-      if ((j & 3) === 3) yield;
+      const z = z0 + (j - R) * step;
+      for (let i = 0; i < hs; i++) H[j * hs + i] = m.heightAt(x0 + (i - R) * step, z);
+      if (j % hRows === hRows - 1) yield;
+    }
+    // Fjord (round 2, art review D7): on coarse LODs the rugged valley walls are under-sampled, so
+    // neighbouring vertex normals differ a lot and every triangle shows its own shading gradient
+    // (hard creases along the triangle edges). There the vertex normals are low-passed with a
+    // [1 2 1]² kernel over the grid (the ring makes chunk borders agree with their neighbours).
+    let SN: Float32Array | null = null;
+    if (R === 2) {
+      yield;
+      const ns = vs + 2;
+      const raw = new Float32Array(ns * ns * 3);
+      for (let j = 0; j < ns; j++)
+        for (let i = 0; i < ns; i++) {
+          const hi = (j + 1) * hs + (i + 1);
+          raw[(j * ns + i) * 3] = H[hi - 1]! - H[hi + 1]!;
+          raw[(j * ns + i) * 3 + 1] = 2 * step;
+          raw[(j * ns + i) * 3 + 2] = H[hi - hs]! - H[hi + hs]!;
+        }
+      SN = new Float32Array(vs * vs * 3);
+      const wk = [1, 2, 1];
+      for (let j = 0; j < vs; j++)
+        for (let i = 0; i < vs; i++) {
+          let ax = 0;
+          let ay = 0;
+          let az = 0;
+          for (let b = 0; b < 3; b++)
+            for (let a = 0; a < 3; a++) {
+              const w = wk[a]! * wk[b]!;
+              const q = ((j + b) * ns + (i + a)) * 3;
+              ax += raw[q]! * w;
+              ay += raw[q + 1]! * w;
+              az += raw[q + 2]! * w;
+            }
+          const l = Math.hypot(ax, ay, az);
+          SN[(j * vs + i) * 3] = ax / l;
+          SN[(j * vs + i) * 3 + 1] = ay / l;
+          SN[(j * vs + i) * 3 + 2] = az / l;
+        }
     }
     // local vertical origin keeps vertex values small (precision on long courses)
-    const y0 = Math.round(H[(1 + (vs >> 1)) * hs + 1 + (vs >> 1)]!);
+    const y0 = Math.round(H[(R + (vs >> 1)) * hs + R + (vs >> 1)]!);
     const skirtCount = 4 * n;
     const vCount = vs * vs + skirtCount + 4;
     const pos = new Float32Array(vCount * 3);
     const nor = new Float32Array(vCount * 3);
     const surf = new Float32Array(vCount * 3);
     let k = 0;
+    const vRows = step <= 8 ? Math.max(1, Math.floor(256 / vs)) : 64;
+    yield;
     for (let j = 0; j < vs; j++) {
       const z = z0 + j * step;
       for (let i = 0; i < vs; i++) {
         const x = x0 + i * step;
-        const hi = (j + 1) * hs + (i + 1);
+        const hi = (j + R) * hs + (i + R);
         pos[k * 3] = i * step;
         pos[k * 3 + 1] = H[hi]! - y0;
         pos[k * 3 + 2] = j * step;
-        const nx = H[hi - 1]! - H[hi + 1]!;
-        const nz = H[hi - hs]! - H[hi + hs]!;
-        const ny = 2 * step;
-        const l = Math.hypot(nx, ny, nz);
-        nor[k * 3] = nx / l;
-        nor[k * 3 + 1] = ny / l;
-        nor[k * 3 + 2] = nz / l;
+        if (SN) {
+          nor[k * 3] = SN[k * 3]!;
+          nor[k * 3 + 1] = SN[k * 3 + 1]!;
+          nor[k * 3 + 2] = SN[k * 3 + 2]!;
+        } else {
+          const nx = H[hi - 1]! - H[hi + 1]!;
+          const nz = H[hi - hs]! - H[hi + hs]!;
+          const ny = 2 * step;
+          const l = Math.hypot(nx, ny, nz);
+          nor[k * 3] = nx / l;
+          nor[k * 3 + 1] = ny / l;
+          nor[k * 3 + 2] = nz / l;
+        }
         if (step <= 8) {
           const w = m.surfaceWeights(x, z);
           surf[k * 3] = w.ice;
@@ -342,8 +433,9 @@ export class TerrainRenderer {
         } else surf[k * 3 + 1] = 0.5;
         k++;
       }
-      if ((j & 7) === 7) yield;
+      if (j % vRows === vRows - 1) yield;
     }
+    yield;
     const quads = n * n;
     const idx = new Uint32Array(quads * 6 + skirtCount * 6);
     let t = 0;
@@ -361,7 +453,9 @@ export class TerrainRenderer {
           idx[t++] = a; idx[t++] = cc; idx[t++] = d;
           idx[t++] = a; idx[t++] = d; idx[t++] = b;
         }
+        if (i === n - 1 && (j & 31) === 31) yield;
       }
+    yield;
     // skirts: duplicate border vertices pushed down; hides cracks between LODs
     const depth = 2 + step * 1.5;
     const border: number[] = [];
@@ -406,12 +500,27 @@ export class TerrainRenderer {
     const m = this.mountain;
     const X0 = tile.ix * FAR_TILE;
     const Z0 = tile.iz * FAR_TILE;
-    const n = FAR_TILE / FAR_STEP;
+    // coastal looks (round 3, art request R3): the tiles beside the corridor — the sea-side cliffs
+    // and the inland wall that fill most chase and reveal frames — at 32 m instead of 64 m, so the
+    // big walls lose their large flat facets. Their outer edges are welded to the 64 m neighbours
+    // (odd vertices on the shared edge lie on the coarse edge: no T-junction cracks).
+    const fine = this.fineFar && X0 >= -FAR_FINE_X && X0 + FAR_TILE <= FAR_FINE_X;
+    const FAR_S = fine ? FAR_STEP / 2 : FAR_STEP;
+    const n = FAR_TILE / FAR_S;
     const vs = n + 1;
     const H = new Float64Array(vs * vs);
+    const hRows = Math.max(1, Math.floor(256 / vs));
     for (let j = 0; j <= n; j++) {
-      for (let i = 0; i <= n; i++) H[j * vs + i] = m.heightAt(X0 + i * FAR_STEP, Z0 + j * FAR_STEP);
-      if ((j & 7) === 7) yield;
+      for (let i = 0; i <= n; i++) H[j * vs + i] = m.heightAt(X0 + i * FAR_S, Z0 + j * FAR_S);
+      if (j % hRows === hRows - 1) yield;
+    }
+    yield;
+    if (fine) {
+      for (const i of [0, n]) {
+        const x = X0 + i * FAR_S;
+        if (x > -FAR_FINE_X && x < FAR_FINE_X) continue; // a fine neighbour: nothing to weld
+        for (let j = 1; j < n; j += 2) H[j * vs + i] = (H[(j - 1) * vs + i]! + H[(j + 1) * vs + i]!) / 2;
+      }
     }
     const y0 = Math.round(H[(vs >> 1) * vs + (vs >> 1)]!);
     const pos = new Float32Array(vs * vs * 3);
@@ -419,27 +528,31 @@ export class TerrainRenderer {
     for (let j = 0; j <= n; j++)
       for (let i = 0; i <= n; i++) {
         const k = j * vs + i;
-        const x = X0 + i * FAR_STEP;
+        const x = X0 + i * FAR_S;
         // inside the corridor strip the far tile is a sunk backstop: the detailed chunks win
         // wherever they exist, and beyond their streaming window the valley floor still exists
         // (no gap or cut wall edges at the end of the view)
         const sunk = x > CORRIDOR_X.x0 && x < CORRIDOR_X.x1 ? 28 : 0;
-        pos[k * 3] = i * FAR_STEP;
+        pos[k * 3] = i * FAR_S;
         pos[k * 3 + 1] = H[k]! - y0 - sunk;
-        pos[k * 3 + 2] = j * FAR_STEP;
+        pos[k * 3 + 2] = j * FAR_S;
         surf[k * 3 + 1] = 0.6;
       }
-    const idx: number[] = [];
+    if (n <= 0) return null;
+    // (the same index width three picked for the old JS array: 16-bit below 65 536 vertices)
+    const idx = vs * vs < 65536 ? new Uint16Array(n * n * 6) : new Uint32Array(n * n * 6);
+    let t = 0;
     for (let j = 0; j < n; j++)
       for (let i = 0; i < n; i++) {
         const a = j * vs + i;
-        idx.push(a, a + vs, a + vs + 1, a, a + vs + 1, a + 1);
+        idx[t++] = a; idx[t++] = a + vs; idx[t++] = a + vs + 1;
+        idx[t++] = a; idx[t++] = a + vs + 1; idx[t++] = a + 1;
       }
-    if (!idx.length) return null;
+    yield;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('aSurf', new THREE.BufferAttribute(surf, 3));
-    geo.setIndex(idx);
+    geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeVertexNormals();
     geo.computeBoundingSphere();
     geo.userData['y0'] = y0;

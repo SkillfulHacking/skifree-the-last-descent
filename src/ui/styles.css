@@ -127,6 +127,9 @@ kbd {
 .hud-sub { position: absolute; left: 0; right: 0; top: calc(40% + clamp(52px, 9vw, 120px)); text-align: center; font-size: 18px; letter-spacing: 0.2em; color: var(--ink-dim); opacity: 0; transition: opacity 0.8s 0.3s !important; }
 .hud-sub.on { opacity: 1; }
 .hud-sub.victory, .hud-sub.defeat { top: calc(22% + clamp(46px, 7vw, 96px)); }
+/* titles over bright scenery (e.g. the Fjord reveal): a dark halo keeps the subtitle legible */
+.hud-sub.scrim { color: #fff; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.95), 0 0 14px rgba(0,0,0,0.7), 0 0 34px rgba(0,0,0,0.45); }
+.hud-center.scrim { text-shadow: 0 0 40px rgba(255, 196, 90, 0.35), 0 2px 4px rgba(0,0,0,0.7), 0 6px 30px rgba(0,0,0,0.6); }
 .hud-sub.intro { top: calc(18% + clamp(40px, 6vw, 80px)); letter-spacing: 0.1em; font-size: 16px; }
 .hud-skip { position: absolute; right: 32px; bottom: calc(11vh + 18px); font-size: 13px; color: var(--ink-dim); letter-spacing: 0.1em; }
 .hud-fps { position: absolute; left: 12px; bottom: 10px; font: 11px ui-monospace, monospace; color: #cfe; background: rgba(0,0,0,0.45); padding: 4px 8px; border-radius: 6px; }
@@ -204,3 +207,22 @@ kbd {
   .main .menu-row { font-size: 19px; }
   .main .course-card { font-size: 15px; }
 }
+
+/* Readability over bright snow, sea and sky (Fjord round-1 E4): a soft dark scrim behind the HUD
+   corner clusters and the Yeti meter, small labels no smaller than 12 px and heavier, the cinematic
+   skip hint and the rear-view label with a stronger shadow. */
+.hud-tl::before, .hud-tr::before, .hud-br::before, .hud-yeti::before { content: ''; position: absolute; inset: -14px -22px; z-index: -1; border-radius: 22px; background: radial-gradient(ellipse at center, rgba(4, 10, 22, 0.34) 0%, rgba(4, 10, 22, 0.18) 55%, rgba(4, 10, 22, 0) 80%); pointer-events: none; }
+.hud-label { font-size: 12.5px; font-weight: 800; color: rgba(236, 244, 255, 0.86); }
+.hud-speed-unit { font-size: 13px; color: rgba(236, 244, 255, 0.86); }
+.hud-mult { text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }
+.hud-yeti-label { font-size: 14px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 2px 12px rgba(0, 0, 0, 0.6); }
+.hud-yeti.near .hud-yeti-label { color: #ffc4c4; }
+.hud-skip { font-size: 14px; color: rgba(236, 244, 255, 0.9); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8); }
+.rear-view::after { font-size: 12px; }
+.menu-row .label small { font-size: 12px; }
+
+/* Fjord round-2 E4 residuals: the rear-view label sits on a dark pill (it was pale pink on pale sky)
+   and the score multiplier is larger, white-cored and outlined, so both read over snow and sky. */
+.rear-view::after { top: 5px; left: 7px; padding: 2px 8px 2px 9px; border-radius: 999px; background: rgba(8, 12, 24, 0.72); color: #ffe1e1; font-size: calc(12px * var(--ui-scale, 1)); letter-spacing: 0.22em; text-shadow: none; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); }
+.hud-mult { display: inline-block; margin-top: 5px; padding: 1px 8px; border-radius: 8px; background: rgba(8, 14, 28, 0.5); font-size: 17px; color: #e9f6ff; -webkit-text-stroke: 0.4px rgba(0, 20, 50, 0.6); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85); }
+.hud-mult.hot { color: #ffd28a; }

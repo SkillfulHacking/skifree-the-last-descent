@@ -78,7 +78,7 @@ export const STAT = {
   longestJump: 'longestJumpAir',
   snowballsDodged: 'snowballsDodged',
   yetiEscapes: 'yetiEscapes',
-  /** set: Daily course dates finished (reached the resort) on that same UTC day */
+  /** set: Daily course dates finished (reached the finish) on that same UTC day */
   dailyDays: 'dailyDays',
   biomesVisited: 'biomesVisited',
   /** set: "<biome>:<id>" */
@@ -155,7 +155,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   {
     id: 'first-descent',
     name: 'First Descent',
-    description: 'Reach the resort at the bottom of any course.',
+    description: 'Reach the finish at the bottom of any course, in any location.',
     category: 'journey',
     icon: 'flag',
     unlock: (e) => e.type === 'RunFinished' && e.outcome === 'victory',
@@ -163,7 +163,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   {
     id: 'not-today-yeti',
     name: 'Not Today, Yeti',
-    description: 'Escape a Yeti chase: reach a refuge or the resort with the Yeti on your tail.',
+    description: 'Escape a Yeti chase: reach a refuge or the finish with the Yeti on your tail.',
     category: 'yeti',
     icon: 'yeti',
     reward: 'jacket.glacier-blue',
@@ -190,7 +190,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   {
     id: 'long-haul',
     name: 'Long Haul',
-    description: 'Reach the resort on an Expedition (50 km) course.',
+    description: 'Reach the finish of an Expedition (50 km) course.',
     category: 'journey',
     icon: 'mountain',
     unlock: (e) => e.type === 'RunFinished' && e.outcome === 'victory' && e.length === 'expedition',
@@ -198,7 +198,7 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
   {
     id: 'daily-ritual',
     name: 'Daily Ritual',
-    description: `Reach the resort on the Daily Mountain on ${DAILY_RITUAL_DAYS} different days, each on its own UTC day (replaying a past day doesn't count).`,
+    description: `Reach the finish of the Daily Mountain on ${DAILY_RITUAL_DAYS} different days, each on its own UTC day (replaying a past day doesn't count).`,
     category: 'daily',
     icon: 'calendar',
     progress: { target: DAILY_RITUAL_DAYS, value: (s) => setSize(s, STAT.dailyDays), unit: 'days' },
@@ -230,13 +230,12 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     category: 'exploration',
     icon: 'viewpoint',
     biome: BIOME_IDS.fjord,
-    requires: 'Fjord Coast location',
     unlock: (e) => e.type === 'ScenicLocationDiscovered' && e.biome === BIOME_IDS.fjord,
   },
   {
     id: 'whiteout-survivor',
     name: 'Whiteout Survivor',
-    description: 'Reach the resort at Whiteout Ridge on Normal or Hard.',
+    description: 'Reach the finish at Whiteout Ridge on Normal or Hard.',
     category: 'exploration',
     icon: 'storm',
     biome: BIOME_IDS.whiteout,
