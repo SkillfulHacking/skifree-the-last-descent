@@ -1,8 +1,8 @@
 /**
  * Pass 4 release verification, WITHOUT ?debug (nothing here may be assisted: the persist policy
  * only commits real, unassisted play):
- *  - the Achievements screen shows all 12 achievements (earned / progress / hidden / the four
- *    awaiting future locations) at 1366x768, 1920x1080 and 2560x1440 (screenshots for review);
+ *  - the Achievements screen shows all 12 achievements (earned / progress / hidden / the three
+ *    awaiting future locations — Scenic Route is earnable in the Fjord Coast build) at 1366x768, 1920x1080 and 2560x1440 (screenshots for review);
  *  - an equipped jacket persists across reloads;
  *  - a real unlock (Pizza Party, from a save 10 m short of the goal) through genuine keyboard play,
  *    granting its jacket, persisted and still shown after a reload.
@@ -49,8 +49,10 @@ test('all 12 achievements display at 1366x768, 1920x1080 and 2560x1440', async (
   await expect(page.locator('.ach-card')).toHaveCount(12);
   await expect(page.locator('.ach-card.earned')).toHaveCount(3);
   await expect(page.locator('.ach-card.secret .ach-name')).toHaveText('???');
-  await expect(page.locator('.ach-card.future')).toHaveCount(4);
-  for (const id of ['scenic-route', 'whiteout-survivor', 'ice-dancer', 'steam-runner']) await expect(page.locator(`.ach-card.future[data-id="${id}"] .ach-req`)).toContainText('coming soon');
+  // (Fjord Coast build: Scenic Route is earnable — only the three achievements of the locations still to come wait)
+  await expect(page.locator('.ach-card.future')).toHaveCount(3);
+  await expect(page.locator('.ach-card.future[data-id="scenic-route"]')).toHaveCount(0);
+  for (const id of ['whiteout-survivor', 'ice-dancer', 'steam-runner']) await expect(page.locator(`.ach-card.future[data-id="${id}"] .ach-req`)).toContainText('coming soon');
   await expect(page.locator('.ach-card[data-id="pizza-party"] .ach-count')).toHaveText('990 / 1,000 m');
   await expect(page.locator('.menu-subtitle')).toContainText('3 / 12 earned');
   for (const [w, h] of [

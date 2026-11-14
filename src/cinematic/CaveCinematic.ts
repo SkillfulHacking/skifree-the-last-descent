@@ -6,6 +6,49 @@ import * as THREE from 'three';
 import { Timeline, ease, pose, type CamPose } from './Timeline';
 import type { Stage } from '../game/Stage';
 import { yetiSpawnAfterCinematic } from '../yeti/spawn';
+import type { CaveCinematicExtras } from '../world/presentation/cave';
+
+/**
+ * Cave-relative camera stations of the shared encounter: offsets (along the cave's outward
+ * direction O, up, +z) from the mouth. Exported so a location's cave dressing can keep its props
+ * out of these lenses (see cameraClearance / the Fjord sea cave).
+ */
+export const CAVE_CAMS = {
+  establish: [30, 7, 14],
+  slough0: [24, 3.5, 9],
+  slough1: [21, 3.2, 7],
+  dark0: [12, 2.4, 1.5],
+  dark1: [6.5, 2.3, 0.6],
+  emerge0: [9.0, 1.4, 3.2],
+  emerge1: [8.6, 1.5, 2.8],
+  roar0: [7.5, 0.6, 3.2],
+  roar1: [7, 0.5, 3],
+} as const satisfies Record<string, readonly [number, number, number]>;
+
+/**
+ * The sight lines of the shared cave shots (camera → what it looks at), in world space, for a cave
+ * with this mouth / outward / brow. The hand and face close-ups sit within ~3 m of the mouth along O
+ * and are approximated by a station there.
+ */
+export function caveCameraSightlines(mouth: THREE.Vector3, outward: THREE.Vector3, lipTop: THREE.Vector3): Array<{ cam: THREE.Vector3; look: THREE.Vector3 }> {
+  const O = outward;
+  const at = (ox: number, oy: number, oz: number) => mouth.clone().addScaledVector(O, ox).add(new THREE.Vector3(0, oy, oz));
+  const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  return [
+    { cam: at(...CAVE_CAMS.establish), look: mouth.clone().add(v(0, 5, 0)) },
+    { cam: at(...CAVE_CAMS.slough0), look: lipTop.clone() },
+    { cam: at(...CAVE_CAMS.slough1), look: lipTop.clone().add(v(0, -1, 0)) },
+    { cam: at(...CAVE_CAMS.dark0), look: mouth.clone().add(v(0, 1.6, 0)) },
+    { cam: at(...CAVE_CAMS.dark1), look: mouth.clone().add(v(0, 1.5, 0)) },
+    { cam: at(...CAVE_CAMS.emerge0), look: mouth.clone().addScaledVector(O, 0.6).add(v(0, 1.8, 0)) },
+    { cam: at(...CAVE_CAMS.emerge1), look: mouth.clone().addScaledVector(O, 1.6).add(v(0, 1.9, 0)) },
+    { cam: at(...CAVE_CAMS.roar0), look: mouth.clone().add(v(-1.5, 3.0, 0)) },
+    { cam: at(...CAVE_CAMS.roar1), look: mouth.clone().add(v(-1.5, 3.2, 0)) },
+    // hand insert and face close-ups (Yeti at the mouth / on the ledge)
+    { cam: at(2.8, 1.2, 0.9), look: mouth.clone().add(v(0, 0.6, 0)) },
+    { cam: at(4.2, 2.9, 0.8), look: mouth.clone().addScaledVector(O, 1.6).add(v(0, 3.1, 0)) },
+  ];
+}
 
 export class CaveCinematic {
   readonly tl = new Timeline();
@@ -53,11 +96,11 @@ export class CaveCinematic {
     const tl = this.tl;
 
     // Beat 1: the camera pulls away from the skier and turns toward the cliffside
-    tl.shot({ start: 0, end: 2.4, from: () => startPose, via: () => pose(P.clone().add(new THREE.Vector3(-4, 7, -6)), M.clone().add(new THREE.Vector3(0, 6, 0)), 55), to: () => pose(at(M, 30, 7, 14), M.clone().add(new THREE.Vector3(0, 5, 0)), 42), easing: ease.inOutCubic });
+    tl.shot({ start: 0, end: 2.4, from: () => startPose, via: () => pose(P.clone().add(new THREE.Vector3(-4, 7, -6)), M.clone().add(new THREE.Vector3(0, 6, 0)), 55), to: () => pose(at(M, ...CAVE_CAMS.establish), M.clone().add(new THREE.Vector3(0, 5, 0)), 42), easing: ease.inOutCubic });
     // Beat 2: snow sloughs off the rocks around the cave
-    tl.shot({ start: 2.4, end: 3.8, from: () => pose(at(M, 24, 3.5, 9), cave.lipTop, 40), to: () => pose(at(M, 21, 3.2, 7), cave.lipTop.clone().add(new THREE.Vector3(0, -1, 0)), 40), handheld: 0.03 });
+    tl.shot({ start: 2.4, end: 3.8, from: () => pose(at(M, ...CAVE_CAMS.slough0), cave.lipTop, 40), to: () => pose(at(M, ...CAVE_CAMS.slough1), cave.lipTop.clone().add(new THREE.Vector3(0, -1, 0)), 40), handheld: 0.03 });
     // Beats 3–4: a huge shadow moves in the darkness; two eyes appear
-    tl.shot({ start: 3.8, end: 6.6, from: () => pose(at(M, 12, 2.4, 1.5), yetiInside.clone().lerp(yetiRoot(), 0.6).add(new THREE.Vector3(0, 1.6, 0)), 38), to: () => pose(at(M, 6.5, 2.3, 0.6), yetiRoot().clone().add(new THREE.Vector3(0, 1.5, 0)), 30), easing: ease.linear, handheld: 0.02 });
+    tl.shot({ start: 3.8, end: 6.6, from: () => pose(at(M, ...CAVE_CAMS.dark0), yetiInside.clone().lerp(yetiRoot(), 0.6).add(new THREE.Vector3(0, 1.6, 0)), 38), to: () => pose(at(M, ...CAVE_CAMS.dark1), yetiRoot().clone().add(new THREE.Vector3(0, 1.5, 0)), 30), easing: ease.linear, handheld: 0.02 });
     // Beat 5: a giant furry hand reaches out of the dark and plants on the threshold
     // (low, close, from just outside the mouth; the head looms behind it in the darkness)
     const hand = new THREE.Vector3();
@@ -71,9 +114,9 @@ export class CaveCinematic {
     };
     tl.shot({ start: 6.6, end: 7.9, from: handShot(2.8, 34), to: handShot(2.4, 32), handheld: 0.012 });
     // Beat 6–7: he emerges and rises to full height (low angle)
-    tl.shot({ start: 7.9, end: 11.0, from: () => pose(at(M, 9.0, 1.4, 3.2), M.clone().addScaledVector(O, 0.6).add(new THREE.Vector3(0, 1.8, 0)), 50), to: () => pose(at(M, 8.6, 1.5, 2.8), M.clone().addScaledVector(O, 1.6).add(new THREE.Vector3(0, 1.9, 0)), 50), handheld: 0.02 });
+    tl.shot({ start: 7.9, end: 11.0, from: () => pose(at(M, ...CAVE_CAMS.emerge0), M.clone().addScaledVector(O, 0.6).add(new THREE.Vector3(0, 1.8, 0)), 50), to: () => pose(at(M, ...CAVE_CAMS.emerge1), M.clone().addScaledVector(O, 1.6).add(new THREE.Vector3(0, 1.9, 0)), 50), handheld: 0.02 });
     // Beat 8: the roar — wide, then (beat 9) a close-up on the face
-    tl.shot({ start: 11.0, end: 12.3, from: () => pose(at(M, 7.5, 0.6, 3.2), M.clone().add(new THREE.Vector3(-1.5, 3.0, 0)), 46), to: () => pose(at(M, 7, 0.5, 3), M.clone().add(new THREE.Vector3(-1.5, 3.2, 0)), 44) });
+    tl.shot({ start: 11.0, end: 12.3, from: () => pose(at(M, ...CAVE_CAMS.roar0), M.clone().add(new THREE.Vector3(-1.5, 3.0, 0)), 46), to: () => pose(at(M, ...CAVE_CAMS.roar1), M.clone().add(new THREE.Vector3(-1.5, 3.2, 0)), 44) });
     tl.shot({
       start: 12.3,
       end: 13.7,
@@ -174,12 +217,18 @@ export class CaveCinematic {
       st.poseOverride = {};
       this.onRunPrompt?.();
     });
+
+    // location beats (Fjord: gulls, spray, its own shot overrides); none for Alpine
+    this.extra = st.world.presentation.cave.cinematic?.({ st, cave, tl, at: (ox, oy, oz) => at(M, ox, oy, oz) }) ?? null;
   }
+
+  private extra: CaveCinematicExtras | null = null;
 
   /** Yeti root motion during the scripted beats. */
   update(dt: number) {
     const st = this.st;
     const t = this.tl.time;
+    this.extra?.update?.(dt, t);
     const O = st.world.cave.outward;
     if (this.leap) {
       const L = this.leap;
@@ -284,6 +333,8 @@ export class CaveCinematic {
   /** The spawn state handed to the chase when the cinematic ends (or is skipped). */
   finish() {
     const st = this.st;
+    this.extra?.dispose();
+    this.extra = null;
     st.yeti.setEyeGlow(0);
     st.yeti.setShade(1);
     st.world.env.setAmbientScale(1);

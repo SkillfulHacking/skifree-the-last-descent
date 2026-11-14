@@ -26,7 +26,22 @@ export interface HazardSetup {
   readonly kinds: readonly string[];
   /** × every kind's default amount (biome hazard tuning; 0 = none) */
   readonly density: number;
+  /**
+   * × the strength of hazard effects by game difficulty (the layout is the same on every
+   * difficulty, so a course code always describes the same course; only how hard a squall pushes or
+   * rock drags changes). Omitted entries are 1. Lets a harder location stay approachable on Relaxed
+   * without touching the Yeti (brief §2).
+   */
+  readonly intensity?: Readonly<Partial<Record<GameDifficulty, number>>>;
+  /**
+   * × intensity on long courses (finite ≥ 20 km, and Endless): the environment's cost accumulates
+   * over a long run, so a location can ease it there to keep its place on the difficulty ladder.
+   */
+  readonly longCourse?: number;
 }
+
+/** The player's game difficulty setting (mirrors game/CourseConfig Difficulty; world code may not import game). */
+export type GameDifficulty = 'relaxed' | 'normal' | 'hard';
 
 export interface PresentationRef {
   /** id of a registered presentation (finish / refuge / cave registries) */
@@ -59,10 +74,15 @@ export interface BiomeCapabilities {
   readonly cave: PresentationRef;
   readonly audio: AudioProfile;
   readonly rating: DifficultyRating;
+  /**
+   * Optional location scenery (three.js, presentation/scenery.ts): streamed set dressing that
+   * follows the course — a coast's water surfaces, sea mist, hamlets, boats, viewpoints. Alpine: none.
+   */
+  readonly scenery?: PresentationRef;
 }
 
 /** Ambience beds the audio engine can play (src/audio/ambience.ts). */
-export const KNOWN_AMBIENCE: readonly string[] = ['wind'];
+export const KNOWN_AMBIENCE: readonly string[] = ['wind', 'surf', 'gulls'];
 
 /** Alpine: the original game, module by module. */
 export const ALPINE_CAPABILITIES: BiomeCapabilities = Object.freeze({
@@ -110,7 +130,7 @@ export function validateCapabilities(b: HasCapabilities): string[] {
   if (new Set(c.hazards.kinds).size !== c.hazards.kinds.length) out.push('hazard kinds must be unique');
   for (const a of c.audio.ambience) if (!KNOWN_AMBIENCE.includes(a)) out.push(`unknown ambience "${a}"`);
   if (!c.audio.ambience.length) out.push('audio.ambience needs at least one bed');
-  for (const [k, ref] of [['finish', c.finish], ['refuge', c.refuge], ['cave', c.cave]] as const) if (!ref.id || !/^[a-z0-9][a-z0-9-]*$/.test(ref.id)) out.push(`${k}.id "${ref.id}" must be lowercase [a-z0-9-]`);
+  for (const [k, ref] of [['finish', c.finish], ['refuge', c.refuge], ['cave', c.cave], ...(c.scenery ? [['scenery', c.scenery] as const] : [])] as const) if (!ref.id || !/^[a-z0-9][a-z0-9-]*$/.test(ref.id)) out.push(`${k}.id "${ref.id}" must be lowercase [a-z0-9-]`);
   if (!c.refuge.name) out.push('refuge.name is required');
   if (!c.surface.id || typeof c.surface.modifiers !== 'function') out.push('surface model needs an id and modifiers()');
   if (!c.weather.id || typeof c.weather.sample !== 'function') out.push('weather model needs an id and sample()');

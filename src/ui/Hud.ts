@@ -127,7 +127,7 @@ export class Hud {
 
   setSkipHint(text: string | null) {
     this.skipHint.classList.toggle('hidden', !text);
-    if (text) this.skipHint.textContent = text;
+    if (text) this.skipHint.innerHTML = text; // text carries <kbd> glyph markup from g()
   }
 
   g(a: Action): string {
@@ -175,16 +175,33 @@ export class Hud {
 
   captionsOn = true;
   private capTimer = 0;
-  /** Closed caption for important non-speech sounds. */
-  caption(text: string, seconds = 2.2) {
-    if (!this.captionsOn) return;
+  /** priority of the caption on screen: Infinity for a hard (Yeti) caption, else its soft priority */
+  private capPriority = 0;
+  /**
+   * Closed caption for important non-speech sounds. `soft`: a location sound — never hides a hard
+   * caption (the Yeti's cues) and only replaces a soft one on screen when its `priority` is higher
+   * (e.g. a squall warning, which asks for a decision, replaces a rock-scrape note, which reports
+   * one: round 2, E3). Returns whether it was shown.
+   */
+  caption(text: string, seconds = 2.2, opts: { soft?: boolean; priority?: number } = {}): boolean {
+    if (!this.captionsOn) return false;
+    const pr = opts.soft ? (opts.priority ?? 0) : Infinity;
+    if (opts.soft && this.capTimer > 0 && pr <= this.capPriority) return false;
     this.cap.textContent = text;
     this.cap.classList.add('on');
     this.capTimer = seconds;
+    this.capPriority = pr;
+    return true;
+  }
+
+  /** the caption on screen (tests) */
+  get captionText(): string | null {
+    return this.capTimer > 0 ? this.cap.textContent : null;
   }
 
   clearCaption() {
     this.capTimer = 0;
+    this.capPriority = 0;
     this.cap.classList.remove('on');
   }
 

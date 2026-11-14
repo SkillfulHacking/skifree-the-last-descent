@@ -1,5 +1,8 @@
 /**
  * Rendering for the Hard-mode snowballs: the ball in flight and a landing marker on the snow.
+ * Round 2 (Fjord reviews C9 / A: 09b–09c): the throw also reads in the small rear-view inset — the
+ * ball in the Yeti's raised fist swells and flashes during the wind-up, and every ball in flight
+ * carries a constant-screen-size glint with a short comet trail.
  *
  * The marker appears the moment the ball is thrown, laid flat on the slope at the landing point:
  * an outer warning ring at the hit radius, and an inner disc that fills as impact approaches, so
@@ -10,6 +13,9 @@ import { ballPosition, SNOWBALL, type Snowball, type SnowballBarrage, type Vec3 
 
 interface Slot {
   ball: THREE.Mesh;
+  /** constant-screen-size glint + a short comet trail: readable in the small rear-view inset */
+  glint: THREE.Sprite;
+  trail: THREE.Sprite[];
   marker: THREE.Group;
   ring: THREE.Mesh;
   fill: THREE.Mesh;
@@ -18,6 +24,53 @@ interface Slot {
 }
 
 const UP = new THREE.Vector3(0, 1, 0);
+/** trail sprites per ball */
+const TRAIL = 6;
+/** how much bigger the glints are drawn in the small rear-view inset than in the main view */
+const INSET_MUL = 3.2;
+const _vp = new THREE.Vector4();
+const _db = new THREE.Vector2();
+
+/**
+ * A constant-screen-size glint that is drawn larger when the renderer is drawing into a small
+ * viewport (the rear-view inset): the scale set by the view (`userData.base`) is multiplied there,
+ * so the ball reads in the inset without a huge star in the main view.
+ */
+function glintSprite(mat: THREE.SpriteMaterial): THREE.Sprite {
+  const s = new THREE.Sprite(mat);
+  s.renderOrder = 7;
+  s.frustumCulled = false;
+  s.userData['base'] = 0.05;
+  s.onBeforeRender = (renderer) => {
+    renderer.getCurrentViewport(_vp);
+    renderer.getDrawingBufferSize(_db);
+    const inset = _vp.w < _db.y * 0.6;
+    s.scale.setScalar((s.userData['base'] as number) * (inset ? INSET_MUL : 1));
+    s.updateMatrixWorld();
+  };
+  return s;
+}
+
+/** a soft four-point star (additive), drawn once */
+function glintTexture(): THREE.Texture {
+  const n = 64;
+  const data = new Uint8Array(4 * n * n);
+  for (let j = 0; j < n; j++)
+    for (let i = 0; i < n; i++) {
+      const x = (i + 0.5) / n * 2 - 1;
+      const y = (j + 0.5) / n * 2 - 1;
+      const r = Math.hypot(x, y);
+      const core = Math.exp(-r * r * 6);
+      const rays = Math.exp(-Math.abs(x) * 26) * Math.exp(-y * y * 3) + Math.exp(-Math.abs(y) * 26) * Math.exp(-x * x * 3);
+      const v = Math.min(1, core + 0.55 * rays * (1 - Math.min(1, r)));
+      data.set([255, 255, 255, Math.round(255 * v)], (j * n + i) * 4);
+    }
+  const t = new THREE.DataTexture(data, n, n);
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearFilter;
+  t.needsUpdate = true;
+  return t;
+}
 
 export class SnowballView {
   readonly group = new THREE.Group();
@@ -33,10 +86,27 @@ export class SnowballView {
   private ringMat = new THREE.MeshBasicMaterial({ color: 0xff3b1f, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide });
   private fillMat = new THREE.MeshBasicMaterial({ color: 0xff5a2a, transparent: true, opacity: 0.32, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide });
   private p: Vec3 = { x: 0, y: 0, z: 0 };
+  private glintTex = glintTexture();
+  // the threat colour of the landing marker (orange-red), alpha-blended so it also reads against
+  // bright snow and sky (an additive white glint vanished there)
+  private glintMat = new THREE.SpriteMaterial({ map: this.glintTex, color: 0xff5a1f, transparent: true, depthWrite: false, depthTest: true, sizeAttenuation: false, fog: false });
+  private heldGlint: THREE.Sprite | null = null;
+  private q: Vec3 = { x: 0, y: 0, z: 0 };
   private n = new THREE.Vector3();
+
+  /**
+   * Round 4 (D r3 defect 5): the first throw slot (ball, marker, the alphaMap beam — a program no
+   * other material uses — glint and trail) is created here, visible far below the course, so the
+   * warm-up compile at session start (App: GameSession.warmupObjects) covers it instead of the
+   * first throw mid-chase. The session's set-up call to update() keeps it shown; the next one
+   * (the first frame, after the compile) hides it.
+   */
+  private warm = 2;
 
   constructor(private readonly normalAt: (x: number, z: number, out: Vec3) => void) {
     this.group.name = 'snowballs';
+    const s = this.slot();
+    for (const o of [s.ball, s.marker, s.beam, s.glint, ...s.trail]) o.position.set(0, -5000, 0);
   }
 
   private slot(): Slot {
@@ -51,8 +121,11 @@ export class SnowballView {
     beam.renderOrder = 6;
     const marker = new THREE.Group();
     marker.add(ring, fill);
-    this.group.add(ball, marker, beam);
-    const s: Slot = { ball, marker, ring, fill, beam, used: false };
+    const glint = glintSprite(this.glintMat.clone());
+    const trail: THREE.Sprite[] = [];
+    for (let k = 0; k < TRAIL; k++) trail.push(glintSprite(this.glintMat.clone()));
+    this.group.add(ball, marker, beam, glint, ...trail);
+    const s: Slot = { ball, glint, trail, marker, ring, fill, beam, used: false };
     this.slots.push(s);
     return s;
   }
@@ -73,12 +146,30 @@ export class SnowballView {
       this.heldBall.visible = !!held;
       if (held) this.heldBall.position.copy(held);
     }
+    // the wind-up reads from the rear view: the ball in his raised fist flashes and swells
+    if (held && !this.heldGlint) {
+      this.heldGlint = glintSprite(this.glintMat.clone());
+      this.group.add(this.heldGlint);
+    }
+    if (this.heldGlint) {
+      this.heldGlint.visible = !!held;
+      if (held) {
+        const pulse = 0.5 + 0.5 * Math.sin(time * 26);
+        this.heldGlint.position.copy(held);
+        this.heldGlint.userData['base'] = 0.05 + 0.035 * pulse;
+        (this.heldGlint.material as THREE.SpriteMaterial).opacity = 0.75 + 0.25 * pulse;
+        if (this.heldBall) this.heldBall.scale.setScalar(1.25 + 0.15 * pulse);
+      }
+    }
+    if (this.warm > 0 && --this.warm > 0 && !barrage) return; // keep the warm-up slot shown for the compile
     for (const s of this.slots) s.used = false;
     if (barrage) for (const b of barrage.balls) this.draw(this.slot(), b, time);
     for (const s of this.slots) {
       s.ball.visible = s.used;
       s.marker.visible = s.used;
       s.beam.visible = s.used;
+      s.glint.visible = s.used;
+      for (const t of s.trail) t.visible = s.used;
     }
   }
 
@@ -88,6 +179,22 @@ export class SnowballView {
     ballPosition(b, this.p);
     s.ball.position.set(this.p.x, this.p.y, this.p.z);
     s.ball.rotation.set(time * 7, time * 5, 0);
+    // glint on the ball (constant on-screen size) and a comet trail of its last ~0.2 s
+    s.glint.position.copy(s.ball.position);
+    s.glint.userData['base'] = 0.042 + 0.01 * Math.sin(time * 30);
+    (s.glint.material as THREE.SpriteMaterial).opacity = 0.95;
+    for (let k = 0; k < TRAIL; k++) {
+      const tk = b.t - (k + 1) * 0.035;
+      const tr = s.trail[k]!;
+      if (tk <= 0) {
+        tr.visible = false;
+        continue;
+      }
+      ballPosition({ ...b, t: tk }, this.q);
+      tr.position.set(this.q.x, this.q.y, this.q.z);
+      tr.userData['base'] = 0.03 * (1 - k / TRAIL);
+      (tr.material as THREE.SpriteMaterial).opacity = 0.6 * (1 - k / TRAIL);
+    }
     // marker: flat on the slope at the landing point
     this.normalAt(b.to.x, b.to.z, this.n);
     s.marker.position.set(b.to.x, b.to.y + 0.06, b.to.z);
@@ -116,6 +223,13 @@ export class SnowballView {
       (s.fill.material as THREE.Material).dispose();
       (s.beam.material as THREE.Material).dispose();
     }
+    for (const s of this.slots) {
+      (s.glint.material as THREE.Material).dispose();
+      for (const t of s.trail) (t.material as THREE.Material).dispose();
+    }
+    (this.heldGlint?.material as THREE.Material | undefined)?.dispose();
+    this.glintMat.dispose();
+    this.glintTex.dispose();
     this.beamGeo.dispose();
     this.beamTex.dispose();
     this.beamMat.dispose();

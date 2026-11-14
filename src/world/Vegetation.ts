@@ -54,6 +54,8 @@ export class Vegetation {
   /** band index → cells */
   private bands = new Map<number, Cell[]>();
   private queue: Array<{ band: number; list: readonly Obstacle[] }> = [];
+  /** the band being built in slices, if any */
+  private job: { band: number; gen: Generator<void, void, void> } | null = null;
   readonly uTime = { value: 0 };
   private geos: THREE.BufferGeometry[] = [];
   private mats: THREE.Material[] = [];
@@ -109,6 +111,10 @@ export class Vegetation {
 
   /** Build every queued band now (loading screen). */
   flush() {
+    if (this.job) {
+      while (!this.job.gen.next().done);
+      this.job = null;
+    }
     while (this.queue.length) {
       const q = this.queue.shift()!;
       this.buildBand(q.band, q.list);
@@ -116,15 +122,23 @@ export class Vegetation {
   }
 
   get pending() {
-    return this.queue.length;
+    return this.queue.length + (this.job ? 1 : 0);
   }
   get bandCount() {
     return this.bands.size;
   }
 
   private dropBand(band: number) {
+    if (this.job && this.job.band === band) {
+      this.job.gen.return(undefined);
+      this.job = null;
+    }
     const qi = this.queue.findIndex((q) => q.band === band);
     if (qi >= 0) this.queue.splice(qi, 1);
+    this.dropCells(band);
+  }
+
+  private dropCells(band: number) {
     const cells = this.bands.get(band);
     if (!cells) return;
     for (const c of cells)
@@ -135,8 +149,19 @@ export class Vegetation {
     this.bands.delete(band);
   }
 
+  /** build a band at once (loading screen, tests) */
   private buildBand(band: number, obstacles: readonly Obstacle[]) {
-    if (this.bands.has(band)) this.dropBand(band);
+    const g = this.buildBandSteps(band, obstacles);
+    while (!g.next().done);
+  }
+
+  /**
+   * One band, in slices (round 8, perf: on the coast a whole band cost 18–26 ms CPU in one frame —
+   * the decor and talus placement probes the coast height ~10× per candidate — and was the largest
+   * spike left in the frame replay). Yields every 48 candidates; installs the meshes at the end.
+   */
+  private *buildBandSteps(band: number, obstacles: readonly Obstacle[]): Generator<void, void, void> {
+    this.dropCells(band);
     const mountain = this.mountain;
     const seed = this.seed;
     const buckets = new Map<number, Bucket>();
@@ -146,7 +171,9 @@ export class Vegetation {
       if (!v) buckets.set(b, (v = { trees: [[], [], []], rocks: Array.from({ length: ROCK_VARIANTS }, () => []), pebbles: [], logs: [], stumps: [], farTrees: [[], [], []] }));
       return v;
     };
+    let tick = 0;
     for (const o of obstacles) {
+      if ((++tick & 47) === 0) yield;
       const b = get(o.x);
       const base: Inst = { x: o.x, y: o.y, z: o.z, rot: o.rot, sx: o.scale, sy: o.scale, sz: o.scale };
       switch (o.kind) {
@@ -198,10 +225,12 @@ export class Vegetation {
     // decorative forests on the outer valley walls (render only, no collision)
     const zA = band * BAND;
     const decorK = mountain.biome.trees.decorDensity;
+    const coast = mountain.coast;
     const speciesW = mountain.biome.trees.speciesWeights;
     if (zA + BAND > -300) {
       const rng = new Rng((seed ^ 0xf0e57 ^ Math.imul(band + 101, 0x27d4eb2d)) >>> 0);
       for (let i = 0; i < this.decorPerBand; i++) {
+        if ((++tick & 47) === 0) yield;
         const z = zA + rng.float() * BAND;
         const side = rng.chance(0.5) ? 1 : -1;
         const cx = mountain.centerX(z);
@@ -216,6 +245,11 @@ export class Vegetation {
         if (Math.abs(x) < 560) continue; // corridor trees come from the obstacle field
         if (z < -300) continue;
         const y = mountain.heightAt(x, z);
+        // coast: no trees in or at the water, nor on the cornice
+        if (coast && (y < coast.seaLevelAt(z) + 5 || (coast.beyondRim(x, z) > -5 && coast.beyondRim(x, z) < 60))) continue;
+        // cliff kit (round 4): the heightfield under the authored cliffs is a hidden backing, behind
+        // and below the rock mesh: nothing grows on it
+        if (coast && mountain.cliff && coast.beyondRim(x, z) > 0 && mountain.cliffKitWeight(z) > 0 && coast.beyondRim(x, z) < mountain.cliff.footOffset(mountain.cliff.gridColumn(z)) + 40) continue;
         // tree line by altitude relative to the local valley floor
         const rel = y - mountain.heightAt(cx, z);
         const dens = smoothstep(260, 120, rel) * (0.5 + 0.5 * smoothstep(-0.3, 0.3, fbm(x / 140, z / 140, seed + 3, 2))) * (0.35 + 0.65 * mountain.profile.treeLine(z)) * decorK;
@@ -229,6 +263,7 @@ export class Vegetation {
       // (cliff bases); sizes follow a power law, so a few big blocks and many small ones
       const talus = Math.round(this.decorPerBand * 0.08);
       for (let i = 0; i < talus; i++) {
+        if ((++tick & 15) === 0) yield;
         const z = zA + rng.float() * BAND;
         const side = rng.chance(0.5) ? 1 : -1;
         const cx = mountain.centerX(z);
@@ -237,6 +272,7 @@ export class Vegetation {
         const seedA = rng.float();
         if (Math.abs(x) < 560 || z < -300) continue;
         const y = mountain.heightAt(x, z);
+        if (coast && y < coast.seaLevelAt(z) + 1) continue;
         const gx = (mountain.heightAt(x + 6, z) - y) / 6;
         const gz = (mountain.heightAt(x, z + 6) - y) / 6;
         const g = Math.hypot(gx, gz);
@@ -254,7 +290,18 @@ export class Vegetation {
           const rz = z + Math.sin(a) * d * 0.6;
           const sz = Math.min(4.0, 0.7 * Math.pow(1 / Math.max(0.06, rng.float()), 0.7));
           const vv = Math.floor(((seedA * 7 + k * 0.37) % 1) * ROCK_VARIANTS);
-          get(rx).rocks[vv]!.push({ x: rx, y: mountain.heightAt(rx, rz) - sz * 0.35, z: rz, rot: rng.float() * 6.28, sx: sz * rng.range(0.85, 1.25), sy: sz * rng.range(0.85, 1.5), sz: sz, rx: rng.range(-0.4, 0.4), rz: rng.range(-0.4, 0.4) });
+          const rotA = rng.float() * 6.28;
+          const sxA = rng.range(0.85, 1.25);
+          const syA = rng.range(0.85, 1.5);
+          const rxA = rng.range(-0.4, 0.4);
+          const rzA = rng.range(-0.4, 0.4);
+          // coast (Fjord art review D9): a block spread off its cluster onto a sheer wall would hang
+          // on the face; keep only blocks whose own ground is below ~45°
+          if (coast) {
+            const yr = mountain.heightAt(rx, rz);
+            if (Math.hypot(mountain.heightAt(rx + 3, rz) - yr, mountain.heightAt(rx, rz + 3) - yr) / 3 > 1.0) continue;
+          }
+          get(rx).rocks[vv]!.push({ x: rx, y: mountain.heightAt(rx, rz) - sz * 0.35, z: rz, rot: rotA, sx: sz * sxA, sy: sz * syA, sz: sz, rx: rxA, rz: rzA });
         }
       }
     }
@@ -282,6 +329,7 @@ export class Vegetation {
       return im;
     };
     const cells: Cell[] = [];
+    yield;
     for (const [bx, b] of buckets) {
       const cell: Cell = { x0: bx * CELL, z0: zA, near: [], far: [], shadowCasters: [], mid: [] };
       b.trees.forEach((list, v) => {
@@ -327,14 +375,18 @@ export class Vegetation {
 
   update(camPos: THREE.Vector3, time: number, budgetMs = 2) {
     this.uTime.value = time;
-    if (this.queue.length) {
+    // (budgetMs ≤ 0: World's shared frame budget is spent — build nothing this frame, round 4)
+    if ((this.queue.length || this.job) && budgetMs > 0) {
       // nearest band first
       this.queue.sort((a, b) => Math.abs(a.band * BAND + BAND / 2 - camPos.z) - Math.abs(b.band * BAND + BAND / 2 - camPos.z));
       const t0 = performance.now();
       do {
-        const q = this.queue.shift()!;
-        this.buildBand(q.band, q.list);
-      } while (this.queue.length && performance.now() - t0 < budgetMs);
+        if (!this.job) {
+          const q = this.queue.shift()!;
+          this.job = { band: q.band, gen: this.buildBandSteps(q.band, q.list) };
+        }
+        if (this.job.gen.next().done) this.job = null;
+      } while ((this.queue.length || this.job) && performance.now() - t0 < budgetMs);
     }
     for (const cells of this.bands.values())
       for (const b of cells) {
@@ -352,6 +404,10 @@ export class Vegetation {
   }
 
   dispose() {
+    if (this.job) {
+      this.job.gen.return(undefined);
+      this.job = null;
+    }
     for (const band of [...this.bands.keys()]) this.dropBand(band);
     for (const g of this.geos) g.dispose();
     for (const m of this.mats) m.dispose();

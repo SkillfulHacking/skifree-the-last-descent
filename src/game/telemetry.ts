@@ -88,6 +88,9 @@ export class RunTelemetry {
       case 'impact':
         this.bus.emit({ type: 'ObstacleHit', kind: e.kind, intensity: e.intensity });
         break;
+      case 'relocate':
+        this.takeoff = null;
+        break;
       case 'crash':
         if (this.drift) this.endDrift(false);
         this.bus.emit({ type: 'Crashed', reason: e.reason });

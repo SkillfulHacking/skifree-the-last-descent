@@ -1,0 +1,1 @@
+{"biome":"fjord","km":12,"frames":34890,"median":3,"p95":9.8,"p99":11.9,"max":31.6,"over8":4785,"over16":27,"over33":0,"restarts":0,"softwareRenderMs":{"n":145,"median":6641},"heapMB":158.7,"renderer":{"fps":10,"p50":100,"p95":100,"calls":592,"triangles":1721343,"geometries":565,"textures":28,"particles":236,"terrainPending":1},"errors":[],"seconds":1141}

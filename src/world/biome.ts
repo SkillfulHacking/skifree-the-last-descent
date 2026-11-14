@@ -31,6 +31,7 @@
  * Alpine default. Read them with `capabilitiesOf(biome)`.
  */
 import type { SegmentType } from './profile';
+import type { CoastParams } from './coast';
 import { validateCapabilities, type BiomeCapabilities } from './capabilities';
 
 /** Linear RGB, 0..1 (values > 1 allowed for tints/multipliers). */
@@ -107,6 +108,17 @@ export interface BiomeRangesLook {
   stoneDark: RGB;
   stoneLight: RGB;
   lowland: RGB;
+  /**
+   * Optional open horizon (e.g. the sea): a sector of the skyline where the distant ridges sink to
+   * `floor` × their height. `center` is the world direction angle atan2(z, x) in radians (+Z, the
+   * way down the course, is π/2; −X is π); `halfWidth` in radians. Omitted: ridges all around.
+   */
+  openSector?: { center: number; halfWidth: number; floor: number };
+  /**
+   * Optional peak opacity of the horizon haze band (default 0.92). Lower = a crisper horizon (Fjord:
+   * clear coastal air, islands and the far shore stay readable).
+   */
+  horizonHaze?: number;
 }
 
 /** One conifer species (shape + needle colour). See props.ts pineGeometry. */
@@ -177,12 +189,28 @@ export interface BiomeTerrain {
   swingScale: number;
   /** relative weights of regular segment types; omit for the original uniform mix */
   segmentWeights?: Partial<Record<SegmentType, number>>;
+  /** segment types that may get an alternate line; omit for the original set */
+  altTypes?: readonly SegmentType[];
+  /** floor (degrees) on regular segments' slope; omit for none (see profile.ts ProfileKnobs) */
+  minSlope?: number;
+  /** ridgeline spines with gap jumps; omit for none (see profile.ts ProfileKnobs) */
+  spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
+  /** run-in slope at the start gate (degrees, default 6) */
+  startSlope?: number;
+  /** side of the piste the Yeti caves are cut into (default +1; a coast: −1, the sea side) */
+  caveSide?: 1 | -1;
   /** valley wall height (m) */
   wallHeight: number;
   /** ridged/fbm relief on the valley walls (m) */
   wallRelief: number;
   /** height of the far ranges rising beyond the walls (m) */
   rangeHeight: number;
+  /**
+   * Optional (round 4, Fjord): rounds the far ranges' summits instead of the 5-octave ridged noise's
+   * needle crests (0 / absent = the original ranges, bit-identical). Only applies ≥ 350 m beyond the
+   * piste edge (art-only: no line, obstacle or hazard comes near).
+   */
+  rangeSoft?: number;
   /** large-scale rolling undulation (m) */
   undulation: number;
   /** mid-scale variation (m) */
@@ -194,6 +222,11 @@ export interface BiomeTerrain {
   driftsPowder: number;
   /** roller amplitude (m) */
   rollers: number;
+  /**
+   * Optional sea coast on the −X side (cliffs, fjord arms, islands, harbour shore; see coast.ts).
+   * Omitted (Alpine): an inland valley, heights unchanged.
+   */
+  coast?: CoastParams;
 }
 
 export interface BiomeAudio {

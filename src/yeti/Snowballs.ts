@@ -182,9 +182,16 @@ export class SnowballBarrage {
   }
 }
 
-/** keep a landing point on the piste (the Yeti aims at the run, not the trees) */
-export function clampToPiste(m: { centerX(z: number): number; halfWidth(z: number): number }, x: number, z: number): number {
+/**
+ * keep a landing point on the piste (the Yeti aims at the run, not the trees); on a coast, also on
+ * the land side of the cliff rim (which can run inside the piste's half-width on the sea side), so
+ * no landing marker is drawn on the cornice or over the drop
+ */
+export function clampToPiste(m: { centerX(z: number): number; halfWidth(z: number): number; coast?: { rimX(z: number): number } | null }, x: number, z: number): number {
   const c = m.centerX(z);
   const w = Math.max(4, m.halfWidth(z) - 4);
-  return Math.min(c + w, Math.max(c - w, x));
+  let lo = c - w;
+  const hi = c + w;
+  if (m.coast) lo = Math.min(hi, Math.max(lo, m.coast.rimX(z) + 10));
+  return Math.min(hi, Math.max(lo, x));
 }

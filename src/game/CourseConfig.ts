@@ -15,7 +15,7 @@
  * a different mountain in every location.
  */
 import { Mountain, SEED_DEFAULT } from '../world/course';
-import { DEFAULT_BIOME, biomeByCode, getBiome, hasBiome, type BiomeId } from '../world/biome';
+import { DEFAULT_BIOME, biomeByCode, getBiome, hasBiome, listBiomes, type BiomeId } from '../world/biome';
 
 export type CourseMode = 'classic' | 'daily' | 'custom';
 export type LengthMode = 'sprint' | 'standard' | 'endurance' | 'expedition' | 'endless';
@@ -34,7 +34,7 @@ export const LENGTH_INFO: Record<LengthMode, { metres: number; label: string; sh
   standard: { metres: 10000, label: 'Standard · 10 km', short: 'STD', blurb: 'The full mountain' },
   endurance: { metres: 20000, label: 'Endurance · 20 km', short: 'END', blurb: 'Long run, more terrain' },
   expedition: { metres: 50000, label: 'Expedition · 50 km', short: 'EXP', blurb: 'An epic traverse' },
-  endless: { metres: Infinity, label: 'Endless', short: 'INF', blurb: 'No finish. Bank at the lodges.' },
+  endless: { metres: Infinity, label: 'Endless', short: 'INF', blurb: 'No finish. Bank your run at the refuges.' },
 };
 
 export interface CourseConfig {
@@ -138,9 +138,24 @@ export function courseId(c: CourseConfig): string {
   return `CLASSIC-${len}${loc}`;
 }
 
+/** Example codes for help text: today's Daily, a Classic, a seed, and a location suffix if one exists. */
+export function exampleCodes(today: string): string {
+  const loc = listBiomes().find((b) => b.id !== DEFAULT_BIOME);
+  return `DAILY-${today}-STD, CLASSIC-END, SEED-1234-SPR-H${loc ? ` or CLASSIC-SPR@${loc.code} (another location)` : ''}`;
+}
+
 /** Parse a share code back into a config (null if not recognised). */
 export function parseCourseId(id: string): CourseConfig | null {
-  const raw = id.trim().toUpperCase();
+  // forgiving input: a code copied out of a URL ("…SPR%40FJORD") and stray spaces ("SPR @ FJORD")
+  let txt = id;
+  if (txt.includes('%')) {
+    try {
+      txt = decodeURIComponent(txt);
+    } catch {
+      return null;
+    }
+  }
+  const raw = txt.replace(/\s+/g, '').toUpperCase();
   // optional location suffix "@CODE" (must name a registered biome)
   const at = raw.indexOf('@');
   const s = at < 0 ? raw : raw.slice(0, at);

@@ -60,6 +60,8 @@ export interface SimOptions {
    * for the mountain's biome and the field's seed (identity on Alpine); null = none.
    */
   environment?: BiomeEnvironment | null;
+  /** game difficulty for the default environment's hazard intensity (default normal) */
+  difficulty?: 'relaxed' | 'normal' | 'hard';
 }
 
 export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierState, t: number) => SkierInput, opts: SimOptions = {}): SimResult {
@@ -68,7 +70,7 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
   const crashAtChase = opts.crashAtChase ?? [];
   const maxZ = opts.maxZ ?? Infinity;
   const finishZ = m.finishZ;
-  const env = opts.environment === undefined ? new BiomeEnvironment(m, f.seed) : opts.environment;
+  const env = opts.environment === undefined ? new BiomeEnvironment(m, f.seed, { difficulty: opts.difficulty }) : opts.environment;
   const phys = new SkierPhysics(m, f, undefined, env);
   phys.reset(m.routeX(0), 0, 0, 0);
   const yeti = new YetiAI(m, f);

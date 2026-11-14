@@ -1,0 +1,1 @@
+{"biome":"alpine","km":12,"frames":32849,"median":0.5,"p95":7.5,"p99":8.2,"max":19.1,"over8":435,"over16":12,"over33":0,"restarts":0,"softwareRenderMs":{"n":136,"median":4671},"heapMB":121.8,"renderer":{"fps":10,"p50":100,"p95":100,"calls":510,"triangles":1823001,"geometries":397,"textures":21,"particles":253,"terrainPending":0},"errors":[],"seconds":735}

@@ -1,0 +1,283 @@
+{
+  "biome": "alpine",
+  "course": "classic:sprint",
+  "viewport": "1920x1080",
+  "sha": "cb87428+dirty",
+  "date": "2026-11-10T08:17:17.390Z",
+  "shots": [
+    {
+      "name": "01_menu",
+      "note": "Main menu, Location row focused; the location preview runs behind the menu",
+      "camera": {
+        "pos": [
+          20.74906774373678,
+          7.68084387449636,
+          -16.19082737186562
+        ],
+        "fov": 55
+      },
+      "phase": "menu",
+      "z": null,
+      "cinematicTime": null,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "02_summit",
+      "note": "Summit: start gate and the descent ahead",
+      "camera": {
+        "pos": [
+          44.36827136384358,
+          61.749429078191916,
+          -70
+        ],
+        "fov": 56
+      },
+      "phase": "learn",
+      "z": 2.0235930220819567,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "03_mid_mountain",
+      "note": "Mid-mountain at z=1500",
+      "camera": {
+        "pos": [
+          -55.514801784026645,
+          -358.2516567829755,
+          1350
+        ],
+        "fov": 52
+      },
+      "phase": "chase",
+      "z": 1500.0127449240376,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "04_signature_hazard",
+      "note": "no hazard kinds in this location: a kicker (the signature feature)",
+      "camera": {
+        "pos": [
+          -128.3739916986051,
+          -489.6965296103625,
+          1649.5510410453426
+        ],
+        "fov": 48
+      },
+      "phase": "chase",
+      "z": 1529.5651117844195,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "05_material",
+      "note": "Terrain material close-up at the rim, z=1080",
+      "camera": {
+        "pos": [
+          -20.58691688412535,
+          -310.90677532292364,
+          1066
+        ],
+        "fov": 62
+      },
+      "phase": "chase",
+      "z": 1080.0113982825696,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "06_long_distance",
+      "note": "Long-distance composition across the valley / fjord",
+      "camera": {
+        "pos": [
+          -1417.145173390648,
+          944.8467130461762,
+          -400
+        ],
+        "fov": 55
+      },
+      "phase": "chase",
+      "z": 900.0168938519171,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "07_yeti_cave",
+      "note": "The Yeti cave with the location dressing, before the encounter",
+      "camera": {
+        "pos": [
+          85.0117590580435,
+          -26.594043731689453,
+          261
+        ],
+        "fov": 50
+      },
+      "phase": "foreshadow",
+      "z": 207.00339092408103,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "08_yeti_cinematic",
+      "note": "Cave cinematic, t≈9.5 s (emergence)",
+      "camera": {
+        "pos": [
+          102.22442904869791,
+          -32.151984187878185,
+          262.98388650810523
+        ],
+        "fov": 50
+      },
+      "phase": "caveCinematic",
+      "z": 282.0734046635351,
+      "cinematicTime": 9.53333333333331,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "08b_yeti_cinematic",
+      "note": "Cave cinematic, t≈14.6 s",
+      "camera": {
+        "pos": [
+          49.547089769744964,
+          -44.71056576915504,
+          284.6519682280132
+        ],
+        "fov": 44.00478306919075
+      },
+      "phase": "caveCinematic",
+      "z": 282.0734046635351,
+      "cinematicTime": 14.633333333333292,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "09_pursuit",
+      "note": "Ordinary chase gameplay, normal follow camera, rear view showing the Yeti",
+      "camera": {
+        "pos": [
+          31.293380696322103,
+          -76.4372845242011,
+          385.8689747004346
+        ],
+        "fov": 74.66166149638606
+      },
+      "phase": "chase",
+      "z": 392.47189824266405,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "09b_hard_snowball",
+      "note": "Hard: the Yeti winds up / releases a snowball during ordinary chase gameplay (rear view + landing marker)",
+      "camera": {
+        "pos": [
+          -53.88657792974111,
+          -354.68487202849303,
+          1216.0705113010995
+        ],
+        "fov": 65.24011620279543
+      },
+      "phase": "chase",
+      "z": 1221.8432388861627,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR-H"
+    },
+    {
+      "name": "09c_hard_snowball_marker",
+      "note": "Hard: snowball in flight, landing marker on the snow",
+      "camera": {
+        "pos": [
+          -55.88265017516012,
+          -355.5489552223844,
+          1219.7797118125773
+        ],
+        "fov": 63.82131204560716
+      },
+      "phase": "chase",
+      "z": 1225.4008855314776,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR-H"
+    },
+    {
+      "name": "10_finish",
+      "note": "Finish environment from above the run-out",
+      "camera": {
+        "pos": [
+          -46,
+          -925.0859225007463,
+          2930
+        ],
+        "fov": 56
+      },
+      "phase": "chase",
+      "z": 2740.0125402695558,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "10b_finish_ground",
+      "note": "Finish environment at eye level",
+      "camera": {
+        "pos": [
+          8,
+          -951.8859225007462,
+          3018
+        ],
+        "fov": 58
+      },
+      "phase": "chase",
+      "z": 2740.0125402695558,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "11_victory_trophy",
+      "note": "Victory: trophy hand-off",
+      "camera": {
+        "pos": [
+          -6.750326212032418,
+          -954.1455850981962,
+          3011.9510460907945
+        ],
+        "fov": 41.46019348362509
+      },
+      "phase": "victory",
+      "z": 3017.3628055434106,
+      "cinematicTime": 9.63333333333331,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "11b_victory_celebration",
+      "note": "Victory: the celebration beat",
+      "camera": {
+        "pos": [
+          -3.7651564391210175,
+          -953.7443002731497,
+          3012.788706511141
+        ],
+        "fov": 40.291664157890814
+      },
+      "phase": "victory",
+      "z": 3017.3628055434106,
+      "cinematicTime": 13.433333333333296,
+      "course": "CLASSIC-SPR"
+    },
+    {
+      "name": "11c_victory_reveal",
+      "note": "Victory: the closing reveal",
+      "camera": {
+        "pos": [
+          -23.857677818368767,
+          -920.1185947723775,
+          3087.3628055434106
+        ],
+        "fov": 55
+      },
+      "phase": "results",
+      "z": 3017.3628055434106,
+      "cinematicTime": 19.500000000000128,
+      "course": "CLASSIC-SPR"
+    }
+  ],
+  "errors": [],
+  "seconds": 4420
+}

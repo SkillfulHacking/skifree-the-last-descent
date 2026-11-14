@@ -1,0 +1,299 @@
+{
+  "biome": "fjord",
+  "course": "classic:sprint",
+  "viewport": "1920x1080",
+  "sha": "f8519ca",
+  "date": "2026-11-10T06:50:04.001Z",
+  "shots": [
+    {
+      "name": "01_menu",
+      "note": "Main menu, Location row focused; the location preview runs behind the menu",
+      "camera": {
+        "pos": [
+          -71.42835804695856,
+          54.65477660004977,
+          -39.100843512727096
+        ],
+        "fov": 58
+      },
+      "phase": "menu",
+      "z": null,
+      "cinematicTime": null,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "02_summit",
+      "note": "Summit: start gate and the descent ahead",
+      "camera": {
+        "pos": [
+          40,
+          62,
+          -70
+        ],
+        "fov": 56
+      },
+      "phase": "learn",
+      "z": 2.023952515831003,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "03_mid_mountain",
+      "note": "Mid-mountain at z=1500",
+      "camera": {
+        "pos": [
+          77.81405939917178,
+          -303.9727982399011,
+          1350
+        ],
+        "fov": 52
+      },
+      "phase": "chase",
+      "z": 1500.0183962727442,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "04_signature_hazard",
+      "note": "sea-gust (id 24576) in its active phase; kinds near: scoured-rock,sea-gust",
+      "camera": {
+        "pos": [
+          29.24097099478367,
+          -396.24762187158933,
+          1526.440813390411
+        ],
+        "fov": 50
+      },
+      "phase": "chase",
+      "z": 1426.6033223679233,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "04b_hazard_rock",
+      "note": "scoured-rock: exposed rock beside the racing line",
+      "camera": {
+        "pos": [
+          -27.516072371610704,
+          -35.31932915701055,
+          279.0963128709793
+        ],
+        "fov": 50
+      },
+      "phase": "chase",
+      "z": 185.09631287097932,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "05_material",
+      "note": "Terrain material close-up at the rim, z=1080",
+      "camera": {
+        "pos": [
+          -59.608824467296955,
+          -223.80689668171473,
+          1066
+        ],
+        "fov": 62
+      },
+      "phase": "chase",
+      "z": 1080.0152936639322,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "06_long_distance",
+      "note": "Long-distance composition across the valley / fjord",
+      "camera": {
+        "pos": [
+          -1463.9789244617364,
+          -488.607089094146,
+          -400
+        ],
+        "fov": 55
+      },
+      "phase": "chase",
+      "z": 900.0157176352757,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "07_yeti_cave",
+      "note": "The Yeti cave with the location dressing, before the encounter",
+      "camera": {
+        "pos": [
+          12.166411876043924,
+          -22.57741355895996,
+          261
+        ],
+        "fov": 50
+      },
+      "phase": "foreshadow",
+      "z": 207.00137182657545,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "08_yeti_cinematic",
+      "note": "Cave cinematic, t≈9.5 s (emergence)",
+      "camera": {
+        "pos": [
+          29.379081866698346,
+          -28.135354015148692,
+          262.98388650810523
+        ],
+        "fov": 50
+      },
+      "phase": "caveCinematic",
+      "z": 282.12625616063315,
+      "cinematicTime": 9.53333333333331,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "08b_yeti_cinematic",
+      "note": "Cave cinematic, t≈14.6 s",
+      "camera": {
+        "pos": [
+          -24.682389524071265,
+          -41.51797416668812,
+          284.55295566357853
+        ],
+        "fov": 44.00478306919075
+      },
+      "phase": "caveCinematic",
+      "z": 282.12625616063315,
+      "cinematicTime": 14.633333333333292,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "09_pursuit",
+      "note": "Ordinary chase gameplay, normal follow camera, rear view showing the Yeti",
+      "camera": {
+        "pos": [
+          -16.93036750149216,
+          -71.78148822792411,
+          382.29308785220826
+        ],
+        "fov": 74.9927947658133
+      },
+      "phase": "chase",
+      "z": 388.86116146070117,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "09b_hard_snowball",
+      "note": "Hard: the Yeti winds up / releases a snowball during ordinary chase gameplay (rear view + landing marker)",
+      "camera": {
+        "pos": [
+          45.232986537785855,
+          -130.2490031451716,
+          681.754857836168
+        ],
+        "fov": 44
+      },
+      "phase": "results",
+      "z": 676.9527692500734,
+      "cinematicTime": 26.20000000000046,
+      "course": "CLASSIC-SPR-H@FJORD"
+    },
+    {
+      "name": "09c_hard_snowball_marker",
+      "note": "Hard: snowball in flight, landing marker on the snow",
+      "camera": {
+        "pos": [
+          45.232986537785855,
+          -130.2490031451716,
+          681.754857836168
+        ],
+        "fov": 44
+      },
+      "phase": "results",
+      "z": 676.9527692500734,
+      "cinematicTime": 26.60000000000048,
+      "course": "CLASSIC-SPR-H@FJORD"
+    },
+    {
+      "name": "10_finish",
+      "note": "Finish environment from above the run-out",
+      "camera": {
+        "pos": [
+          -46,
+          -792.7229892750975,
+          2930
+        ],
+        "fov": 56
+      },
+      "phase": "chase",
+      "z": 2740.0094795064742,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "10b_finish_ground",
+      "note": "Finish environment at eye level",
+      "camera": {
+        "pos": [
+          8,
+          -819.5229892750974,
+          3018
+        ],
+        "fov": 58
+      },
+      "phase": "chase",
+      "z": 2740.0094795064742,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11_victory_trophy",
+      "note": "Victory: trophy hand-off",
+      "camera": {
+        "pos": [
+          -2.978173737891191,
+          -822.173346314541,
+          3014.0861641826873
+        ],
+        "fov": 43.2719189814815
+      },
+      "phase": "victory",
+      "z": 3019.79493177528,
+      "cinematicTime": 9.63333333333331,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11b_victory_celebration",
+      "note": "Victory: the celebration beat",
+      "camera": {
+        "pos": [
+          24.53331138545955,
+          -822.9737645399621,
+          3228.433377229081
+        ],
+        "fov": 45.0666227709191
+      },
+      "phase": "victory",
+      "z": 3019.79493177528,
+      "cinematicTime": 13.433333333333296,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11c_victory_reveal",
+      "note": "Victory: the closing reveal",
+      "camera": {
+        "pos": [
+          179.04000000000525,
+          -654.8320490941352,
+          4540.386560000057
+        ],
+        "fov": 49.440000000000325
+      },
+      "phase": "victory",
+      "z": 3019.79493177528,
+      "cinematicTime": 19.500000000000128,
+      "course": "CLASSIC-SPR@FJORD"
+    }
+  ],
+  "errors": [],
+  "seconds": 4400
+}

@@ -1,0 +1,147 @@
+{
+ "res": [
+  {
+   "x": 0.5,
+   "y": 0.5,
+   "hits": [
+    {
+     "d": 46,
+     "chain": "cave-rock<Group<Scene",
+     "mat": "MeshStandardMaterial",
+     "ud": "{\"rock\":{\"uWater\":{\"value\":-1000000000},\"uSnow\":{\"value\":1},\"uOrigin\":{\"value\":{",
+     "key": "art-rock-rock_face_03-2-6-0-1-0.6-{\"lum\":0.06,\"desat\":0.9,\"tint\":[0.94,0.98,1.05]}-4--0",
+     "geo": "BufferGeometry:24181",
+     "inst": false,
+     "p": [
+      -68,
+      -33,
+      268
+     ]
+    },
+    {
+     "d": 48,
+     "chain": "Mesh<Group<Scene",
+     "mat": "MeshStandardMaterial",
+     "ud": "{}",
+     "key": "skifree-snow-v6:fjord",
+     "geo": "BufferGeometry:17153",
+     "inst": false,
+     "p": [
+      -70,
+      -33,
+      269
+     ]
+    },
+    {
+     "d": 49,
+     "chain": "cave-rock<Group<Scene",
+     "mat": "MeshStandardMaterial",
+     "ud": "{\"rock\":{\"uWater\":{\"value\":-1000000000},\"uSnow\":{\"value\":1},\"uOrigin\":{\"value\":{",
+     "key": "art-rock-rock_face_03-2-6-0-1-0.6-{\"lum\":0.06,\"desat\":0.9,\"tint\":[0.94,0.98,1.05]}-4--0",
+     "geo": "BufferGeometry:24181",
+     "inst": false,
+     "p": [
+      -71,
+      -33,
+      270
+     ]
+    }
+   ]
+  }
+ ],
+ "segs": {
+  "cam": [
+   -30,
+   -27,
+   243
+  ],
+  "focus": null,
+  "jobs": 0,
+  "segs": [
+   {
+    "i": 1,
+    "lod": 0,
+    "v": 21125,
+    "name": "cliff-seg-1"
+   },
+   {
+    "i": 2,
+    "lod": 0,
+    "v": 16835,
+    "name": "cliff-seg-2"
+   },
+   {
+    "i": 3,
+    "lod": 1,
+    "v": 3960,
+    "name": "cliff-seg-3"
+   },
+   {
+    "i": 4,
+    "lod": 1,
+    "v": 3366,
+    "name": "cliff-seg-4"
+   },
+   {
+    "i": 5,
+    "lod": 1,
+    "v": 2904,
+    "name": "cliff-seg-5"
+   },
+   {
+    "i": 6,
+    "lod": 2,
+    "v": 731,
+    "name": "cliff-seg-6"
+   },
+   {
+    "i": 7,
+    "lod": 2,
+    "v": 595,
+    "name": "cliff-seg-7"
+   },
+   {
+    "i": 8,
+    "lod": 2,
+    "v": 476,
+    "name": "cliff-seg-8"
+   },
+   {
+    "i": 9,
+    "lod": 2,
+    "v": 240,
+    "name": "cliff-seg-9"
+   },
+   {
+    "i": 0,
+    "lod": 0,
+    "v": 21125,
+    "name": "cliff-seg-0"
+   },
+   {
+    "i": -1,
+    "lod": 0,
+    "v": 22425,
+    "name": "cliff-seg--1"
+   },
+   {
+    "i": -2,
+    "lod": 1,
+    "v": 6072,
+    "name": "cliff-seg--2"
+   },
+   {
+    "i": -3,
+    "lod": 1,
+    "v": 7062,
+    "name": "cliff-seg--3"
+   },
+   {
+    "i": -4,
+    "lod": 1,
+    "v": 8415,
+    "name": "cliff-seg--4"
+   }
+  ]
+ }
+}

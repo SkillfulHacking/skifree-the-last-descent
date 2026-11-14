@@ -31,6 +31,12 @@ export interface RefugeBuildContext {
 export interface RefugeDefinition {
   readonly id: string;
   build(ctx: RefugeBuildContext): RefugeView;
+  /**
+   * Optional time-sliced build (round 3, D6): a generator that yields between pieces of work and
+   * returns the same view as `build`. World steps it one slice per frame while the refuge is still
+   * far ahead (refuges stream in 1.6 km early) and builds it at once when loading.
+   */
+  buildSteps?(ctx: RefugeBuildContext): Generator<void, RefugeView, void>;
 }
 
 const refuges = new Map<string, RefugeDefinition>();

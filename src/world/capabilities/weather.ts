@@ -12,7 +12,7 @@
 import { clamp, fbm, gnoise, smoothstep } from '../../core/rng';
 
 export interface WeatherSample {
-  /** wind at the skier, m/s (+X = right when facing downhill, +Z = downhill) */
+  /** wind at the skier, m/s (+X = the skier's left when facing downhill, +Z = downhill) */
   windX: number;
   windZ: number;
   /** × the biome's base fog density (1 = biome default, > 1 = thicker / lower visibility) */

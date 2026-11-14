@@ -112,7 +112,9 @@ test('Achievements + Locker: layout, keyboard/mouse/gamepad, v1 save migration, 
   await expect(page.locator('.ach-card.earned .ach-name')).toHaveText('Not Today, Yeti');
   await expect(page.locator('.ach-card[data-id="pizza-party"] .ach-count')).toHaveText('400 / 1,000 m');
   await expect(page.locator('.ach-card.secret .ach-name')).toHaveText('???');
-  await expect(page.locator('.ach-card.future')).toHaveCount(4);
+  // (Fjord Coast build: Scenic Route is earnable — only the three achievements of the locations still to come wait)
+  await expect(page.locator('.ach-card.future')).toHaveCount(3);
+  await expect(page.locator('.ach-card.future[data-id="scenic-route"]')).toHaveCount(0);
   await expect(page.locator('.menu-subtitle')).toContainText('1 / 12 earned');
   for (const [w, h] of [
     [1366, 768],

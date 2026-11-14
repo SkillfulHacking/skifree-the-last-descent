@@ -334,7 +334,7 @@ describe('registries and validation', () => {
     const make = (caps: Biome['capabilities'], id = 'test-caps') => deriveBiome(ALPINE, { id, code: 'TCAP', name: 'Caps', capabilities: caps });
     expect(() => registerBiome(make({ hazards: { kinds: ['no-such-hazard'], density: 1 } }))).toThrow(/not registered/);
     expect(() => registerBiome(make({ rating: { level: 7 as 1, label: 'x' } }))).toThrow(/rating/);
-    expect(() => registerBiome(make({ audio: { ambience: ['surf'] } }))).toThrow(/ambience/);
+    expect(() => registerBiome(make({ audio: { ambience: ['no-such-bed'] } }))).toThrow(/ambience/);
     expect(() => registerBiome(make({ weather: { ...ALPINE_WEATHER, id: 'w', coupling: { airborne: 5, balance: 0 } } }))).toThrow(/airborne/);
     expect(listBiomes().map((b) => b.id)).not.toContain('test-caps');
     // the hazard test biome is valid; its presentation needs the hazard view
@@ -435,7 +435,14 @@ describe('hazards: deterministic placement and streaming', () => {
       for (let z = 0; z < 12000; z += 64) {
         env.stream(z);
         env.release(z - 900, z + 1600);
+        // views are built on a frame budget (round 3, D1): a frame's pump builds at least one, and
+        // flush() (loading) builds the rest
+        const pending = layer.pendingCount;
+        layer.pump(0);
+        if (pending) expect(layer.pendingCount).toBe(pending - 1);
+        layer.flush();
         layer.update(1 / 60);
+        expect(layer.pendingCount).toBe(0);
         expect(layer.liveCount).toBe(env.hazards.count);
         expect(layer.group.children.length).toBe(env.hazards.count);
       }
@@ -579,8 +586,8 @@ describe('course rules and codes', () => {
 
 // ------------------------------------------------------------------------------------------------
 describe('Location menu', () => {
-  it('only Alpine ships: the game registers no placeholder locations', () => {
-    expect(listBiomes().filter((b) => b.id.startsWith('test-') === false).map((b) => b.id)).toEqual(['alpine']);
+  it('Alpine and Fjord Coast ship: the game registers no placeholder locations', () => {
+    expect(listBiomes().filter((b) => b.id.startsWith('test-') === false).map((b) => b.id)).toEqual(['alpine', 'fjord']);
     expect(getBiome(DEBUG_TEST_BIOME_ID)).toBe(ALPINE);
   });
 

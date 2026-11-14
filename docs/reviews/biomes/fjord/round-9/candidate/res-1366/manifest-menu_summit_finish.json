@@ -1,0 +1,75 @@
+{
+  "biome": "fjord",
+  "course": "classic:sprint",
+  "viewport": "1366x768",
+  "sha": "c9ffd1b",
+  "date": "2026-11-14T03:25:16.551Z",
+  "shots": [
+    {
+      "name": "01_menu",
+      "note": "Main menu, Location row focused; the location preview runs behind the menu",
+      "camera": {
+        "pos": [
+          -85.52839614514124,
+          50.30279509352072,
+          -44.92145740962387
+        ],
+        "fov": 58
+      },
+      "phase": "menu",
+      "z": null,
+      "cinematicTime": null,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "02_summit",
+      "note": "Summit: start gate and the descent ahead",
+      "camera": {
+        "pos": [
+          40,
+          62,
+          -70
+        ],
+        "fov": 56
+      },
+      "phase": "learn",
+      "z": 2.185463865401224,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "10_finish",
+      "note": "Finish environment from above the run-out",
+      "camera": {
+        "pos": [
+          -46,
+          -752.4826196111624,
+          2930
+        ],
+        "fov": 56
+      },
+      "phase": "chase",
+      "z": 2740.009521656621,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "10b_finish_ground",
+      "note": "Finish environment at eye level",
+      "camera": {
+        "pos": [
+          8,
+          -779.2826196111623,
+          3018
+        ],
+        "fov": 58
+      },
+      "phase": "chase",
+      "z": 2740.009521656621,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    }
+  ],
+  "errors": [],
+  "seconds": 2092
+}
