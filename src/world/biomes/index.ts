@@ -7,4 +7,5 @@
  * See docs/BIOMES.md.
  */
 import './fjord';
+import './whiteout';
 export {};

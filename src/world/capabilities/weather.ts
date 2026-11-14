@@ -21,6 +21,11 @@ export interface WeatherSample {
   snowfall: number;
   /** 0..1 gustiness right now (drives balance coupling and audio) */
   gust: number;
+  /**
+   * 0..1 storm intensity (Whiteout: dims the daylight, greys the fog, drives the storm audio and HUD).
+   * Absent or 0 = fair weather; models that never storm leave it out.
+   */
+  storm?: number;
 }
 
 export interface WeatherCoupling {
@@ -43,6 +48,20 @@ export interface WeatherModel {
   readonly static?: boolean;
   readonly coupling: WeatherCoupling;
   sample(x: number, z: number, t: number, seed: number, out: WeatherSample): WeatherSample;
+  /**
+   * Optional 0..1 exposure of the ground at (x, z) to the wind (1 = fully exposed, the default):
+   * BiomeEnvironment scales the airborne, balance and headwind couplings by it, so sheltered lines
+   * (trees, gullies) ski calmer than exposed ones. Pure; given the course.
+   */
+  exposure?(m: ExposureQuery, x: number, z: number): number;
+}
+
+/** what an exposure model may read from the course (a Mountain satisfies it) */
+export interface ExposureQuery {
+  routeX(z: number): number;
+  halfWidth(z: number): number;
+  altLane(x: number, z: number): number;
+  readonly profile: { segmentAt(z: number): string; finishZ: number };
 }
 
 export function makeWeatherSample(): WeatherSample {
@@ -129,6 +148,7 @@ export function validateWeather(m: WeatherModel, seed = 1): string[] {
       else if (s.visibility <= 0 || s.visibility > 12) out.push(`visibility=${s.visibility} outside (0, 12] at z=${z} t=${t}`);
       else if (s.snowfall < 0 || s.snowfall > 4) out.push(`snowfall=${s.snowfall} outside [0, 4]`);
       else if (Math.hypot(s.windX, s.windZ) > 40) out.push(`wind ${Math.hypot(s.windX, s.windZ).toFixed(1)} m/s > 40`);
+      else if (s.storm !== undefined && !(s.storm >= 0 && s.storm <= 1)) out.push(`storm=${s.storm} outside [0, 1]`);
       if (out.length > 4) return out;
     }
   return out;

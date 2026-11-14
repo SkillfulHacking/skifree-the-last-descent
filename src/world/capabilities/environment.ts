@@ -93,6 +93,8 @@ export class BiomeEnvironment implements PhysicsEnvironment {
   readonly intensity: number;
   /** the weather's mean wind speed over a run (m/s), the reference for the headwind's gust factor */
   private readonly meanWind: number;
+  /** the wind exposure (0..1) at the last sampled point (1 when the model has none) */
+  lastExposure = 1;
   /** this course's headwind drag coefficient (0 = none; WeatherCoupling.headwind) */
   readonly headwind: number;
 
@@ -207,6 +209,13 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       gust = w.gust;
       // the breeze's strength relative to its mean (gusts above 1, lulls below)
       gustK = this.meanWind > 0 ? Math.hypot(wx, wz) / this.meanWind : 1;
+      // sheltered ground (trees, gullies) takes less of the wind (WeatherModel.exposure; default 1)
+      const ex = caps.weather.exposure ? caps.weather.exposure(this.mountain, q.x, q.z) : 1;
+      this.lastExposure = ex;
+      wx *= ex;
+      wz *= ex;
+      gust *= ex;
+      gustK *= ex;
     }
     // a steady breeze into the skier's face (grounded, upright): extra drag
     if (this.headwind && q.grounded && !q.crashed) S.dragAdd += this.headwind * gustK;

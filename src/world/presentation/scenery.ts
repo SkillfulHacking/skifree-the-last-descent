@@ -32,6 +32,8 @@ export interface SceneryFrame {
   camPos: THREE.Vector3;
   /** render-space origin (World.origin) */
   origin: THREE.Vector3;
+  /** the weather's storm intensity at the focus right now (0..1; 0 where it never storms) */
+  storm?: number;
 }
 
 export interface SceneryView {

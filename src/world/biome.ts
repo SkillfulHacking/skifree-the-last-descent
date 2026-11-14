@@ -74,6 +74,11 @@ export interface BiomeAtmosphere {
   linear: number;
   /** 1 / haze scale height (m) */
   falloff: number;
+  /**
+   * Optional accessibility ceiling on the FogExp2 density the weather may reach (Whiteout: the
+   * fog never closes in below ~80 m, so obstacles stay readable at speed). Absent = no ceiling.
+   */
+  maxFogDensity?: number;
 }
 
 export interface BiomeWeather {

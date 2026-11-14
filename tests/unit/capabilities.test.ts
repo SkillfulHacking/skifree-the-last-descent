@@ -586,8 +586,8 @@ describe('course rules and codes', () => {
 
 // ------------------------------------------------------------------------------------------------
 describe('Location menu', () => {
-  it('Alpine and Fjord Coast ship: the game registers no placeholder locations', () => {
-    expect(listBiomes().filter((b) => b.id.startsWith('test-') === false).map((b) => b.id)).toEqual(['alpine', 'fjord']);
+  it('Alpine, Fjord Coast and Whiteout Ridge ship: the game registers no placeholder locations', () => {
+    expect(listBiomes().filter((b) => b.id.startsWith('test-') === false).map((b) => b.id)).toEqual(['alpine', 'fjord', 'whiteout']);
     expect(getBiome(DEBUG_TEST_BIOME_ID)).toBe(ALPINE);
   });
 

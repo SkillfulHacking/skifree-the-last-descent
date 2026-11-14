@@ -412,7 +412,14 @@ export class World {
     return this.finish;
   }
 
+  /**
+   * A finish cinematic's own weather (Whiteout: the storm clears over the rescue station), in place
+   * of the weather model's while set. Cleared with the trophy at the next run.
+   */
+  weatherOverride: { visibility: number; snowfall: number; storm: number; windX: number } | null = null;
+
   resetTrophy() {
+    this.weatherOverride = null;
     if (!this.finish || !this.trophyHome) return;
     const t = this.finish.trophy;
     const h = this.trophyHome;
@@ -552,10 +559,17 @@ export class World {
     // weather on the physics clock (Alpine: constant; fog, flakes exactly as before)
     const env = this.environment;
     env.weatherAt(focus.x, focus.z, env.clock, this.weather);
-    this.env.applyWeather(this.weather.visibility * env.hazardVisibility(focus.x, focus.z, env.clock), this.weather.snowfall);
+    const wo = this.weatherOverride;
+    if (wo) {
+      this.weather.visibility = wo.visibility;
+      this.weather.snowfall = wo.snowfall;
+      this.weather.storm = wo.storm;
+      this.weather.windX = wo.windX;
+    }
+    this.env.applyWeather(this.weather.visibility * (wo ? 1 : env.hazardVisibility(focus.x, focus.z, env.clock)), this.weather.snowfall, this.weather.storm ?? 0);
     this.env.update(dt, focus, camPos, time, this.weather.windX);
     this.hazardViews.update(dt, focus.z);
-    this.scenery?.update(dt, time, { focus, camPos, origin: this.origin });
+    this.scenery?.update(dt, time, { focus, camPos, origin: this.origin, storm: this.weather.storm ?? 0 });
     for (const s of this.caves.values()) s.dressing?.update?.(dt, time);
     this.particles.update(dt);
   }

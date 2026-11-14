@@ -171,8 +171,22 @@ export class Environment {
 
   /** Scale sky/ambient light (1 = normal). Used by the cave reveal. */
   setAmbientScale(k: number) {
-    this.hemi.intensity = this.hemiBase * k;
-    this.scene.environmentIntensity = this.envBase * k;
+    this.ambientK = k;
+    this.applyLight();
+  }
+
+  private ambientK = 1;
+  private storm = 0;
+  private sunBase = 0;
+  private readonly fogClear = new THREE.Color();
+  private readonly skyClear = { turbidity: 0, rayleigh: 0, mie: 0 };
+
+  /** storm (0..1) dims the sun and the sky light (Whiteout fronts); 0 leaves every light at its base */
+  private applyLight() {
+    const s = this.storm;
+    this.hemi.intensity = this.hemiBase * this.ambientK * (1 - 0.12 * s);
+    this.scene.environmentIntensity = this.envBase * this.ambientK * (1 - 0.3 * s);
+    this.sun.intensity = this.sunBase * (1 - 0.78 * s);
   }
 
   /** Show/hide the ambient falling snow (hidden in the dark cave shots, where it reads as stars). */
@@ -186,7 +200,14 @@ export class Environment {
 
   setFogBoost(f: number) {
     this.fogBoost = f;
-    this.fog.density = this.baseFogDensity * this.weatherFog * (1 + f);
+    this.fog.density = this.fogDensityFor(this.weatherFog, f);
+  }
+
+  /** the fog density for a weather visibility factor, under the biome's accessibility ceiling */
+  private fogDensityFor(visibility: number, boost: number): number {
+    const d = this.baseFogDensity * visibility * (1 + boost);
+    const max = this.biome.atmosphere.maxFogDensity;
+    return max !== undefined && boost === 0 ? Math.min(max, d) : d;
   }
 
   /**
@@ -194,10 +215,28 @@ export class Environment {
    * density, `snowfall` × the base flake opacity. Alpine passes 1 and 1, which leaves both exactly
    * at their original values.
    */
-  applyWeather(visibility: number, snowfall: number) {
+  applyWeather(visibility: number, snowfall: number, storm = 0) {
     if (visibility !== this.weatherFog) {
       this.weatherFog = visibility;
-      this.fog.density = this.baseFogDensity * visibility * (1 + this.fogBoost);
+      this.fog.density = this.fogDensityFor(visibility, this.fogBoost);
+    }
+    if (storm !== this.storm) {
+      // (Pass 5, Whiteout) a front greys the air and the sky and dims the sun; at 0 nothing changes
+      if (this.sunBase === 0) {
+        this.sunBase = this.sun.intensity;
+        this.fogClear.copy(this.fog.color);
+        const u = this.sky.material.uniforms;
+        this.skyClear.turbidity = u['turbidity']!.value as number;
+        this.skyClear.rayleigh = u['rayleigh']!.value as number;
+        this.skyClear.mie = u['mieCoefficient']!.value as number;
+      }
+      this.storm = storm;
+      this.fog.color.copy(this.fogClear).lerp(STORM_GREY, 0.85 * storm);
+      const u = this.sky.material.uniforms;
+      u['turbidity']!.value = this.skyClear.turbidity + (20 - this.skyClear.turbidity) * storm;
+      u['rayleigh']!.value = this.skyClear.rayleigh * (1 - 0.85 * storm);
+      u['mieCoefficient']!.value = this.skyClear.mie + (0.05 - this.skyClear.mie) * storm;
+      this.applyLight();
     }
     if (snowfall !== this.snowfall) {
       this.snowfall = snowfall;
@@ -218,6 +257,9 @@ export class Environment {
     this.scene.remove(this.sky, this.sun, this.hemi, this.snow, this.ranges.group);
   }
 }
+
+/** the colour of the air inside a storm front: bright, flat, blue-grey */
+const STORM_GREY = new THREE.Color(0.8, 0.83, 0.87);
 
 export function makeFlakeTexture(): THREE.Texture {
   const c = document.createElement('canvas');
