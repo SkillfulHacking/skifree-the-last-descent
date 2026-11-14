@@ -146,7 +146,7 @@ describe('Fjord: scoured rock across the racing line', () => {
       for (const h of onLine.slice(0, 2)) {
         n++;
         const run = (round: boolean, on: boolean) => {
-          const p = new SkierPhysics(m, f, undefined, on ? new BiomeEnvironment(m, ws) : null);
+          const p = new SkierPhysics(m, f, undefined, on ? new BiomeEnvironment(m, ws, { headwind: false }) : null); // the rock alone (not the breeze)
           const z0 = h.z - 90;
           f.ensure(z0 - 100, h.z + 200);
           p.reset(m.routeX(z0), z0, Math.atan2(m.routeX(z0 + 10) - m.routeX(z0), 10), 20);

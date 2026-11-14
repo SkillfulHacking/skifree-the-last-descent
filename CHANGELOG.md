@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased — Pass 5: release hardening
+- **Deploys:** the Pages deploy keeps every hashed asset the previous build referenced for 14 days
+  (`tools/pages/retain_assets.mjs`, `asset-history.json`), so a browser holding a cached
+  index.html never asks for a bundle that has gone (tested with a real previous build).
+- **Assets:** the conversion pipeline lives in the repo (`tools/assets/`, pinned Node and Python
+  dependencies, `npm run assets:*`), rebuilds every shipped texture and mesh byte-for-byte from a
+  clean checkout, and records verified licences per source. CI checks that every bundled asset
+  exists, decodes and matches the manifest under the Pages base path. Unused textures and art
+  experiments removed.
+- **Fjord:** cave boulders are rocks (rock crash response and sound; clear them in the air); no
+  collision where a scan failed to load; no rescue for a skier who chooses to skate uphill; the
+  Standard-course Yeti emergence frames the sea; on Normal and Hard the onshore breeze costs a
+  grounded skier speed, so Fjord is reliably the harder mountain (Relaxed and the Yeti unchanged).
+- **Saves:** no key or format change.
+
 ## Unreleased — Fjord Coast (Location 2)
 - **New location: Fjord Coast** (2/5 "Scenic"): a descent along sea cliffs to a fishing harbour.
   Cornice along the rim (anisotropic friction, stall recovery after 3 s), wind gates (sheltered lee

@@ -227,7 +227,8 @@ describe('Fjord Coast: physics (cornice guard, crosswind)', () => {
   });
 
   it('the cornice only acts near the rim: the piste and the inland side ski like Alpine', () => {
-    const e = env();
+    // (the surface model alone: the weather's headwind adds its own drag everywhere, F-039)
+    const e = new BiomeEnvironment(m, worldSeed(course('standard')), { headwind: false });
     const hz = collectPlacements(m, worldSeed(course('standard')), [getHazardKind('sea-gust'), getHazardKind('scoured-rock')], 1, 0, 10000);
     for (let z = 300; z < 9000; z += 211) {
       // (scoured rock patches and squalls are hazards, not the surface model: skip points in one)
