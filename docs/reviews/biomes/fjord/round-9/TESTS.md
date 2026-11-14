@@ -55,3 +55,14 @@ the click on the Mountain row's ▶ waited for frames). #10–#11 are serial aft
 in the cave-mouth terrain; #4–#11 on `3bf5a7e`). That includes the no-debug Scenic Route journey (#19),
 save migration from Pass 3 and from v1 progress (#12, #13), keyboard/mouse/gamepad menu control (#9), and the
 real unlock by keyboard play (#18). Screenshots the suite writes are copied to `browser-shots/`.
+
+## Re-run on `3bf5a7e`: `npx playwright test tests/e2e/game.spec.ts --workers=1` (37 min)
+
+| # | Test | Result | Time |
+|---|---|---|---|
+| 1 | `game.spec.ts` main menu loads with a rendered 3D background and no fatal errors | pass | 4.8m |
+| 2 | `game.spec.ts` full loop: start → learn → cave cinematic → chase → caught → retry → victory | pass | 28.3m |
+| 3 | `game.spec.ts` pause/resume and gamepad hot-plug do not break the game | pass | 4.0m |
+
+(Requested by F r9: the full loop crosses the cave mouth whose terrain differs between `e0e2eca` and `3bf5a7e`.)
+So #1–#11 have now passed on `3bf5a7e` itself; #12–#19 (migration, progression, release, Scenic Route) on `e0e2eca`.

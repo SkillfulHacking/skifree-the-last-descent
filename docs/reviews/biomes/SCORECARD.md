@@ -173,5 +173,46 @@ streaks (F-028); summit sugarloaf (F-029); no foam/wet band on the island scans;
 gull beat framed the brow after the gulls moved to the boulders; coastal reveal partial (inside terrain on 3
 Endurance caves, no mouth in frame); Sprint ladder within seed noise (F). B/D/E not run.
 
+### Round 8 — build `d1f642b` — **FAIL**; gate blocked by a new cinematic regression (C) and missing browser evidence (E)
+
+| Category | A | B | C | D | E | F |
+|---|---|---|---|---|---|---|
+| Visual art direction | **8** | 7.5 | 7.5 | 7.5 | 8 | 8 |
+| Environmental uniqueness | **8** | 8.5 | 8 | 8.5 | 8.5 | 8.5 |
+| Skiing and hazard mechanics | 6.5 | **8** | 7 | 8.5 | 7.5 | 7.5 |
+| Difficulty and fairness | 7 | **7.5** | 7 | 8 | 7.5 | 7.5 |
+| Cinematics | 7.5 | 7 | **8** | 8 | 8 | 8 |
+| Performance and stability | 7 | 8 | 7 | **8** | 7.5 | 7 |
+| Accessibility and controls | 7 | 7.5 | 7 | 8 | **7** | 7 |
+| Overall player experience | 8 | 8 | 7.5 | 8 | 7.5 | **8.5** |
+
+The `06` pinstripe was a harness artefact (debug camera applied after the world update: the finest cliff LOD
+seen from 1.3 km); the white slabs and menu ribbons were stretched terrain-patch scans (removed). New: the
+gull beat showed the Yeti before his growl (C), the pin rescue fired on players standing still (B, E), island
+placement spiked 45–66 ms (D), browser suite not run on the build (E).
+
+### Round 9 — candidate `3bf5a7e` — **FAIL against 9/10; public-preview gate MET**
+
+| Category | A | B | C | D | E | F |
+|---|---|---|---|---|---|---|
+| Visual art direction | **8** | 7.5 | 7.5 | 7.5 | 8 | 8 |
+| Environmental uniqueness | **7.5** | 8.5 | 8 | 8.5 | 8.5 | 8 |
+| Skiing and hazard mechanics | 6.5 | **8.5** | 7 | 8.5 | 8 | 7.5 |
+| Difficulty and fairness | 7 | **7.5** | 7 | 8 | 7.5 | 7.5 |
+| Cinematics | 7 | 7 | **8.5** | 8 | 8 | 7.5 |
+| Performance and stability | 7.5 | 8 | 8 | **8.5** | 8 | 7 |
+| Accessibility and controls | 7.5 | 8 | 7.5 | 8 | **8** | 7.5 |
+| Overall player experience | 8 | 8 | 8 | 8 | 8 | **8** |
+
+Bold = the reviewer's primary category. A preliminary A/C/F pass on `e0e2eca` found a shard and holes in the
+Sprint cave mouth (a too-wide jamb cap plus a half-refined terrain LOD in the harness); fixed in `3bf5a7e` and
+re-verified by A, C and F. Gate items (completion brief §10), each confirmed by the reviewers in their area:
+no Critical; no unrecoverable state (B 0/1,296, E 0/2,880 cave approaches stuck); all finite lengths
+completable; Endless streams (heap flat over 40 km); no major cinematic regression (C met; F "narrowly met");
+assets load in production; saves compatible (migration tests); keyboard and controller (browser tests); no
+major performance regression (D: island and vegetation spikes fixed; Fjord still ~2× Alpine CPU per frame
+inside budget); all tests pass (311/311 unit; 19/19 browser); critic Overall 8; art direction 8.
+**Classification: public preview** (full approval needs 9 in every category; not met).
+
 ## Whiteout Ridge, Frozen Frontier, Volcanic Expanse
 Not started.

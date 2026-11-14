@@ -13,6 +13,11 @@
 - **Engine (PR #6):** steep terrain faces (> 50°, > 0.5 m rise) are walls: slide / bounce / crash
   by the speed into the face, with energy caps — no more launches off cliff and cave walls
   (Alpine too).
+- **Rounds 8–9:** islands are boulder scans only (no stretched terrain-patch scans); cave boulders bedded
+  and solid; the gull beat no longer shows the Yeti early; instruction subtitles on a dark pill; the
+  pinned-skier rescue only for a skier skating into a pocket, and not counted as a crash; vegetation
+  bands and island placement time-sliced under the frame budget; island materials freed; softer far
+  crests; a wider wet band at the waterline; no snow wedge at a cave mouth's jamb.
 - **Saves:** no key or format change; existing achievements, jackets, records and settings carry over.
 
 ## Unreleased — Pass 4 Stage 1: biome capability foundations
