@@ -1,0 +1,22 @@
+{
+ "fjord": {
+  "frames": 32000,
+  "median": 4.0,
+  "p95": 8,
+  "p99": 11.96,
+  "max": 27.19,
+  "over16": 6,
+  "over33": 0,
+  "starved": 317
+ },
+ "alpine": {
+  "frames": 32000,
+  "median": 0.0,
+  "p95": 8,
+  "p99": 8.01,
+  "max": 35.86,
+  "over16": 4,
+  "over33": 1,
+  "starved": 10
+ }
+}

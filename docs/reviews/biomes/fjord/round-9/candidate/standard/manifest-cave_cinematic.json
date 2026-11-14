@@ -1,0 +1,107 @@
+{
+  "biome": "fjord",
+  "course": "classic:standard",
+  "viewport": "1920x1080",
+  "sha": "3bf5a7e",
+  "date": "2026-11-14T13:02:21.127Z",
+  "shots": [
+    {
+      "name": "07_yeti_cave",
+      "note": "The Yeti cave with the location dressing, before the encounter",
+      "camera": {
+        "pos": [
+          26.833489432791907,
+          -175.60498046875,
+          943
+        ],
+        "fov": 50
+      },
+      "phase": "foreshadow",
+      "z": 907.0101461104098,
+      "cinematicTime": -1,
+      "course": "CLASSIC-STD@FJORD"
+    },
+    {
+      "name": "07b_yeti_cave_outlook",
+      "note": "Fjord: the sea cave from inside its mouth, looking out past the basalt portal (the mouth faces inland, toward the piste)",
+      "camera": {
+        "pos": [
+          -3.408566969656497,
+          -179.79936567528506,
+          959.8137110513123
+        ],
+        "fov": 62
+      },
+      "phase": "foreshadow",
+      "z": 907.0101461104098,
+      "cinematicTime": -1,
+      "course": "CLASSIC-STD@FJORD"
+    },
+    {
+      "name": "08c_yeti_cinematic_gulls",
+      "note": "Cave cinematic, t≈2.95 s (Fjord: gulls burst off the basalt portal on the rumble)",
+      "camera": {
+        "pos": [
+          5.070037792879745,
+          -179.54086561047856,
+          935.4936661072398
+        ],
+        "fov": 45.43548212935968
+      },
+      "phase": "caveCinematic",
+      "z": 982.2265020359471,
+      "cinematicTime": 2.966666666666666,
+      "course": "CLASSIC-STD@FJORD"
+    },
+    {
+      "name": "08_yeti_cinematic",
+      "note": "Cave cinematic, t≈9.5 s (Fjord: the emergence seen from inside the sea cave, the Yeti against the fjord)",
+      "camera": {
+        "pos": [
+          9.77593832600364,
+          -177.16203896920234,
+          953.0721434740639
+        ],
+        "fov": 46
+      },
+      "phase": "caveCinematic",
+      "z": 982.2265020359471,
+      "cinematicTime": 9.53333333333331,
+      "course": "CLASSIC-STD@FJORD"
+    },
+    {
+      "name": "08d_yeti_cinematic_roar",
+      "note": "Cave cinematic, t≈11.65 s (Fjord: the roar blows spray and sea smoke out of the mouth; the lintel icicles drop and shatter)",
+      "camera": {
+        "pos": [
+          8.073876155427168,
+          -182.05690312422294,
+          963.0961546890542
+        ],
+        "fov": 53.92309378108209
+      },
+      "phase": "caveCinematic",
+      "z": 982.2265020359471,
+      "cinematicTime": 11.666666666666636,
+      "course": "CLASSIC-STD@FJORD"
+    },
+    {
+      "name": "08b_yeti_cinematic",
+      "note": "Cave cinematic, t≈15.0 s (Fjord: the leap from the ledge, down onto the skier)",
+      "camera": {
+        "pos": [
+          0.5385196588635477,
+          -180.06783046602501,
+          958.7012249465348
+        ],
+        "fov": 56.35786832361766
+      },
+      "phase": "caveCinematic",
+      "z": 982.2265020359471,
+      "cinematicTime": 15.03333333333329,
+      "course": "CLASSIC-STD@FJORD"
+    }
+  ],
+  "errors": [],
+  "seconds": 2826
+}

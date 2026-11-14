@@ -1,0 +1,9 @@
+
+ RUN  v5.1.0 /home/claude/sf-fjord
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  01:55:29
+   Duration  136.66s (tests 98%, transform 2%)
+

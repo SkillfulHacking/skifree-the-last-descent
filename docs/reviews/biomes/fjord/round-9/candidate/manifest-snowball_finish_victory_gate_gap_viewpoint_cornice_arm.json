@@ -1,0 +1,331 @@
+{
+  "biome": "fjord",
+  "course": "classic:sprint",
+  "viewport": "1920x1080",
+  "sha": "c9ffd1b",
+  "date": "2026-11-14T00:26:31.119Z",
+  "shots": [
+    {
+      "name": "09b_hard_snowball",
+      "note": "Hard: the Yeti winds up / releases a snowball during ordinary chase gameplay (rear view + landing marker)",
+      "camera": {
+        "pos": [
+          29.288756935745788,
+          -337.8510271687632,
+          1172.7228095484807
+        ],
+        "fov": 71.70837623702157
+      },
+      "phase": "chase",
+      "z": 1179.8748668979836,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR-H@FJORD"
+    },
+    {
+      "name": "09c_hard_snowball_marker",
+      "note": "Hard: snowball in flight, landing marker on the snow",
+      "camera": {
+        "pos": [
+          29.63055912863689,
+          -340.42872734449634,
+          1180.905507537929
+        ],
+        "fov": 71.52924410776117
+      },
+      "phase": "chase",
+      "z": 1188.0511324444878,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR-H@FJORD"
+    },
+    {
+      "name": "10_finish",
+      "note": "Finish environment from above the run-out",
+      "camera": {
+        "pos": [
+          -46,
+          -752.4826196111624,
+          2930
+        ],
+        "fov": 56
+      },
+      "phase": "chase",
+      "z": 2740.009521656621,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "10b_finish_ground",
+      "note": "Finish environment at eye level",
+      "camera": {
+        "pos": [
+          8,
+          -779.2826196111623,
+          3018
+        ],
+        "fov": 58
+      },
+      "phase": "chase",
+      "z": 2740.009521656621,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11d_victory_quay",
+      "note": "Victory: onto the quay (low tracking shot down the street to the water)",
+      "camera": {
+        "pos": [
+          -7.990495487736226,
+          -782.6789159607906,
+          3017.959407967666
+        ],
+        "fov": 48.57154488092815
+      },
+      "phase": "victory",
+      "z": 3020.281286566811,
+      "cinematicTime": 2.200000000000002,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11e_victory_racks",
+      "note": "Victory: the Yeti arrives at the stockfish rack on the quay",
+      "camera": {
+        "pos": [
+          -16.764827504279314,
+          -780.5188017396785,
+          3085.772413644144
+        ],
+        "fov": 42.427586355855794
+      },
+      "phase": "victory",
+      "z": 3019.785402660341,
+      "cinematicTime": 4.733333333333326,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11f_victory_gag",
+      "note": "Victory: the Yeti turns to us and bites the dried cod",
+      "camera": {
+        "pos": [
+          -18.876306978458878,
+          -782.0753096116543,
+          3092.696296296296
+        ],
+        "fov": 42.518518518518505
+      },
+      "phase": "victory",
+      "z": 3019.785402660341,
+      "cinematicTime": 6.066666666666655,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11f2_victory_gag_face",
+      "note": "Victory: the gag (his face), the harbour behind",
+      "camera": {
+        "pos": [
+          -18.707726871156897,
+          -782.0204620342081,
+          3092.5194792227912
+        ],
+        "fov": 43.40260388604268
+      },
+      "phase": "victory",
+      "z": 3019.785402660341,
+      "cinematicTime": 6.766666666666652,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11g_victory_present",
+      "note": "Victory: the harbourmaster presents the trophy in both hands (over the shoulder)",
+      "camera": {
+        "pos": [
+          -3.123479088320805,
+          -782.0553613986443,
+          3017.960127423629
+        ],
+        "fov": 46
+      },
+      "phase": "victory",
+      "z": 3019.785402660341,
+      "cinematicTime": 8.933333333333312,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11_victory_trophy",
+      "note": "Victory: the trophy caught and held up (reverse angle)",
+      "camera": {
+        "pos": [
+          -2.0557257270731943,
+          -781.3813384947151,
+          3015.4625290099993
+        ],
+        "fov": 44.8914946013656
+      },
+      "phase": "victory",
+      "z": 3019.785402660341,
+      "cinematicTime": 10.933333333333305,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11b_victory_celebration",
+      "note": "Victory: apres on the pier (tub, bonfire, sauna), the bather sprinting for the edge",
+      "camera": {
+        "pos": [
+          36.31035555555552,
+          -781.057740200204,
+          3175.9137925925925
+        ],
+        "fov": 51.72414814814811
+      },
+      "phase": "victory",
+      "z": 3019.785402660341,
+      "cinematicTime": 13.533333333333296,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11j_victory_plunge",
+      "note": "Victory: the cannonball (tucked, at the top of its arc)",
+      "camera": {
+        "pos": [
+          36.48996740270545,
+          -786.4903346989018,
+          3177.1950419108075
+        ],
+        "fov": 50
+      },
+      "phase": "victory",
+      "z": 3019.785402660341,
+      "cinematicTime": 14.433333333333293,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11h_victory_splash",
+      "note": "Victory: the crown splash",
+      "camera": {
+        "pos": [
+          36.343518518518536,
+          -786.532177237241,
+          3177.383333333333
+        ],
+        "fov": 50
+      },
+      "phase": "victory",
+      "z": 3019.785402660341,
+      "cinematicTime": 15.066666666666624,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11i_victory_reveal_mid",
+      "note": "Victory: the reveal, mid-move",
+      "camera": {
+        "pos": [
+          -259.132193815984,
+          -690.0447338183496,
+          3912.2110592106346
+        ],
+        "fov": 41.83254027882157
+      },
+      "phase": "victory",
+      "z": 3019.785402660341,
+      "cinematicTime": 20.000000000000153,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "11c_victory_reveal",
+      "note": "Victory: the closing reveal, settled (the start beacon, the title)",
+      "camera": {
+        "pos": [
+          -700,
+          -349.7164364965,
+          5093.037037037037
+        ],
+        "fov": 46
+      },
+      "phase": "victory",
+      "z": 3019.785402660341,
+      "cinematicTime": 24.80000000000039,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "12_wind_gate_gust",
+      "note": "Wind gate (id 12288) in the gust (active): windsock flying, spindrift funnelled through the notch (sea side, frame right); drifted lee behind the rib (frame left)",
+      "camera": {
+        "pos": [
+          46.783477833309625,
+          -229.3295831295328,
+          851.4068609297276
+        ],
+        "fov": 56
+      },
+      "phase": "chase",
+      "z": 779.7489191083247,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "12b_wind_gate_lull",
+      "note": "The same wind gate in the lull (dormant): windsock limp, the notch is free",
+      "camera": {
+        "pos": [
+          46.783477833309625,
+          -229.3295831295328,
+          851.4068609297276
+        ],
+        "fov": 56
+      },
+      "phase": "chase",
+      "z": 894.298820930666,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "14_viewpoint",
+      "note": "Scenic viewpoint at z≈2491 (chase stretch): the platform and the view over the fjord",
+      "camera": {
+        "pos": [
+          -47.233113035952684,
+          -652.794733908064,
+          2476.959401616361
+        ],
+        "fov": 58
+      },
+      "phase": "chase",
+      "z": 2390.959401616361,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "15_cornice_relocation",
+      "note": "Cornice relocation cue: the skier sent over the rim at z≈1350 is put back on the piste (relocated) with the title and caption",
+      "camera": {
+        "pos": [
+          32.784107730632876,
+          -386.2365622703872,
+          1338.1297899156498
+        ],
+        "fov": 62.00157280435751
+      },
+      "phase": "chase",
+      "z": 1345.5297899156499,
+      "cinematicTime": -1,
+      "course": "CLASSIC-SPR@FJORD"
+    },
+    {
+      "name": "16_expedition_arm",
+      "note": "Expedition: ordinary chase gameplay beside fjord arm 1 (z 2802–5748), rear view showing the Yeti",
+      "camera": {
+        "pos": [
+          -13.279756177663113,
+          -1525.0203749839973,
+          5372.038003054597
+        ],
+        "fov": 74.08802585847732
+      },
+      "phase": "chase",
+      "z": 5379.027951592727,
+      "cinematicTime": -1,
+      "course": "CLASSIC-EXP@FJORD"
+    }
+  ],
+  "errors": [],
+  "seconds": 8162
+}
