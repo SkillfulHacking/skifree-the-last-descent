@@ -1,4 +1,5 @@
-# Pack Poly Haven scans (converted WebP) into the rock material layout:
+# Pack Poly Haven scans (converted WebP) into the rock material layout
+# (reproducible asset pipeline: tools/assets/README.md):
 #   <out>_albedo.webp : sRGB diffuse RGB + cavity AO (from displacement) in A
 #   <out>_nhr.webp    : normal X, normal Y (OpenGL), height (disp), roughness
 import sys, numpy as np

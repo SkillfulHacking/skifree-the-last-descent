@@ -1,3 +1,8 @@
+> **Pass 5:** the build-time tools now live in `tools/assets/` (reproducible pipeline, manifest and
+> licences: `tools/assets/README.md`). The art test scene (`tools/artscene/`, `/artscene.html`), the
+> experiment coast and the baked gneiss set described below were removed. This document is kept as
+> the Pass 4 record.
+
 # Fjord Coast art pipeline — round 4 investigation (experiment branch `fjord-art-r4`)
 
 Status: **experiment, not integrated.** Everything here lives in `src/world/art/**`,
