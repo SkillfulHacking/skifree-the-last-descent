@@ -111,6 +111,9 @@ const settle = async (ms = 2500) => {
     w.scenery.update(0, 0, { focus: window.__skifree.camera.position, camPos: window.__skifree.camera.position, origin: w.origin });
     w.scenery.flush?.();
   });
+  // and let the terrain finish streaming for the new viewpoint (a GPU frame loop gets there in well
+  // under a second; SwiftShader frames take seconds each) — terrain detail at a cave notch included
+  await ev(() => { const s = window.__skifree.state().session; const t = window.__skifree.world?.()?.terrain; if (s && t?.flushAround) t.flushAround(s.x, s.z); });
   await page.waitForTimeout(ms);
 };
 /** terrain/vegetation around z built at full detail (teleport flushes them) */

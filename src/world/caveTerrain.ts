@@ -354,7 +354,17 @@ export function caveTerrainOffset(a: CaveAnchor, x: number, z: number, d: number
   // smooth max where the ledge meets the bank/hill: a hard max left a crease that the 1 m terrain grid
   // drew as triangle facets in the snow beside the mouth (A37). Off only where the floor mesh covers the
   // terrain (there the terrain must stay just under the floor).
-  return bank + smaxT(liftGround, Math.min(hill, chamberRamp), 0.05 + 0.75 * smoothstep(0.2, 1.4, cover));
+  const out = bank + smaxT(liftGround, Math.min(hill, chamberRamp), 0.05 + 0.75 * smoothstep(0.2, 1.4, cover));
+  // round 9 (Standard-course cave: the 1 m terrain grid caught the hillside's rise at the mouth's jamb
+  // as a single high vertex — a white wedge of snow inside the opening, over the Yeti in the emergence
+  // shot): just inside the mouth, within a short margin of the chamber wall, the heightfield stays
+  // at the ledge (the jamb is rock: rockField covers it)
+  if (u > MOUTH_U - 0.5 && u < MOUTH_U + 5 && cd < 2.6) {
+    const jamb = (1 - smoothstep(MOUTH_U + 3.5, MOUTH_U + 5, u)) * (1 - smoothstep(2.0, 2.6, cd)) * smoothstep(MOUTH_U - 0.5, MOUTH_U, u);
+    const cap = bank + liftGround + 0.4;
+    if (out > cap) return out + (cap - out) * jamb;
+  }
+  return out;
 }
 
 function smaxT(a: number, b: number, k: number): number {
