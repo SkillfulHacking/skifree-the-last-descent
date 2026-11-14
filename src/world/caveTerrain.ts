@@ -152,6 +152,8 @@ export function hillSurface(t: number, v: number, H: number, seed: number): numb
 }
 /** Steepness of the heightfield's drop into the chamber pit (hidden inside the chamber walls and roof). */
 export const PIT_K = 14;
+/** the jamb cap's reach outside the chamber wall (m; see caveTerrainOffset) */
+export const JAMB_CAP = { cd: 1.6 };
 /** The pit's rim: beyond this (cd = distance to the chamber path − half-width) the heightfield is the hillside again. */
 export function pitRim(hill: number): number {
   return 1.1 + hill / PIT_K;
@@ -355,12 +357,13 @@ export function caveTerrainOffset(a: CaveAnchor, x: number, z: number, d: number
   // drew as triangle facets in the snow beside the mouth (A37). Off only where the floor mesh covers the
   // terrain (there the terrain must stay just under the floor).
   const out = bank + smaxT(liftGround, Math.min(hill, chamberRamp), 0.05 + 0.75 * smoothstep(0.2, 1.4, cover));
-  // round 9 (Standard-course cave: the 1 m terrain grid caught the hillside's rise at the mouth's jamb
+  // round 9 (Standard-course cave: the 1 m terrain grid caught the chamber ramp at the mouth's jamb
   // as a single high vertex — a white wedge of snow inside the opening, over the Yeti in the emergence
-  // shot): just inside the mouth, within a short margin of the chamber wall, the heightfield stays
-  // at the ledge (the jamb is rock: rockField covers it)
-  if (u > MOUTH_U - 0.5 && u < MOUTH_U + 5 && cd < 2.6) {
-    const jamb = (1 - smoothstep(MOUTH_U + 3.5, MOUTH_U + 5, u)) * (1 - smoothstep(2.0, 2.6, cd)) * smoothstep(MOUTH_U - 0.5, MOUTH_U, u);
+  // shot). Just inside the mouth and only in the first half metre outside the chamber wall (where the
+  // ramp starts), the heightfield stays at the ledge. (Round 9b, A/C/F r9: a 1.5 m margin lowered the
+  // ground under the rock field's jamb on every cave and opened holes beside the Sprint mouth.)
+  if (u > MOUTH_U - 0.5 && u < MOUTH_U + 4.5 && cd < JAMB_CAP.cd) {
+    const jamb = (1 - smoothstep(MOUTH_U + 3.2, MOUTH_U + 4.5, u)) * (1 - smoothstep(JAMB_CAP.cd - 0.15, JAMB_CAP.cd, cd)) * smoothstep(MOUTH_U - 0.5, MOUTH_U, u);
     const cap = bank + liftGround + 0.4;
     if (out > cap) return out + (cap - out) * jamb;
   }
