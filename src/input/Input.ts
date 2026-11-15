@@ -277,6 +277,8 @@ export class Input {
     if (s.invertCameraY) camY = -camY;
     steer = clamp(steer * s.steerSensitivity, -1, 1);
     this.pressedQ.clear();
+    // (a tap shorter than one frame — slow frames — still counts as held for that frame: one stroke)
+    recoverHeld = recoverHeld || recoverPressed;
     return { steer, tuck, brake, drift, pop, recoverPressed, recoverHeld, lookBack, pausePressed, skipPressed, camX, camY };
   }
 

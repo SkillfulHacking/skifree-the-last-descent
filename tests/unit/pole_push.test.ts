@@ -308,6 +308,19 @@ describe('pole push: input', () => {
     expect(inp2.gameplay(1 / 60).recoverHeld).toBe(false);
   });
 
+  it('a tap shorter than a frame still counts as held for that frame (one stroke at low frame rates)', () => {
+    const w = new FakeWindow();
+    const inp = new Input(settings(), w as unknown as Window);
+    inp.padSource = () => [];
+    w.fire('keydown', { code: 'KeyR' });
+    w.fire('keyup', { code: 'KeyR' });
+    inp.poll();
+    const g = inp.gameplay(1 / 60);
+    expect(g.recoverPressed).toBe(true);
+    expect(g.recoverHeld).toBe(true);
+    expect(inp.gameplay(1 / 60).recoverHeld).toBe(false);
+  });
+
   it('a remapped Recover key drives both recovering and poling; the old key does nothing', () => {
     const w = new FakeWindow();
     const s = settings();
