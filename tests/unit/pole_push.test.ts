@@ -214,35 +214,56 @@ describe('pole push: context and cadence', () => {
     expect(plantThen(0.05)).toBeGreaterThanOrEqual(0);
   });
 
-  it('releasing between strokes never beats holding, with or without the tuck (physics reviews r2, r3)', () => {
-    // the exploit: press again only after the poles have been idle k steps (the button is up between
-    // strokes, the skate pushes meanwhile if the tuck is held) — keyed on the idle time, not on the
-    // stroke ending (a held button starts the next stroke in the same step)
-    const dist = (z: number, v: number, inp: (p: SkierPhysics) => Partial<SkierInput>) => {
-      const p = skier(z, v);
-      const z0 = p.s.pos.z;
-      run(p, () => inp(p), 10);
-      return p.s.pos.z - z0;
+  it('no timing of the button beats holding it: slopes × surfaces × speeds × tuck (physics reviews r2–r4)', () => {
+    // the exploit family: press again only after the poles have been idle k steps (the skate pushes
+    // or the tuck coasts meanwhile), or tap at a fixed rhythm — against the best of hold+tuck, tuck
+    // alone and hold alone. Keyed on the idle time (a held button starts the next stroke in the same
+    // step, so watching for a stroke to end never sees a gap).
+    const grade = (z: number) => Math.atan2(m.heightAt(m.routeX(z), z) - m.heightAt(m.routeX(z + 10), z + 10), 10) * (180 / Math.PI);
+    const at = (deg: number) => {
+      let best = FLAT;
+      for (let z = 100; z < m.finishZ - 50; z += 20) if (Math.abs(grade(z) - deg) < Math.abs(grade(best) - deg)) best = z;
+      return best;
     };
-    const STEEP = 200; // the upper course
-    for (const [z, v] of [[FLAT, 0], [FLAT, 3], [STEEP, 0]] as const)
-      for (const tuck of [0, 1]) {
-        const best = Math.max(dist(z, v, () => ({ pole: true, tuck })), dist(z, v, () => ({ tuck })), dist(z, v, () => ({ pole: true })));
-        for (const k of [1, 2, 4, 12, 30, 36, 37, 40, 60, 90]) {
-          let idle = 0;
-          const d = dist(z, v, (p) => {
-            idle = p.s.poleT >= 0 ? 0 : idle + 1;
-            return { pole: p.s.poleT < 0 && idle >= k, tuck };
-          });
-          expect(d, `z ${z} v ${v} tuck ${tuck} idle ${k}`).toBeLessThanOrEqual(best * 1.002 + 0.02);
-        }
-        for (const [on, per] of [[1, 62], [6, 50], [84, 96], [70, 110], [6, 12]]) {
-          let i = 0;
-          const r = dist(z, v, () => ({ pole: i++ % per < on, tuck }));
-          expect(r, `z ${z} v ${v} tuck ${tuck} tap ${on}/${per}`).toBeLessThanOrEqual(best * 1.002 + 0.02);
-        }
+    const spots = [FLAT, at(1), at(9), at(13)];
+    const orig = m.surfaceAt.bind(m);
+    let worst = { r: 0, what: '' };
+    try {
+      for (const surf of ['snow', 'ice', 'powder'] as const) {
+        (m as unknown as { surfaceAt: typeof m.surfaceAt }).surfaceAt = ((x: number, z: number) => (surf === 'snow' ? orig(x, z) : surf)) as typeof m.surfaceAt;
+        for (const z of spots)
+          for (const v of [0, 3, 7, 10, 14])
+            for (const tuck of [0, 1]) {
+              const dist = (inp: (p: SkierPhysics, i: number) => Partial<SkierInput>) => {
+                const p = skier(z, v);
+                const z0 = p.s.pos.z;
+                let i = 0;
+                run(p, () => inp(p, i++), 6);
+                return p.s.pos.z - z0;
+              };
+              const best = Math.max(dist(() => ({ pole: true, tuck })), dist(() => ({ tuck })), dist(() => ({ pole: true })));
+              const tries: Array<[string, (p: SkierPhysics, i: number) => Partial<SkierInput>]> = [];
+              for (const k of [1, 12, 36, 37, 40, 60, 90]) {
+                let idle = 0;
+                tries.push([`idle ${k}`, (p) => {
+                  idle = p.s.poleT >= 0 ? 0 : idle + 1;
+                  return { pole: p.s.poleT < 0 && idle >= k, tuck };
+                }]);
+              }
+              for (const [on, per] of [[1, 62], [84, 120], [6, 12]]) tries.push([`tap ${on}/${per}`, (_p, i) => ({ pole: i % per < on, tuck })]);
+              for (const [what, f] of tries) {
+                const d = dist(f);
+                const r = d / Math.max(best, 1e-6) - 1;
+                if (r > worst.r) worst = { r, what: `${surf} ${grade(z).toFixed(1)}° v${v} tuck ${tuck} ${what}: ${d.toFixed(2)} vs ${best.toFixed(2)}` };
+              }
+            }
       }
-  });
+    } finally {
+      (m as unknown as { surfaceAt: typeof m.surfaceAt }).surfaceAt = orig;
+    }
+    // (0.3 %: alternating skate and poles at rest mixes two techniques, accepted by the review)
+    expect(worst.r, worst.what).toBeLessThan(0.003);
+  }, 600_000);
 
   it('a crash right after a stroke: the first stroke after getting up still gets its head start', () => {
     const p = skier(FLAT, 3);

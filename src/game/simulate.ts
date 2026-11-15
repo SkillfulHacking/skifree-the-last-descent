@@ -92,7 +92,7 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
   let peakBands = 0;
   let active: Encounter | null = null;
   const done = new Set<number>();
-  const target = { pos: phys.s.pos, vel: phys.s.vel, airborne: false, down: false };
+  const target = { pos: phys.s.pos, vel: phys.s.vel, airborne: false };
   let nextEncCheck = -Infinity;
   let upcoming: Encounter[] = [];
   const result = (outcome: SimResult['outcome'], finalGap: number): SimResult => {
@@ -184,7 +184,6 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
         }
       }
       target.airborne = !s.grounded;
-      target.down = s.crashed || s.recoverTime > 0;
       yeti.update(PHYS_DT, target);
       opts.trace?.(active, ct, s, yeti, false);
       if (balls) {

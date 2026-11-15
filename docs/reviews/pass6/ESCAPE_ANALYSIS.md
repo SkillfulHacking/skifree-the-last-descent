@@ -326,3 +326,61 @@ What it shows:
 
 Clean runs are unchanged by this round: the delay curve and the cap are as in round 3. A clean slow start
 escapes Normal; Hard still catches some.
+
+## Round 5, after the fourth review
+
+The round-4 reviewers (model-based, isolated) used new fresh courses: 2027-02-09, 2027-03-17, SNOWCAT and
+FIRNLINE. They confirmed that chases skied in match the pre-Pass 6 Yeti (24 of 24, falls included), that a
+clean slow start escapes on Normal (4 of 4 for `straight`, `poles` and `skilled`), and that there is no step
+at 11 m/s.
+
+They also found that two more claims from round 4 were false. This is the third round in a row with a false
+"never" claim, because each fix was tested only on the case that had been reported:
+- **Poles: "tuck + tapping never beats holding" was false above 7 m/s.** Coasting in the tuck through a gap
+  of 0.3 s or more is almost free there, and the next stroke still got its head start: +1.2 % on ice,
+  +0.3 % on snow. The test covered only snow, from 0 or 3 m/s.
+- **Yeti: "no reason to enter slowly" was false against the 3–11 m/s band.** Round 4 compared a standstill
+  only with chases skied in. After a fall at 2 s, a standstill entry was caught 1 of 4 times against 16 of 20
+  for entries at 3–11 m/s. The cause was the half-rate clock while the skier is down: the inversion grows as
+  the allowance grows.
+
+Changes:
+- **Poles.** The first-stroke head start applies only from near a standstill (below 1.5 m/s), which is what
+  it was for. The test is now the reviewer's whole family:
+  - flat, 1°, 9° and 13° × snow, ice and powder × 0, 3, 7, 10 and 14 m/s × tuck on or off;
+  - for each, every idle-k press pattern and three tap rhythms;
+  - each compared with the best of hold+tuck, tuck alone and hold alone.
+
+  The worst pattern must be under +0.3 %. That margin is for alternating skate and poles at rest, which mixes
+  two techniques and was accepted by the review. The test was checked to fail with the old head start
+  (+0.77 %, ice, 9.5°, 10 m/s).
+- **Yeti.** There is no allowance for a fall any more. The restart, the window and the slower clock are all
+  gone. The slow-start help is now only a function of the start speed and time: the cap and the roar delay.
+  A fall costs what it costs any chase that has not built a lead yet.
+
+Evidence (`data/r5_fall_band.jsonl.gz`, 672 runs): 8 fresh courses (2027-02-09, 2027-02-21, 2027-03-04,
+2027-03-17, SNOWCAT, FIRNLINE, PINECONE, SLUSHY), Fjord and Alpine, Normal, the `straight` driver. Caught
+out of 16:
+
+| Start speed (m/s) | 0 | 2 | 4 | 6 | 9 | 10.9 | skied in |
+|---|---|---|---|---|---|---|---|
+| no fall | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| fall at 2 s, half-rate clock (round 4) | 5 | 10 | 12 | 14 | 13 | 13 | 5 |
+| fall at 2 s, no allowance (round 5) | 12 | 15 | 15 | 16 | 13 | 13 | 5 |
+| fall at 4 s, half-rate clock (round 4) | 12 | 14 | 14 | 14 | 10 | 10 | 2 |
+| fall at 4 s, no allowance (round 5) | 15 | 15 | 16 | 14 | 10 | 10 | 2 |
+
+What it shows:
+- **Clean runs are unchanged.** Every start speed escapes Normal without a fall.
+- **An early fall is roughly as costly from a standstill as from any start below 11 m/s.** This is how the
+  original game already treats an entry at 9–11 m/s: 13 of 16 caught, with no slow-start rules involved. Only
+  chases skied in fast have the lead to survive it.
+- **A small residual remains, and it is stated rather than hidden.** The slow-start help itself still leaves a
+  standstill slightly better off after a fall: 12 of 16 caught against 13–16 of 16 here, and 14 of 16 against
+  16 of 16 on the test's seeds. Stopping before the cave therefore buys a 1-in-8 chance at most, and only for a
+  player who then falls within seconds. Without a fall it only costs gap. `yeti_escape.test.ts` asserts this
+  bound: a standstill is caught at least 75 % of the time and is never better than a faster start by more
+  than 2 in 16. Under the round-4 rule this was 5/16 against 14/16.
+- **Round 1's complaint** that one fall right after a slow start meant certain capture is answered by
+  measurement, not by an exception. That fall is now about as fatal as the same fall after a 9–11 m/s entry
+  in the unchanged original game. It is not a slow-start penalty.

@@ -107,6 +107,8 @@ export const POLE = {
    *  head start), so releasing between strokes never beats holding, with or without the tuck held
    *  (physics reviews r2, r3): > firstStrokeAt × period[0] */
   continueGap: 0.3,
+  /** m/s: the first-stroke head start applies only below this (getting going from a standstill) */
+  headStartBelow: 1.5,
 };
 
 /** mean push (m/s²) a held pole cycle gives at this speed on a surface with this bite */
@@ -487,7 +489,10 @@ export class SkierPhysics {
       if (sp < POLE.zero) {
         s.polePeriod = THREE.MathUtils.lerp(POLE.period[0], POLE.period[1], clamp(sp / POLE.zero, 0, 1));
         // continuing a hold: the next stroke follows on; from rest: the hands are already going forward
-        s.poleT = wasPoling || s.poleIdle < POLE.continueGap ? 0 : POLE.firstStrokeAt * s.polePeriod;
+        // (the head start is only for getting going from (near) a standstill — the laggy first push of
+        // review r1 — and only after the poles and the skate have both been idle: physics review r4
+        // found a timed release still paid above 7 m/s while coasting in the tuck)
+        s.poleT = !wasPoling && sp < POLE.headStartBelow && s.poleIdle >= POLE.continueGap ? POLE.firstStrokeAt * s.polePeriod : 0;
         s.poleStrokes++;
         this.emit({ type: 'pole-stroke' });
       }

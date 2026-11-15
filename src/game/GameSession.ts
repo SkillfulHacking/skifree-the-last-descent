@@ -440,7 +440,7 @@ export class GameSession implements Stage {
     if (startCave) this.beginCave();
 
     if (this.run.phase === 'chase') {
-      const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded, down: s.crashed || s.recoverTime > 0 };
+      const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded };
       this.yetiAI.update(PHYS_DT, target);
       this.stepSnowballs();
       if (this.yetiAI.phase === 'chase' && !this.yetiAI.airborne) this.chaseMinGap = Math.min(this.chaseMinGap, this.yetiAI.distance);
