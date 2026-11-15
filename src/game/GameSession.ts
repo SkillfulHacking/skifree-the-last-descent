@@ -13,7 +13,7 @@ export const VIEWPOINT_POINTS = 500;
 export const CAPTION_PRIORITY = { ambient: 0, report: 1, warning: 2 } as const;
 /** style points for clearing a Fjord gap jump (× the multiplier) */
 export const GAP_POINTS = { cleared: 150, clean: 300 } as const;
-import { PHYS_DT, SkierPhysics, type SkierEvent, type SkierInput, DRIFT_MIN_SPEED } from '../physics/SkierPhysics';
+import { PHYS_DT, SkierPhysics, type SkierEvent, type SkierInput, DRIFT_MIN_SPEED, poleEffect } from '../physics/SkierPhysics';
 import { YetiAI } from '../yeti/YetiAI';
 import { RunState } from './RunState';
 import { FollowCamera } from '../camera/FollowCamera';
@@ -29,7 +29,7 @@ import type { YetiModel } from '../yeti/YetiModel';
 import type { AudioEngine } from '../audio/AudioEngine';
 import type { Hud } from '../ui/Hud';
 import type { Settings, RunStats } from '../core/settings';
-import type { Device, GameplayInput } from '../input/Input';
+import type { Action, Device, GameplayInput } from '../input/Input';
 import type { Stage } from './Stage';
 import { SnowballBarrage, SNOWBALL, clampToPiste, type SnowballEvent } from '../yeti/Snowballs';
 import { SnowballView } from '../yeti/SnowballView';
@@ -38,6 +38,14 @@ import { EventBus, type GameEvent, type RunContext, type RunOutcome } from './ev
 import { RunTelemetry } from './telemetry';
 
 const UP = new THREE.Vector3(0, 1, 0);
+
+/** pole push prompt thresholds (m/s): shown below `show` (20 km/h), hidden above `hide` */
+export const POLE_PROMPT = { show: 20 / 3.6, hide: 26 / 3.6 } as const;
+
+/** a binding's glyph as plain text (captions are text, not HTML) */
+function glyphText(h: Hud, a: Action): string {
+  return h.g(a).replace(/<[^>]+>/g, '');
+}
 
 const TUTORIAL: Array<{ key: string; html: (h: Hud) => string; done: (s: SessionView) => boolean }> = [
   { key: 'steer', html: (h) => `${h.g('left')} ${h.g('right')} Steer — lean into the turns`, done: (s) => s.tut.steer > 1.0 },
@@ -70,7 +78,7 @@ export class GameSession implements Stage {
   private renderPos = new THREE.Vector3();
   private prevHeading = 0;
   private normalSmoothed = new THREE.Vector3(0, 1, 0);
-  private input: SkierInput = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recover: false };
+  private input: SkierInput = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recover: false, pole: false };
   private recoverLatch = false;
   private cave: CaveCinematic | null = null;
   private defeat: DefeatCinematic | null = null;
@@ -384,6 +392,8 @@ export class GameSession implements Stage {
     this.input.brake = ctl ? gi.brake : 0;
     this.input.drift = ctl && gi.drift;
     this.input.pop = ctl && gi.pop;
+    // the same button: Recover when down, a pole push when upright (SkierPhysics.poleCycle decides)
+    this.input.pole = ctl && gi.recoverHeld;
     if (gi.recoverPressed) this.recoverLatch = true;
   }
 
@@ -391,7 +401,10 @@ export class GameSession implements Stage {
     const s = this.phys.s;
     this.prevPos.copy(s.pos);
     this.prevHeading = s.heading;
-    if (!this.autopilot) this.input.recover = this.recoverLatch;
+    if (!this.autopilot) {
+      this.input.recover = this.recoverLatch;
+      this.input.polePressed = this.recoverLatch && this.input.pole === true;
+    }
     if (!this.runStartedSent) this.emitRunStarted();
     this.phys.step(this.input, PHYS_DT);
     this.recoverLatch = false;
@@ -427,7 +440,7 @@ export class GameSession implements Stage {
     if (startCave) this.beginCave();
 
     if (this.run.phase === 'chase') {
-      const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded };
+      const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded, down: s.crashed || s.recoverTime > 0 };
       this.yetiAI.update(PHYS_DT, target);
       this.stepSnowballs();
       if (this.yetiAI.phase === 'chase' && !this.yetiAI.airborne) this.chaseMinGap = Math.min(this.chaseMinGap, this.yetiAI.distance);
@@ -590,6 +603,23 @@ export class GameSession implements Stage {
         break;
       case 'recover':
         break;
+      case 'pole-plant': {
+        // both tips bite: a crunch, a puff of snow at each basket, a light tick on the controller
+        this.audio.playPolePlant(e.surface, 0.45 + 0.55 * e.effect);
+        const f = { x: Math.sin(s.heading), z: Math.cos(s.heading) };
+        if (e.surface !== 'ice') {
+          for (const sg of [-1, 1]) {
+            // at the tips (beside the bindings, ~0.42 m out), left behind on the snow (animation review r1)
+            const x = s.pos.x + f.z * 0.42 * sg + f.x * 0.04;
+            const z = s.pos.z - f.x * 0.42 * sg + f.z * 0.04;
+            this.world.particles.emit({ x, y: this.world.mountain.heightAt(x, z) + 0.05, z, vx: 0, vy: 0.7, vz: 0, spread: 0.25, size: 0.22, life: 0.55, count: e.surface === 'powder' ? 9 : 5, gravity: 0.6, drag: 3, grow: 0.8, alpha: 0.7 });
+          }
+        }
+        this.rumble?.(0, 0.25 * e.effect, 45);
+        break;
+      }
+      case 'pole-stroke':
+        break;
       case 'relocate':
         // out of bounds (over a sea cliff's crest): back on the piste, with a clear cue
         this.prevPos.copy(s.pos);
@@ -718,6 +748,8 @@ export class GameSession implements Stage {
   }
 
   onCaveSeen: (() => void) | null = null;
+  /** controller rumble (App wires it to the active gamepad; strong/weak 0..1, ms) */
+  rumble: ((strong: number, weak: number, ms: number) => void) | null = null;
   /** fired once when the tutorial has been through all its lessons */
   onTutorialDone: (() => void) | null = null;
   /** the tutorial was shown in this run (first playthrough) */
@@ -938,6 +970,10 @@ export class GameSession implements Stage {
       celebrate: 0,
       wobble: s.wobble,
       time: this.time,
+      // (no frozen mid-stroke arms when the physics stops: cinematics, capture — QA r1)
+      pole: s.poleT >= 0 && !s.crashed && this.run.simulating ? 1 : 0,
+      polePhase: s.poleT >= 0 ? s.poleT / s.polePeriod : 1,
+      poleAmp: 0.55 + 0.45 * poleEffect(s.speed),
       ...this.poseOverride,
     };
     this.skier.update(dt, p);
@@ -1016,16 +1052,53 @@ export class GameSession implements Stage {
     this.world.update(dt, this.time, focus, this.camera.position);
   }
 
+  /** seconds the skier has been upright, grounded and slow enough for the pole prompt */
+  private slowFor = 0;
+  /** fired once, the first time the pole hint is shown (App persists it) */
+  onPoleHint: (() => void) | null = null;
+
+  /**
+   * The pole push prompt (Pass 6): `<Recover> — POLE PUSH` while upright, on the ground and slow
+   * (shown after 0.6 s below POLE_PROMPT.show, gone above POLE_PROMPT.hide — never at speed), and,
+   * once ever, a caption that explains it the first time a player slows down that much.
+   */
+  private updatePolePrompt(dt: number) {
+    const s = this.phys.s;
+    const ok = this.run.controllable && !s.crashed && s.grounded && !this.autopilot && !this.intro;
+    const sp = s.speed;
+    if (ok && sp < POLE_PROMPT.show) this.slowFor += dt;
+    else if (!ok || sp > POLE_PROMPT.hide) this.slowFor = 0;
+    const show = this.slowFor > 0.6;
+    if (show) {
+      // (the key is part of the prompt id: a remap mid-run redraws it; QA r1) — still held since
+      // getting up: the push needs a fresh press, so the prompt says so
+      const k = this.hud.g('recover');
+      if (s.poleArmed || !this.input.pole) this.hud.setPrompt(`pole:${this.hud.device}:${k}`, `${k} — <b>POLE PUSH</b>`);
+      else this.hud.setPrompt(`pole-release:${this.hud.device}:${k}`, `Release ${k}, then press — <b>POLE PUSH</b>`);
+      if (!this.settings.seenPoleHint && this.settings.controlHints && this.slowFor > 1.2) {
+        // (a hint, not a sound caption: shown even with sound captions off; remembered once seen)
+        const shown = this.hud.hint(`Moving slowly? Hold ${glyphText(this.hud, 'recover')} to push with your poles.`, 5);
+        if (shown) {
+          this.settings.seenPoleHint = true;
+          this.onPoleHint?.();
+        }
+      }
+    } else if (this.hud.currentPrompt.startsWith('pole')) this.hud.setPrompt(null);
+  }
+
   private updateTutorial(dt: number) {
     const s = this.phys.s;
     if (s.crashed && this.run.controllable) {
       const can = s.crashTime > 1.0;
-      this.hud.setPrompt(can ? `recover:${this.hud.device}` : 'crashed', can ? `Press ${this.hud.g('recover')} to get up` : 'WIPEOUT!');
+      this.hud.setPrompt(can ? `recover:${this.hud.device}:${this.hud.g('recover')}` : 'crashed', can ? `${this.hud.g('recover')} — <b>RECOVER</b>` : 'WIPEOUT!');
+      this.slowFor = 0;
       return;
     }
     if (this.hud.currentPrompt.startsWith('recover') || this.hud.currentPrompt === 'crashed') this.hud.setPrompt(null);
-    if (!this.settings.showTutorial || this.run.phase !== 'learn' || this.autopilot) {
-      if (this.hud.currentPrompt && this.tutIndex < TUTORIAL.length && this.run.phase !== 'learn') this.hud.setPrompt(null);
+    const tutorialOn = this.settings.showTutorial && this.run.phase === 'learn' && !this.autopilot && this.tutIndex < TUTORIAL.length;
+    if (!tutorialOn) {
+      if (this.hud.currentPrompt && this.tutIndex < TUTORIAL.length && this.run.phase !== 'learn' && !this.hud.currentPrompt.startsWith('pole')) this.hud.setPrompt(null);
+      this.updatePolePrompt(dt);
       return;
     }
     const step = TUTORIAL[this.tutIndex];
@@ -1176,9 +1249,12 @@ export class GameSession implements Stage {
   }
 
   /** Run the per-frame logic N times at a fixed dt (cinematics included). */
+  /** (debug/captures) buttons held during debugFrames (e.g. { recoverHeld: true } to keep poling) */
+  debugHeld: Partial<GameplayInput> = {};
+
   debugFrames(n: number, dt = 1 / 30) {
     this.debugUsed = true;
-    const neutral = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recoverPressed: false, lookBack: false, pausePressed: false, skipPressed: false, camX: 0, camY: 0 };
+    const neutral = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recoverPressed: false, recoverHeld: false, lookBack: false, pausePressed: false, skipPressed: false, camX: 0, camY: 0, ...this.debugHeld };
     for (let i = 0; i < n; i++) this.frame(dt, neutral, 'keyboard');
   }
 
@@ -1201,6 +1277,9 @@ export class GameSession implements Stage {
       chaseTime: this.run.chaseTime,
       cinematicTime: this.cave?.tl.time ?? this.victory?.tl.time ?? this.defeat?.tl.time ?? -1,
       crashes: s.crashes,
+      poleStrokes: s.poleStrokes,
+      poleT: s.poleT,
+      prompt: this.hud.currentPrompt,
       intro: !!this.intro,
       encounter: this.run.encounter?.index ?? null,
       caveZ: this.run.encounter?.caveZ ?? null,

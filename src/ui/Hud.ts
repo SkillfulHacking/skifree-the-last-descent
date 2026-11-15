@@ -187,10 +187,24 @@ export class Hud {
     if (!this.captionsOn) return false;
     const pr = opts.soft ? (opts.priority ?? 0) : Infinity;
     if (opts.soft && this.capTimer > 0 && pr <= this.capPriority) return false;
+    this.cap.classList.remove('hint');
     this.cap.textContent = text;
     this.cap.classList.add('on');
     this.capTimer = seconds;
     this.capPriority = pr;
+    return true;
+  }
+
+  /**
+   * A one-time control hint in the caption line (not a sound caption, so it shows with captions
+   * off). Never replaces a caption on screen; returns whether it was shown.
+   */
+  hint(text: string, seconds = 5): boolean {
+    if (this.capTimer > 0) return false;
+    this.cap.textContent = text;
+    this.cap.classList.add('on', 'hint');
+    this.capTimer = seconds;
+    this.capPriority = 1;
     return true;
   }
 
@@ -260,7 +274,7 @@ export class Hud {
     }
     if (this.capTimer > 0) {
       this.capTimer -= dt;
-      if (this.capTimer <= 0) this.cap.classList.remove('on');
+      if (this.capTimer <= 0) this.cap.classList.remove('on', 'hint');
     }
     if (this.centerTimer > 0) {
       this.centerTimer -= dt;

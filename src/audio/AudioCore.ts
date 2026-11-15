@@ -115,6 +115,9 @@ export class AudioCore {
   playLanding(intensity: number, hard: boolean): void {
     this.go('landing', 0.5, () => sfx.landing(this.dst, this.t, intensity, hard));
   }
+  playPolePlant(surface: 'snow' | 'packed' | 'powder' | 'ice', intensity: number): void {
+    this.go('pole', 0.25, () => sfx.polePlant(this.dst, this.t, surface, intensity));
+  }
   playPop(): void {
     this.go('pop', 0.15, () => sfx.pop(this.dst, this.t));
   }
