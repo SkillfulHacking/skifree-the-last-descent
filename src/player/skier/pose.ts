@@ -69,6 +69,44 @@ export interface SmoothedPose {
   celebrate: number;
   wobble: number;
   time: number;
+  /** pole stroke weight (0..1), phase (0..1) and amplitude (0..1); see SkierPose */
+  pole: number;
+  polePhase: number;
+  poleAmp: number;
+}
+
+/** pole-stroke phase marks (must match SkierPhysics POLE.plantAt / powerEnd) */
+export const POLE_PHASE = { plant: 0.3, release: 0.62 } as const;
+
+/** 0..1 power-phase shape (half-sine between plant and release; 0 outside) */
+export function polePower(u: number): number {
+  if (u < POLE_PHASE.plant || u >= POLE_PHASE.release) return 0;
+  return Math.sin((Math.PI * (u - POLE_PHASE.plant)) / (POLE_PHASE.release - POLE_PHASE.plant));
+}
+
+/**
+ * Hand target (chest frame, from the shoulder) through a pole stroke: rest → reach forward and up
+ * (plant at POLE_PHASE.plant) → drive down and back past the hip (release) → swing up behind →
+ * forward to rest. Returns how planted the pole is (1 = tip on the snow).
+ */
+function poleHand(u: number, sg: number, out: V3): number {
+  const D: V3 = [sg * 0.1, -0.4, 0.3];
+  const F: V3 = [sg * 0.13, -0.16, 0.52];
+  const K: V3 = [sg * 0.17, -0.66, -0.16];
+  const R: V3 = [sg * 0.2, -0.5, -0.3];
+  const seg = (a: V3, b: V3, k: number) => {
+    const e = k * k * (3 - 2 * k);
+    out[0] = a[0] + (b[0] - a[0]) * e;
+    out[1] = a[1] + (b[1] - a[1]) * e;
+    out[2] = a[2] + (b[2] - a[2]) * e;
+  };
+  const P = POLE_PHASE;
+  if (u < P.plant) seg(D, F, u / P.plant);
+  else if (u < P.release) seg(F, K, (u - P.plant) / (P.release - P.plant));
+  else if (u < 0.8) seg(K, R, (u - P.release) / (0.8 - P.release));
+  else seg(R, D, (u - 0.8) / 0.2);
+  // planted from just before the plant mark to the release; lifting off over the next 6 %
+  return u < P.plant - 0.04 ? 0 : u < P.plant ? (u - (P.plant - 0.04)) / 0.04 : u < P.release ? 1 : u < P.release + 0.06 ? 1 - (u - P.release) / 0.06 : 0;
 }
 
 // scratch
@@ -186,8 +224,11 @@ export function buildActivePose(st: SmoothedPose, out: PoseSpec): void {
   const counterYaw = steer * 0.22 - psi * 0.72;
   const lb = st.lookBack;
   const wobRoll = Math.sin(t * 8.1) * 0.16 * wob;
-  const spP = 0.1 + tuck * 0.5 + cr * 0.08 - cel * 0.1 + Math.sin(t * 6.3) * 0.08 * wob;
-  const chP = 0.07 + tuck * 0.4 + breathe * 0.012 - cel * 0.12 - air * 0.06;
+  // pole stroke: the torso crunches down over the poles in the power phase
+  const poleW = st.pole * st.poleAmp;
+  const crunch = polePower(st.polePhase) * poleW;
+  const spP = 0.1 + tuck * 0.5 + cr * 0.08 - cel * 0.1 + Math.sin(t * 6.3) * 0.08 * wob + 0.3 * crunch;
+  const chP = 0.07 + tuck * 0.4 + breathe * 0.012 - cel * 0.12 - air * 0.06 + 0.12 * crunch;
   quatYXZ(counterYaw * 0.4 + lb * 0.12, spP, -lean * 0.25 + wobRoll, out.spine);
   quatYXZ(counterYaw * 0.6 + lb * 0.25, chP, -lean * 0.22 + wobRoll * 0.7, out.chest);
   const T = pelvisPitch + spP + chP;
@@ -221,6 +262,13 @@ export function buildActivePose(st: SmoothedPose, out: PoseSpec): void {
       mix3(elb, [sg * 0.8, 0, -0.5], wob);
     }
     const right = i === 1;
+    let planted = 0;
+    if (poleW > 0.001) {
+      const ph: V3 = [0, 0, 0];
+      planted = poleHand(st.polePhase, sg, ph);
+      mix3(hnd, ph, poleW);
+      mix3(elb, [sg * 0.62, -0.45, -0.55], poleW);
+    }
     mix3(hnd, right ? [sg * 0.17, 0.51, 0.1] : [sg * 0.27, 0.45, 0.06], cel);
     mix3(elb, [sg * 1, 0.1, -0.35], cel);
     handFromChest(i, hnd[0], hnd[1], hnd[2], out.hand[i]);
@@ -250,6 +298,20 @@ export function buildActivePose(st: SmoothedPose, out: PoseSpec): void {
       pd.set(pd.x * k, ny, pd.z * k);
     }
     out.poleSlide[i] = -0.11 * cel;
+    // pole stroke: from the plant to the release the tip is on the snow beside the boots (body space
+    // y≈0 is the slope plane: the model root follows the terrain normal), at full pole length from the
+    // hand — no sinking in and no floating. Swinging forward, the tip trails up and back.
+    if (poleW > 0.001) {
+      const H = out.hand[i];
+      const dy = Math.max(0, H.y - 0.025);
+      const dx = sg * 0.11;
+      const dz = -Math.sqrt(Math.max(0, L * L - dy * dy - dx * dx));
+      vC.set(dx, -dy, dz).normalize();
+      const swing = vB.set(sg * 0.2, -0.55, -0.8).normalize();
+      const aim = vA.copy(swing).lerp(vC, planted).normalize();
+      pd.lerp(aim, poleW).normalize();
+      if (planted > 0.999 && poleW > 0.999) pd.copy(vC);
+    }
   }
 
   // ---- whole-body airborne rotation ----

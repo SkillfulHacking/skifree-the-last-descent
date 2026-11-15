@@ -65,7 +65,7 @@ export class SkierModel {
   private readonly spec = new PoseSpec();
   private readonly st: SmoothedPose = {
     steer: 0, lean: 0, tuck: 0, pizza: 0, drift: 0, driftAngle: 0, crouch: 0, air: 0, airTime: 0, land: 0,
-    crashW: 0, crashTime: 0, crashSide: 1, speed: 0, lookBack: 0, celebrate: 0, wobble: 0, time: 0,
+    crashW: 0, crashTime: 0, crashSide: 1, speed: 0, lookBack: 0, celebrate: 0, wobble: 0, time: 0, pole: 0, polePhase: 0, poleAmp: 1,
   };
   private initialized = false;
   private wasCrashed = false;
@@ -204,6 +204,7 @@ export class SkierModel {
       st.lookBack = pose.lookBack;
       st.celebrate = pose.celebrate;
       st.wobble = pose.wobble;
+      st.pole = pose.pole ?? 0;
       st.crashW = crashTarget;
     } else {
       st.steer = damp(st.steer, pose.steer, 8, dt);
@@ -218,6 +219,8 @@ export class SkierModel {
       st.lookBack = damp(st.lookBack, pose.lookBack, 7, dt);
       st.celebrate = damp(st.celebrate, pose.celebrate, 5, dt);
       st.wobble = damp(st.wobble, pose.wobble, 9, dt);
+      // into a stroke quickly, out of the last one gently
+      st.pole = damp(st.pole, pose.pole ?? 0, (pose.pole ?? 0) > st.pole ? 20 : 6, dt);
       st.crashW = damp(st.crashW, crashTarget, crashTarget > st.crashW ? 20 : 9, dt);
     }
     if (pose.crashed && !this.wasCrashed) {
@@ -228,6 +231,8 @@ export class SkierModel {
     st.crashTime = pose.crashTime;
     st.speed = pose.speed;
     st.time = pose.time;
+    st.polePhase = pose.polePhase ?? 1;
+    st.poleAmp = damp(st.poleAmp, pose.poleAmp ?? 1, 6, dt);
 
     buildActivePose(st, this.specActive);
     let spec = this.specActive;

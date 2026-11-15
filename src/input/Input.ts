@@ -27,7 +27,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   brake: 'Pizza (brake)',
   drift: 'Drift',
   pop: 'Pop / jump',
-  recover: 'Recover',
+  recover: 'Recover / pole push',
   lookback: 'Look back',
   pause: 'Pause',
   skip: 'Skip cinematic',
@@ -52,6 +52,8 @@ export interface GameplayInput {
   drift: boolean;
   pop: boolean;
   recoverPressed: boolean;
+  /** Recover held (the pole push while upright: SkierInput.pole) */
+  recoverHeld: boolean;
   lookBack: boolean;
   pausePressed: boolean;
   skipPressed: boolean;
@@ -240,6 +242,7 @@ export class Input {
     let drift = this.key('drift');
     let pop = this.key('pop');
     let recoverPressed = this.keyPressed('recover');
+    let recoverHeld = this.key('recover');
     let lookBack = this.key('lookback');
     let pausePressed = this.keyPressed('pause');
     let skipPressed = this.keyPressed('skip');
@@ -263,6 +266,7 @@ export class Input {
       drift = drift || !!this.padNow[PAD.RB];
       pop = pop || !!this.padNow[PAD.A];
       recoverPressed = recoverPressed || this.padPressed(PAD.Y);
+      recoverHeld = recoverHeld || !!this.padNow[PAD.Y];
       lookBack = lookBack || !!this.padNow[PAD.B];
       pausePressed = pausePressed || this.padPressed(PAD.START);
       skipPressed = skipPressed || this.padPressed(PAD.START);
@@ -273,7 +277,7 @@ export class Input {
     if (s.invertCameraY) camY = -camY;
     steer = clamp(steer * s.steerSensitivity, -1, 1);
     this.pressedQ.clear();
-    return { steer, tuck, brake, drift, pop, recoverPressed, lookBack, pausePressed, skipPressed, camX, camY };
+    return { steer, tuck, brake, drift, pop, recoverPressed, recoverHeld, lookBack, pausePressed, skipPressed, camX, camY };
   }
 
   /** Read menu navigation (edge-triggered, with stick auto-repeat). */

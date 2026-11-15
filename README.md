@@ -53,11 +53,17 @@ there is no CDN, no API key and no telemetry.
 | Pizza (snowplow brake) | S / ↓ | Left trigger LT / L2 (analog) |
 | Drift / aggressive carve (needs speed) | Left Shift | RB / R1 |
 | Pop — hold to crouch, release to jump | Space | A / ✕ |
-| Recover after a crash | R | Y / △ |
+| Recover after a crash · **pole push** when upright and slow (hold to keep poling) | R | Y / △ |
 | Look back (hold) | C | B / ○ |
 | Pause / menu | Esc | Start / Options |
 | Camera look (optional) | Mouse drag | Right stick |
 
+- **Pole push.** The Recover button does two jobs. After a crash it gets you up, as it always did. Once
+  you are back on your skis, let go of it and press it again to plant your poles and push. Hold it
+  to keep poling at a natural rhythm. Pushing is strongest below 30 km/h, fades above 35 km/h and
+  gives nothing from 55 km/h; gravity can still carry you faster. It does not work in the air. It is
+  weaker on ice and in deep powder, and almost nothing in a pizza wedge. While you pole you stand up
+  out of the tuck, so tuck and poles never add up. The prompt shows the key you have bound.
 - You never need the mouse during gameplay.
 - On-screen prompts switch to whichever device you used last.
 - Keyboard keys can be remapped, and the stick dead zone, steering and camera sensitivity and camera

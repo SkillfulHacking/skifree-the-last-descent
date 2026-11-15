@@ -194,6 +194,19 @@ export class Hud {
     return true;
   }
 
+  /**
+   * A one-time control hint in the caption line (not a sound caption, so it shows with captions
+   * off). Never replaces a caption on screen; returns whether it was shown.
+   */
+  hint(text: string, seconds = 5): boolean {
+    if (this.capTimer > 0) return false;
+    this.cap.textContent = text;
+    this.cap.classList.add('on');
+    this.capTimer = seconds;
+    this.capPriority = 1;
+    return true;
+  }
+
   /** the caption on screen (tests) */
   get captionText(): string | null {
     return this.capTimer > 0 ? this.cap.textContent : null;

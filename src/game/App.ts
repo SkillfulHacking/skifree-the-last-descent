@@ -10,7 +10,7 @@ import { YetiModel } from '../yeti/YetiModel';
 import { AudioEngine } from '../audio/AudioEngine';
 import { Input, ACTION_LABELS, keyName, type Action, DEFAULT_BINDINGS, type GameplayInput } from '../input/Input';
 
-const NEUTRAL_INPUT: GameplayInput = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recoverPressed: false, lookBack: false, pausePressed: false, skipPressed: false, camX: 0, camY: 0 };
+const NEUTRAL_INPUT: GameplayInput = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recoverPressed: false, recoverHeld: false, lookBack: false, pausePressed: false, skipPressed: false, camX: 0, camY: 0 };
 import { Hud } from '../ui/Hud';
 import { MenuSystem, type Screen, type MenuItem } from '../ui/Menu';
 import { applyRun, loadRecordBook, loadSettings, recordsFor, saveRecordBook, saveSettings, type RecordBook, type RunStats, type Settings, type Records } from '../core/settings';
@@ -522,6 +522,9 @@ export class App {
     // the controls are taught once: after a run that showed the tutorial (or once every lesson is
     // done) it is switched off; Settings → Tutorial prompts turns it back on for another pass
     this.session.onTutorialDone = () => this.retireTutorial();
+    this.session.rumble = (a, b, ms) => this.input.rumble(a, b, ms);
+    // the one-time pole push hint is remembered (no tutorial reset; Settings → Control hints)
+    this.session.onPoleHint = () => saveSettings(this.settings);
     this.mode = 'playing';
   }
 
@@ -650,6 +653,7 @@ export class App {
       { kind: 'slider', label: 'Interface text size', min: 0.85, max: 1.5, step: 0.05, get: () => s.uiScale, set: (v) => ((s.uiScale = v), changed()), fmt: pct },
       { kind: 'toggle', label: 'Sound captions', get: () => s.captions, set: (v) => ((s.captions = v), changed()) },
       { kind: 'toggle', label: 'Tutorial prompts', get: () => s.showTutorial, set: (v) => ((s.showTutorial = v), changed()) },
+      { kind: 'toggle', label: 'Control hints', get: () => s.controlHints, set: (v) => ((s.controlHints = v), changed()) },
       { kind: 'button', label: 'Credits & Licences', action: () => this.menu.push(this.creditsScreen()) },
       { kind: 'button', label: 'Reset settings to defaults', action: () => {
         const keepQ = s.quality;
@@ -721,10 +725,10 @@ export class App {
       { kind: 'info', html: `<div class="controls-grid">
         <div><h3>Keyboard</h3>
         <p><kbd>A</kbd>/<kbd>←</kbd> <kbd>D</kbd>/<kbd>→</kbd> steer · <kbd>W</kbd>/<kbd>↑</kbd> french fry (tuck) · <kbd>S</kbd>/<kbd>↓</kbd> pizza (brake)</p>
-        <p><kbd>Shift</kbd> drift · <kbd>Space</kbd> hold &amp; release to pop · <kbd>R</kbd> recover · <kbd>C</kbd> look back · <kbd>Esc</kbd> pause · mouse drag: look around</p></div>
+        <p><kbd>Shift</kbd> drift · <kbd>Space</kbd> hold &amp; release to pop · <kbd>${keyName(s.bindings.recover[0] ?? 'KeyR')}</kbd> recover — when upright and slow, hold it to push with your poles · <kbd>C</kbd> look back · <kbd>Esc</kbd> pause · mouse drag: look around</p></div>
         <div><h3>Controller</h3>
         <p>Left stick steer · Right stick camera · <kbd>RT</kbd>/<kbd>R2</kbd> tuck · <kbd>LT</kbd>/<kbd>L2</kbd> brake (analog)</p>
-        <p><kbd>RB</kbd>/<kbd>R1</kbd> drift · <kbd>A</kbd>/<kbd>✕</kbd> pop · <kbd>Y</kbd>/<kbd>△</kbd> recover · <kbd>B</kbd>/<kbd>○</kbd> look back · <kbd>Start</kbd>/<kbd>Options</kbd> pause</p></div>
+        <p><kbd>RB</kbd>/<kbd>R1</kbd> drift · <kbd>A</kbd>/<kbd>✕</kbd> pop · <kbd>Y</kbd>/<kbd>△</kbd> recover / pole push · <kbd>B</kbd>/<kbd>○</kbd> look back · <kbd>Start</kbd>/<kbd>Options</kbd> pause</p></div>
       </div>` },
       { kind: 'info', html: '<h3>Remap keyboard</h3><p class="menu-note">Select an action and press the new key (Esc / controller B cancels). Controller buttons use the standard layout above.</p>' },
       ...bindRows,
@@ -970,6 +974,12 @@ export class App {
         if (e) this.session?.debugTeleport(e.triggerZ - 12, 16);
       },
       advance: (sec: number) => this.session?.debugAdvance(sec),
+      /** (captures/tests) buttons held while frames() steps the game, e.g. { recoverHeld: true } */
+      holdInput: (inp: Partial<GameplayInput>) => {
+        if (this.session) this.session.debugHeld = { ...inp };
+      },
+      /** (tests) wipe the skier out where they are */
+      crash: () => this.session?.phys.forceCrash('debug'),
       autopilot: (style: AutopilotStyle | null) => {
         if (this.session) this.session.autopilot = style;
       },

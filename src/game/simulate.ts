@@ -62,6 +62,11 @@ export interface SimOptions {
   environment?: BiomeEnvironment | null;
   /** game difficulty for the default environment's hazard intensity (default normal) */
   difficulty?: 'relaxed' | 'normal' | 'hard';
+  /**
+   * analysis hook, called after every physics step while a chase is on (and once when it starts,
+   * with `start` true): the encounter, the time into the chase, the skier and the Yeti
+   */
+  trace?: (e: Encounter, ct: number, s: SkierState, yeti: YetiAI, start: boolean) => void;
 }
 
 export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierState, t: number) => SkierInput, opts: SimOptions = {}): SimResult {
@@ -166,6 +171,7 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
         if (firstChase < 0) firstChase = t;
         active = e;
         if (log) log.push(`${t.toFixed(1)}s encounter ${e.index} at z=${e.caveZ.toFixed(0)} (x${e.speedMul.toFixed(2)})`);
+        opts.trace?.(e, 0, s, yeti, true);
         break;
       }
     }
@@ -179,6 +185,7 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
       }
       target.airborne = !s.grounded;
       yeti.update(PHYS_DT, target);
+      opts.trace?.(active, ct, s, yeti, false);
       if (balls) {
         ballEv.length = 0;
         balls.update(PHYS_DT, yeti.pos, s, yeti.phase === 'chase' && !yeti.airborne, ballEv);

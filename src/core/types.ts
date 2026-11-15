@@ -43,6 +43,12 @@ export interface SkierPose {
   celebrate: number;
   /** 0..1 stumble / balance wobble after light impacts. */
   wobble: number;
+  /** a pole stroke is under way (SkierPhysics.poleT ≥ 0): 0/1, smoothed by the model */
+  pole?: number;
+  /** 0..1 progress through the current pole stroke (reach → plant → push → recovery) */
+  polePhase?: number;
+  /** 0..1 how strongly the stroke is made (smaller near the pole cutoff speed) */
+  poleAmp?: number;
   /** Elapsed game time (for idle motion). */
   time: number;
 }

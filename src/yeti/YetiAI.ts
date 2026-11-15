@@ -31,6 +31,15 @@ export const YETI = {
   lungeCooldown: 3.2,
   catchDistance: 2.7,
   startDelay: 0.6,
+  /**
+   * Pass 6, chase start in step with the skier: in the first seconds the Yeti runs at most
+   * `syncMargin` m/s faster than the skier was going when the chase began, plus `syncAccel` m/s per
+   * second (about what a tucked skier gains on the gentle ground below a cave). A skier who came
+   * into the cave slowly gets the seconds to build speed that a fast one already has; for a skier
+   * already at speed the cap is above the Yeti's own pace, so nothing changes.
+   */
+  syncMargin: 3,
+  syncAccel: 1.1,
 };
 
 export type YetiPhase = 'dormant' | 'scripted' | 'chase' | 'caught' | 'stopped';
@@ -65,6 +74,8 @@ export class YetiAI {
   desired = 0;
   /** per-encounter pursuit scaling (1 = classic; Endless escalates) */
   speedMul = 1;
+  /** the skier's ground speed when this chase began (YETI.syncMargin); NaN until the first update */
+  startSkierSpeed = NaN;
 
   constructor(
     private mountain: Mountain,
@@ -98,6 +109,7 @@ export class YetiAI {
   startChase(leapVelocity: THREE.Vector3 | null) {
     this.phase = 'chase';
     this.chaseTime = 0;
+    this.startSkierSpeed = NaN;
     this.delay = YETI.startDelay;
     if (leapVelocity) {
       this.airborne = true;
@@ -114,6 +126,7 @@ export class YetiAI {
       return;
     }
     this.chaseTime += dt;
+    if (Number.isNaN(this.startSkierSpeed)) this.startSkierSpeed = Math.hypot(target.vel.x, target.vel.z);
 
     if (this.airborne) {
       this.vy -= 9.81 * dt;
@@ -193,7 +206,12 @@ export class YetiAI {
     const pressure = smoothstep(YETI.catchUpGap, YETI.catchUpGap + 120, gap) * YETI.catchUpBoost + smoothstep(105, 170, gap) * 7;
     // ramp in over the first seconds of the chase
     const warm = smoothstep(0, 4, this.chaseTime);
-    let desired = (YETI.baseSpeed * this.speedMul + pressure) * terrain * (0.55 + 0.45 * warm);
+    const ramp = terrain * (0.55 + 0.45 * warm);
+    // a slow start: the Yeti's own pace comes up with the skier's, not at once (YETI.syncMargin).
+    // Only its own pace: the catch-up pressure when far behind is untouched, and for a skier who
+    // started the chase at speed the cap is above that pace, so the chase is exactly as before.
+    const own = Math.min(YETI.baseSpeed * this.speedMul * ramp, this.startSkierSpeed + YETI.syncMargin + YETI.syncAccel * this.chaseTime);
+    let desired = own + pressure * ramp;
     // on gentle ground a running beast is not much faster than a gliding skier
     if (slope < 12) desired = Math.min(desired, 13 + 0.5 * slope);
 

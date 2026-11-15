@@ -20,6 +20,10 @@ export interface Settings {
   deadzone: number;
   showFps: boolean;
   showTutorial: boolean;
+  /** contextual control hints (e.g. the one-time pole push hint) — separate from the tutorial */
+  controlHints: boolean;
+  /** the one-time pole push hint has been shown */
+  seenPoleHint: boolean;
   uiScale: number;
   rearView: boolean;
   captions: boolean;
@@ -64,6 +68,8 @@ export const DEFAULT_SETTINGS: Settings = {
   deadzone: 0.15,
   showFps: false,
   showTutorial: true,
+  controlHints: true,
+  seenPoleHint: false,
   uiScale: 1,
   rearView: true,
   captions: true,
@@ -136,6 +142,8 @@ export function sanitize(s: Settings): Settings {
   s.invertCameraY = bool(s.invertCameraY, d.invertCameraY);
   s.showFps = bool(s.showFps, d.showFps);
   s.showTutorial = bool(s.showTutorial, d.showTutorial);
+  s.controlHints = bool(s.controlHints, d.controlHints);
+  s.seenPoleHint = bool(s.seenPoleHint, d.seenPoleHint);
   s.rearView = bool(s.rearView, d.rearView);
   s.captions = bool(s.captions, d.captions);
   if (s.course !== 'classic' && s.course !== 'daily' && s.course !== 'custom') s.course = 'classic';
