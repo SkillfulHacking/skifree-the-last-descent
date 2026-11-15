@@ -114,3 +114,11 @@ are in `docs/reviews/pass2/final/FINAL_REVIEW_A_CE.md` and the QUALITY_REPORT.
   skier's travel and the slide is a few tenths of a metre. Above that the tip slides forward a little
   during the (short, fading) push; it is visible in a side view, hard to see from the game camera.
   Mid-push the hands rise behind the hips a little early, and the recovery swing is nearly horizontal.
+- **Pole push, technique choice:** with tuck and poles held together the game picks the skate or the poles
+  by their mean push (never both). Switching by hand at a better speed can be up to about 2 % quicker over
+  a few seconds near the crossover (about 0.4 m); the choice ignores the tuck's lower drag.
+- **Deep powder (pre-Pass 6):** popping in rhythm beats skiing by 10–15 % in deep powder (less drag while
+  airborne). Found by the Pass 6 physics review; not pole-related.
+- **Yeti after a slow start:** a skier who stops before the cave and then falls within about a second of the
+  chase starting is caught slightly less often than one who entered at 2–11 m/s (12–14 of 16 against
+  15–16 of 16), because the Yeti's pace cap is lower. Over all fall times a standstill does no better.

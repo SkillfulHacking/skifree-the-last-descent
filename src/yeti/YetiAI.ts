@@ -53,6 +53,8 @@ export interface YetiTarget {
   pos: THREE.Vector3;
   vel: THREE.Vector3;
   airborne: boolean;
+  /** the skier is down (crashed or getting up): cancels the rest of the slow-start roar */
+  down?: boolean;
 }
 
 const tmp = new THREE.Vector3();
@@ -71,6 +73,8 @@ export class YetiAI {
   lungeTimer = 0;
   lungeCooldown = 0;
   delay = 0;
+  /** what is left of the slow-start roar (YETI.slowDelay), included in `delay` */
+  extraDelay = 0;
   airborne = false;
   vy = 0;
   /** distance to target (3D) */
@@ -120,6 +124,7 @@ export class YetiAI {
     this.startSkierSpeed = NaN;
     this.syncClock = 0;
     this.delay = YETI.startDelay;
+    this.extraDelay = 0;
     if (leapVelocity) {
       this.airborne = true;
       this.vel.copy(leapVelocity);
@@ -139,8 +144,16 @@ export class YetiAI {
     if (Number.isNaN(this.startSkierSpeed)) {
       this.startSkierSpeed = vs;
       // a slow start: he stands and roars a little longer before the first stride
-      this.delay += YETI.slowDelay * Math.max(0, 1 - (vs / YETI.syncSlow) ** 2);
+      this.extraDelay = YETI.slowDelay * Math.max(0, 1 - (vs / YETI.syncSlow) ** 2);
+      this.delay += this.extraDelay;
     }
+    // the extra roar is for a skier getting going: one who falls during it loses what is left of it
+    // (review r5: a fall in the first 1–2 s after a standstill cost nothing while he still stood)
+    if (target.down && this.extraDelay > 0) {
+      this.delay = Math.max(0, this.delay - this.extraDelay);
+      this.extraDelay = 0;
+    }
+    if (this.extraDelay > 0) this.extraDelay = Math.max(0, Math.min(this.extraDelay, this.delay - dt));
     // (no allowance for a fall: reviews r2–r4 tried a restart, a window and a slower clock while the
     // skier is down; each made entering slowly pay after an early fall. A fall now costs what it costs
     // any chase that has not built a lead yet.)

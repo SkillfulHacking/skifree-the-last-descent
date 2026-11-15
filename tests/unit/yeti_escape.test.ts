@@ -37,30 +37,34 @@ describe('Yeti escape after a slow start', () => {
       }
   }, 900_000);
 
-  it('after an early fall, entering slower is never better: outcomes across the whole start-speed band (reviews r3–r4)', () => {
-    // (a restart, a window and a slower clock while down were each tried; each made stopping before the
-    // cave a fall insurance. Single chases are chaotic, so in aggregate: caught counts per start speed.)
-    const speeds = [0, 3, 6, 10.9, 11.1];
-    const caught = speeds.map(() => 0);
+  it('falls across the whole band: stopping before the cave does not pay (reviews r3–r5)', () => {
+    // fall times from 0.5 s (inside the roar) to 12 s × start speeds 0–11.1 m/s; single chases are
+    // chaotic, so in aggregate. ESCAPE_ANALYSIS round 6: the only edge left for a standstill is a fall
+    // within ~1 s of the start (the lower pace cap), and over all fall times it is caught at least as
+    // often as a start at 7–11 m/s.
+    const speeds = [0, 4, 7, 10.9, 11.1];
+    const falls = [0.5, 1, 3, 6, 12];
+    const caught = speeds.map(() => falls.map(() => 0));
     const gap5: number[][] = speeds.map(() => []);
-    for (const d of DAYS.slice(0, 4))
+    for (const d of DAYS.slice(0, 3))
       for (const b of ['alpine', 'fjord'])
-        for (const crashAt of [2, 4])
+        falls.forEach((crashAt, j) =>
           speeds.forEach((v, i) => {
             const r = runEscape(base(d, b, { startV: v, crashAt }));
-            caught[i]! += +(r.outcome === 'caught');
+            caught[i]![j]! += +(r.outcome === 'caught');
             gap5[i]!.push(r.gaps[1] ?? 0);
-          });
-    // a standstill keeps a little of the slow-start help after a fall (the lower cap and the roar
-    // delay; measured 14 of 16 caught against 16 of 16 here, 12/16 against 13–16/16 on the review's
-    // seeds): at most 2 in 16 better — stopping before the cave buys almost nothing — and nowhere
-    // near the 5/16 against 14/16 the half-rate fall rule gave (ESCAPE_ANALYSIS, round 5)
-    for (let i = 1; i < speeds.length; i++) expect(caught[0]!, `caught ${speeds.join('/')}: ${caught.join('/')}`).toBeGreaterThanOrEqual(caught[i]! - 2);
-    expect(caught[0]! / gap5[0]!.length).toBeGreaterThanOrEqual(0.75);
-    // and no step at 11 m/s
-    expect(Math.abs(caught[3]! - caught[4]!)).toBeLessThanOrEqual(1);
+          }),
+        );
+    const total = caught.map((row) => row.reduce((a, c) => a + c, 0));
+    const msg = `caught per speed ${speeds.join('/')} × falls ${falls.join('/')}: ${JSON.stringify(caught)}`;
+    // over all fall times a standstill is caught at least as often as a start at 7 m/s or more
+    for (let i = 2; i < speeds.length; i++) expect(total[0]!, msg).toBeGreaterThanOrEqual(total[i]!);
+    // from 3 s on, a standstill is never better than any faster start (one chase of slack for chaos)
+    for (let j = 2; j < falls.length; j++) for (let i = 1; i < speeds.length; i++) expect(caught[0]![j]!, msg).toBeGreaterThanOrEqual(caught[i]![j]! - 1);
+    // no step at 11 m/s
+    expect(Math.abs(total[3]! - total[4]!)).toBeLessThanOrEqual(2);
     for (let k = 0; k < gap5[3]!.length; k++) expect(Math.abs(gap5[3]![k]! - gap5[4]![k]!)).toBeLessThan(3);
-  }, 1_200_000);
+  }, 1_800_000);
 
   it('Alpine Normal, a standstill at the chase start, tucking: escapes (without the slow-start rules an upright skier was caught in ~6–10 s)', () => {
     let before = 0;

@@ -384,3 +384,60 @@ What it shows:
 - **Round 1's complaint** that one fall right after a slow start meant certain capture is answered by
   measurement, not by an exception. That fall is now about as fatal as the same fall after a 9–11 m/s entry
   in the unchanged original game. It is not a slow-start penalty.
+
+## Round 6, after the fifth review: what is and is not guaranteed
+
+The round-5 reviewers searched the classes, not single instances. For physics they used a random search plus
+hill-climbing over input sequences on synthetic slopes from −4° to 15°, on snow, ice, powder and packed,
+at 0–16 m/s. For the Yeti they ran about 500 chases on new courses, across start speeds 0–13 m/s and fall
+times 0–15 s. They confirmed:
+- Chases skied in are bit-identical to the pre-Pass 6 Yeti, falls included (16 of 16).
+- Clean slow starts escape Normal: 0 of 64 caught for `straight`, 48 of 48 escaped for `poles`, `skilled`
+  and `intermediate`, and 2 of 2 escaped at Standard length.
+- There is no step at 11 m/s.
+- Stopping before the cave does not pay in outcomes, averaged over fall times.
+
+Two documented bounds were still broader than what had been tested.
+
+**1. A fall during the extended roar was free.** A standstill entry that fell in the first 0.5–1.5 s was
+caught 11 of 24 times, against 24 of 24 at 11.1 m/s. The Yeti was still standing.
+- **Fix:** the extra roar is cancelled as soon as the skier goes down (`YetiAI.extraDelay`). It is meant for
+  a skier getting going.
+- **Measured** (`data/r6_falls_band.jsonl.gz`, 672 runs): 8 new courses (2026-06-05, 2027-05-12,
+  2027-06-02, 2027-06-19, BERGSCHRUND, SASTRUGI, MOGUL, FONDUE), Fjord and Alpine Normal. Caught out of 16:
+
+| Fall at | 0 m/s | 2 | 4 | 7 | 10.9 | 11.1 | skied in |
+|---|---|---|---|---|---|---|---|
+| 0.5 s | 12 | 16 | 16 | 16 | 16 | 16 | 6 |
+| 1 s | 14 | 16 | 16 | 16 | 16 | 15 | 6 |
+| 1.5 s | 16 | 16 | 16 | 16 | 16 | 15 | 5 |
+| 3 s | 16 | 16 | 16 | 16 | 13 | 13 | 5 |
+| 6 s | 16 | 16 | 15 | 12 | 10 | 10 | 7 |
+| 12 s | 12 | 10 | 10 | 7 | 6 | 6 | 3 |
+| **all** | **86** | 90 | 89 | 83 | 77 | 75 | 32 |
+
+- **What is guaranteed.** Over all fall times, a standstill is caught at least as often as a start at 7 m/s
+  or more. From a fall at 1.5 s on, a standstill is never better off than a faster start.
+- **What is not.** A standstill keeps an edge only for a fall within about 1 s of the start, from the lower
+  pace cap: 12–14 of 16 caught, against 15–16 of 16. A skier at a standstill hardly ever falls in that
+  second, and buying that edge costs a much smaller lead for every later mistake.
+- `yeti_escape.test.ts` checks these bounds (falls at 0.5, 1, 3, 6 and 12 s × starts at 0, 4, 7, 10.9 and
+  11.1 m/s).
+
+**2. "No input pattern beats holding" was too broad.** What the pole changes guarantee, and test, is about
+the button.
+- **Guaranteed and tested** (`pole_push.test.ts`): no timing of the pole button beats the best of hold+tuck,
+  tuck alone and hold alone by more than 0.3 %. That covers presses after k idle steps (the skate pushing or
+  the tuck coasting in the gap) and tap rhythms, on flat, 1°, 9° and 13° slopes × snow, ice and powder × 0,
+  3, 7, 10 and 14 m/s × tuck on or off. The reviewers' search found nothing on non-powder surfaces either.
+- **Head start.** It now fades from full at a standstill to none at 2.5 m/s. This avoids the latency step
+  the reviewers measured at 1.5 m/s (0.11 s to 0.28 s to the first push), and it shrinks the residual they
+  found just under the old cut-off.
+- **Not a button-timing exploit, and not changed: switching technique by hand.** With tuck and poles held
+  together, the game picks skate or poles by their mean push. A player who switches by hand at a better
+  speed can do up to about 2 % better over 6 s near the crossover; that is about 0.4 m. The automatic choice
+  ignores the tuck's lower drag and a stroke's dead time. This is a small skill margin, not stacking: the two
+  never push at once. It is noted in `KNOWN_ISSUES.md`.
+- **Pre-existing, not pole-related: popping in rhythm in deep powder.** It beats skiing by 10–15 %, with or
+  without poles. This is a powder-drag and airtime issue that predates Pass 6. It is noted in
+  `KNOWN_ISSUES.md` for a later pass.
