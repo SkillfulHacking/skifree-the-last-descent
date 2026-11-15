@@ -561,6 +561,33 @@ export function takeoff(d: Dest, t: number, intensity: number): number {
   return 0.45;
 }
 
+/**
+ * Pole plant: the carbide tip and basket punching into the snow (a short crunch with a dull thump);
+ * on ice a bright scratch-click, in powder a soft muffled puff. Two tips, a few ms apart.
+ */
+export function polePlant(d: Dest, t: number, surface: 'snow' | 'packed' | 'powder' | 'ice', intensity: number): number {
+  const v = new Voice(d);
+  const I = clamp(intensity, 0.2, 1);
+  for (const [o, pan] of [[0, -0.4], [0.018, 0.4]] as const) {
+    const out = v.gain(1);
+    const p = v.ctx.createStereoPanner();
+    p.pan.value = pan;
+    out.connect(p).connect(d.out);
+    if (surface === 'ice') {
+      burst(v, out, t + o, 'highpass', 3800, 1.2, 0.001, 0.05, 0.16 * I);
+      burst(v, out, t + o, 'bandpass', 1900, 2.5, 0.001, 0.09, 0.1 * I);
+    } else if (surface === 'powder') {
+      burst(v, out, t + o, 'lowpass', 700, 0.8, 0.01, 0.16, 0.2 * I, 'brown');
+    } else {
+      // packed/snow: crunch + thump
+      burst(v, out, t + o, 'bandpass', 1300, 1.1, 0.002, 0.07, 0.16 * I);
+      burst(v, out, t + o, 'lowpass', 420, 0.7, 0.004, 0.12, 0.22 * I, 'brown');
+    }
+  }
+  v.play(t, t + 0.3);
+  return 0.3;
+}
+
 export function landing(d: Dest, t: number, intensity: number, hard: boolean): number {
   const v = new Voice(d);
   const I = clamp(intensity, 0.1, 1);

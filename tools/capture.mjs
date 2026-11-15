@@ -20,6 +20,8 @@ for (const s of steps) {
   else if (s.do === 'advance') await p.evaluate((sec) => window.__skifree.advance(sec), s.sec);
   else if (s.do === 'autopilot') await p.evaluate((st) => window.__skifree.autopilot(st), s.style);
   else if (s.do === 'wait') await p.waitForTimeout(s.ms);
+  else if (s.do === 'keydown') await p.keyboard.down(s.key);
+  else if (s.do === 'keyup') await p.keyboard.up(s.key);
   else if (s.do === 'waitFor') await p.waitForFunction(s.fn, null, { timeout: s.timeout ?? 120000, polling: 500 });
   else if (s.do === 'eval') console.log('eval', s.label ?? '', String(JSON.stringify(await p.evaluate(s.fn))).slice(0, 600));
   else if (s.do === 'shot') { await p.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))); await p.screenshot({ path: `${outDir}/${s.name}.png`, timeout: 600000 }); }

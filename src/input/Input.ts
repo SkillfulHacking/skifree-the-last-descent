@@ -27,7 +27,7 @@ export const ACTION_LABELS: Record<Action, string> = {
   brake: 'Pizza (brake)',
   drift: 'Drift',
   pop: 'Pop / jump',
-  recover: 'Recover',
+  recover: 'Recover / pole push',
   lookback: 'Look back',
   pause: 'Pause',
   skip: 'Skip cinematic',
@@ -52,6 +52,8 @@ export interface GameplayInput {
   drift: boolean;
   pop: boolean;
   recoverPressed: boolean;
+  /** Recover held (the pole push while upright: SkierInput.pole) */
+  recoverHeld: boolean;
   lookBack: boolean;
   pausePressed: boolean;
   skipPressed: boolean;
@@ -240,6 +242,7 @@ export class Input {
     let drift = this.key('drift');
     let pop = this.key('pop');
     let recoverPressed = this.keyPressed('recover');
+    let recoverHeld = this.key('recover');
     let lookBack = this.key('lookback');
     let pausePressed = this.keyPressed('pause');
     let skipPressed = this.keyPressed('skip');
@@ -263,6 +266,7 @@ export class Input {
       drift = drift || !!this.padNow[PAD.RB];
       pop = pop || !!this.padNow[PAD.A];
       recoverPressed = recoverPressed || this.padPressed(PAD.Y);
+      recoverHeld = recoverHeld || !!this.padNow[PAD.Y];
       lookBack = lookBack || !!this.padNow[PAD.B];
       pausePressed = pausePressed || this.padPressed(PAD.START);
       skipPressed = skipPressed || this.padPressed(PAD.START);
@@ -273,7 +277,9 @@ export class Input {
     if (s.invertCameraY) camY = -camY;
     steer = clamp(steer * s.steerSensitivity, -1, 1);
     this.pressedQ.clear();
-    return { steer, tuck, brake, drift, pop, recoverPressed, lookBack, pausePressed, skipPressed, camX, camY };
+    // (a tap shorter than one frame — slow frames — still counts as held for that frame: one stroke)
+    recoverHeld = recoverHeld || recoverPressed;
+    return { steer, tuck, brake, drift, pop, recoverPressed, recoverHeld, lookBack, pausePressed, skipPressed, camX, camY };
   }
 
   /** Read menu navigation (edge-triggered, with stick auto-repeat). */
@@ -385,4 +391,35 @@ export function keyName(code: string): string {
     AltLeft: 'Alt',
   };
   return map[code] ?? code;
+}
+
+/**
+ * Bind `code` as the primary key of `a` (Controls screen). The key is removed from every other
+ * action listed in `actions`; an action that would be left with no key takes over `a`'s old key
+ * instead (a swap, so nothing is left unbound and the reload's default repair cannot double-bind a
+ * key). Escape is never handed over — it always pauses, so an action left with only Escape would
+ * be unusable: the emptied action gets `a`'s first other key, else its own default if free, else
+ * the rebind is refused (returns false, bindings untouched). Escape stays on Pause.
+ */
+export function rebindKey(b: Record<Action, string[]>, a: Action, code: string, actions: readonly Action[]): boolean {
+  if (code === 'Escape') return false;
+  const prev = b[a].find((c) => c !== 'Escape' && c !== code);
+  const plan: Partial<Record<Action, string[]>> = {};
+  let handed = false;
+  for (const other of actions) {
+    if (other === a) continue;
+    const left = b[other].filter((c) => c !== code);
+    if (!left.length && other !== 'pause') {
+      const taken = (k: string) => k === code || actions.some((o) => o !== other && o !== a && b[o].includes(k));
+      const fallback = prev ?? DEFAULT_BINDINGS[other].find((k) => k !== 'Escape' && !taken(k));
+      if (!fallback) return false;
+      plan[other] = [fallback];
+      if (fallback === prev) handed = true;
+    } else plan[other] = left;
+  }
+  for (const other of actions) if (plan[other]) b[other] = plan[other]!;
+  const rest = b[a].slice(1).filter((c) => c !== code && !(handed && c === prev));
+  b[a] = [code, ...rest];
+  if (!b.pause.includes('Escape')) b.pause.push('Escape');
+  return true;
 }

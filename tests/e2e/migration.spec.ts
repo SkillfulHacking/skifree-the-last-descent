@@ -162,7 +162,11 @@ test('a Pass 3 save (settings + per-course records, no progress key) loads uncha
   after = await dump(page);
   expect(JSON.parse(after[KEY_RB]!)).toEqual(PASS3_BOOK);
   expect(after[KEY_R1]).toBe(seeded[KEY_R1]);
-  expect(JSON.parse(after[KEY_S]!)).toEqual({ ...PASS3_SETTINGS, course: 'classic' });
+  // (Pass 6: a save also writes the two new settings at their defaults — every Pass 3 value is kept;
+  // the pole hint may or may not have been shown during the run)
+  const savedS = JSON.parse(after[KEY_S]!);
+  expect(typeof savedS.seenPoleHint).toBe('boolean');
+  expect(savedS).toEqual({ ...PASS3_SETTINGS, course: 'classic', controlHints: true, seenPoleHint: savedS.seenPoleHint });
   if (after[KEY_P] !== undefined) {
     const p = JSON.parse(after[KEY_P]!);
     expect(p.version).toBe(2);

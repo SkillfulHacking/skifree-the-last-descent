@@ -72,6 +72,65 @@ export const TUNING = {
   landCrash: 11.5,
 };
 
+/**
+ * Ski-pole propulsion (Pass 6), on the Recover button while upright. One stroke is a cycle of
+ * `period` s: reach (poles swing forward) → plant at `plantAt` → power phase until `powerEnd`
+ * (push along the skis, half-sine in time) → recovery (poles lift and swing forward again). A tap
+ * gives one whole stroke; holding repeats at the cycle's cadence.
+ *  - accel: mean push acceleration (m/s²) over the power phase at full effect (~0.95 m/s gained
+ *    per stroke before friction: on level snow a held push settles near 30 km/h, a strong
+ *    recreational double-pole);
+ *  - full / zero: full effect up to `full` m/s (30 km/h), none at `zero` m/s (55 km/h) and above
+ *    (gravity may carry the skier faster: there is no speed limit on the skier, only on the poles);
+ *  - period: cycle length (s) at rest → at `zero` (a quicker cadence when moving faster);
+ *  - surface: how well a pole tip bites (ice skids, powder gives under the basket);
+ *  - brake: pushing while in a pizza wedge mostly drives the skis into the snow (× 1 − brake·0.85).
+ * Exclusive with the skate assist (tuck below 7 m/s): while poling the skier stands up out of the tuck.
+ */
+export const POLE = {
+  accel: 3.0,
+  full: 30 / 3.6,
+  zero: 55 / 3.6,
+  period: [0.95, 0.72] as const,
+  plantAt: 0.3,
+  powerEnd: 0.62,
+  surface: { snow: 1, packed: 1, powder: 0.72, ice: 0.55 } as Record<SurfaceType, number>,
+  brake: 0.85,
+  /**
+   * a stroke begun from rest (not continuing a hold) starts with the hands already partly forward:
+   * the first push comes ~0.1 s after the press instead of ~0.3 s (gameplay review r1: laggy start)
+   */
+  firstStrokeAt: 0.18,
+  /** s airborne after which a planted stroke is dropped */
+  airDrop: 0.1,
+  /** a stroke starting within this many s of the last stroke or skate push is a continuation (no
+   *  head start), so releasing between strokes never beats holding, with or without the tuck held
+   *  (physics reviews r2, r3): > firstStrokeAt × period[0] */
+  continueGap: 0.3,
+  /** m/s: the first-stroke head start fades from full at a standstill to none at this speed (no
+   *  latency step: review r5) */
+  headStartBelow: 2.5,
+};
+
+/** mean push (m/s²) a held pole cycle gives at this speed on a surface with this bite */
+export function poleMean(speed: number, bite: number): number {
+  const period = THREE.MathUtils.lerp(POLE.period[0], POLE.period[1], clamp(speed / POLE.zero, 0, 1));
+  return (POLE.accel * (POLE.powerEnd - POLE.plantAt) * poleEffect(speed) * bite) / period;
+}
+
+/** mean push (m/s²) of the low-speed skate assist (tuck held below 7 m/s) */
+export function skateMean(speed: number, tuck: number): number {
+  return speed < 7 ? TUNING.skatePush * tuck * (1 - speed / 7) : 0;
+}
+
+/** 0..1 how much of a pole push takes effect at this speed (m/s) */
+export function poleEffect(speed: number): number {
+  if (speed <= POLE.full) return 1;
+  if (speed >= POLE.zero) return 0;
+  const u = (speed - POLE.full) / (POLE.zero - POLE.full);
+  return 1 - u * u * (3 - 2 * u);
+}
+
 /** How a grounded side-slip (EnvSample.groundSlip*) takes hold, by what the skier is doing. */
 export const SLIP_EDGE = { base: 1, tuck: 0.6, brake: 0.45, drift: 0.6 } as const;
 
@@ -137,9 +196,16 @@ export interface SkierInput {
   drift: boolean;
   pop: boolean; // held
   recover: boolean; // pressed
+  /** the Recover button held (pole push while upright; see POLE). Optional: absent = not held. */
+  pole?: boolean;
+  /**
+   * the Recover button was pressed since the last step (an edge): a fresh press re-arms the poles
+   * after a recovery even when the release fell between two frames (slow frame rates)
+   */
+  polePressed?: boolean;
 }
 
-export const NO_INPUT: SkierInput = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recover: false };
+export const NO_INPUT: SkierInput = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recover: false, pole: false };
 
 export type SkierEvent =
   | { type: 'takeoff'; speed: number }
@@ -148,6 +214,9 @@ export type SkierEvent =
   | { type: 'crash'; reason: string; intensity: number }
   | { type: 'pop' }
   | { type: 'recover' }
+  /** a pole stroke began (poles swing forward) / the tips bit into the snow (start of the power phase) */
+  | { type: 'pole-stroke' }
+  | { type: 'pole-plant'; surface: SurfaceType; effect: number }
   /** put back on the piste after going out of bounds (see SkierPhysics.relocate) */
   | { type: 'relocate'; reason: string; x: number; z: number }
   | { type: 'trick'; name: string; points: number };
@@ -199,6 +268,22 @@ export class SkierState {
   pinAnchorT = 0;
   /** since when (s) the player has been continuously trying to move (tuck/skate or steer held) */
   pushSince = 0;
+  /** pole stroke: time into the current stroke (s), −1 when none */
+  poleT = -1;
+  /** s since the last stroke ended or the last skate push (POLE.continueGap) */
+  poleIdle = 99;
+  /** this stroke's cycle length (s) */
+  polePeriod: number = POLE.period[0];
+  /** the Recover button has been released since the last crash/recovery: a hold may push again */
+  poleArmed = true;
+  /** the push acceleration applied on the last step (m/s², telemetry/animation) */
+  polePush = 0;
+  /** strokes begun this run */
+  poleStrokes = 0;
+  /** this step the held button is used for poling (not skating instead) */
+  poleChosen = false;
+  /** the skate assist's push on the last step (m/s², tests: never with a pole push) */
+  skateAccel = 0;
 
   get speed(): number {
     return this.vel.length();
@@ -348,14 +433,22 @@ export class SkierPhysics {
     }
     this.pinWatchdog(input);
 
+    s.polePush = 0;
     if (s.crashed) {
+      // recovery has priority: no stroke while down, and the button must be let go once back up
+      s.poleT = -1;
+      s.poleIdle = 99;
+      s.poleArmed = false;
       this.stepCrashed(input, dt);
       return;
     }
     if (s.recoverTime > 0) s.recoverTime = Math.max(0, s.recoverTime - dt * E.surface.recovery);
     const control = s.recoverTime > 0 ? 0.35 : 1;
+    this.poleCycle(input, dt);
 
-    s.tuck = damp(s.tuck, input.tuck * control, 8, dt);
+    // poling, the skier stands up out of the tuck — less so near the poles' cutoff, where a stroke is
+    // a short jab from a crouch (gameplay review r1: holding the button at 35–55 km/h cost speed)
+    s.tuck = damp(s.tuck, input.tuck * control * (s.poleT >= 0 ? 1 - poleEffect(s.speed) : 1), 8, dt);
     s.brake = damp(s.brake, input.brake * control, 9, dt);
 
     if (s.grounded) this.stepGrounded(input, dt, control);
@@ -364,6 +457,59 @@ export class SkierPhysics {
     this.collide(dt);
     const sp = s.speed;
     if (sp > s.maxSpeed) s.maxSpeed = sp;
+  }
+
+  /**
+   * The pole-stroke cycle (deterministic at the fixed step). A stroke starts when the button is held,
+   * the skier is upright, on the ground, below POLE.zero and the button has been released since the
+   * last crash; it then runs its whole cycle (a tap = one stroke) and the next starts only after it.
+   */
+  private poleCycle(input: SkierInput, dt: number) {
+    const s = this.s;
+    const held = !!input.pole;
+    if ((!held || input.polePressed) && s.recoverTime <= 0) s.poleArmed = true;
+    const wasPoling = s.poleT >= 0;
+    if (s.poleT >= 0) {
+      const u0 = s.poleT / s.polePeriod;
+      s.poleT += dt;
+      const u1 = s.poleT / s.polePeriod;
+      if (u0 < POLE.plantAt && u1 >= POLE.plantAt) {
+        // the tips need snow to bite: a stroke that reaches its plant in the air is dropped (QA r1)
+        if (s.grounded) this.emit({ type: 'pole-plant', surface: s.surface, effect: poleEffect(s.speed) });
+        else s.poleT = -1;
+      }
+      // a planted stroke that leaves the snow for more than a hop loses its plant (QA r2, m2)
+      else if (!s.grounded && s.airTime > POLE.airDrop && u1 >= POLE.plantAt) s.poleT = -1;
+      if (s.poleT >= s.polePeriod) s.poleT = -1;
+      if (s.poleT < 0) s.poleIdle = 0;
+    } else if (s.skateAccel > 0) s.poleIdle = 0;
+    else s.poleIdle += dt;
+    s.poleChosen = held && s.poleArmed && this.polesBetter(input);
+    if (s.poleT < 0 && s.poleChosen && s.recoverTime <= 0 && s.grounded) {
+      const sp = s.speed;
+      if (sp < POLE.zero) {
+        s.polePeriod = THREE.MathUtils.lerp(POLE.period[0], POLE.period[1], clamp(sp / POLE.zero, 0, 1));
+        // continuing a hold: the next stroke follows on; from rest: the hands are already going forward
+        // (the head start is only for getting going from (near) a standstill, fading out with speed — the laggy first push of
+        // review r1 — and only after the poles and the skate have both been idle: physics review r4
+        // found a timed release still paid above 7 m/s while coasting in the tuck)
+        s.poleT = !wasPoling && s.poleIdle >= POLE.continueGap ? POLE.firstStrokeAt * s.polePeriod * clamp(1 - sp / POLE.headStartBelow, 0, 1) : 0;
+        s.poleStrokes++;
+        this.emit({ type: 'pole-stroke' });
+      }
+    }
+  }
+
+  /**
+   * With the tuck also held, the skier uses whichever of the two gets them going better — the skate
+   * (stronger from rest, uphill, in deep powder or on poor grip) or the poles — never both at once
+   * (physics/gameplay review r1: holding both used to switch the skate off even where it was better).
+   */
+  private polesBetter(input: SkierInput): boolean {
+    if (input.tuck <= 0.2) return true;
+    const s = this.s;
+    const bite = POLE.surface[s.surface] * clamp(this.envOut.surface.grip, 0.55, 1);
+    return poleMean(s.speed, bite) >= skateMean(s.speed, input.tuck);
   }
 
   private stepGrounded(input: SkierInput, dt: number, control: number) {
@@ -442,8 +588,27 @@ export class SkierPhysics {
       s.vel.multiplyScalar((speed - dv) / speed);
     }
 
-    // skating push on flats (tuck input at low speed)
-    if (input.tuck > 0.2 && speed < 7 && control > 0.5) {
+    // pole push (power phase of a stroke): along the skis, against the snow under the tips
+    if (s.poleT >= 0) {
+      const u = s.poleT / s.polePeriod;
+      if (u >= POLE.plantAt && u < POLE.powerEnd) {
+        const w = (u - POLE.plantAt) / (POLE.powerEnd - POLE.plantAt);
+        // half-sine in time with mean 1 over the power phase
+        const shape = (Math.PI / 2) * Math.sin(Math.PI * w);
+        const bite = POLE.surface[surf] * clamp(M.grip, 0.55, 1);
+        const a = POLE.accel * shape * poleEffect(speed) * bite * (1 - POLE.brake * s.brake) * control;
+        if (a > 0) {
+          s.vel.addScaledVector(f, a * dt);
+          s.polePush = a;
+        }
+      }
+    }
+
+    // skating push on flats (tuck input at low speed) — not while poling (the two never stack)
+    s.skateAccel = 0;
+    if (input.tuck > 0.2 && speed < 7 && control > 0.5 && s.poleT < 0 && !s.poleChosen) {
+      s.skateAccel = TUNING.skatePush * input.tuck * (1 - speed / 7);
+      // (the original expression, operand order included: Alpine runs stay bit-identical)
       s.vel.addScaledVector(f, TUNING.skatePush * input.tuck * dt * (1 - speed / 7));
     }
 
@@ -1033,7 +1198,10 @@ export class SkierPhysics {
     // (round 9, B r8 #1: a held steer key alone counted as pushing — a player standing still on open
     // snow, turning or holding brake plus a direction, was teleported and given a crash. Only skating
     // forward (tuck, no brake) is trying to get going)
-    if (!(input.tuck > 0.5 && input.brake < 0.3)) s.pushSince = s.time;
+    // (a held pole button counts only while it is actually poling: held without pushing — not yet
+    // released after a recovery — is not trying to move; QA r1)
+    const poling = s.poleT >= 0 || (!!input.pole && s.poleArmed);
+    if (!((input.tuck > 0.5 || poling) && input.brake < 0.3)) s.pushSince = s.time;
     if (s.crashed || !s.grounded || Math.hypot(s.pos.x - s.pinAnchorX, s.pos.z - s.pinAnchorZ) > PIN_WATCH.escape) {
       s.pinAnchorX = s.pos.x;
       s.pinAnchorZ = s.pos.z;

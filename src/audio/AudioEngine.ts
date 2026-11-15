@@ -123,6 +123,9 @@ export class AudioEngine {
   playImpact(kind: ImpactKind, intensity: number): void {
     this.one((c) => c.playImpact(kind, intensity));
   }
+  playPolePlant(surface: 'snow' | 'packed' | 'powder' | 'ice', intensity: number): void {
+    this.one((c) => c.playPolePlant(surface, intensity));
+  }
   playTakeoff(intensity: number): void {
     this.one((c) => c.playTakeoff(intensity));
   }
