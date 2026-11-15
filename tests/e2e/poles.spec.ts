@@ -42,12 +42,13 @@ const st = async (page: Page) => (await page.evaluate(() => (window as unknown a
 const until = (page: Page, fn: string, timeout = 240_000) => page.waitForFunction(fn, null, { timeout, polling: 250 });
 const S = 'window.__skifree.state().session';
 const frames = (page: Page, n: number) => page.evaluate((k) => (window as unknown as W).__skifree.frames(k), n);
-const pad = (page: Page, y: boolean) =>
-  page.evaluate((yy) => {
+const pad = (page: Page, y: boolean, lt = false) =>
+  page.evaluate(([yy, ll]) => {
     const buttons = Array.from({ length: 17 }, () => ({ value: 0, pressed: false }));
     buttons[3] = { value: yy ? 1 : 0, pressed: yy };
+    buttons[6] = { value: ll ? 1 : 0, pressed: ll }; // LT: pizza
     (window as unknown as W).__skifree.setInputPads(() => [{ id: 'Xbox Wireless Controller (STANDARD GAMEPAD Vendor: 045e)', connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons }]);
-  }, y);
+  }, [y, lt] as const);
 
 test.describe.configure({ mode: 'serial' });
 
@@ -135,9 +136,12 @@ test('controller Y pushes and shows Y in the prompt; a remapped key replaces R',
   test.setTimeout(30 * 60 * 1000);
   await boot(page, { course: 'classic', courseLength: 'sprint', showTutorial: false, seenPoleHint: true, bindings: { recover: ['KeyF'] } });
   await page.evaluate(() => (window as unknown as W).__skifree.startRun(true));
-  await pad(page, false);
+  // the prompts follow the device used last: touch the pad first (pizza on the trigger — harmless at
+  // the start gate), as a player would; a connected but untouched pad does not take over
+  await pad(page, false, true);
   await until(page, `${S}.prompt.startsWith('pole:xbox')`);
   await expect(page.locator('.hud-prompt kbd')).toHaveText('Y');
+  await pad(page, false);
   await pad(page, true);
   await until(page, `${S}.poleStrokes >= 2`);
   await pad(page, false);
