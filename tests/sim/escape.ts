@@ -50,8 +50,16 @@ export function driverFor(m: Mountain, d: EscapeDriver): (s: SkierState, t: numb
   // gravity: tucked only above 7 m/s (no skate assist): what the slope alone gives
   if (d === 'gravity') return lineDriver(m, (v) => (v >= 7 ? 1 : 0.1));
   // poles: like 'straight', but pole-pushing (the Recover button held) below 40 km/h
-  // (a player lets go of the button after getting up, then holds it again: poleArmed)
-  return lineDriver(m, () => 1, (s) => ({ pole: s.speed < POLE_UNTIL && !s.crashed && s.poleArmed }));
+  // (like a player: lets go of the button once back on the skis for a quarter second, then holds it
+  // again — no peeking at internal state; review r1)
+  let upSince = -1;
+  return lineDriver(m, () => 1, (s) => {
+    const down = s.crashed || s.recoverTime > 0;
+    if (down) upSince = -1;
+    else if (upSince < 0) upSince = s.time;
+    const released = upSince >= 0 && s.time - upSince < 0.25 && s.crashes > 0;
+    return { pole: s.speed < POLE_UNTIL && !down && !released };
+  });
 }
 
 export interface EscapeRow extends EscapeCase {

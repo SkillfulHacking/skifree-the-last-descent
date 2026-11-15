@@ -427,7 +427,9 @@ describe('normal Alpine runs are bit-identical to before the fix', () => {
   };
   const cases: Array<[string, AutopilotStyle, string, number]> = [
     ['EC1', 'skilled', '35375fc6', 149.108],
-    ['EC1', 'average', 'cb29719a', 64.817],
+    // (Pass 6: this run starts its chase slowly — 'average' never tucks — so the Yeti's slow-start rules
+    // (YETI.syncMargin, slowDelay) catch it 0.66 s later: same skier steps, a longer run; was cb29719a / 64.817)
+    ['EC1', 'average', '7d5f3537', 65.475],
     ['classic', 'skilled', 'e414dde2', 156.992],
   ];
   for (const [seed, style, hash, time] of cases) {
@@ -441,10 +443,13 @@ describe('normal Alpine runs are bit-identical to before the fix', () => {
         f = new ObstacleField(m, worldSeed(c));
       }
       let h = 0x811c9dc5;
+      let hPrefix = '';
       const res = simulateCourse(
         m,
         f,
         (s, t) => {
+          // the steps up to the old capture time are the old ones exactly (EC1 average)
+          if (seed === 'EC1' && style === 'average' && !hPrefix && t > 64.817 - 0.005) hPrefix = h.toString(16);
           h = mix(mix(mix(mix(h, s.pos.x), s.pos.y), s.pos.z), s.vel.y);
           return autopilotInput(m, s, style, t);
         },
@@ -452,6 +457,7 @@ describe('normal Alpine runs are bit-identical to before the fix', () => {
       );
       expect(+res.time.toFixed(3)).toBe(time);
       expect(h.toString(16)).toBe(hash);
+      if (seed === 'EC1' && style === 'average') expect(hPrefix).toBe('cb29719a');
     });
   }
 });

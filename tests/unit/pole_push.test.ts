@@ -6,7 +6,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import '../../src/world/biomes';
 import { buildMountain, makeCourse } from '../../src/game/CourseConfig';
-import { NO_INPUT, PHYS_DT, POLE, SkierPhysics, poleEffect, type SkierInput } from '../../src/physics/SkierPhysics';
+import { NO_INPUT, PHYS_DT, POLE, SkierPhysics, poleEffect, poleMean, skateMean, type SkierInput } from '../../src/physics/SkierPhysics';
 import { DEFAULT_BINDINGS, Input, PAD, type PadLike } from '../../src/input/Input';
 import { clamp, wrapAngle } from '../../src/core/rng';
 import { polePower, POLE_PHASE } from '../../src/player/skier/pose';
@@ -74,9 +74,12 @@ describe('pole push: context and cadence', () => {
     expect(p.s.poleStrokes).toBe(1);
     expect(p.s.poleT).toBe(-1);
     const pushing = acc.map((a, i) => (a > 0 ? i * PHYS_DT : -1)).filter((t) => t >= 0);
-    // inside the power window (plant → release) only
-    expect(Math.min(...pushing)).toBeGreaterThanOrEqual(POLE.plantAt * per - 0.02);
-    expect(Math.max(...pushing)).toBeLessThanOrEqual(POLE.powerEnd * per + 0.02);
+    // inside the power window (plant → release) only; a stroke from rest starts with the hands
+    // already part-way forward (POLE.firstStrokeAt): the push comes ~0.1 s after the press
+    const start = POLE.firstStrokeAt * per;
+    expect(Math.min(...pushing)).toBeGreaterThanOrEqual(POLE.plantAt * per - start - 0.02);
+    expect(Math.min(...pushing)).toBeLessThan(0.16);
+    expect(Math.max(...pushing)).toBeLessThanOrEqual(POLE.powerEnd * per - start + 0.02);
     // never an instantaneous jump: the largest one-step speed change is small
     expect(Math.max(...acc) * PHYS_DT).toBeLessThan(0.06);
     // one stroke from a standstill on level snow: well under 1 m/s
@@ -120,6 +123,17 @@ describe('pole push: context and cadence', () => {
     expect(p.s.poleStrokes).toBe(1);
   });
 
+  it('a fresh press re-arms even if the release fell between two frames (slow frame rates)', () => {
+    const p = skier(FLAT, 3);
+    p.forceCrash('test');
+    run(p, () => ({ pole: true, recover: p.s.crashTime > 1.05 }), 3);
+    expect(p.s.crashed).toBe(false);
+    expect(p.s.poleStrokes).toBe(0);
+    // the game saw the button held on both frames, but a new press edge came in between
+    run(p, (i) => ({ pole: true, polePressed: i === 0 }), 0.1);
+    expect(p.s.poleStrokes).toBe(1);
+  });
+
   it('no stroke while crashed or getting up, even on a fresh press', () => {
     const p = skier(FLAT, 4);
     p.forceCrash('test');
@@ -146,6 +160,37 @@ describe('pole push: context and cadence', () => {
     }
     expect(p.s.poleStrokes).toBe(0);
     expect(Math.hypot(p.s.vel.x, p.s.vel.z)).toBeLessThanOrEqual(v0 + 1e-6);
+  });
+
+  it('a button held without poling (not yet released after getting up) is not "trying to move" for the pin rescue', () => {
+    // off the piste on level snow, facing the piste, the button held through a crash and the get-up
+    const p = new SkierPhysics(m, null);
+    const x = m.routeX(FLAT) + 30;
+    p.reset(x, FLAT, -Math.PI / 2, 2);
+    p.forceCrash('test');
+    let relocated = 0;
+    for (let i = 0; i < Math.round(9 / PHYS_DT); i++) {
+      p.step({ ...NO_INPUT, pole: true, recover: p.s.crashTime > 1.2 }, PHYS_DT);
+      for (const e of p.drainEvents()) if (e.type === 'relocate') relocated++;
+    }
+    expect(p.s.poleStrokes).toBe(0);
+    expect(relocated).toBe(0);
+  });
+
+  it('a stroke whose plant comes in the air is dropped (no push on landing without a plant)', () => {
+    const p = skier(FLAT, 3);
+    run(p, (i) => ({ pole: i === 0 }), 0.02);
+    expect(p.s.poleT).toBeGreaterThanOrEqual(0);
+    p.s.pos.y += 1.2;
+    p.s.grounded = false;
+    p.s.vel.y = 3;
+    let pushed = 0;
+    for (let i = 0; i < 240; i++) {
+      p.step({ ...NO_INPUT }, PHYS_DT);
+      if (p.s.polePush > 0) pushed++;
+    }
+    expect(p.s.poleT).toBe(-1);
+    expect(pushed).toBe(0);
   });
 
   it('is deterministic at the fixed step', () => {
@@ -220,15 +265,35 @@ describe('pole push: physics', () => {
     expect(both).toBeLessThan(pole * 0.15 + 0.05);
   });
 
-  it('tuck + poles do not stack: holding both is exactly poling (the skate assist is off while poling)', () => {
+  it('tuck + poles never stack: one technique at a time, the better one for the speed and snow', () => {
     for (const z of [FLAT, m.profile.encounters(0, m.finishZ)[0]!.caveZ - 40]) {
-      const pole = run(skier(z), { pole: true }, 10);
-      const both = run(skier(z), { pole: true, tuck: 1 }, 10);
-      expect(both).toEqual(pole);
-      // and not faster than the better of the two on its own over the first seconds
-      const tuck = run(skier(z), { tuck: 1 }, 10);
-      for (let i = 0; i < pole.length; i += 120) expect(both[i]!).toBeLessThanOrEqual(Math.max(pole[i]!, tuck[i]!) + 1e-9);
+      const p = skier(z);
+      let both = 0;
+      let skate = 0;
+      let pole = 0;
+      run(p, () => {
+        if (p.s.skateAccel > 0 && p.s.polePush > 0) both++;
+        if (p.s.skateAccel > 0) skate++;
+        if (p.s.polePush > 0) pole++;
+        return { pole: true, tuck: 1 };
+      }, 12);
+      expect(both).toBe(0);
+      // from rest the skate gets going first, then the poles take over
+      expect(skate).toBeGreaterThan(0);
+      expect(pole).toBeGreaterThan(0);
+      // the choice follows the mean push: skate below the crossover, poles above it
+      const cross = [...Array(70).keys()].map((i) => i * 0.1).find((v) => poleMean(v, 1) >= skateMean(v, 1))!;
+      expect(cross).toBeGreaterThan(1);
+      expect(cross).toBeLessThan(4);
     }
+  });
+
+  it('holding both at speed costs (almost) nothing against tucking: near the cutoff a stroke stays crouched', () => {
+    const enc = m.profile.encounters(0, m.finishZ)[0]!;
+    const z = enc.caveZ + 60;
+    const tuck = last(run(skier(z, 11), { tuck: 1 }, 6));
+    const both = last(run(skier(z, 11), { tuck: 1, pole: true }, 6));
+    expect(both).toBeGreaterThan(tuck - 0.6);
   });
 
   it('ice and powder bite less than packed snow', () => {

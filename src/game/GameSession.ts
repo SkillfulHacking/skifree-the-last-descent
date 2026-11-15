@@ -401,7 +401,10 @@ export class GameSession implements Stage {
     const s = this.phys.s;
     this.prevPos.copy(s.pos);
     this.prevHeading = s.heading;
-    if (!this.autopilot) this.input.recover = this.recoverLatch;
+    if (!this.autopilot) {
+      this.input.recover = this.recoverLatch;
+      this.input.polePressed = this.recoverLatch && this.input.pole === true;
+    }
     if (!this.runStartedSent) this.emitRunStarted();
     this.phys.step(this.input, PHYS_DT);
     this.recoverLatch = false;
@@ -437,7 +440,7 @@ export class GameSession implements Stage {
     if (startCave) this.beginCave();
 
     if (this.run.phase === 'chase') {
-      const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded };
+      const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded, down: s.crashed || s.recoverTime > 0 };
       this.yetiAI.update(PHYS_DT, target);
       this.stepSnowballs();
       if (this.yetiAI.phase === 'chase' && !this.yetiAI.airborne) this.chaseMinGap = Math.min(this.chaseMinGap, this.yetiAI.distance);
@@ -606,9 +609,10 @@ export class GameSession implements Stage {
         const f = { x: Math.sin(s.heading), z: Math.cos(s.heading) };
         if (e.surface !== 'ice') {
           for (const sg of [-1, 1]) {
-            const x = s.pos.x + f.z * 0.36 * sg + f.x * 0.15;
-            const z = s.pos.z - f.x * 0.36 * sg + f.z * 0.15;
-            this.world.particles.emit({ x, y: this.world.mountain.heightAt(x, z) + 0.05, z, vx: s.vel.x * 0.3, vy: 0.7, vz: s.vel.z * 0.3, spread: 0.25, size: 0.22, life: 0.55, count: e.surface === 'powder' ? 9 : 5, gravity: 0.6, drag: 3, grow: 0.8, alpha: 0.7 });
+            // at the tips (beside the bindings, ~0.42 m out), left behind on the snow (animation review r1)
+            const x = s.pos.x + f.z * 0.42 * sg + f.x * 0.04;
+            const z = s.pos.z - f.x * 0.42 * sg + f.z * 0.04;
+            this.world.particles.emit({ x, y: this.world.mountain.heightAt(x, z) + 0.05, z, vx: 0, vy: 0.7, vz: 0, spread: 0.25, size: 0.22, life: 0.55, count: e.surface === 'powder' ? 9 : 5, gravity: 0.6, drag: 3, grow: 0.8, alpha: 0.7 });
           }
         }
         this.rumble?.(0, 0.25 * e.effect, 45);
@@ -966,7 +970,8 @@ export class GameSession implements Stage {
       celebrate: 0,
       wobble: s.wobble,
       time: this.time,
-      pole: s.poleT >= 0 && !s.crashed ? 1 : 0,
+      // (no frozen mid-stroke arms when the physics stops: cinematics, capture — QA r1)
+      pole: s.poleT >= 0 && !s.crashed && this.run.simulating ? 1 : 0,
       polePhase: s.poleT >= 0 ? s.poleT / s.polePeriod : 1,
       poleAmp: 0.55 + 0.45 * poleEffect(s.speed),
       ...this.poseOverride,
@@ -1065,10 +1070,14 @@ export class GameSession implements Stage {
     else if (!ok || sp > POLE_PROMPT.hide) this.slowFor = 0;
     const show = this.slowFor > 0.6;
     if (show) {
-      this.hud.setPrompt(`pole:${this.hud.device}`, `${this.hud.g('recover')} — <b>POLE PUSH</b>`);
+      // (the key is part of the prompt id: a remap mid-run redraws it; QA r1) — still held since
+      // getting up: the push needs a fresh press, so the prompt says so
+      const k = this.hud.g('recover');
+      if (s.poleArmed || !this.input.pole) this.hud.setPrompt(`pole:${this.hud.device}:${k}`, `${k} — <b>POLE PUSH</b>`);
+      else this.hud.setPrompt(`pole-release:${this.hud.device}:${k}`, `Release ${k}, then press — <b>POLE PUSH</b>`);
       if (!this.settings.seenPoleHint && this.settings.controlHints && this.slowFor > 1.2) {
         // (a hint, not a sound caption: shown even with sound captions off; remembered once seen)
-        const shown = this.hud.hint(`Moving slowly? Hold ${glyphText(this.hud, 'recover')} to push with your poles — strongest on gentle snow, fading out as you gain speed.`, 5);
+        const shown = this.hud.hint(`Moving slowly? Hold ${glyphText(this.hud, 'recover')} to push with your poles.`, 5);
         if (shown) {
           this.settings.seenPoleHint = true;
           this.onPoleHint?.();
@@ -1081,7 +1090,7 @@ export class GameSession implements Stage {
     const s = this.phys.s;
     if (s.crashed && this.run.controllable) {
       const can = s.crashTime > 1.0;
-      this.hud.setPrompt(can ? `recover:${this.hud.device}` : 'crashed', can ? `${this.hud.g('recover')} — <b>RECOVER</b>` : 'WIPEOUT!');
+      this.hud.setPrompt(can ? `recover:${this.hud.device}:${this.hud.g('recover')}` : 'crashed', can ? `${this.hud.g('recover')} — <b>RECOVER</b>` : 'WIPEOUT!');
       this.slowFor = 0;
       return;
     }

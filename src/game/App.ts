@@ -689,8 +689,16 @@ export class App {
           clearTimeout(timer);
           if (code !== 'Escape') {
             // the new key becomes the primary binding; it is removed from any other gameplay action
-            for (const other of actions) if (other !== a) s.bindings[other] = s.bindings[other].filter((c) => c !== code);
-            const rest = s.bindings[a].slice(1).filter((c) => c !== code);
+            // (Pass 6, QA: an action left with no key — e.g. Recover after binding its key to Pop —
+            // takes over this action's old primary key instead: a swap, so nothing is left unbound
+            // and the reload's default repair cannot double-bind a key)
+            const prev = s.bindings[a][0];
+            for (const other of actions) {
+              if (other === a) continue;
+              s.bindings[other] = s.bindings[other].filter((c) => c !== code);
+              if (!s.bindings[other].length && prev && prev !== code) s.bindings[other] = [prev];
+            }
+            const rest = s.bindings[a].slice(1).filter((c) => c !== code && c !== prev);
             s.bindings[a] = [code, ...rest];
             // Escape always pauses, whatever else is bound
             if (!s.bindings.pause.includes('Escape')) s.bindings.pause.push('Escape');
@@ -725,7 +733,7 @@ export class App {
       { kind: 'info', html: `<div class="controls-grid">
         <div><h3>Keyboard</h3>
         <p><kbd>A</kbd>/<kbd>←</kbd> <kbd>D</kbd>/<kbd>→</kbd> steer · <kbd>W</kbd>/<kbd>↑</kbd> french fry (tuck) · <kbd>S</kbd>/<kbd>↓</kbd> pizza (brake)</p>
-        <p><kbd>Shift</kbd> drift · <kbd>Space</kbd> hold &amp; release to pop · <kbd>${keyName(s.bindings.recover[0] ?? 'KeyR')}</kbd> recover — when upright and slow, hold it to push with your poles · <kbd>C</kbd> look back · <kbd>Esc</kbd> pause · mouse drag: look around</p></div>
+        <p><kbd>Shift</kbd> drift · <kbd>Space</kbd> hold &amp; release to pop · <kbd>${s.bindings.recover[0] ? keyName(s.bindings.recover[0]) : '—'}</kbd> recover — when upright and slow, hold it to push with your poles · <kbd>C</kbd> look back · <kbd>Esc</kbd> pause · mouse drag: look around</p></div>
         <div><h3>Controller</h3>
         <p>Left stick steer · Right stick camera · <kbd>RT</kbd>/<kbd>R2</kbd> tuck · <kbd>LT</kbd>/<kbd>L2</kbd> brake (analog)</p>
         <p><kbd>RB</kbd>/<kbd>R1</kbd> drift · <kbd>A</kbd>/<kbd>✕</kbd> pop · <kbd>Y</kbd>/<kbd>△</kbd> recover / pole push · <kbd>B</kbd>/<kbd>○</kbd> look back · <kbd>Start</kbd>/<kbd>Options</kbd> pause</p></div>

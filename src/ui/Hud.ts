@@ -187,6 +187,7 @@ export class Hud {
     if (!this.captionsOn) return false;
     const pr = opts.soft ? (opts.priority ?? 0) : Infinity;
     if (opts.soft && this.capTimer > 0 && pr <= this.capPriority) return false;
+    this.cap.classList.remove('hint');
     this.cap.textContent = text;
     this.cap.classList.add('on');
     this.capTimer = seconds;
@@ -201,7 +202,7 @@ export class Hud {
   hint(text: string, seconds = 5): boolean {
     if (this.capTimer > 0) return false;
     this.cap.textContent = text;
-    this.cap.classList.add('on');
+    this.cap.classList.add('on', 'hint');
     this.capTimer = seconds;
     this.capPriority = 1;
     return true;

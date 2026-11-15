@@ -58,7 +58,7 @@ test('keyboard: slow → POLE PUSH prompt and hint; hold R strokes; crash → R 
   // standing at the start gate (pizza held so the run-in does not carry the skier off): the prompt
   // shows the configured key
   await page.keyboard.down('KeyS');
-  await until(page, `${S}.prompt === 'pole:keyboard'`);
+  await until(page, `${S}.prompt.startsWith('pole:keyboard')`);
   let s = await st(page);
   await expect(page.locator('.hud-prompt')).toContainText('POLE PUSH');
   await expect(page.locator('.hud-prompt kbd')).toHaveText('R');
@@ -84,7 +84,7 @@ test('keyboard: slow → POLE PUSH prompt and hint; hold R strokes; crash → R 
 
   // crash, then hold R: it gets the skier up — and no push while it stays held
   await page.evaluate(() => (window as unknown as W).__skifree.crash());
-  await until(page, `${S}.prompt === 'recover:keyboard'`);
+  await until(page, `${S}.prompt.startsWith('recover:keyboard')`);
   await expect(page.locator('.hud-prompt')).toContainText('RECOVER');
   const strokes = (await st(page)).poleStrokes;
   await page.keyboard.down('KeyR');
@@ -124,7 +124,7 @@ test('controller Y pushes and shows Y in the prompt; a remapped key replaces R',
   await boot(page, { course: 'classic', courseLength: 'sprint', showTutorial: false, seenPoleHint: true, bindings: { recover: ['KeyF'] } });
   await page.evaluate(() => (window as unknown as W).__skifree.startRun(true));
   await pad(page, false);
-  await until(page, `${S}.prompt === 'pole:xbox'`);
+  await until(page, `${S}.prompt.startsWith('pole:xbox')`);
   await expect(page.locator('.hud-prompt kbd')).toHaveText('Y');
   await pad(page, true);
   await until(page, `${S}.poleStrokes >= 2`);
@@ -140,7 +140,7 @@ test('controller Y pushes and shows Y in the prompt; a remapped key replaces R',
   await page.keyboard.down('KeyF');
   await until(page, `${S}.poleStrokes > ${n}`);
   await page.keyboard.up('KeyF');
-  await until(page, `${S}.prompt === 'pole:keyboard'`);
+  await until(page, `${S}.prompt.startsWith('pole:keyboard')`);
   await expect(page.locator('.hud-prompt kbd')).toHaveText('F');
   expect(errors).toEqual([]);
 });

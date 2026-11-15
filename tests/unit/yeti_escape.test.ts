@@ -13,21 +13,39 @@ import { YETI } from '../../src/yeti/YetiAI';
 const base = (key: string, biome: string, extra: Partial<EscapeCase> = {}): EscapeCase => ({ mode: 'daily', len: 'sprint', key, biome, diff: 'normal', driver: 'straight', ...extra });
 const withoutSync = <T>(fn: () => T): T => {
   const m = YETI.syncMargin;
+  const d = YETI.slowDelay;
   YETI.syncMargin = 1e9;
+  YETI.slowDelay = 0;
   try {
     return fn();
   } finally {
     YETI.syncMargin = m;
+    YETI.slowDelay = d;
   }
 };
 const DAYS = ['2026-10-20', '2026-10-24', '2026-10-29', '2026-11-02', '2026-11-08', '2026-11-12'];
 
 describe('Yeti escape after a slow start', () => {
-  it('Alpine Normal, 2 m/s at the chase start, tucking: never caught in the first 20 s (was caught in ~6–10 s without the start sync on some seeds)', () => {
+  it('starting slower is never better: the gap 10 s in grows with the start speed (within 4 m seed by seed: terrain and lunges add noise) and stays below a chase begun at speed', () => {
+    for (const d of DAYS.slice(0, 4))
+      for (const b of ['alpine', 'fjord']) {
+        const g = [0, 4, 8].map((v) => runEscape(base(d, b, { startV: v })).gaps[2] ?? 0);
+        const fast = runEscape(base(d, b)).gaps[2] ?? 0;
+        expect(g[1]!, `${d} ${b} ${g}`).toBeGreaterThanOrEqual(g[0]! - 4);
+        expect(g[2]!, `${d} ${b} ${g}`).toBeGreaterThanOrEqual(g[1]! - 4);
+        expect(fast).toBeGreaterThan(g[2]!);
+      }
+  }, 900_000);
+
+  it('one fall 3 s into a slow start is not certain capture (Alpine Normal)', () => {
+    for (const d of DAYS.slice(0, 4)) expect(runEscape(base(d, 'alpine', { startV: 0, crashAt: 3 })).outcome).not.toBe('caught');
+  }, 600_000);
+
+  it('Alpine Normal, a standstill at the chase start, tucking: escapes (without the slow-start rules an upright skier was caught in ~6–10 s)', () => {
     let before = 0;
     for (const d of DAYS) {
-      const r = runEscape(base(d, 'alpine', { startV: 2 }));
-      expect(r.outcome === 'caught' && (r.captureT ?? 0) < 20, `${d} ${r.captureT}`).toBe(false);
+      const r = runEscape(base(d, 'alpine', { startV: 0 }));
+      expect(r.outcome, `${d} ${r.captureT}`).not.toBe('caught');
       const o = withoutSync(() => runEscape(base(d, 'alpine', { startV: 2, driver: 'gravity' })));
       if (o.outcome === 'caught' && (o.captureT ?? 99) < 12) before++;
     }
