@@ -421,23 +421,41 @@ caught 11 of 24 times, against 24 of 24 at 11.1 m/s. The Yeti was still standing
 - **What is not.** A standstill keeps an edge only for a fall within about 1 s of the start, from the lower
   pace cap: 12–14 of 16 caught, against 15–16 of 16. A skier at a standstill hardly ever falls in that
   second, and buying that edge costs a much smaller lead for every later mistake.
-- `yeti_escape.test.ts` checks these bounds (falls at 0.5, 1, 3, 6 and 12 s × starts at 0, 4, 7, 10.9 and
-  11.1 m/s).
+- `yeti_escape.test.ts` checks falls at 0.5, 1, 3, 6 and 12 s × starts at 0, 4, 7, 10.9 and 11.1 m/s. It
+  checks the total, and from a fall at 3 s on it checks each fall time with one chase of slack for chaos.
+  The 1.5 s row is measured above but not tested.
 
 **2. "No input pattern beats holding" was too broad.** What the pole changes guarantee, and test, is about
 the button.
 - **Guaranteed and tested** (`pole_push.test.ts`): no timing of the pole button beats the best of hold+tuck,
   tuck alone and hold alone by more than 0.3 %. That covers presses after k idle steps (the skate pushing or
   the tuck coasting in the gap) and tap rhythms, on flat, 1°, 9° and 13° slopes × snow, ice and powder × 0,
-  3, 7, 10 and 14 m/s × tuck on or off. The reviewers' search found nothing on non-powder surfaces either.
+  3, 7, 10 and 14 m/s × tuck on or off. This guarantee holds on that grid only. The final reviewers searched
+  between the grid points at 0–3 m/s and found up to 1.3 % (0.08 m over 2 s; 5.4°, 1.2 m/s, tuck held, a tap
+  every 62 steps) and 1.1 % (0.22 m over 6 s, 0.3°, 1.5 m/s). So the honest bound for button timing is
+  about 1.3 % and at most 0.2 m.
 - **Head start.** It now fades from full at a standstill to none at 2.5 m/s. This avoids the latency step
   the reviewers measured at 1.5 m/s (0.11 s to 0.28 s to the first push), and it shrinks the residual they
   found just under the old cut-off.
 - **Not a button-timing exploit, and not changed: switching technique by hand.** With tuck and poles held
   together, the game picks skate or poles by their mean push. A player who switches by hand at a better
-  speed can do up to about 2 % better over 6 s near the crossover; that is about 0.4 m. The automatic choice
+  speed can do up to about 2 % better than the automatic choice over 6 s near the crossover; that is about
+  0.4 m. Against the best single technique held throughout, the final review measured at most 0.8 %. The automatic choice
   ignores the tuck's lower drag and a stroke's dead time. This is a small skill margin, not stacking: the two
   never push at once. It is noted in `KNOWN_ISSUES.md`.
 - **Pre-existing, not pole-related: popping in rhythm in deep powder.** It beats skiing by 10–15 %, with or
   without poles. This is a powder-drag and airtime issue that predates Pass 6. It is noted in
   `KNOWN_ISSUES.md` for a later pass.
+
+## Final review (commit 706a5f7)
+
+The last isolated review (model-based, not human playtesters) used 400 chases on courses not used anywhere
+above: 2027-09-03, 2027-10-11, 2027-11-21, 2027-12-15, CORNICE, GRAUPEL, VERGLAS and SKIJOR. It also ran
+physics searches. Verdict: **pass** on all three reviews (physics 8/10, gameplay 9/10, critic 7/10), with no
+critical or major findings.
+- The Round 6 Yeti guarantees held on every cell.
+- The roar cancel never helped a skier: 0 of 64 runs, falls at 0.2–2 s from 0–6 m/s.
+- Chases skied in matched the pre-Pass 6 YetiAI (df23247) on every field: 24 of 24 runs, falls included.
+- The first push is at 0.117 s from rest, rising smoothly to 0.283 s at 2.5 m/s, with no step.
+- It asked for three doc wordings, now made above: the button-timing bound between grid points, the
+  hand-switching margin, and what the fall test actually covers.

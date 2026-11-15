@@ -121,4 +121,5 @@ are in `docs/reviews/pass2/final/FINAL_REVIEW_A_CE.md` and the QUALITY_REPORT.
   airborne). Found by the Pass 6 physics review; not pole-related.
 - **Yeti after a slow start:** a skier who stops before the cave and then falls within about a second of the
   chase starting is caught slightly less often than one who entered at 2–11 m/s (12–14 of 16 against
-  15–16 of 16), because the Yeti's pace cap is lower. Over all fall times a standstill does no better.
+  15–16 of 16), because the Yeti's pace cap is lower. Over all fall times a standstill is caught at least as
+  often as a start at 7 m/s or more (it can fare slightly better than a 2–4 m/s start).
