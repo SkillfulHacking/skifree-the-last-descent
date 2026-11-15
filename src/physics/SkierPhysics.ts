@@ -101,6 +101,8 @@ export const POLE = {
    * the first push comes ~0.1 s after the press instead of ~0.3 s (gameplay review r1: laggy start)
    */
   firstStrokeAt: 0.18,
+  /** s airborne after which a planted stroke is dropped */
+  airDrop: 0.1,
 };
 
 /** mean push (m/s²) a held pole cycle gives at this speed on a surface with this bite */
@@ -466,6 +468,8 @@ export class SkierPhysics {
         if (s.grounded) this.emit({ type: 'pole-plant', surface: s.surface, effect: poleEffect(s.speed) });
         else s.poleT = -1;
       }
+      // a planted stroke that leaves the snow for more than a hop loses its plant (QA r2, m2)
+      else if (!s.grounded && s.airTime > POLE.airDrop && u1 >= POLE.plantAt) s.poleT = -1;
       if (s.poleT >= s.polePeriod) s.poleT = -1;
     }
     s.poleChosen = held && s.poleArmed && this.polesBetter(input);

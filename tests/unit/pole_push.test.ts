@@ -193,6 +193,27 @@ describe('pole push: context and cadence', () => {
     expect(pushed).toBe(0);
   });
 
+  it('a planted stroke that leaves the snow for more than a hop is dropped; a tiny hop keeps it', () => {
+    const plantThen = (air: number) => {
+      const p = skier(FLAT, 3);
+      // run until just after the plant
+      let i = 0;
+      while (p.s.poleT < 0 || p.s.poleT / p.s.polePeriod < POLE.plantAt + 0.01) {
+        p.step({ ...NO_INPUT, pole: i++ === 0 }, PHYS_DT);
+        if (i > 400) throw new Error('no plant');
+      }
+      p.s.grounded = false;
+      p.s.airTime = 0;
+      p.s.pos.y += 2;
+      p.s.vel.y = 0;
+      const n = Math.round(air / PHYS_DT);
+      for (let k = 0; k < n; k++) p.step({ ...NO_INPUT }, PHYS_DT);
+      return p.s.poleT;
+    };
+    expect(plantThen(0.25)).toBe(-1);
+    expect(plantThen(0.05)).toBeGreaterThanOrEqual(0);
+  });
+
   it('is deterministic at the fixed step', () => {
     const a = skier(FLAT, 2);
     const b = skier(FLAT, 2);

@@ -392,3 +392,34 @@ export function keyName(code: string): string {
   };
   return map[code] ?? code;
 }
+
+/**
+ * Bind `code` as the primary key of `a` (Controls screen). The key is removed from every other
+ * action listed in `actions`; an action that would be left with no key takes over `a`'s old key
+ * instead (a swap, so nothing is left unbound and the reload's default repair cannot double-bind a
+ * key). Escape is never handed over — it always pauses, so an action left with only Escape would
+ * be unusable: the emptied action gets `a`'s first other key, else its own default if free, else
+ * the rebind is refused (returns false, bindings untouched). Escape stays on Pause.
+ */
+export function rebindKey(b: Record<Action, string[]>, a: Action, code: string, actions: readonly Action[]): boolean {
+  if (code === 'Escape') return false;
+  const prev = b[a].find((c) => c !== 'Escape' && c !== code);
+  const plan: Partial<Record<Action, string[]>> = {};
+  let handed = false;
+  for (const other of actions) {
+    if (other === a) continue;
+    const left = b[other].filter((c) => c !== code);
+    if (!left.length && other !== 'pause') {
+      const taken = (k: string) => k === code || actions.some((o) => o !== other && o !== a && b[o].includes(k));
+      const fallback = prev ?? DEFAULT_BINDINGS[other].find((k) => k !== 'Escape' && !taken(k));
+      if (!fallback) return false;
+      plan[other] = [fallback];
+      if (fallback === prev) handed = true;
+    } else plan[other] = left;
+  }
+  for (const other of actions) if (plan[other]) b[other] = plan[other]!;
+  const rest = b[a].slice(1).filter((c) => c !== code && !(handed && c === prev));
+  b[a] = [code, ...rest];
+  if (!b.pause.includes('Escape')) b.pause.push('Escape');
+  return true;
+}

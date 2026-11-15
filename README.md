@@ -62,8 +62,8 @@ there is no CDN, no API key and no telemetry.
   you are back on your skis, let go of it and press it again to plant your poles and push. Hold it
   to keep poling at a natural rhythm. Pushing is at full strength up to 30 km/h, fades above that
   and gives nothing from 55 km/h; gravity can still carry you faster. It does not work in the air. It is
-  weaker on ice and in deep powder, and almost nothing in a pizza wedge. While you pole you stand up
-  out of the tuck, so tuck and poles never add up. The prompt shows the key you have bound.
+  weaker on ice and in deep powder, and almost nothing in a pizza wedge. Holding tuck and poles together
+  never adds two pushes: you use whichever helps more at that speed. The prompt shows the key you have bound.
 - You never need the mouse during gameplay.
 - On-screen prompts switch to whichever device you used last.
 - Keyboard keys can be remapped, and the stick dead zone, steering and camera sensitivity and camera

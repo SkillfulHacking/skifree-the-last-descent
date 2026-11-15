@@ -8,7 +8,7 @@ import { autoUiScale } from '../ui/scale';
 import { SkierModel } from '../player/SkierModel';
 import { YetiModel } from '../yeti/YetiModel';
 import { AudioEngine } from '../audio/AudioEngine';
-import { Input, ACTION_LABELS, keyName, type Action, DEFAULT_BINDINGS, type GameplayInput } from '../input/Input';
+import { Input, ACTION_LABELS, keyName, type Action, DEFAULT_BINDINGS, type GameplayInput, rebindKey } from '../input/Input';
 
 const NEUTRAL_INPUT: GameplayInput = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recoverPressed: false, recoverHeld: false, lookBack: false, pausePressed: false, skipPressed: false, camX: 0, camY: 0 };
 import { Hud } from '../ui/Hud';
@@ -688,20 +688,10 @@ export class App {
         this.input.listenNextKey = (code) => {
           clearTimeout(timer);
           if (code !== 'Escape') {
-            // the new key becomes the primary binding; it is removed from any other gameplay action
-            // (Pass 6, QA: an action left with no key — e.g. Recover after binding its key to Pop —
-            // takes over this action's old primary key instead: a swap, so nothing is left unbound
-            // and the reload's default repair cannot double-bind a key)
-            const prev = s.bindings[a][0];
-            for (const other of actions) {
-              if (other === a) continue;
-              s.bindings[other] = s.bindings[other].filter((c) => c !== code);
-              if (!s.bindings[other].length && prev && prev !== code) s.bindings[other] = [prev];
+            if (!rebindKey(s.bindings, a, code, actions)) {
+              done();
+              return;
             }
-            const rest = s.bindings[a].slice(1).filter((c) => c !== code && c !== prev);
-            s.bindings[a] = [code, ...rest];
-            // Escape always pauses, whatever else is bound
-            if (!s.bindings.pause.includes('Escape')) s.bindings.pause.push('Escape');
             changed();
           }
           done();

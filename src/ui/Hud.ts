@@ -274,7 +274,7 @@ export class Hud {
     }
     if (this.capTimer > 0) {
       this.capTimer -= dt;
-      if (this.capTimer <= 0) this.cap.classList.remove('on');
+      if (this.capTimer <= 0) this.cap.classList.remove('on', 'hint');
     }
     if (this.centerTimer > 0) {
       this.centerTimer -= dt;

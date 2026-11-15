@@ -95,14 +95,14 @@ function poleHand(u: number, sg: number, out: V3, elb: V3, drive: number): numbe
   // down on the reach, back and close in the push. `drive` scales the push with the skier's speed
   // so the planted tips slide as little as possible: a standing start pushes short)
   const D: V3 = [sg * 0.1, -0.4, 0.3];
-  const F: V3 = [sg * 0.16, 0.02, 0.46];
+  const F: V3 = [sg * 0.2, 0.02, 0.55];
   const K0: V3 = [sg * 0.24, -0.62, -0.3];
   const K: V3 = [F[0] + (K0[0] - F[0]) * drive, F[1] + (K0[1] - F[1]) * drive, F[2] + (K0[2] - F[2]) * drive];
-  const R: V3 = [sg * 0.3, -0.32, -0.45];
+  const R: V3 = [sg * 0.18, -0.32, -0.45];
   const eD: V3 = [sg * 0.75, -0.35, -0.6];
   const eF: V3 = [sg * 0.45, -0.85, -0.2];
   const eK: V3 = [sg * 0.35, -0.5, -0.85];
-  const eR: V3 = [sg * 0.5, -0.3, -0.8];
+  const eR: V3 = [sg * 0.28, -0.3, -0.8];
   const seg = (a: V3, b: V3, ea: V3, eb: V3, k: number) => {
     const e = k * k * (3 - 2 * k);
     for (let j = 0; j < 3; j++) {
@@ -317,10 +317,10 @@ export function buildActivePose(st: SmoothedPose, out: PoseSpec): void {
     if (poleW > 0.001) {
       const H = out.hand[i];
       const dy = Math.max(0, H.y - 0.025);
-      const dx = sg * 0.12;
+      const dx = sg * 0.18;
       const dz = -Math.sqrt(Math.max(0, L * L - dy * dy - dx * dx));
       vC.set(dx, -dy, dz).normalize();
-      const swing = vB.set(sg * 0.35, -0.45, -0.82).normalize();
+      const swing = vB.set(sg * 0.3, -0.3, -0.82).normalize();
       const aim = vA.copy(swing).lerp(vC, planted).normalize();
       pd.lerp(aim, poleW).normalize();
       // planted: exactly on the snow at pole length (vC already uses the blended hand)
