@@ -93,14 +93,21 @@ test('keyboard: slow → POLE PUSH prompt and hint; hold R strokes; crash → R 
   await until(page, `!${S}.crashed`);
   await page.waitForTimeout(4000);
   expect((await st(page)).poleStrokes).toBe(strokes);
+  // held through the get-up: the prompt asks for a release
+  await until(page, `${S}.prompt.startsWith('pole-release:keyboard')`);
+  await expect(page.locator('.hud-prompt')).toContainText('Release');
+  expect((await st(page)).poleStrokes).toBe(strokes);
   await page.keyboard.up('KeyR');
-  await page.waitForTimeout(1000);
+  // (frame-rate independent: the game has seen the release once the prompt is back to POLE PUSH —
+  // under SwiftShader on a loaded machine a fixed 1 s wait can fall between frames)
+  await until(page, `${S}.prompt.startsWith('pole:keyboard')`);
   // (below the 55 km/h cutoff, or a press could not push)
   expect((await st(page)).speed).toBeLessThan(55 / 3.6);
+  // a press pushes: one stroke, and nothing more once the key is up (a sub-frame tap is a unit test)
   await page.keyboard.down('KeyR');
-  await page.waitForTimeout(150);
-  await page.keyboard.up('KeyR');
   await until(page, `${S}.poleStrokes === ${strokes + 1}`);
+  await page.keyboard.up('KeyR');
+  await until(page, `${S}.poleT < 0`);
   await page.waitForTimeout(3000);
   expect((await st(page)).poleStrokes).toBe(strokes + 1);
   await page.keyboard.up('KeyS');

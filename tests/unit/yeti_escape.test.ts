@@ -37,9 +37,32 @@ describe('Yeti escape after a slow start', () => {
       }
   }, 900_000);
 
-  it('one fall 3 s into a slow start is not certain capture (Alpine Normal)', () => {
-    for (const d of DAYS.slice(0, 4)) expect(runEscape(base(d, 'alpine', { startV: 0, crashAt: 3 })).outcome).not.toBe('caught');
-  }, 600_000);
+  it('a fall after a slow start is not certain capture, and never cheaper than the same fall in a chase skied in (no reason to enter slowly)', () => {
+    // (review r3: a hard 11 m/s threshold made entering just slower than that a free fall insurance)
+    let slowCaught = 0;
+    let fastCaught = 0;
+    let n = 0;
+    let under = 0;
+    let over = 0;
+    const gapDiff: number[] = [];
+    for (const d of DAYS.slice(0, 4))
+      for (const crashAt of [2, 5]) {
+        n++;
+        if (runEscape(base(d, 'alpine', { startV: 0, crashAt })).outcome === 'caught') slowCaught++;
+        if (runEscape(base(d, 'alpine', { crashAt })).outcome === 'caught') fastCaught++;
+        // continuous in the start speed: just under and just over 11 m/s are the same chase, near enough
+        // (single chases are chaotic — a few cm/s at the start can flip one — so in aggregate)
+        const a = runEscape(base(d, 'alpine', { startV: 10.9, crashAt }));
+        const b = runEscape(base(d, 'alpine', { startV: 11.1, crashAt }));
+        under += +(a.outcome === 'caught');
+        over += +(b.outcome === 'caught');
+        gapDiff.push(Math.abs((a.gaps[1] ?? 0) - (b.gaps[1] ?? 0)));
+      }
+    expect(Math.abs(under - over), `caught: 10.9 m/s ${under}, 11.1 m/s ${over}`).toBeLessThanOrEqual(1);
+    expect(Math.max(...gapDiff)).toBeLessThan(3);
+    expect(slowCaught).toBeLessThan(n);
+    expect(slowCaught).toBeGreaterThanOrEqual(fastCaught);
+  }, 900_000);
 
   it('Alpine Normal, a standstill at the chase start, tucking: escapes (without the slow-start rules an upright skier was caught in ~6–10 s)', () => {
     let before = 0;
@@ -55,7 +78,7 @@ describe('Yeti escape after a slow start', () => {
 
   it('a chase that starts at speed is unchanged by the slow-start rules, with or without an early fall', () => {
     // (review r2: an early fall used to restart the cap in fast chases too, making the fall nearly free)
-    for (const [d, b, crashAt] of [['2026-10-20', 'alpine', undefined], ['2026-11-02', 'fjord', undefined], ['2026-11-08', 'alpine', 3], ['2026-11-02', 'fjord', 2]] as const) {
+    for (const [d, b, crashAt] of [['2026-10-20', 'alpine', undefined], ['2026-11-02', 'fjord', undefined], ['2026-11-08', 'alpine', 3], ['2026-11-02', 'fjord', 2], ['2026-10-24', 'fjord', 9]] as const) {
       const c = base(d, b, { driver: 'skilled', ...(crashAt !== undefined ? { crashAt } : {}) });
       const a = runEscape(c);
       const o = withoutSync(() => runEscape(c));

@@ -214,48 +214,34 @@ describe('pole push: context and cadence', () => {
     expect(plantThen(0.05)).toBeGreaterThanOrEqual(0);
   });
 
-  it('releasing between strokes never beats holding (no head start for a quick re-press)', () => {
-    const dist = (inp: (i: number) => Partial<SkierInput>) => {
-      const p = skier(FLAT, 0);
+  it('releasing between strokes never beats holding, with or without the tuck (physics reviews r2, r3)', () => {
+    // the exploit: press again only after the poles have been idle k steps (the button is up between
+    // strokes, the skate pushes meanwhile if the tuck is held) — keyed on the idle time, not on the
+    // stroke ending (a held button starts the next stroke in the same step)
+    const dist = (z: number, v: number, inp: (p: SkierPhysics) => Partial<SkierInput>) => {
+      const p = skier(z, v);
       const z0 = p.s.pos.z;
-      run(p, inp, 10);
+      run(p, () => inp(p), 10);
       return p.s.pos.z - z0;
     };
-    const hold = dist(() => ({ pole: true }));
-    // release for k steps whenever a stroke has just ended (the review's exploit), and rhythmic taps
-    for (const k of [1, 2, 4, 12, 30, 40]) {
-      let gap = 0;
-      let prevT = -1;
-      const p = skier(FLAT, 0);
-      const z0 = p.s.pos.z;
-      run(p, () => {
-        const t = p.s.poleT;
-        if (prevT >= 0 && t < 0) gap = k;
-        prevT = t;
-        return { pole: gap-- <= 0 };
-      }, 10);
-      expect(p.s.pos.z - z0, `release ${k} steps`).toBeLessThanOrEqual(hold + 0.05);
-    }
-    // with the tuck held too (the skate fills the gap): still no better than holding both
-    const tuckHold = dist(() => ({ pole: true, tuck: 1 }));
-    for (const k of [1, 2, 4, 12, 30]) {
-      let gap = 0;
-      let prevT = -1;
-      const p = skier(FLAT, 0);
-      const z0 = p.s.pos.z;
-      run(p, () => {
-        const t = p.s.poleT;
-        if (prevT >= 0 && t < 0) gap = k;
-        prevT = t;
-        return { pole: gap-- <= 0, tuck: 1 };
-      }, 10);
-      expect(p.s.pos.z - z0, `tuck + release ${k} steps`).toBeLessThanOrEqual(tuckHold + 0.05);
-    }
-    for (const [on, off] of [[0.7, 0.1], [0.8, 0.1], [0.6, 0.25], [0.05, 0.05]]) {
-      const per = Math.round((on + off) / PHYS_DT);
-      const onN = Math.round(on / PHYS_DT);
-      expect(dist((i) => ({ pole: i % per < onN })), `tap ${on}/${off}`).toBeLessThanOrEqual(hold + 0.05);
-    }
+    const STEEP = 200; // the upper course
+    for (const [z, v] of [[FLAT, 0], [FLAT, 3], [STEEP, 0]] as const)
+      for (const tuck of [0, 1]) {
+        const best = Math.max(dist(z, v, () => ({ pole: true, tuck })), dist(z, v, () => ({ tuck })), dist(z, v, () => ({ pole: true })));
+        for (const k of [1, 2, 4, 12, 30, 36, 37, 40, 60, 90]) {
+          let idle = 0;
+          const d = dist(z, v, (p) => {
+            idle = p.s.poleT >= 0 ? 0 : idle + 1;
+            return { pole: p.s.poleT < 0 && idle >= k, tuck };
+          });
+          expect(d, `z ${z} v ${v} tuck ${tuck} idle ${k}`).toBeLessThanOrEqual(best * 1.002 + 0.02);
+        }
+        for (const [on, per] of [[1, 62], [6, 50], [84, 96], [70, 110], [6, 12]]) {
+          let i = 0;
+          const r = dist(z, v, () => ({ pole: i++ % per < on, tuck }));
+          expect(r, `z ${z} v ${v} tuck ${tuck} tap ${on}/${per}`).toBeLessThanOrEqual(best * 1.002 + 0.02);
+        }
+      }
   });
 
   it('a crash right after a stroke: the first stroke after getting up still gets its head start', () => {

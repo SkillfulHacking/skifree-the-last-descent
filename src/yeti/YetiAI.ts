@@ -37,16 +37,15 @@ export const YETI = {
    *    `syncAccel` m/s per second (about what a tucked skier gains on the gentle ground below a cave);
    *    the cap scales with speedMul and the catch-up pressure is untouched, so a chase that starts
    *    at speed is unchanged;
-   *  - an early fall restarts it, only in a chase that began below `syncSlow`: for a fall that begins
-   *    in the first `syncWindow` s the cap's clock stops while the skier is down and restarts from
-   *    their speed when they are back up (he keeps coming meanwhile);
+   *  - while the skier is down the cap's clock runs at `syncDownRate` (he keeps coming meanwhile); in
+   *    a chase begun at speed the cap is above his own pace and none of this changes anything;
    *  - he stands and roars longer before the first stride: `slowDelay` × (1 − (v/syncSlow)²) s more,
    *    flat near a standstill so the gap still grows with the speed the chase starts at (review r2:
    *    a linear 2.5 s gave a standstill more lead than a 3–6 m/s start), none from `syncSlow` m/s.
    */
   syncMargin: 3,
   syncAccel: 1.1,
-  syncWindow: 10,
+  syncDownRate: 0.5,
   syncSlow: 11,
   slowDelay: 1.6,
 };
@@ -57,7 +56,7 @@ export interface YetiTarget {
   pos: THREE.Vector3;
   vel: THREE.Vector3;
   airborne: boolean;
-  /** the skier is down (crashed or getting up): YETI.syncWindow */
+  /** the skier is down (crashed or getting up): YETI.syncDownRate */
   down?: boolean;
 }
 
@@ -85,13 +84,11 @@ export class YetiAI {
   desired = 0;
   /** per-encounter pursuit scaling (1 = classic; Endless escalates) */
   speedMul = 1;
-  /** the skier's speed when the chase began, or when they got up from an early fall (YETI.syncMargin); NaN until the first update */
+  /** the skier's speed when the chase began (YETI.syncMargin); NaN until the first update */
   startSkierSpeed = NaN;
   /** the start cap's own clock (s): stops while the skier is down early in the chase */
   syncClock = 0;
-  /** the skier's speed when the chase began (an early-fall restart only applies below YETI.syncSlow) */
-  chaseStartSpeed = NaN;
-  private syncDown = false;
+
 
   constructor(
     private mountain: Mountain,
@@ -127,8 +124,6 @@ export class YetiAI {
     this.chaseTime = 0;
     this.startSkierSpeed = NaN;
     this.syncClock = 0;
-    this.chaseStartSpeed = NaN;
-    this.syncDown = false;
     this.delay = YETI.startDelay;
     if (leapVelocity) {
       this.airborne = true;
@@ -148,22 +143,13 @@ export class YetiAI {
     const vs = Math.hypot(target.vel.x, target.vel.z);
     if (Number.isNaN(this.startSkierSpeed)) {
       this.startSkierSpeed = vs;
-      this.chaseStartSpeed = vs;
       // a slow start: he stands and roars a little longer before the first stride
       this.delay += YETI.slowDelay * Math.max(0, 1 - (vs / YETI.syncSlow) ** 2);
     }
-    // an early fall in a chase that began slowly (review r2: in a chase begun at speed a fall costs
-    // what it always did); a fall that begins inside the window counts until the skier is back up
-    if (target.down && this.chaseStartSpeed < YETI.syncSlow && (this.chaseTime < YETI.syncWindow || this.syncDown)) this.syncDown = true;
-    else {
-      if (this.syncDown) {
-        // back up after an early fall: the cap starts again from the skier's speed now
-        this.syncDown = false;
-        this.startSkierSpeed = vs;
-        this.syncClock = 0;
-      }
-      this.syncClock += dt;
-    }
+    // the cap's clock runs slower while the skier is down: a fall costs ground but does not let him
+    // run away at full pace from a skier who never got going (review r3: continuous — no window
+    // edge and no speed step; it fades out by itself once the cap is above his own pace)
+    this.syncClock += dt * (target.down ? YETI.syncDownRate : 1);
 
     if (this.airborne) {
       this.vy -= 9.81 * dt;

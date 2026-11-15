@@ -103,8 +103,9 @@ export const POLE = {
   firstStrokeAt: 0.18,
   /** s airborne after which a planted stroke is dropped */
   airDrop: 0.1,
-  /** a stroke starting within this many s of the last one is a continuation (no head start), so
-   *  releasing between strokes never beats holding (physics review r2): > firstStrokeAt × period[0] */
+  /** a stroke starting within this many s of the last stroke or skate push is a continuation (no
+   *  head start), so releasing between strokes never beats holding, with or without the tuck held
+   *  (physics reviews r2, r3): > firstStrokeAt × period[0] */
   continueGap: 0.3,
 };
 
@@ -266,7 +267,7 @@ export class SkierState {
   pushSince = 0;
   /** pole stroke: time into the current stroke (s), −1 when none */
   poleT = -1;
-  /** s since the last stroke ended (POLE.continueGap) */
+  /** s since the last stroke ended or the last skate push (POLE.continueGap) */
   poleIdle = 99;
   /** this stroke's cycle length (s) */
   polePeriod: number = POLE.period[0];
@@ -478,7 +479,8 @@ export class SkierPhysics {
       else if (!s.grounded && s.airTime > POLE.airDrop && u1 >= POLE.plantAt) s.poleT = -1;
       if (s.poleT >= s.polePeriod) s.poleT = -1;
       if (s.poleT < 0) s.poleIdle = 0;
-    } else s.poleIdle += dt;
+    } else if (s.skateAccel > 0) s.poleIdle = 0;
+    else s.poleIdle += dt;
     s.poleChosen = held && s.poleArmed && this.polesBetter(input);
     if (s.poleT < 0 && s.poleChosen && s.recoverTime <= 0 && s.grounded) {
       const sp = s.speed;
