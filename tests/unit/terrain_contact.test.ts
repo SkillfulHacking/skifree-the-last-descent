@@ -6,6 +6,7 @@
  * skier up the face and launched them (15 → 60 m/s in one tick, 8.5 s of air, 84 m above ground);
  * 123 of 1,080 Alpine cave approaches flew > 3 s.
  */
+import { YETI } from '../../src/yeti/YetiAI';
 import { describe, expect, it } from 'vitest';
 import '../../src/world/biomes';
 import { DIFFICULTY, buildMountain, makeCourse, worldSeed } from '../../src/game/CourseConfig';
@@ -428,8 +429,8 @@ describe('normal Alpine runs are bit-identical to before the fix', () => {
   const cases: Array<[string, AutopilotStyle, string, number]> = [
     ['EC1', 'skilled', '35375fc6', 149.108],
     // (Pass 6: this run starts its chase slowly — 'average' never tucks — so the Yeti's slow-start rules
-    // (YETI.syncMargin, slowDelay) catch it 0.66 s later: same skier steps, a longer run; was cb29719a / 64.817)
-    ['EC1', 'average', '7d5f3537', 65.475],
+    // (YETI.syncMargin, slowDelay) catch it 0.87 s later: same skier steps, a longer run; was cb29719a / 64.817)
+    ['EC1', 'average', 'a95c4ba9', 65.683],
     ['classic', 'skilled', 'e414dde2', 156.992],
   ];
   for (const [seed, style, hash, time] of cases) {
@@ -460,4 +461,30 @@ describe('normal Alpine runs are bit-identical to before the fix', () => {
       if (seed === 'EC1' && style === 'average') expect(hPrefix).toBe('cb29719a');
     });
   }
+  it('EC1 average with the Pass 6 slow-start rules switched off is the old run exactly', () => {
+    // (review r2: the prefix hash covers only the skier, whose steps never depend on the Yeti before a
+    // capture; this proves the whole difference is the Yeti's slow-start rules)
+    const keep = { ...YETI };
+    try {
+      YETI.syncMargin = 1e9;
+      YETI.slowDelay = 0;
+      const c = makeCourse('custom', 'sprint', { customText: 'EC1', difficulty: 'normal' });
+      const m = buildMountain(c);
+      const f = new ObstacleField(m, worldSeed(c));
+      let h = 0x811c9dc5;
+      const res = simulateCourse(
+        m,
+        f,
+        (s, t) => {
+          h = mix(mix(mix(mix(h, s.pos.x), s.pos.y), s.pos.z), s.vel.y);
+          return autopilotInput(m, s, 'average', t);
+        },
+        { streaming: true, yetiSpeed: DIFFICULTY.normal.yetiSpeed, maxTime: 900 },
+      );
+      expect(+res.time.toFixed(3)).toBe(64.817);
+      expect(h.toString(16)).toBe('cb29719a');
+    } finally {
+      Object.assign(YETI, keep);
+    }
+  });
 });

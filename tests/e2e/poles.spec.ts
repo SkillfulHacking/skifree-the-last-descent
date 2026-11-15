@@ -82,7 +82,9 @@ test('keyboard: slow → POLE PUSH prompt and hint; hold R strokes; crash → R 
   expect(s.z).toBeGreaterThan(z0 + 0.5);
   await page.keyboard.up('KeyR');
 
-  // crash, then hold R: it gets the skier up — and no push while it stays held
+  // crash, then hold R: it gets the skier up — and no push while it stays held (pizza held from
+  // here on, so the skier stays below the pole cutoff on the start slope while the test waits)
+  await page.keyboard.down('KeyS');
   await page.evaluate(() => (window as unknown as W).__skifree.crash());
   await until(page, `${S}.prompt.startsWith('recover:keyboard')`);
   await expect(page.locator('.hud-prompt')).toContainText('RECOVER');
@@ -93,12 +95,15 @@ test('keyboard: slow → POLE PUSH prompt and hint; hold R strokes; crash → R 
   expect((await st(page)).poleStrokes).toBe(strokes);
   await page.keyboard.up('KeyR');
   await page.waitForTimeout(1000);
+  // (below the 55 km/h cutoff, or a press could not push)
+  expect((await st(page)).speed).toBeLessThan(55 / 3.6);
   await page.keyboard.down('KeyR');
   await page.waitForTimeout(150);
   await page.keyboard.up('KeyR');
   await until(page, `${S}.poleStrokes === ${strokes + 1}`);
   await page.waitForTimeout(3000);
   expect((await st(page)).poleStrokes).toBe(strokes + 1);
+  await page.keyboard.up('KeyS');
 
   // the cave cinematic: holding the button does nothing
   await page.evaluate(() => {

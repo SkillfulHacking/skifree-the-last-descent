@@ -26,13 +26,13 @@ const withoutSync = <T>(fn: () => T): T => {
 const DAYS = ['2026-10-20', '2026-10-24', '2026-10-29', '2026-11-02', '2026-11-08', '2026-11-12'];
 
 describe('Yeti escape after a slow start', () => {
-  it('starting slower is never better: the gap 10 s in grows with the start speed (within 4 m seed by seed: terrain and lunges add noise) and stays below a chase begun at speed', () => {
+  it('starting slower is never better: the gap 10 s in grows with the start speed (within 2 m seed by seed: terrain and lunges add noise) and stays below a chase begun at speed', () => {
     for (const d of DAYS.slice(0, 4))
       for (const b of ['alpine', 'fjord']) {
         const g = [0, 4, 8].map((v) => runEscape(base(d, b, { startV: v })).gaps[2] ?? 0);
         const fast = runEscape(base(d, b)).gaps[2] ?? 0;
-        expect(g[1]!, `${d} ${b} ${g}`).toBeGreaterThanOrEqual(g[0]! - 4);
-        expect(g[2]!, `${d} ${b} ${g}`).toBeGreaterThanOrEqual(g[1]! - 4);
+        expect(g[1]!, `${d} ${b} ${g}`).toBeGreaterThanOrEqual(g[0]! - 2);
+        expect(g[2]!, `${d} ${b} ${g}`).toBeGreaterThanOrEqual(g[1]! - 2);
         expect(fast).toBeGreaterThan(g[2]!);
       }
   }, 900_000);
@@ -53,13 +53,16 @@ describe('Yeti escape after a slow start', () => {
     expect(before).toBeGreaterThanOrEqual(3);
   }, 600_000);
 
-  it('a chase that starts at speed is unchanged by the start sync', () => {
-    for (const [d, b] of [['2026-10-20', 'alpine'], ['2026-11-02', 'fjord'], ['2026-11-08', 'alpine']] as const) {
-      const a = runEscape(base(d, b, { driver: 'skilled' }));
-      const o = withoutSync(() => runEscape(base(d, b, { driver: 'skilled' })));
-      expect(a.v0).toBeGreaterThan(10);
+  it('a chase that starts at speed is unchanged by the slow-start rules, with or without an early fall', () => {
+    // (review r2: an early fall used to restart the cap in fast chases too, making the fall nearly free)
+    for (const [d, b, crashAt] of [['2026-10-20', 'alpine', undefined], ['2026-11-02', 'fjord', undefined], ['2026-11-08', 'alpine', 3], ['2026-11-02', 'fjord', 2]] as const) {
+      const c = base(d, b, { driver: 'skilled', ...(crashAt !== undefined ? { crashAt } : {}) });
+      const a = runEscape(c);
+      const o = withoutSync(() => runEscape(c));
+      expect(a.v0).toBeGreaterThan(YETI.syncSlow);
       expect(a.gaps).toEqual(o.gaps);
       expect(a.minGap).toBe(o.minGap);
+      expect(a.outcome).toBe(o.outcome);
     }
   }, 600_000);
 

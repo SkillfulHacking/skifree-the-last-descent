@@ -214,6 +214,50 @@ describe('pole push: context and cadence', () => {
     expect(plantThen(0.05)).toBeGreaterThanOrEqual(0);
   });
 
+  it('releasing between strokes never beats holding (no head start for a quick re-press)', () => {
+    const dist = (inp: (i: number) => Partial<SkierInput>) => {
+      const p = skier(FLAT, 0);
+      const z0 = p.s.pos.z;
+      run(p, inp, 10);
+      return p.s.pos.z - z0;
+    };
+    const hold = dist(() => ({ pole: true }));
+    // release for k steps whenever a stroke has just ended (the review's exploit), and rhythmic taps
+    for (const k of [1, 2, 4, 12, 30, 40]) {
+      let gap = 0;
+      let prevT = -1;
+      const p = skier(FLAT, 0);
+      const z0 = p.s.pos.z;
+      run(p, () => {
+        const t = p.s.poleT;
+        if (prevT >= 0 && t < 0) gap = k;
+        prevT = t;
+        return { pole: gap-- <= 0 };
+      }, 10);
+      expect(p.s.pos.z - z0, `release ${k} steps`).toBeLessThanOrEqual(hold + 0.05);
+    }
+    // with the tuck held too (the skate fills the gap): still no better than holding both
+    const tuckHold = dist(() => ({ pole: true, tuck: 1 }));
+    for (const k of [1, 2, 4, 12, 30]) {
+      let gap = 0;
+      let prevT = -1;
+      const p = skier(FLAT, 0);
+      const z0 = p.s.pos.z;
+      run(p, () => {
+        const t = p.s.poleT;
+        if (prevT >= 0 && t < 0) gap = k;
+        prevT = t;
+        return { pole: gap-- <= 0, tuck: 1 };
+      }, 10);
+      expect(p.s.pos.z - z0, `tuck + release ${k} steps`).toBeLessThanOrEqual(tuckHold + 0.05);
+    }
+    for (const [on, off] of [[0.7, 0.1], [0.8, 0.1], [0.6, 0.25], [0.05, 0.05]]) {
+      const per = Math.round((on + off) / PHYS_DT);
+      const onN = Math.round(on / PHYS_DT);
+      expect(dist((i) => ({ pole: i % per < onN })), `tap ${on}/${off}`).toBeLessThanOrEqual(hold + 0.05);
+    }
+  });
+
   it('is deterministic at the fixed step', () => {
     const a = skier(FLAT, 2);
     const b = skier(FLAT, 2);
