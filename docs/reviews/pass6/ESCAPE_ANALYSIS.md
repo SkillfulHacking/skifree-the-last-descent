@@ -259,3 +259,70 @@ tapping rhythm beats holding, with or without the tuck.
 
 **Remaining known minor issue.** On ice, holding tuck and poles together is about 0.2 m/s slower at 10 s
 than tuck alone: the technique choice compares only the mean push and ignores what standing up costs.
+
+## Round 4, after the third reviews
+
+The round-3 reviewers (model-based, isolated, not human playtesters) used other fresh seeds: 2026-07-03,
+07-14 and 07-22, 2027-01-06, 01-17 and 01-28, GLOGG and TOBOGGAN. They confirmed the following:
+- The delay curve gives a gap at 10 s that rises with the start speed (never more than 0.1 m down across
+  128 seed pairs).
+- Chases skied in match the pre-Pass 6 Yeti: 96 of 96, falls included.
+- The EC1 check now proves what it claims.
+- QA and animation pass.
+
+They also found two things wrong. Round 3 claimed both were impossible:
+- **Tuck + tapping still beat holding.** With the tuck held, the skate pushes during the gap, and the next
+  stroke still got its head start: +4.6 % distance in 10 s on the flat. The round-3 test could not catch
+  this. It looked for the moment a stroke ended, but a held button starts the next stroke in the same physics
+  step, so every "release" case was really holding. The round-3 sentence saying the test checks "with or
+  without the tuck" was false.
+- **The 11 m/s threshold worked as free fall insurance.** One fall at 3 s, Alpine Normal, start speed
+  10.9 m/s against 11.1 m/s: 0/8 caught against 4/8. On Fjord Hard, stopping before the cave beat entering
+  fast for a player who falls early more than about 1 time in 3. Round 3 said "stopping before the cave never
+  pays"; that held for the gap but not for outcomes.
+
+Changes:
+- **Poles.** A stroke gets the first-stroke head start only when there has been no stroke and no skate push
+  in the last 0.3 s. The test now presses again only after k idle steps (k = 1…90), and also uses fixed tap
+  rhythms. It runs with and without the tuck, on the flat from rest and at 3 m/s, and on the upper course. It
+  requires every pattern to be no better than the best of hold+tuck, tuck alone and hold alone. It was
+  checked to fail without the fix (38.1 m against 36.5 m).
+- **Yeti.** The early-fall restart, its 10 s window and its 11 m/s threshold are gone. One continuous rule
+  replaces them: while the skier is down, the slow-start cap's clock runs at half rate (`syncDownRate` 0.5).
+  In a chase begun at speed the cap is above the Yeti's own pace, so nothing changes there, and the effect
+  fades out by itself between slow and fast starts.
+
+Evidence (`data/r4_fall_rate.jsonl.gz`, 1,152 runs): 6 of the reviewers' fresh courses, Fjord and Alpine,
+Normal and Hard, Sprint, the `straight` driver. One fall at 2, 5 or 9 s, or none. The rate while down is
+0 (cap clock paused), 0.5 or 1 (no allowance).
+
+Caught out of 6, for rates 0 | 0.5 | 1; the median gap at 10 s at rate 0.5 is in brackets:
+
+| Start | no fall | fall 2 s | fall 5 s | fall 9 s |
+|---|---|---|---|---|
+| Alpine Normal, skied in | 0 (98) | 0 (16) | 1 (38) | 2 (92) |
+| Alpine Normal, 0 m/s | 0 (45) | 1·3·5 (4) | 4·4·6 (2) | 5·5·6 (40) |
+| Alpine Normal, 10.9 m/s | 0 (77) | 4 (0) | 4 (17) | 2 (71) |
+| Fjord Normal, skied in | 1 (80) | 6 (7) | 6 (30) | 5 (76) |
+| Fjord Normal, 0 m/s | 0 (50) | 1·3·6 (9) | 5·6·6 (9) | 6 (45) |
+| Fjord Hard, skied in | 2 (74) | 6 (0) | 6 (24) | 6 (69) |
+| Fjord Hard, 0 m/s | 4 (44) | 5·6·6 (6) | 6 (5) | 6 (39) |
+| Alpine Hard, skied in | 0 (91) | 5 (0) | 4 (32) | 3 (85) |
+| Alpine Hard, 0 m/s | 0 (39) | 3·4·5 (2) | 4·6·6 (0) | 6 (34) |
+
+What it shows:
+- **No reason to enter slowly.** At rate 0.5, a fall soon after a slow start is caught about as often as the
+  same fall in a chase skied in (16 of 24 against 17 of 24 at 2 s), and more often for later falls (22–23 of
+  24 against 16–17). Without a fall, a slow start is never ahead.
+- **Not certain capture either.** Alpine Normal, a standstill and a fall at 2 s: 3 of 6 caught. Round 1 had
+  12 of 12, the critic's original complaint.
+- **No step.** A start at 10.9 m/s behaves like a chase skied in. `yeti_escape.test.ts` checks this: 10.9 and
+  11.1 m/s are caught within one of each other, and the gap at 5 s is within 3 m. It checks it in aggregate,
+  because one chase is chaotic and a few cm/s at the start can flip it.
+- **Falls are expensive in general.** An early fall loses most chases on the Fjord whichever way the skier
+  came in. That is the original game's behaviour and is unchanged for chases skied in.
+- **Chases skied in** are still identical to the pre-Pass 6 Yeti, falls included (`yeti_escape.test.ts`, falls
+  at 2, 3 and 9 s).
+
+Clean runs are unchanged by this round: the delay curve and the cap are as in round 3. A clean slow start
+escapes Normal; Hard still catches some.
