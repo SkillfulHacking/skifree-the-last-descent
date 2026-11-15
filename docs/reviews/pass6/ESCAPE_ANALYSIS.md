@@ -188,3 +188,74 @@ What the table shows:
   capture time and is caught 0.66 s later.
 - **Poles.** A helpful skill: from a standstill they add 9 m of gap at 10 s over tucking, and win 1 more
   Fjord course. They are not required: tucking alone escapes every Alpine Normal course.
+
+## Round 3, after the second reviews
+
+The round-2 reviewers (model-based, isolated, not human playtesters) re-ran the chase on fresh seeds
+(2026-08-05/11/19, 2026-12-02/09/24/30 and custom words) and found three problems with round 2. Two of the
+round-2 claims above were wrong as written:
+- **"Bit-identical at speed" held only without a fall.** The early-fall restart also applied to chases begun at
+  speed, so a fall in the first ~7 s cost almost nothing there: Fjord Hard, fall at 2 s, 2/8 caught where the
+  old Yeti caught 8/8.
+- **"Monotonic in every row" failed on fresh seeds.** The linear 2.5 s roar delay gave a standstill more lead
+  than a 3–6 m/s start (Fjord Normal median gap at 10 s: 65.6 m at 0 m/s, 61.3 m at 3 m/s).
+- **The EC1 "prefix" check proved nothing about the chase.** It hashes only the skier's steps, which never
+  depend on the Yeti before a capture.
+
+Changes:
+- **The early-fall restart applies only to a chase that began below 11 m/s.** A fall counts by when it
+  begins (inside the first 10 s), not by when the skier gets up.
+- **Roar delay 1.6 s × (1 − (v / 11)²)**, flat near a standstill, in place of 2.5 s × (1 − v / 11).
+- **EC1 check.** With the slow-start rules switched off, the EC1 average run is the old run exactly (hash
+  `cb29719a`, caught at 64.817 s). With them on it is caught at 65.683 s (`a95c4ba9`).
+
+Evidence (`data/r3_*.jsonl.gz`; 8 fresh courses: 2026-08-05, 2026-08-19, 2026-12-02, 2026-12-09, 2026-12-24,
+KETTLE, MARMOT, HOTWAX; Sprint):
+
+**Delay setting.** `r3_delay_linear` and `r3_delay_sweep` cover 1,632 runs. Whatever the setting, the closest
+call (median minimum gap) rises with the start speed and does not depend on the delay, and no setting caught
+anyone on Normal. Hard caught 1–2 of 8 at every start speed, the same as chases skied in at 12 m/s. Median
+gap at 10 s, `straight` driver, with the chosen 1.6 s curve:
+
+| Start speed (m/s) | 0 | 2 | 4 | 6 | 9 | 12 |
+|---|---|---|---|---|---|---|
+| Fjord Normal | 58.0 | 59.2 | 60.8 | 64.8 | 72.7 | 73.8 |
+| Alpine Normal | 52.4 | 55.5 | 58.8 | 65.0 | 75.2 | 80.1 |
+| Fjord Hard | 48.2 | 49.1 | 51.5 | 55.9 | 65.3 | 62.8 |
+
+Seed by seed, the gap at 10 s never falls by more than 0.1 m as the start speed rises from 0 to 9 m/s, across
+256 pairs. Above 9 m/s the Hard rows can dip a few metres where the slow-start rules fade out.
+`yeti_escape.test.ts` now allows 2 m (was 4 m).
+
+**Falls.** `r3_falls` has 960 runs: one fall at 2, 4, 7 or 9.5 s, or none. Each run is played twice, against
+the current Yeti and against the pre-Pass 6 Yeti. Caught out of 8, current (pre-Pass 6 in brackets):
+
+| | no fall | 2 s | 4 s | 7 s | 9.5 s |
+|---|---|---|---|---|---|
+| Fjord Normal, skied in | 0 (0) | 3 (3) | 3 (3) | 3 (3) | 3 (3) |
+| Fjord Normal, standstill | 0 (4) | 0 (8) | 1 (8) | 1 (8) | 1 (8) |
+| Fjord Hard, skied in | 1 (1) | 8 (8) | 8 (8) | 8 (8) | 5 (5) |
+| Fjord Hard, standstill | 2 (6) | 3 (8) | 3 (8) | 3 (8) | 4 (8) |
+| Alpine Normal, skied in | 0 (0) | 0 (0) | 0 (0) | 3 (3) | 4 (4) |
+| Alpine Normal, standstill | 0 (5) | 0 (8) | 0 (8) | 0 (8) | 0 (8) |
+| Alpine Hard, skied in | 1 (1) | 4 (4) | 3 (3) | 6 (6) | 4 (4) |
+| Alpine Hard, standstill | 1 (8) | 2 (8) | 2 (8) | 2 (8) | 3 (8) |
+
+- **Chases skied in, falls included, are identical to the pre-Pass 6 Yeti:** 160 of 160 runs have the same
+  gaps and outcome (slowest entry 13.35 m/s). `yeti_escape.test.ts` checks this with falls at 2 and 3 s.
+- **A fall still costs ground in a slow start.** The gap at 10 s drops from 58 m to 27–37 m on the Fjord
+  (Normal).
+- **An honest asymmetry.** One fall in the first few seconds is forgiven more after a slow start than in a
+  chase begun at speed. That is because the fast-chase penalty is the original game's, deliberately left
+  alone: the brief asked for the smallest correction. Stopping before the cave never pays: without a fall the
+  slow start is behind at 10 s in every row, and a planned fall is not a strategy.
+- **The Yeti stays threatening.** The closest call from a standstill is a median 23–25 m on Normal. A late
+  fall, or Hard, still loses runs.
+
+**Poles.** Holding the button can no longer be beaten by tapping it. A stroke that starts within 0.3 s of the
+last one gets no head start. Before this change, a one-frame release between strokes gave +22 % speed on
+the flat over 10 s (reviewer's measurement). `pole_push.test.ts` now checks that no release pattern and no
+tapping rhythm beats holding, with or without the tuck.
+
+**Remaining known minor issue.** On ice, holding tuck and poles together is about 0.2 m/s slower at 10 s
+than tuck alone: the technique choice compares only the mean push and ignores what standing up costs.
