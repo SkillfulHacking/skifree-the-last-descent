@@ -118,9 +118,13 @@ export function makeWhiteoutBiome(): Biome {
       altTypes: ['alpine', 'highspeed', 'basin', 'ridgeline', 'chute', 'forest'],
       // on the ridge, not in a valley: low, broken shoulders either side of the piste (the sky and
       // the storm visible over them) and big peaks far off across the void, seen in the clear windows
-      wallHeight: 110,
+      // the course runs along the ridge's shoulder: on the right the ground rolls over and falls
+      // away into open air (the storms come over it); the caves are cut into the left side
+      shoulderDrop: { side: 1, depth: 150, width: 520 },
+      caveSide: -1,
+      wallHeight: 130,
       wallRelief: 95,
-      rangeHeight: 620,
+      rangeHeight: 1400,
       rangeSoft: 0.4,
       undulation: 9,
       detail: 1.8,

@@ -204,6 +204,13 @@ export interface BiomeTerrain {
   startSlope?: number;
   /** side of the piste the Yeti caves are cut into (default +1; a coast: −1, the sea side) */
   caveSide?: 1 | -1;
+  /**
+   * Optional (Pass 5, Whiteout): the ground falls away on one side of the piste instead of rising
+   * into a valley wall — the course runs along a ridge's shoulder with open air on that side. The
+   * drop is `depth` m reached over `width` m from the piste edge (keep it skiable: ≤ ~16°). The
+   * cave side must be the other side. Absent = a valley on both sides (bit-identical).
+   */
+  shoulderDrop?: { side: 1 | -1; depth: number; width: number };
   /** valley wall height (m) */
   wallHeight: number;
   /** ridged/fbm relief on the valley walls (m) */

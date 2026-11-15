@@ -44,6 +44,7 @@ export class Mountain {
   // terrain amplitudes from the biome (alpine: the original literals, so heights are bit-identical)
   private readonly kWall: number;
   private readonly kRelief: number;
+  private readonly kDrop: { side: 1 | -1; depth: number; width: number } | null;
   private readonly kRanges: number;
   private readonly kUndulation: number;
   private readonly kDetail: number;
@@ -85,6 +86,7 @@ export class Mountain {
     this.kDriftsPowder = t.driftsPowder;
     this.kRollers = t.rollers;
     this.kRangeSoft = t.rangeSoft ?? 0;
+    this.kDrop = t.shoulderDrop ?? null;
     if (typeof seedOrProfile === 'number') {
       this.seed = seedOrProfile;
       this.profile = new ClassicProfile(seedOrProfile);
@@ -304,7 +306,13 @@ export class Mountain {
       if (this.kRangeSoft > 0 && rr > 0.5) rr = 0.5 + (rr - 0.5) * (1 - 0.6 * this.kRangeSoft);
       const rf = 0.5 + 0.5 * fbm(x / 210, z / 210, s + 17, 3);
       const rough = (0.55 * rr + 0.45 * rf) * this.kRelief * smoothstep(30, 220, e) * (0.6 + 0.4 * P.rockBias(z));
-      if (side < 0 && this.coast) {
+      if (this.kDrop && side === this.kDrop.side) {
+        // a ridge's shoulder: the ground rolls over and falls away (broken by the relief), the far
+        // ranges stand across the void
+        const D = this.kDrop;
+        h += -D.depth * smoothstep(0, D.width, e) + rough * 0.6 + 0.04 * es;
+        h += this.kRanges * smoothstep(900, 3200, e) * (0.35 + (this.kRangeSoft > 0 ? this.softRange(x, z, s) : ridged(x / 900, z / 900, s + 11, 5)));
+      } else if (side < 0 && this.coast) {
         // a coast: the sea side is only a low bank up to the cliff rim (open views over the fjord)
         h += (wall + rough) * (SEA_BANK + (1 - SEA_BANK) * seaCave);
       } else {

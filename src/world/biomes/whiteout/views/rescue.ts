@@ -93,9 +93,16 @@ export class RescueStation implements FinishEnvironment {
     const side = m.routeX(F.z) >= m.centerX(F.z) ? -1 : 1;
     const x = m.routeX(z) + side * C.side;
     // level pad: the lowest corner, the walls sunk into the snow on the uphill side
+    // on its high corner, the low side on a stone foundation (never buried in the slope)
+    let maxY = -Infinity;
     let minY = Infinity;
-    for (const [dx, dz] of [[-C.hutW / 2, -C.hutD / 2], [C.hutW / 2, -C.hutD / 2], [-C.hutW / 2, C.hutD / 2], [C.hutW / 2, C.hutD / 2]] as const) minY = Math.min(minY, H(x + dx, z + dz));
-    const y0 = minY - 0.3;
+    for (const [dx, dz] of [[-C.hutW / 2, -C.hutD / 2], [C.hutW / 2, -C.hutD / 2], [-C.hutW / 2, C.hutD / 2], [C.hutW / 2, C.hutD / 2]] as const) {
+      const hy = H(x + dx, z + dz);
+      maxY = Math.max(maxY, hy);
+      minY = Math.min(minY, hy);
+    }
+    const y0 = maxY - 0.25;
+    const footing = y0 - minY + 0.8;
     this.hut.set(x, y0, z);
     // the door faces back up toward the arriving skier (toward the finish line)
     this.faces.set(F.x - x, 0, F.z - z).normalize();
@@ -116,7 +123,8 @@ export class RescueStation implements FinishEnvironment {
     const white = mk(new THREE.MeshStandardMaterial({ color: 0xf0ede6, roughness: 0.7 }));
     const roofM = mk(new THREE.MeshStandardMaterial({ color: 0x2c2f35, roughness: 0.6, metalness: 0.3 }));
     const snowM = mk(new THREE.MeshStandardMaterial({ color: 0xf6f8fc, roughness: 0.85 }));
-    const warm = mk(new THREE.MeshStandardMaterial({ color: 0xffc27a, emissive: new THREE.Color(1.0, 0.62, 0.25), emissiveIntensity: 2.2, roughness: 0.4 }));
+    // unlit: the lit door and windows must glow through the storm whatever the exposure
+    const warm = mk(new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.66, 0.28) }));
     const dark = mk(new THREE.MeshStandardMaterial({ color: 0x1d1f24, roughness: 0.8 }));
     const steel = mk(new THREE.MeshStandardMaterial({ color: 0x8b9099, roughness: 0.4, metalness: 0.7 }));
     const yellow = mk(new THREE.MeshStandardMaterial({ color: 0xe8b416, roughness: 0.55 }));
@@ -130,7 +138,7 @@ export class RescueStation implements FinishEnvironment {
     };
     // walls (a plinth course in white), a gable roof with a snow load
     add(new THREE.BoxGeometry(C.hutW, C.wall, C.hutD), red, 0, C.wall / 2 + 0.6, 0);
-    add(new THREE.BoxGeometry(C.hutW + 0.2, 0.7, C.hutD + 0.2), white, 0, 0.35, 0);
+    add(new THREE.BoxGeometry(C.hutW + 0.2, 0.7 + footing, C.hutD + 0.2), mk(new THREE.MeshStandardMaterial({ color: 0x6b6e74, roughness: 0.95 })), 0, 0.35 - footing / 2, 0);
     const roofShape = new THREE.Shape();
     roofShape.moveTo(-C.hutW / 2 - 0.6, 0);
     roofShape.lineTo(0, C.roof);
@@ -230,11 +238,11 @@ export class RescueStation implements FinishEnvironment {
     // marker poles leading from the finish line to the door
     const pole = geo(new THREE.CylinderGeometry(0.05, 0.06, 2.4, 6));
     const poleM = mk(new THREE.MeshStandardMaterial({ color: 0xf06010, roughness: 0.5 }));
-    for (let k = 1; k <= 5; k++) {
-      const p = new THREE.Vector3().lerpVectors(new THREE.Vector3(F.x, 0, F.z), this.door, k / 6);
+    for (let k = 1; k <= 3; k++) {
+      const p = new THREE.Vector3().lerpVectors(new THREE.Vector3(F.x, 0, F.z), this.door, k / 4);
       for (const s of [-1, 1]) {
-        const px = p.x + s * 3 * this.faces.z;
-        const pz = p.z - s * 3 * this.faces.x;
+        const px = p.x + s * 7 * this.faces.z;
+        const pz = p.z - s * 7 * this.faces.x;
         const mesh = new THREE.Mesh(pole, poleM);
         mesh.position.set(px, H(px, pz) + 1.1, pz);
         this.group.add(mesh);

@@ -37,3 +37,19 @@ won. Relaxed: Whiteout 10/10 (reader), 3/10 for the never-tucking "average" auto
 
 Verdict: the weather systems and their telegraphing work in the integrated game; the slice is **not** ready to build
 the full course on until findings 1–2 are resolved.
+
+## Iteration 2 (same session)
+- **Finding 1, partly addressed:** a new terrain knob, \`shoulderDrop\` (Alpine/Fjord bit-identical), makes the course
+  run along a ridge's shoulder. The ground falls 150 m away on the skier's left, with the caves on the right
+  (\`04_shoulder_drop.png\`). It reads as open high country rather than a trough, but it is not yet a dramatic edge.
+- **Finding 2, addressed:** in a storm the chasing Yeti darkens to a grey silhouette with distance. At 51 m he reads
+  as a dark figure in the rear view (\`05_storm_chase_yeti_rearview.png\`).
+- **Storm look:** fog has no height thinning inside a front, and the storm dome shrinks to where the fog saturates,
+  so there is no hard edge of clear slope against the dome. The lit door and windows of the rescue hut are unlit
+  warm colour.
+- **Victory:** rendered end to end with no errors (\`06\`–\`08\`). The shots for the arrival, the Yeti at the edge
+  of the light and the break in the storm work. The lantern beat was not captured, because of capture timing.
+- Playability is unchanged by the terrain change: Normal reader 10/10 at 168.1 s; Hard 4/10.
+
+Still open: a more dramatic ridge edge (cornices), cloud motion, a frame-accurate victory capture, the full course
+evidence set (menu, summit, cave, hazards close up), and the six-reviewer round.

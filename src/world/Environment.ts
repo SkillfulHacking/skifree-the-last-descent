@@ -140,7 +140,11 @@ export class Environment {
     this.sun.target.updateMatrixWorld();
     // the sky dome is finite (45 km): keep it centred on the viewer for any course length
     this.sky.position.copy(camPos);
-    this.stormDome?.position.copy(camPos);
+    if (this.stormDome) {
+      this.stormDome.position.copy(camPos);
+      // just beyond where the storm's fog is saturated (≈ 2 / density), never further than 1.1 km
+      this.stormDome.scale.setScalar(Math.min(1, Math.max(0.2, 2.4 / Math.max(1e-6, this.fog.density) / 1100)));
+    }
     this.ranges.update(focus, camPos, dt);
     atmosphere.uFogColor.value.copy(this.fog.color);
     atmosphere.uFogExp.value = this.fog.density;
@@ -181,6 +185,7 @@ export class Environment {
   private sunBase = 0;
   private readonly fogClear = new THREE.Color();
   private flakeBase = 0;
+  private falloffBase = 0;
   private stormDome: THREE.Mesh | null = null;
 
   /** storm (0..1) dims the sun and the sky light (Whiteout fronts); 0 leaves every light at its base */
@@ -229,7 +234,11 @@ export class Environment {
         this.sunBase = this.sun.intensity;
         this.fogClear.copy(this.fog.color);
         this.flakeBase = (this.snow.material as THREE.PointsMaterial).size;
+        this.falloffBase = atmosphere.uFogFalloff.value;
       }
+      // inside a front the fog is a uniform cloud: no thinning with height (else the slopes above the
+      // camera show through the storm with a hard edge against the dome)
+      atmosphere.uFogFalloff.value = this.falloffBase * (1 - storm);
       this.storm = storm;
       this.fog.color.copy(this.fogClear).lerp(STORM_GREY, 0.85 * storm);
       if (!this.stormDome && storm > 0) {

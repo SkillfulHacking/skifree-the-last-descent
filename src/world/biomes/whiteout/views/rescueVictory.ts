@@ -80,12 +80,15 @@ export class RescueVictory implements VictoryScript {
       to: () => pose(st.yetiAI.pos.clone().addScaledVector(toDoor(), 6).add(new THREE.Vector3(0, 1.6, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.3, 0)), 32),
       handheld: 0.02,
     });
-    // 3) the door and the lantern: from beside the doorway, the skier in the warm light
+    // 3) the door and the lantern: from the storm side, the skier in front of the warm doorway
+    // (framed from wherever the skier came to a stop)
+    const toHut = () => door.clone().sub(sk()).setY(0).normalize();
+    const side = () => new THREE.Vector3(toHut().z, 0, -toHut().x);
     tl.shot({
       start: 7.6,
       end: 11.0,
-      from: () => pose(door.clone().addScaledVector(faces, 3.2).addScaledVector(across, -3.4).add(new THREE.Vector3(0, 1.7, 0)), sk().add(new THREE.Vector3(0, 1.3, 0)), 44),
-      to: () => pose(door.clone().addScaledVector(faces, 3.6).addScaledVector(across, -2.8).add(new THREE.Vector3(0, 1.6, 0)), sk().add(new THREE.Vector3(0, 1.6, 0)), 40),
+      from: () => pose(sk().addScaledVector(toHut(), -4.6).addScaledVector(side(), 1.8).add(new THREE.Vector3(0, 1.75, 0)), sk().addScaledVector(toHut(), 2.5).add(new THREE.Vector3(0, 1.3, 0)), 46),
+      to: () => pose(sk().addScaledVector(toHut(), -3.8).addScaledVector(side(), 1.4).add(new THREE.Vector3(0, 1.6, 0)), sk().addScaledVector(toHut(), 1.5).add(new THREE.Vector3(0, 1.5, 0)), 42),
       easing: ease.inOut,
     });
     tl.at(RESCUE_BEATS.lantern, () => this.trophy.start());
