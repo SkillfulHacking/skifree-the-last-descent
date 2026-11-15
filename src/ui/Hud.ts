@@ -101,6 +101,7 @@ export class Hud {
     const bar = el('div', 'hud-yeti-bar', this.yetiWrap);
     this.yetiBar = el('div', 'fill', bar);
 
+    this.weatherPill = el('div', 'hud-weather hidden', this.root);
     this.air = el('div', 'hud-air', this.root);
     this.trick = el('div', 'hud-trick', this.root);
     this.prompt = el('div', 'hud-prompt', this.root);
@@ -123,6 +124,27 @@ export class Hud {
   letterbox(on: boolean) {
     this.letterTop.classList.toggle('on', on);
     this.letterBot.classList.toggle('on', on);
+  }
+
+  private weatherPill: HTMLElement;
+  private weatherText = '';
+  /**
+   * The storm-front forecast (Whiteout): a pill under the score with the wind's direction (an arrow
+   * pointing the way it blows) — e.g. "STORM IN 6 s ←", "STORM ←", "CLEARING". null hides it.
+   */
+  setWeather(text: string | null, level: 'warn' | 'storm' | 'calm' = 'calm') {
+    const t = text ?? '';
+    if (t === this.weatherText) return;
+    this.weatherText = t;
+    this.weatherPill.classList.toggle('hidden', !text);
+    this.weatherPill.classList.toggle('warn', level === 'warn');
+    this.weatherPill.classList.toggle('storm', level === 'storm');
+    this.weatherPill.textContent = t;
+  }
+
+  /** the weather pill's text (tests) */
+  get weatherPillText(): string | null {
+    return this.weatherText || null;
   }
 
   setSkipHint(text: string | null) {

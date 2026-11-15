@@ -90,6 +90,9 @@ kbd {
 .letterbox.on { height: 11vh; }
 .hud-tl { position: absolute; left: 32px; top: 26px; text-shadow: 0 2px 12px rgba(0,0,0,0.45); }
 .hud-score { font: 900 30px/1 var(--display); letter-spacing: 0.02em; }
+.hud-weather { position: absolute; left: 32px; top: 104px; padding: 5px 12px; border-radius: 999px; background: rgba(12,18,28,0.62); color: #e8f0ff; font: 800 14px/1.2 var(--display, sans-serif); letter-spacing: 0.1em; text-shadow: none; }
+.hud-weather.warn { background: rgba(170,110,10,0.82); color: #fff; }
+.hud-weather.storm { background: rgba(28,44,70,0.85); color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.5); }
 .hud-mult { margin-top: 4px; font-weight: 800; font-size: 15px; color: var(--ice); letter-spacing: 0.08em; }
 .hud-mult.hot { color: var(--accent); }
 .hud-tr { position: absolute; right: 32px; top: 26px; text-align: right; text-shadow: 0 2px 12px rgba(0,0,0,0.45); }

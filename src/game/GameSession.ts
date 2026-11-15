@@ -779,6 +779,13 @@ export class GameSession implements Stage {
           const text = P.gate ? '[a squall builds off the sea — take the lee of the rocks, or the notch in the lull]' : (P.slip ?? 0) > 0 ? '[a squall builds off the sea — it will push you left]' : '[a squall gusts across the jump ahead]';
           this.envCaption(text, 2.4, `squall:${e.hazard.id}`, CAPTION_PRIORITY.warning);
         }
+        if (e.type === 'hazard-telegraph' && e.kind === 'blizzard') {
+          const dir = (e.hazard.params as { dir?: number }).dir ?? 1;
+          this.envCaption(`[a blizzard sweeps across the piste ahead — it will push you ${dir > 0 ? 'left' : 'right'}]`, 2.6, `blizzard:${e.hazard.id}`, CAPTION_PRIORITY.warning);
+        }
+      } else if (e.type === 'hazard-enter' && e.kind === 'wind-drift') {
+        this.audio.playCue('drift-plough', null);
+        this.envCaption('[skis plough into a deep drift]', 1.4, 'drift', CAPTION_PRIORITY.report);
       } else if (e.type === 'hazard-enter' && e.kind === 'scoured-rock') {
         this.audio.playCue('rock-scrape', null);
         this.envCaption('[skis scrape over bare rock]', 1.6, 'rock', CAPTION_PRIORITY.report);
@@ -1050,7 +1057,34 @@ export class GameSession implements Stage {
     }
   }
 
+  private lastFront: { k: string; phase: string } = { k: '', phase: 'clear' };
+  /** the storm-front forecast on the HUD and in the captions (locations whose weather has fronts) */
+  private updateWeatherHud() {
+    const env = this.world.environment;
+    const wm = capabilitiesOf(this.world.biome).weather;
+    const f = wm.front?.(env.clock, env.seed) ?? null;
+    if (!f || !this.run.simulating) {
+      this.hud.setWeather(null);
+      return;
+    }
+    // +X (dir +1) is the skier's left when facing downhill: the arrow points the way the wind pushes
+    const arrow = f.dir > 0 ? '←' : '→';
+    const side = f.dir > 0 ? 'left' : 'right';
+    if (f.phase === 'build') this.hud.setWeather(`STORM IN ${Math.max(1, Math.ceil(f.left))} s  ${arrow}`, 'warn');
+    else if (f.phase === 'storm') this.hud.setWeather(`STORM  ${arrow}`, 'storm');
+    else if (f.phase === 'ease') this.hud.setWeather('CLEARING', 'calm');
+    else this.hud.setWeather(null);
+    if (f.phase !== this.lastFront.phase) {
+      if (f.phase === 'build') {
+        this.audio.playCue('blizzard-build', null);
+        this.envCaption(`[a storm front rolls in — the wind will push you ${side}; shelter in the trees or check your speed]`, 3, 'front', CAPTION_PRIORITY.warning);
+      } else if (f.phase === 'ease') this.envCaption('[the storm eases — the view opens up]', 2.2, 'front', CAPTION_PRIORITY.report);
+      this.lastFront.phase = f.phase;
+    }
+  }
+
   private updateHud(dt: number) {
+    this.updateWeatherHud();
     const s = this.phys.s;
     const m = this.world.mountain;
     const L = m.finishZ;

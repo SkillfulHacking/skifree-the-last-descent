@@ -140,6 +140,7 @@ export class Environment {
     this.sun.target.updateMatrixWorld();
     // the sky dome is finite (45 km): keep it centred on the viewer for any course length
     this.sky.position.copy(camPos);
+    this.stormDome?.position.copy(camPos);
     this.ranges.update(focus, camPos, dt);
     atmosphere.uFogColor.value.copy(this.fog.color);
     atmosphere.uFogExp.value = this.fog.density;
@@ -179,7 +180,8 @@ export class Environment {
   private storm = 0;
   private sunBase = 0;
   private readonly fogClear = new THREE.Color();
-  private readonly skyClear = { turbidity: 0, rayleigh: 0, mie: 0 };
+  private flakeBase = 0;
+  private stormDome: THREE.Mesh | null = null;
 
   /** storm (0..1) dims the sun and the sky light (Whiteout fronts); 0 leaves every light at its base */
   private applyLight() {
@@ -221,21 +223,29 @@ export class Environment {
       this.fog.density = this.fogDensityFor(visibility, this.fogBoost);
     }
     if (storm !== this.storm) {
-      // (Pass 5, Whiteout) a front greys the air and the sky and dims the sun; at 0 nothing changes
+      // (Pass 5, Whiteout) a front greys the air, hides the sky and the far ranges behind a dome of
+      // storm cloud, thickens the driven snow and dims the sun; at 0 nothing changes
       if (this.sunBase === 0) {
         this.sunBase = this.sun.intensity;
         this.fogClear.copy(this.fog.color);
-        const u = this.sky.material.uniforms;
-        this.skyClear.turbidity = u['turbidity']!.value as number;
-        this.skyClear.rayleigh = u['rayleigh']!.value as number;
-        this.skyClear.mie = u['mieCoefficient']!.value as number;
+        this.flakeBase = (this.snow.material as THREE.PointsMaterial).size;
       }
       this.storm = storm;
       this.fog.color.copy(this.fogClear).lerp(STORM_GREY, 0.85 * storm);
-      const u = this.sky.material.uniforms;
-      u['turbidity']!.value = this.skyClear.turbidity + (20 - this.skyClear.turbidity) * storm;
-      u['rayleigh']!.value = this.skyClear.rayleigh * (1 - 0.85 * storm);
-      u['mieCoefficient']!.value = this.skyClear.mie + (0.05 - this.skyClear.mie) * storm;
+      if (!this.stormDome && storm > 0) {
+        const m = new THREE.MeshBasicMaterial({ color: this.fog.color.clone(), side: THREE.BackSide, transparent: true, opacity: 0, depthWrite: false, fog: false });
+        this.stormDome = new THREE.Mesh(new THREE.SphereGeometry(1100, 24, 12), m);
+        this.stormDome.renderOrder = 5;
+        this.stormDome.frustumCulled = false;
+        this.scene.add(this.stormDome);
+      }
+      if (this.stormDome) {
+        const m = this.stormDome.material as THREE.MeshBasicMaterial;
+        m.color.copy(this.fog.color);
+        m.opacity = Math.min(0.97, 1.15 * storm);
+        this.stormDome.visible = storm > 0.002;
+      }
+      (this.snow.material as THREE.PointsMaterial).size = this.flakeBase * (1 + 1.3 * storm);
       this.applyLight();
     }
     if (snowfall !== this.snowfall) {
@@ -251,6 +261,11 @@ export class Environment {
     this.snow.geometry.dispose();
     (this.snow.material as THREE.PointsMaterial).map?.dispose();
     (this.snow.material as THREE.Material).dispose();
+    if (this.stormDome) {
+      this.stormDome.geometry.dispose();
+      (this.stormDome.material as THREE.Material).dispose();
+      this.scene.remove(this.stormDome);
+    }
     this.sky.geometry.dispose();
     this.sky.material.dispose();
     this.ranges.dispose();

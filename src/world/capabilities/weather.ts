@@ -54,6 +54,19 @@ export interface WeatherModel {
    * (trees, gullies) ski calmer than exposed ones. Pure; given the course.
    */
   exposure?(m: ExposureQuery, x: number, z: number): number;
+  /**
+   * Optional storm-front forecast at time t (Whiteout): what the HUD and the captions telegraph —
+   * the phase, seconds until it changes, which side the wind blows from (+1 = from the skier's
+   * right, toward +X) and the intensity. Null/absent: no fronts.
+   */
+  front?(t: number, seed: number): WeatherFront | null;
+}
+
+export interface WeatherFront {
+  phase: 'clear' | 'build' | 'storm' | 'ease';
+  left: number;
+  dir: number;
+  s: number;
 }
 
 /** what an exposure model may read from the course (a Mountain satisfies it) */

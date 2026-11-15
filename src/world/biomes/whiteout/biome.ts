@@ -116,9 +116,11 @@ export function makeWhiteoutBiome(): Biome {
       startSlope: 8,
       // fast alternate lines over the exposed crests (the risky choice in a storm)
       altTypes: ['alpine', 'highspeed', 'basin', 'ridgeline', 'chute', 'forest'],
-      wallHeight: 460,
-      wallRelief: 230,
-      rangeHeight: 1500,
+      // on the ridge, not in a valley: low, broken shoulders either side of the piste (the sky and
+      // the storm visible over them) and big peaks far off across the void, seen in the clear windows
+      wallHeight: 110,
+      wallRelief: 95,
+      rangeHeight: 620,
       rangeSoft: 0.4,
       undulation: 9,
       detail: 1.8,

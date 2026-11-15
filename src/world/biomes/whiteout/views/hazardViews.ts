@@ -35,7 +35,7 @@ function driftView(h: HazardInstance<DriftParams>, m: Mountain): HazardView {
   obj.name = 'wind-drift';
   const L = h.r * h.params.len;
   const W = h.r * 0.75;
-  const H = 1.15 + 0.35 * ((h.seed % 97) / 97);
+  const H = 1.7 + 0.5 * ((h.seed % 97) / 97);
   const nu = 26;
   const nv = 14;
   const pos: number[] = [];
@@ -59,7 +59,7 @@ function driftView(h: HazardInstance<DriftParams>, m: Mountain): HazardView {
       pos.push(x, m.heightAt(x, z) + y + 0.03, z);
       // the lee face sits in its own shadow (a touch bluer)
       const lee = v > 0.35 ? Math.min(1, (v - 0.35) * 2.2) * along : 0;
-      col.push(1 - 0.16 * lee, 1 - 0.11 * lee, 1 - 0.02 * lee);
+      col.push(1 - 0.3 * lee, 1 - 0.22 * lee, 1 - 0.06 * lee);
     }
   for (let j = 0; j < nv; j++)
     for (let i = 0; i < nu; i++) {

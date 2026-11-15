@@ -154,6 +154,7 @@ export const WHITEOUT_WEATHER: WeatherModel = {
   id: 'whiteout',
   coupling: { airborne: 0.13, balance: 0.4, headwind: { relaxed: 0.0002, normal: 0.001, hard: 0.001 } },
   exposure: whiteoutExposure,
+  front: (t, seed) => frontAt(t, seed, forecast),
   sample(x: number, z: number, t: number, seed: number, out: WeatherSample): WeatherSample {
     const f = frontAt(t, seed, scratch);
     const s = f.s;
@@ -174,4 +175,5 @@ export const WHITEOUT_WEATHER: WeatherModel = {
     return out;
   },
 };
+const forecast: FrontState = { s: 0, dir: 1, phase: 'clear', left: 0, k: 0 };
 const scratch: FrontState = { s: 0, dir: 1, phase: 'clear', left: 0, k: 0 };
