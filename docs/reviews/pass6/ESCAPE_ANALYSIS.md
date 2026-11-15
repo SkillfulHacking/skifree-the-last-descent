@@ -84,7 +84,7 @@ The smallest correction is a cap on the Yeti's own pace for the first seconds: t
 start + 3 m/s + 1.1 m/s per second (`YETI.syncMargin`, `syncAccel`).
 - The catch-up pressure is untouched.
 - The cap is above his pace whenever the skier starts at more than about 14 m/s, so every chase skied at speed
-  is **bit-identical**: 0 of 225 as-skied chases changed (`yeti_escape.test.ts`, and the comparison below).
+  is **bit-identical** (round 1: all 225 as-skied `gravity` chases compared were unchanged; `yeti_escape.test.ts`).
 - No terrain, course code or record changes.
 - The Yeti is not slower anywhere else.
 
@@ -183,7 +183,7 @@ What the table shows:
 - **Fjord Normal.** A slow start still costs a clean, tucking skier the run on about 10 % of courses (3 of 30),
   against 1 of 30 skied in. Hard stays hard.
 - **Chases begun at speed** (median entry 15.9 m/s, minimum seen 12.2 m/s, above the 11 m/s threshold) are
-  bit-identical. 0 of 172 as-skied runs changed. `terrain_contact.test.ts` holds the reference runs: the one
+  bit-identical: all 114 as-skied runs that overlap the round-0 data (old AI, the `gravity` driver) have identical gaps, minimum gap and outcome. `terrain_contact.test.ts` holds the reference runs: the one
   run that starts its chase slowly (`EC1 average`, never tucks) has the same skier steps up to the old
   capture time and is caught 0.66 s later.
 - **Poles.** A helpful skill: from a standstill they add 9 m of gap at 10 s over tucking, and win 1 more
