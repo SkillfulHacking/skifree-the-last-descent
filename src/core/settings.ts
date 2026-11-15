@@ -154,7 +154,10 @@ export function sanitize(s: Settings): Settings {
   if (s.dailyDate !== null && !(typeof s.dailyDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s.dailyDate) && new Date(`${s.dailyDate}T00:00:00Z`).toISOString().startsWith(s.dailyDate))) s.dailyDate = null;
   for (const k of Object.keys(d.bindings) as Array<keyof Settings['bindings']>) {
     const v = s.bindings?.[k];
-    s.bindings[k] = Array.isArray(v) && v.every((c) => typeof c === 'string') && v.length > 0 ? v : [...d.bindings[k]];
+    // (an action other than Pause/Skip left with only Escape — possible after a rebind in an
+    // unreleased Pass 6 build — is unusable: it gets its default keys back)
+    const escOnly = k !== 'pause' && k !== 'skip' && Array.isArray(v) && v.length > 0 && v.every((c) => c === 'Escape');
+    s.bindings[k] = Array.isArray(v) && v.every((c) => typeof c === 'string') && v.length > 0 && !escOnly ? v : [...d.bindings[k]];
   }
   if (!s.bindings.pause.includes('Escape')) s.bindings.pause.push('Escape');
   return s;

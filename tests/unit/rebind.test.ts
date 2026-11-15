@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_BINDINGS, rebindKey, type Action } from '../../src/input/Input';
+import { loadSettings } from '../../src/core/settings';
 
 const ACTIONS: Action[] = ['left', 'right', 'tuck', 'brake', 'drift', 'pop', 'recover', 'lookback', 'pause'];
 const fresh = () => JSON.parse(JSON.stringify(DEFAULT_BINDINGS)) as Record<Action, string[]>;
@@ -56,5 +57,15 @@ describe('Controls rebind (Pass 6 round 2, QA M1)', () => {
     const b = fresh();
     expect(rebindKey(b, 'tuck', 'Escape', ACTIONS)).toBe(false);
     expect(b).toEqual(fresh());
+  });
+  it('a stored gameplay action bound only to Escape gets its defaults back on load', () => {
+    const store = new Map<string, string>();
+    const kv = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) };
+    const b = fresh();
+    b.recover = ['Escape'];
+    b.pause = ['KeyR', 'Escape'];
+    store.set('skifree-tld.settings.v1', JSON.stringify({ bindings: b }));
+    const s = loadSettings(kv as never);
+    expect(s.bindings.recover).toEqual(['KeyR']);
   });
 });

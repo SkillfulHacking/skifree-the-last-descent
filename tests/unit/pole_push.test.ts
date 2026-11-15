@@ -258,6 +258,21 @@ describe('pole push: context and cadence', () => {
     }
   });
 
+  it('a crash right after a stroke: the first stroke after getting up still gets its head start', () => {
+    const p = skier(FLAT, 3);
+    let i = 0;
+    while (p.s.poleStrokes < 1 || p.s.poleT >= 0) {
+      p.step({ ...NO_INPUT, pole: i++ < 5 }, PHYS_DT);
+      if (i > 600) throw new Error('no stroke');
+    }
+    p.forceCrash('test');
+    run(p, (k) => ({ recover: k === 150 }), 3);
+    expect(p.s.crashed).toBe(false);
+    run(p, () => ({}), 0.05); // released
+    p.step({ ...NO_INPUT, pole: true, polePressed: true }, PHYS_DT);
+    expect(p.s.poleT).toBeGreaterThan(POLE.firstStrokeAt * POLE.period[1] - 1e-9);
+  });
+
   it('is deterministic at the fixed step', () => {
     const a = skier(FLAT, 2);
     const b = skier(FLAT, 2);

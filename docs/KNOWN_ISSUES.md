@@ -109,3 +109,8 @@ are in `docs/reviews/pass2/final/FINAL_REVIEW_A_CE.md` and the QUALITY_REPORT.
   1,000 km; memory is not affected.
 - **Precision:** particles and tracks use absolute float32 positions (B12). The error is under 4 mm
   at 50 km and about 3 cm beyond 250 km of Endless.
+- **Pole push animation:** a planted pole tip is held on the snow at pole length from the hand, not
+  pinned to a world point. At push speeds up to about 6 m/s the hand drive roughly matches the
+  skier's travel and the slide is a few tenths of a metre. Above that the tip slides forward a little
+  during the (short, fading) push; it is visible in a side view, hard to see from the game camera.
+  Mid-push the hands rise behind the hips a little early, and the recovery swing is nearly horizontal.
