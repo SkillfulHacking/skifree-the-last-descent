@@ -1,0 +1,662 @@
+[
+ {
+  "case": "alpine-sprint",
+  "courseId": "SEED-3755869459-SPR",
+  "biome": "alpine",
+  "length": "sprint",
+  "flow": "retry (2nd run on the same world)",
+  "beats": [
+   {
+    "t": 8.63,
+    "lum": {
+     "stdev": 72.1,
+     "mean": 90.6
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.09,
+    "sunBase": 4.2
+   },
+   {
+    "t": 11.33,
+    "lum": {
+     "stdev": 54.4,
+     "mean": 51.4
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.09,
+    "sunBase": 4.2
+   },
+   {
+    "t": 14.63,
+    "lum": {
+     "stdev": 42.1,
+     "mean": 153.9
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.09,
+    "sunBase": 4.2
+   },
+   {
+    "t": 15.23,
+    "lum": {
+     "stdev": 41.5,
+     "mean": 153.2
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.09,
+    "sunBase": 4.2
+   },
+   {
+    "t": 16.9,
+    "lum": {
+     "stdev": 39.4,
+     "mean": 153.7
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.09,
+    "sunBase": 4.2
+   }
+  ],
+  "chase": {
+   "lum": {
+    "stdev": 28.1,
+    "mean": 153.7
+   },
+   "origin": [
+    0,
+    0,
+    0
+   ],
+   "snow": {
+    "n": 2400,
+    "nan": 0,
+    "sun": 4.2,
+    "hemi": 0.25,
+    "size": 0.09,
+    "opacity": 0.75,
+    "visible": true,
+    "flakeBase": 0.09,
+    "sunBase": 4.2,
+    "falloffBase": 0.0019230769230769232,
+    "storm": 0,
+    "snowfall": 1,
+    "dMin": 3.1412665100873,
+    "d1": 7.110944527205789,
+    "dMed": 25.598816490253054,
+    "within2m": 0
+   },
+   "falloff": 0.0019230769230769232
+  },
+  "errors": []
+ },
+ {
+  "case": "fjord-sprint",
+  "courseId": "SEED-3755869459-SPR@FJORD",
+  "biome": "fjord",
+  "length": "sprint",
+  "flow": "retry (2nd run on the same world)",
+  "beats": [
+   {
+    "t": 8.63,
+    "lum": {
+     "stdev": 50.4,
+     "mean": 113.4
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.07,
+    "sunBase": 4.5
+   },
+   {
+    "t": 11.33,
+    "lum": {
+     "stdev": 57.9,
+     "mean": 48
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.07,
+    "sunBase": 4.5
+   },
+   {
+    "t": 14.63,
+    "lum": {
+     "stdev": 59.1,
+     "mean": 94.2
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.07,
+    "sunBase": 4.5
+   },
+   {
+    "t": 15.23,
+    "lum": {
+     "stdev": 58.6,
+     "mean": 116.1
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.07,
+    "sunBase": 4.5
+   },
+   {
+    "t": 16.9,
+    "lum": {
+     "stdev": 32.1,
+     "mean": 153.1
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.07,
+    "sunBase": 4.5
+   }
+  ],
+  "chase": {
+   "lum": {
+    "stdev": 29.9,
+    "mean": 148.4
+   },
+   "origin": [
+    0,
+    0,
+    0
+   ],
+   "snow": {
+    "n": 720,
+    "nan": 0,
+    "sun": 4.5,
+    "hemi": 0.27,
+    "size": 0.07,
+    "opacity": 0.17748979645395965,
+    "visible": true,
+    "flakeBase": 0.07,
+    "sunBase": 4.5,
+    "falloffBase": 0.0003846153846153846,
+    "storm": 0,
+    "snowfall": 0.32270872082538116,
+    "dMin": 3.1865051341549324,
+    "d1": 7.38853200818094,
+    "dMed": 25.8285897361237,
+    "within2m": 0
+   },
+   "falloff": 0.0003846153846153846
+  },
+  "errors": []
+ },
+ {
+  "case": "wo-endless",
+  "courseId": "SEED-3755869459-INF@WHITE",
+  "biome": "whiteout",
+  "length": "endless",
+  "flow": "retry (2nd run on the same world)",
+  "beats": [
+   {
+    "t": 8.63,
+    "lum": {
+     "stdev": 49.2,
+     "mean": 51.3
+    },
+    "origin": [
+     0,
+     -3072,
+     13312
+    ],
+    "flake": 0.133870145469861,
+    "sunBase": 3.6
+   },
+   {
+    "t": 11.33,
+    "lum": {
+     "stdev": 35.5,
+     "mean": 34.6
+    },
+    "origin": [
+     0,
+     -3072,
+     13312
+    ],
+    "flake": 0.13545,
+    "sunBase": 3.6
+   },
+   {
+    "t": 14.63,
+    "lum": {
+     "stdev": 41.1,
+     "mean": 103
+    },
+    "origin": [
+     0,
+     -3072,
+     13312
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   },
+   {
+    "t": 15.23,
+    "lum": {
+     "stdev": 43.8,
+     "mean": 107.8
+    },
+    "origin": [
+     0,
+     -3072,
+     13312
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   },
+   {
+    "t": 16.9,
+    "lum": {
+     "stdev": 33.9,
+     "mean": 103.7
+    },
+    "origin": [
+     0,
+     -3072,
+     13312
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   }
+  ],
+  "chase": {
+   "lum": {
+    "stdev": 22,
+    "mean": 153.3
+   },
+   "origin": [
+    0,
+    -3072,
+    13312
+   ],
+   "snow": {
+    "n": 3000,
+    "nan": 0,
+    "sun": 3.213119999999999,
+    "hemi": 0.413056,
+    "size": 0.08843333333333338,
+    "opacity": 0.5430555555555564,
+    "visible": true,
+    "flakeBase": 0.075,
+    "sunBase": 3.6,
+    "falloffBase": 0.0007142857142857143,
+    "storm": 0.1377777777777781,
+    "snowfall": 0.6388888888888898,
+    "dMin": 1.9205265167213812,
+    "d1": 5.976452522829274,
+    "dMed": 25.367555269858663,
+    "within2m": 1
+   },
+   "falloff": 0.0006158730158730156
+  },
+  "errors": []
+ },
+ {
+  "case": "wo-endurance",
+  "courseId": "SEED-3755869459-END@WHITE",
+  "biome": "whiteout",
+  "length": "endurance",
+  "flow": "retry (2nd run on the same world)",
+  "beats": [
+   {
+    "t": 8.63,
+    "lum": {
+     "stdev": 52.7,
+     "mean": 58.2
+    },
+    "origin": [
+     0,
+     -2048,
+     7168
+    ],
+    "flake": 0.133870145469861,
+    "sunBase": 3.6
+   },
+   {
+    "t": 11.33,
+    "lum": {
+     "stdev": 45.9,
+     "mean": 43.9
+    },
+    "origin": [
+     0,
+     -2048,
+     7168
+    ],
+    "flake": 0.13545,
+    "sunBase": 3.6
+   },
+   {
+    "t": 14.63,
+    "lum": {
+     "stdev": 38.8,
+     "mean": 114.9
+    },
+    "origin": [
+     0,
+     -2048,
+     7168
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   },
+   {
+    "t": 15.23,
+    "lum": {
+     "stdev": 37.5,
+     "mean": 116.5
+    },
+    "origin": [
+     0,
+     -2048,
+     7168
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   },
+   {
+    "t": 16.9,
+    "lum": {
+     "stdev": 36.3,
+     "mean": 116.5
+    },
+    "origin": [
+     0,
+     -2048,
+     7168
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   }
+  ],
+  "chase": {
+   "lum": {
+    "stdev": 25.9,
+    "mean": 146.4
+   },
+   "origin": [
+    0,
+    -2048,
+    7168
+   ],
+   "snow": {
+    "n": 3000,
+    "nan": 0,
+    "sun": 3.213119999999999,
+    "hemi": 0.413056,
+    "size": 0.08843333333333338,
+    "opacity": 0.5430555555555564,
+    "visible": true,
+    "flakeBase": 0.075,
+    "sunBase": 3.6,
+    "falloffBase": 0.0007142857142857143,
+    "storm": 0.1377777777777781,
+    "snowfall": 0.6388888888888898,
+    "dMin": 1.1122940132431371,
+    "d1": 6.403567450963093,
+    "dMed": 25.769895255344863,
+    "within2m": 1
+   },
+   "falloff": 0.0006158730158730156
+  },
+  "errors": []
+ },
+ {
+  "case": "wo-expedition",
+  "courseId": "SEED-3755869459-EXP@WHITE",
+  "biome": "whiteout",
+  "length": "expedition",
+  "flow": "retry (2nd run on the same world)",
+  "beats": [
+   {
+    "t": 8.63,
+    "lum": {
+     "stdev": 49,
+     "mean": 54.8
+    },
+    "origin": [
+     0,
+     -3072,
+     13312
+    ],
+    "flake": 0.133870145469861,
+    "sunBase": 3.6
+   },
+   {
+    "t": 11.33,
+    "lum": {
+     "stdev": 45.9,
+     "mean": 44.3
+    },
+    "origin": [
+     0,
+     -3072,
+     13312
+    ],
+    "flake": 0.13545,
+    "sunBase": 3.6
+   },
+   {
+    "t": 14.63,
+    "lum": {
+     "stdev": 41.4,
+     "mean": 121.1
+    },
+    "origin": [
+     0,
+     -3072,
+     13312
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   },
+   {
+    "t": 15.23,
+    "lum": {
+     "stdev": 42.2,
+     "mean": 123.9
+    },
+    "origin": [
+     0,
+     -3072,
+     13312
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   },
+   {
+    "t": 16.9,
+    "lum": {
+     "stdev": 37.4,
+     "mean": 124.3
+    },
+    "origin": [
+     0,
+     -3072,
+     13312
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   }
+  ],
+  "chase": {
+   "lum": {
+    "stdev": 24.2,
+    "mean": 146.5
+   },
+   "origin": [
+    0,
+    -3072,
+    13312
+   ],
+   "snow": {
+    "n": 3000,
+    "nan": 0,
+    "sun": 3.213119999999999,
+    "hemi": 0.413056,
+    "size": 0.08843333333333338,
+    "opacity": 0.5430555555555564,
+    "visible": true,
+    "flakeBase": 0.075,
+    "sunBase": 3.6,
+    "falloffBase": 0.0007142857142857143,
+    "storm": 0.1377777777777781,
+    "snowfall": 0.6388888888888898,
+    "dMin": 2.2311435153393333,
+    "d1": 5.751953530297135,
+    "dMed": 25.53693632824978,
+    "within2m": 0
+   },
+   "falloff": 0.0006158730158730156
+  },
+  "errors": []
+ },
+ {
+  "case": "wo-standard",
+  "courseId": "SEED-3755869459-STD@WHITE",
+  "biome": "whiteout",
+  "length": "standard",
+  "flow": "retry (2nd run on the same world)",
+  "beats": [
+   {
+    "t": 8.63,
+    "lum": {
+     "stdev": 51.4,
+     "mean": 53.9
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.133870145469861,
+    "sunBase": 3.6
+   },
+   {
+    "t": 11.33,
+    "lum": {
+     "stdev": 46.1,
+     "mean": 40.7
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.13545,
+    "sunBase": 3.6
+   },
+   {
+    "t": 14.63,
+    "lum": {
+     "stdev": 54.6,
+     "mean": 96.6
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   },
+   {
+    "t": 15.23,
+    "lum": {
+     "stdev": 61.7,
+     "mean": 108.1
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   },
+   {
+    "t": 16.9,
+    "lum": {
+     "stdev": 46.9,
+     "mean": 104.7
+    },
+    "origin": [
+     0,
+     0,
+     0
+    ],
+    "flake": 0.093135,
+    "sunBase": 3.6
+   }
+  ],
+  "chase": {
+   "lum": {
+    "stdev": 24.4,
+    "mean": 145.6
+   },
+   "origin": [
+    0,
+    0,
+    0
+   ],
+   "snow": {
+    "n": 3000,
+    "nan": 0,
+    "sun": 3.213119999999999,
+    "hemi": 0.413056,
+    "size": 0.08843333333333338,
+    "opacity": 0.5430555555555564,
+    "visible": true,
+    "flakeBase": 0.075,
+    "sunBase": 3.6,
+    "falloffBase": 0.0007142857142857143,
+    "storm": 0.1377777777777781,
+    "snowfall": 0.6388888888888898,
+    "dMin": 1.7532626516290104,
+    "d1": 6.2365764220311295,
+    "dMed": 25.592638496473736,
+    "within2m": 2
+   },
+   "falloff": 0.0006158730158730156
+  },
+  "errors": []
+ }
+]
