@@ -967,6 +967,15 @@ export class App {
       toMenu: () => this.toMenu(),
       /** (evidence captures) optional x and heading (rad, 0 = down the course +Z) */
       teleport: (z: number, speed = 18, x?: number, heading?: number) => this.session?.debugTeleport(z, speed, x, heading),
+      /** (evidence captures) set the physics clock (s): the weather timeline jumps with it */
+      setTime: (t: number) => this.session?.debugSetTime(t),
+      /** (evidence captures) the weather front at physics time t (Whiteout), or null */
+      front: (t: number) => {
+        const env = this.session?.world.environment;
+        if (!env) return null;
+        const f = env.caps.weather.front?.(t, env.seed);
+        return f ? { ...f } : null;
+      },
       toCave: () => {
         const e = this.session?.run.encounter;
         if (e) this.session?.debugTeleport(e.triggerZ - 12, 16);

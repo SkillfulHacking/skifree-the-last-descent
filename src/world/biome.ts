@@ -124,6 +124,12 @@ export interface BiomeRangesLook {
    * clear coastal air, islands and the far shore stay readable).
    */
   horizonHaze?: number;
+  /**
+   * Optional (Whiteout, W-004): 0..1 rounds the far ridges' crests (fewer noise octaves, compressed
+   * peaks) — the 5-octave ridged crest aliases into a regular sawtooth on the 480-segment rings.
+   * Absent = the original skyline (bit-identical).
+   */
+  soft?: number;
 }
 
 /** One conifer species (shape + needle colour). See props.ts pineGeometry. */
@@ -220,6 +226,12 @@ export interface BiomeTerrain {
    * `shoulderDrop`; absent = no ridge (bit-identical). Off-piste only: the rim guard
    * (capabilities/environment.ts) returns a skier who goes over the rim.
    */
+  /**
+   * Optional (Whiteout, W-005): 0..1 domain-warps the wind drifts and breaks them into patches
+   * (sastrugi fields), instead of one regular anisotropic noise (which reads as diagonal stripes).
+   * Absent = the original drifts (bit-identical).
+   */
+  driftWarp?: number;
   ridge?: { dropSide: 1 | -1; rim: number; lip: number; depth: number; flank: number; crest: number; crestE: number; backDrop: number };
   /** valley wall height (m) */
   wallHeight: number;

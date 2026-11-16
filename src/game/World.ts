@@ -143,7 +143,7 @@ export class World {
       const t = this.finish.trophy;
       this.trophyHome = { parent: t.parent, pos: t.position.clone(), quat: t.quaternion.clone(), scale: t.scale.clone() };
     } else this.finish = null;
-    this.hazardViews = new HazardLayer(this.environment, { mountain: this.mountain, quality, biome: this.biome });
+    this.hazardViews = new HazardLayer(this.environment, { mountain: this.mountain, quality, biome: this.biome, terrainMaterial: this.terrain.material });
     this.scene.add(this.hazardViews.group);
     this.scenery = this.presentation.scenery?.build({ mountain: this.mountain, quality, biome: this.biome, terrain: this.terrain.uniforms, sunDir: this.env.sunDir }) ?? null;
     if (this.scenery) this.scene.add(this.scenery.group);

@@ -14,7 +14,33 @@ import { registerHazardView, type HazardView } from '../../../presentation/hazar
 import { makeFlakeTexture } from '../../../Environment';
 import { BLIZZARD, blizzardStrength, type BlizzardParams, type DriftParams } from '../hazards';
 
-let shared: { drift: THREE.MeshStandardMaterial; plume: THREE.PointsMaterial; curtain: THREE.MeshBasicMaterial; flake: THREE.Texture } | null = null;
+let shared: { drift: THREE.MeshStandardMaterial; plume: THREE.PointsMaterial; curtain: THREE.ShaderMaterial; flake: THREE.Texture } | null = null;
+
+/**
+ * W-008: a blizzard curtain is a soft sheet of driven snow — feathered on every edge, streaked along
+ * the wind, thinning with distance like the fog — never a flat translucent rectangle.
+ */
+function curtainMaterial(): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    uniforms: { uOpacity: { value: 0 }, uTime: { value: 0 }, uColor: { value: new THREE.Color(0.9, 0.93, 0.97) } },
+    vertexShader: 'varying vec2 vUv; varying float vD; void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vD = -mv.z; gl_Position = projectionMatrix * mv; }',
+    fragmentShader: `uniform float uOpacity; uniform float uTime; uniform vec3 uColor; varying vec2 vUv; varying float vD;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
+      void main(){
+        float edge = smoothstep(0.0, 0.22, vUv.x) * smoothstep(1.0, 0.78, vUv.x) * smoothstep(0.0, 0.15, vUv.y) * smoothstep(1.0, 0.45, vUv.y);
+        float streak = 0.55 + 0.45 * n(vec2(vUv.x * 7.0 - uTime * 0.9, vUv.y * 40.0));
+        float billow = 0.6 + 0.4 * n(vec2(vUv.x * 3.0 - uTime * 0.25, vUv.y * 2.5 + 1.7));
+        float near = smoothstep(2.0, 9.0, vD);
+        float a = uOpacity * edge * streak * billow * near;
+        if (a < 0.003) discard;
+        gl_FragColor = vec4(uColor, a);
+      }`,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+}
 function mats() {
   if (shared) return shared;
   const flake = makeFlakeTexture();
@@ -22,14 +48,19 @@ function mats() {
     // fresh wind-loaded snow: brighter and smoother than the piste around it
     drift: new THREE.MeshStandardMaterial({ color: new THREE.Color(0.97, 0.985, 1.0), roughness: 0.62, metalness: 0, vertexColors: true }),
     plume: new THREE.PointsMaterial({ size: 0.9, color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false, map: flake, sizeAttenuation: true }),
-    curtain: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.9, 0.93, 0.97), transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, fog: true }),
+    curtain: curtainMaterial(),
     flake,
   };
   return shared;
 }
 
-/** A drift: an elongated mound across the fall line (gentle windward side, steep lee), draped on the snow. */
-function driftView(h: HazardInstance<DriftParams>, m: Mountain): HazardView {
+/**
+ * A drift: an elongated wind-built mound across the fall line (gentle windward side, a sharp crest and
+ * a steep lee), draped on the snow and shaded by the terrain's own snow material (W-008: with a plain
+ * white material it read as a smooth grey berm), with sastrugi grooves cut along the wind and a plume
+ * of spindrift off the crest.
+ */
+function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMat?: THREE.Material): HazardView {
   const M = mats();
   const obj = new THREE.Group();
   obj.name = 'wind-drift';
@@ -54,8 +85,10 @@ function driftView(h: HazardInstance<DriftParams>, m: Mountain): HazardView {
       // profile: long windward ramp, crest at v≈0.35, steep lee
       const across = v < 0.35 ? Math.pow(Math.max(0, (v + 1) / 1.35), 1.6) : Math.max(0, 1 - Math.pow((v - 0.35) / 0.65, 0.7));
       const along = Math.pow(Math.max(0, 1 - u * u), 0.8);
-      const ripple = 0.06 * Math.sin(lx * 1.7 + h.seed) * across;
-      const y = H * across * along + ripple;
+      // sastrugi: wind-cut grooves along the windward face, a few cm deep, wandering
+      const groove = 0.07 * Math.sin(lz * 2.6 + 1.3 * Math.sin(lx * 0.35 + h.seed)) * across * (v < 0.35 ? 1 : 0.3);
+      const ripple = 0.05 * Math.sin(lx * 1.7 + h.seed) * across;
+      const y = H * across * along + ripple + groove;
       pos.push(x, m.heightAt(x, z) + y + 0.03, z);
       // the lee face sits in its own shadow (a touch bluer)
       const lee = v > 0.35 ? Math.min(1, (v - 0.35) * 2.2) * along : 0;
@@ -71,7 +104,11 @@ function driftView(h: HazardInstance<DriftParams>, m: Mountain): HazardView {
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
-  const mesh = new THREE.Mesh(g, M.drift);
+  // fresh wind-loaded snow for the terrain shader: soft (powder) on the mound, none of the groomed look
+  const surf = new Float32Array((pos.length / 3) * 3);
+  for (let i = 0; i < pos.length / 3; i++) surf.set([0, 0.85, 0], i * 3);
+  g.setAttribute('aSurf', new THREE.BufferAttribute(surf, 3));
+  const mesh = new THREE.Mesh(g, terrainMat ?? M.drift);
   mesh.receiveShadow = true;
   obj.add(mesh);
   // spindrift off the crest
@@ -166,7 +203,8 @@ function blizzardView(h: HazardInstance<BlizzardParams>, m: Mountain): HazardVie
         p[i * 3 + 2] = h.z + z;
       }
       (g.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
-      cm.opacity = 0.16 * Math.max(w, ph.phase === 'telegraph' ? 0.6 * ph.u : 0);
+      cm.uniforms.uOpacity!.value = 0.28 * Math.max(w, ph.phase === 'telegraph' ? 0.6 * ph.u : 0);
+      cm.uniforms.uTime!.value = t;
       curtains.forEach((sh, k) => {
         sh.position.set(cx + (k - 1.5) * R * 0.42 + dir * ((t * 9 + k * 13) % 24) - dir * 12, ground + 11, h.z);
       });
@@ -180,5 +218,5 @@ function blizzardView(h: HazardInstance<BlizzardParams>, m: Mountain): HazardVie
   };
 }
 
-registerHazardView('wind-drift', (h, ctx) => driftView(h as HazardInstance<DriftParams>, ctx.mountain));
+registerHazardView('wind-drift', (h, ctx) => driftView(h as HazardInstance<DriftParams>, ctx.mountain, ctx.terrainMaterial));
 registerHazardView('blizzard', (h, ctx) => blizzardView(h as HazardInstance<BlizzardParams>, ctx.mountain));

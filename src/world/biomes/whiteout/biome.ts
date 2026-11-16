@@ -85,7 +85,7 @@ export function makeWhiteoutBiome(): Biome {
       shadeTint: [0.86, 0.92, 1.08],
       skylightTint: [0.9, 0.96, 1.15],
     },
-    ranges: { skyColor: [0.6, 0.67, 0.78], snow: [0.9, 0.92, 0.96], stoneDark: [0.11, 0.115, 0.13], stoneLight: [0.3, 0.31, 0.33], lowland: [0.2, 0.22, 0.26], horizonHaze: 0.8 },
+    ranges: { skyColor: [0.6, 0.67, 0.78], snow: [0.9, 0.92, 0.96], stoneDark: [0.11, 0.115, 0.13], stoneLight: [0.3, 0.31, 0.33], lowland: [0.2, 0.22, 0.26], horizonHaze: 0.8, soft: 0.8 },
     trees: {
       species: [
         // stunted krummholz spruce at the treeline: short, dense, flagged
@@ -135,6 +135,7 @@ export function makeWhiteoutBiome(): Biome {
       moguls: 0.3,
       // wind-sculpted: big drifts and sastrugi
       drifts: 1.7,
+      driftWarp: 1,
       driftsPowder: 1.1,
       rollers: 0.9,
     },
@@ -145,7 +146,7 @@ export function makeWhiteoutBiome(): Biome {
       // drifts and blizzards on every difficulty; Relaxed softer, long courses × 0.85 (as Fjord)
       hazards: { kinds: ['wind-drift', 'blizzard'], density: 1, intensity: { relaxed: 0.5, normal: 1, hard: 1 }, longCourse: 0.85 },
       finish: { id: 'whiteout-rescue' },
-      refuge: { id: 'ski-patrol-cabin', name: 'Storm hut' },
+      refuge: { id: 'ridge-rescue-hut', name: 'Rescue hut' },
       cave: { id: 'whiteout-storm-cave' },
       scenery: { id: 'whiteout-ridge' },
       audio: { ambience: ['wind'] },

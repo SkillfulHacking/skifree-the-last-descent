@@ -1225,6 +1225,12 @@ export class GameSession implements Stage {
   }
 
   // --- debug / test harness (not exposed in UI) -----------------------------------
+  /** (evidence captures) jump the run's physics clock — the weather timeline follows it (Whiteout fronts) */
+  debugSetTime(t: number) {
+    this.debugUsed = true;
+    this.phys.s.time = t;
+  }
+
   debugTeleport(z: number, speed = 18, atX?: number, heading?: number) {
     this.debugUsed = true;
     const m = this.world.mountain;
@@ -1303,7 +1309,11 @@ export class GameSession implements Stage {
       outcome: this.run.outcome,
       z: s.pos.z,
       x: s.pos.x,
+      y: s.pos.y,
+      time: s.time,
       speed: s.speed,
+      /** (evidence) a Hard snowball in flight, i.e. its landing ring is up */
+      snowballMarker: (this.snowballs?.balls.length ?? 0) > 0,
       grounded: s.grounded,
       crashed: s.crashed,
       heading: s.heading,

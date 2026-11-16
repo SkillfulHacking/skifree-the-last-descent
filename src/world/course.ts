@@ -46,6 +46,7 @@ export class Mountain {
   private readonly kRelief: number;
   private readonly kDrop: { side: 1 | -1; depth: number; width: number } | null;
   private readonly kRidge: NonNullable<Biome['terrain']['ridge']> | null;
+  private readonly kDriftWarp: number;
   private readonly kRanges: number;
   private readonly kUndulation: number;
   private readonly kDetail: number;
@@ -89,6 +90,7 @@ export class Mountain {
     this.kRangeSoft = t.rangeSoft ?? 0;
     this.kDrop = t.shoulderDrop ?? null;
     this.kRidge = t.ridge ?? null;
+    this.kDriftWarp = t.driftWarp ?? 0;
     if (typeof seedOrProfile === 'number') {
       this.seed = seedOrProfile;
       this.profile = new ClassicProfile(seedOrProfile);
@@ -381,7 +383,17 @@ export class Mountain {
 
     // wind-shaped drifts (anisotropic), mostly off the groomed line
     const driftMask = smoothstep(w * 0.4, w * 1.2, ad);
-    if (driftMask > 0.001) h += driftMask * (this.kDrifts + this.kDriftsPowder * P.powderBias(z)) * gnoise(x / 26, z / 7.5, s + 4);
+    if (driftMask > 0.001) {
+      const amp = driftMask * (this.kDrifts + this.kDriftsPowder * P.powderBias(z));
+      if (this.kDriftWarp > 0) {
+        // (W-005) warped, patchy sastrugi fields: the crests wander and come and go
+        const k = this.kDriftWarp;
+        const wx = x + 22 * k * fbm(x / 95, z / 95, s + 51, 2);
+        const wz = z + 14 * k * fbm(x / 70 + 3.3, z / 70, s + 52, 2);
+        const patch = 0.35 + 0.65 * smoothstep(0.3, 0.7, 0.5 + 0.5 * fbm(x / 160, z / 160, s + 53, 2));
+        h += amp * (1 - 0.5 * k + 0.5 * k * patch) * (0.7 * gnoise(wx / 26, wz / 7.5, s + 4) + 0.3 * gnoise(wx / 11, wz / 4.2, s + 54));
+      } else h += amp * gnoise(x / 26, z / 7.5, s + 4);
+    }
 
     // rollers across the piste
     const roller = P.rollerZone(z);
