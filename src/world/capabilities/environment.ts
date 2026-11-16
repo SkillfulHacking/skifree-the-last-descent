@@ -81,6 +81,8 @@ export class BiomeEnvironment implements PhysicsEnvironment {
   clock = 0;
   private listeners = new Set<EnvironmentListener>();
   private tracks = new Map<number, Track>();
+  /** hazards already reported as passed (id → z), never re-tracked */
+  private passed = new Map<number, number>();
   private near: HazardInstance[] = [];
   private lastSurface: SurfaceType | null = null;
   private w = makeWeatherSample();
@@ -164,6 +166,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     this.lastSurface = null;
     this.stall = 0;
     this.stallT = 0;
+    this.passed.clear();
   }
 
   sample(q: EnvQuery, out: EnvSample): void {
@@ -269,6 +272,10 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     const near = this.hazards.near(q.x, q.z + HAZARD_ALERT_RANGE * 0.5, HAZARD_ALERT_RANGE * 0.5 + HAZARD_PASS_RANGE, this.near);
     const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity, tuck: q.tuck };
     for (const h of near) {
+      // a hazard already passed (left behind and reported) stays forgotten: the near window reaches
+      // HAZARD_PASS_RANGE behind the skier, so without this it was re-tracked and reported as passed
+      // again every step until it fell out of the window (thousands of HazardSurvived events per run)
+      if (this.passed.has(h.id)) continue;
       let tr = this.tracks.get(h.id);
       const k = tr?.k ?? getHazardKind(h.kind);
       // markers (e.g. the poles at a gap jump) have no physics and no gameplay events
@@ -327,7 +334,10 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       if (q.z <= h.z + h.r + 2 && this.hazards.hasBand(h.band)) continue;
       if (tr.closest <= HAZARD_PASS_RANGE) this.emit({ type: 'hazard-passed', hazard: h, kind: tr.k.id, hit: tr.hit, entered: tr.entered, closest: Math.max(0, tr.closest), t: q.t });
       this.tracks.delete(id);
+      if (q.z > h.z + h.r + 2) this.passed.set(id, h.z);
     }
+    // forget passed ids far behind (bounded over any course length)
+    if (this.passed.size > 256) for (const [id, z] of this.passed) if (z < q.z - 400) this.passed.delete(id);
     return hw;
   }
 
