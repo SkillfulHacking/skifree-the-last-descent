@@ -24,7 +24,7 @@ type W = {
     seenCave(v: boolean): void;
     autopilot(style: string | null): void;
     placeYeti(gap: number): void;
-    progress(): { saved: { stats: { sets: { biomesVisited: string[] } } }; events: string[] };
+    progress(): { saved: { stats: { sets: { biomesVisited?: string[] } } }; events: string[]; persisting: boolean };
   };
 };
 
@@ -115,7 +115,7 @@ test('Hard: the Yeti throws in the storm and the landing marks are up', async ({
   expect(errors).toEqual([]);
 });
 
-test('storm cave encounter plays through to the chase; the rescue station finish saves the visit', async ({ page }) => {
+test('storm cave encounter plays through to the chase; the rescue station finish reports the visit', async ({ page }) => {
   test.setTimeout(40 * 60 * 1000);
   await boot(page, { ...WHITEOUT, customSeed: 'WO-E2E-C' });
   await api(page, (w) => w.startRun(true));
@@ -139,7 +139,12 @@ test('storm cave encounter plays through to the chase; the rescue station finish
   expect((await sess(page)).outcome).toBe('victory');
   // the victory sequence runs
   await frames(page, 300);
+  // the run reports its location and its finish; a debug-driven run (teleports) never persists, so the
+  // saved records are untouched by the test (the tracker's persist policy)
   const p = await api(page, (w) => w.progress());
-  expect(p.saved.stats.sets.biomesVisited).toContain('whiteout');
+  expect(p.events).toContain('BiomeVisited');
+  expect(p.events).toContain('RunFinished');
+  expect(p.persisting).toBe(false);
+  expect(p.saved.stats.sets.biomesVisited ?? []).not.toContain('whiteout');
   expect(errors).toEqual([]);
 });
