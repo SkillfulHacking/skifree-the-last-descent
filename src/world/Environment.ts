@@ -245,6 +245,7 @@ export class Environment {
         const m = new THREE.MeshBasicMaterial({ color: this.fog.color.clone(), side: THREE.BackSide, transparent: true, opacity: 0, depthWrite: false, fog: false });
         this.stormDome = new THREE.Mesh(new THREE.SphereGeometry(1100, 24, 12), m);
         this.stormDome.renderOrder = 5;
+        this.stormDome.name = 'storm-dome';
         this.stormDome.frustumCulled = false;
         this.scene.add(this.stormDome);
       }
@@ -252,7 +253,7 @@ export class Environment {
         const m = this.stormDome.material as THREE.MeshBasicMaterial;
         m.color.copy(this.fog.color);
         m.opacity = Math.min(0.97, 1.15 * storm);
-        this.stormDome.visible = storm > 0.002;
+        this.stormDome.visible = storm > 0.002 && !this.stormDome.userData.debugHidden;
       }
       (this.snow.material as THREE.PointsMaterial).size = this.flakeBase * (1 + 1.3 * storm);
       this.applyLight();

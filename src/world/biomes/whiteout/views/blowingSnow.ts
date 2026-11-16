@@ -120,6 +120,7 @@ export class BlowingSnow {
       uOpacity: { value: 0.8 },
     };
     this.mesh = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: this.u, vertexShader: VS, fragmentShader: FS, transparent: true, depthWrite: false, fog: false }));
+    this.mesh.name = 'whiteout-blowing-snow';
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 6;
   }
@@ -132,7 +133,7 @@ export class BlowingSnow {
     (U.uWind!.value as THREE.Vector3).set(windX, 0, windZ);
     U.uDensity!.value = 0.08 + 0.92 * Math.min(1, storm * 1.15);
     U.uOpacity!.value = 0.45 + 0.4 * storm;
-    this.mesh.visible = U.uDensity!.value > 0.02;
+    this.mesh.visible = U.uDensity!.value > 0.02 && !this.mesh.userData.debugHidden;
   }
 
   dispose() {

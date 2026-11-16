@@ -1016,6 +1016,19 @@ export class App {
       freeCam: (pos: number[] | null, look?: number[], fov = 50) => {
         this.freeCam = pos && look ? { pos: new THREE.Vector3(...pos), look: new THREE.Vector3(...look), fov } : null;
       },
+      /** (diagnostics) hide/show scene objects by name; returns how many matched (kept hidden by a flag
+       *  the game does not reset: hidden objects stay hidden until shown again) */
+      setVisible: (name: string, v: boolean) => {
+        let n = 0;
+        this.world?.scene.traverse((o) => {
+          if (o.name === name) {
+            o.visible = v;
+            o.userData.debugHidden = !v;
+            n++;
+          }
+        });
+        return n;
+      },
       breakdown: () => {
         const out: Record<string, { meshes: number; tris: number }> = {};
         const w = this.world;

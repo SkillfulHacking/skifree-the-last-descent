@@ -187,6 +187,13 @@ if (want('cave') && G.cave) {
     await framesUntil(`(s) => s.cinematicTime >= ${t}`, 900);
     await settle(1200);
     await shot(name, note);
+    if (process.env.DIAG && name === '15_cave_leap') {
+      log('weather', JSON.stringify(await P(`(w) => ({ weather: w.weather, density: w.env.fog.density, override: w.weatherOverride })`)));
+      await ev(() => window.__skifree.setVisible('whiteout-blowing-snow', false));
+      await shot('15b_no_blowing_snow', 'diagnostic');
+      await ev(() => window.__skifree.setVisible('storm-dome', false));
+      await shot('15c_no_snow_no_dome', 'diagnostic');
+    }
   }
 }
 
