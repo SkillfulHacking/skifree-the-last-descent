@@ -10,6 +10,7 @@ import { ObstacleField } from '../../src/physics/obstacles';
 import { simulateCourse } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
 import { corniceSamples, wandSpots } from '../../src/world/biomes/whiteout/views/cornice';
+import { ridgeRockPlacements } from '../../src/world/biomes/whiteout/views/ridgeRocks';
 import { stormWall, SKY } from '../../src/world/biomes/whiteout/views/sky';
 import { frontAt } from '../../src/world/biomes/whiteout/storm';
 import { SkierPhysics, NO_INPUT } from '../../src/physics/SkierPhysics';
@@ -50,6 +51,27 @@ describe('Whiteout ridge terrain', () => {
     expect(broken).toBeLessThan(S.length * 0.6);
     // the rim wands stand inside the rim, on the snow
     for (const w of wandSpots(m, 0, 4000)) expect(Math.abs(w.y - m.heightAt(w.x, w.z))).toBeLessThan(1e-6);
+  });
+});
+
+describe('Whiteout ridge rock', () => {
+  it('every block is bedded below the snow under its footprint and none stands on the piste or a line', () => {
+    for (const seed of ['K1', 'K2']) {
+      const m = buildMountain(course('standard', seed));
+      const pls = ridgeRockPlacements(m, 0, 6000);
+      const fam = { tor: 0, rim: 0, flank: 0 };
+      for (const p of pls) {
+        fam[p.family]++;
+        // bedded: the base is below the terrain at the centre by ≥ 25 % of the block's height
+        expect(p.y).toBeLessThanOrEqual(m.heightAt(p.x, p.z) - 0.25 * p.sy + 1e-6);
+        // off the piste (beyond its edge by more than the block's half size)
+        expect(Math.abs(p.x - m.profile.centerX(p.z))).toBeGreaterThan(m.profile.halfWidth(p.z) + 0.3 * Math.max(p.sx, p.sz));
+        // rim blocks stand past the rim (the rim guard's ground), never inside it
+        if (p.family === 'rim') expect(m.beyondRidgeRim(p.x, p.z)).toBeGreaterThan(0);
+      }
+      expect(fam.tor).toBeGreaterThan(20);
+      expect(fam.flank).toBeGreaterThan(5);
+    }
   });
 });
 

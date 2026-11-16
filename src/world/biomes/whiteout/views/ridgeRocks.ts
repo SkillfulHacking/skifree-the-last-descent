@@ -1,0 +1,198 @@
+/**
+ * Whiteout Ridge: wind-carved rock on the ridge (scanned CC0 boulders, art/scanModels.ts).
+ *
+ * Three families, placed deterministically per 256 m chunk:
+ *  - crest tors: clusters of 2–4 frost-shattered blocks along the broken crest (crest side, where the
+ *    crest tops out), the skyline seen across the piste;
+ *  - rim bands: where the cornice breaks off (CORNICE breaks), a band of rock just beyond the rim
+ *    (past the rim: never inside the skiable area, so they need no collider — a skier there has
+ *    already gone over and is returned by the rim guard);
+ *  - flank buttresses: big slabs half-buried in the upper flank below the rim, seen when the course
+ *    swings toward the edge or in the clear windows.
+ *
+ * Every block is bedded: its base sits 25–40 % of its height below the LOWEST terrain point under its
+ * footprint, so no block shows a gap underneath on a slope. Shared triplanar PBR rock material, graded
+ * dark (granite/schist), snow on surfaces flatter than ~40°.
+ */
+import * as THREE from 'three';
+import { fbm, hash2 } from '../../../../core/rng';
+import type { Mountain } from '../../../course';
+import { createRockMaterial, disposeRockMaterial } from '../../../art/rockMaterial';
+import { loadScan, type ScanId } from '../../../art/scanModels';
+import { corniceSamples } from './cornice';
+
+export const RIDGE_ROCK_IDS: ScanId[] = ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'];
+
+export interface RockPlacement {
+  id: ScanId;
+  x: number;
+  y: number;
+  z: number;
+  sx: number;
+  sy: number;
+  sz: number;
+  yaw: number;
+  tilt: number;
+  family: 'tor' | 'rim' | 'flank';
+}
+
+/** lowest terrain height under a footprint (centre + 8 points on the ellipse) */
+function lowest(m: Mountain, x: number, z: number, rx: number, rz: number, yaw: number): number {
+  let lo = m.heightAt(x, z);
+  const c = Math.cos(yaw), s = Math.sin(yaw);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const u = Math.cos(a) * rx * 0.5, v = Math.sin(a) * rz * 0.5;
+    lo = Math.min(lo, m.heightAt(x + u * c - v * s, z + u * s + v * c));
+  }
+  return lo;
+}
+
+/** placements in [z0, z1) (pure; tests check bedding and that none is on the piste) */
+export function ridgeRockPlacements(m: Mountain, z0: number, z1: number): RockPlacement[] {
+  const R = m.biome.terrain.ridge;
+  const out: RockPlacement[] = [];
+  if (!R) return out;
+  const s = m.seed;
+  const P = m.profile;
+  const end = Number.isFinite(m.finishZ) ? m.finishZ - 240 : Infinity;
+  const pick = (k: number) => RIDGE_ROCK_IDS[Math.floor(hash2(k, 5, s) * RIDGE_ROCK_IDS.length) % RIDGE_ROCK_IDS.length]!;
+  const add = (pl: Omit<RockPlacement, 'y'>, sink: number) => {
+    const base = lowest(m, pl.x, pl.z, pl.sx, pl.sz, pl.yaw);
+    out.push({ ...pl, y: base - sink * pl.sy });
+  };
+  // crest tors (the crest side is −dropSide)
+  const cs = -R.dropSide as 1 | -1;
+  const TOR = 70;
+  for (let z = Math.ceil(z0 / TOR) * TOR; z < z1 && z < end; z += TOR) {
+    if (z < 80) continue;
+    const k = Math.round(z / TOR);
+    if (hash2(k, 1, s) < 0.3) continue; // gaps along the crest
+    // not over a cave (the cave builds its own rock there)
+    if (m.cavesNear(z - 90, z + 90).some((c) => Math.abs(c.z - z) < 90)) continue;
+    const w = P.halfWidth(z);
+    const e = Math.max(w, w * P.sideSetback(z, cs));
+    const zz = z + (hash2(k, 2, s) - 0.5) * 40;
+    const x0 = P.centerX(zz) + cs * (e + R.crestE * (0.75 + 0.35 * hash2(k, 3, s)));
+    const n = 2 + Math.floor(hash2(k, 4, s) * 3);
+    for (let j = 0; j < n; j++) {
+      const big = 7 + 10 * hash2(k * 7 + j, 6, s);
+      const x = x0 + cs * (hash2(k * 7 + j, 7, s) - 0.5) * 22;
+      const z2 = zz + (hash2(k * 7 + j, 8, s) - 0.5) * 26;
+      add({ id: pick(k * 7 + j), x, z: z2, sx: big * (0.9 + 0.5 * hash2(k * 7 + j, 9, s)), sy: big * (0.55 + 0.6 * hash2(k * 7 + j, 10, s)), sz: big * (0.8 + 0.5 * hash2(k * 7 + j, 11, s)), yaw: hash2(k * 7 + j, 12, s) * Math.PI * 2, tilt: (hash2(k * 7 + j, 13, s) - 0.5) * 0.35, family: 'tor' }, 0.3);
+    }
+  }
+  // rim bands where the cornice breaks
+  const S = corniceSamples(m, z0, z1);
+  for (let i = 0; i < S.length; i += 4) {
+    const c = S[i]!;
+    if (c.k > 0.1) continue;
+    const k = Math.round(c.z);
+    if (hash2(k, 21, s) < 0.35) continue;
+    const big = 3.5 + 5 * hash2(k, 22, s);
+    add({ id: pick(k), x: c.x + R.dropSide * (1.5 + 2.5 * hash2(k, 23, s)), z: c.z, sx: big * 1.3, sy: big * (0.6 + 0.4 * hash2(k, 24, s)), sz: big, yaw: hash2(k, 25, s) * Math.PI * 2, tilt: R.dropSide * 0.25, family: 'rim' }, 0.35);
+  }
+  // flank buttresses
+  const FL = 150;
+  for (let z = Math.ceil(z0 / FL) * FL; z < z1 && z < end + 200; z += FL) {
+    const k = Math.round(z / FL);
+    if (0.5 + 0.5 * fbm(z / 400, 1.7, s + 71, 2) < 0.45) continue;
+    const rim = m.ridgeRimX(z);
+    const out1 = 70 + 220 * hash2(k, 31, s);
+    const big = 16 + 22 * hash2(k, 32, s);
+    add({ id: pick(k + 999), x: rim + R.dropSide * out1, z: z + (hash2(k, 33, s) - 0.5) * 80, sx: big * 1.4, sy: big * 0.8, sz: big, yaw: hash2(k, 34, s) * Math.PI * 2, tilt: R.dropSide * 0.45, family: 'flank' }, 0.4);
+  }
+  return out;
+}
+
+const CHUNK = 256;
+
+export class RidgeRocks {
+  readonly group = new THREE.Group();
+  private geos = new Map<ScanId, THREE.BufferGeometry>();
+  private mat: THREE.MeshStandardMaterial;
+  private chunks = new Map<number, THREE.InstancedMesh[]>();
+  private disposed = false;
+  private stale = false;
+
+  constructor(
+    private m: Mountain,
+    quality: string,
+  ) {
+    this.group.name = 'whiteout-ridge-rocks';
+    this.mat = createRockMaterial({
+      kind: 'rock_face_03',
+      tile: 7,
+      snow: 0.8,
+      snowFrom: 0.72,
+      strata: 0.25,
+      hq: quality !== 'low',
+      grade: { lum: 0.055, desat: 0.92, tint: [0.93, 0.97, 1.06] },
+      macroSet: { kind: 'cliff_side', tile: 90, strength: 0.35 },
+      streaks: 0.35,
+    });
+    for (const id of RIDGE_ROCK_IDS)
+      void loadScan(id).then((g) => {
+        if (this.disposed || !g) return;
+        this.geos.set(id, g);
+        this.stale = true;
+      });
+  }
+
+  /** keep the chunks around z; rebuild the live ones when a scan arrives */
+  stream(c0: number, c1: number) {
+    for (const [k, list] of this.chunks)
+      if (k < c0 || k > c1 || this.stale) {
+        for (const im of list) {
+          im.removeFromParent();
+          im.dispose();
+        }
+        this.chunks.delete(k);
+      }
+    this.stale = false;
+    if (!this.geos.size) return;
+    for (let k = Math.max(0, c0); k <= c1; k++) if (!this.chunks.has(k)) this.build(k);
+  }
+
+  private build(k: number) {
+    const pls = ridgeRockPlacements(this.m, k * CHUNK, (k + 1) * CHUNK);
+    const list: THREE.InstancedMesh[] = [];
+    const M = new THREE.Matrix4();
+    const q = new THREE.Quaternion();
+    const e = new THREE.Euler();
+    const p = new THREE.Vector3();
+    const sc = new THREE.Vector3();
+    for (const id of RIDGE_ROCK_IDS) {
+      const g = this.geos.get(id);
+      const mine = pls.filter((pl) => pl.id === id);
+      if (!g || !mine.length) continue;
+      const im = new THREE.InstancedMesh(g, this.mat, mine.length);
+      mine.forEach((pl, i) => {
+        e.set(0, pl.yaw, pl.tilt, 'YXZ');
+        q.setFromEuler(e);
+        M.compose(p.set(pl.x, pl.y, pl.z), q, sc.set(pl.sx, pl.sy, pl.sz));
+        im.setMatrixAt(i, M);
+      });
+      im.instanceMatrix.needsUpdate = true;
+      im.castShadow = true;
+      im.receiveShadow = true;
+      im.frustumCulled = false;
+      this.group.add(im);
+      list.push(im);
+    }
+    this.chunks.set(k, list);
+  }
+
+  count(): number {
+    let n = 0;
+    for (const l of this.chunks.values()) for (const im of l) n += im.count;
+    return n;
+  }
+
+  dispose() {
+    this.disposed = true;
+    for (const list of this.chunks.values()) for (const im of list) im.dispose();
+    this.chunks.clear();
+    disposeRockMaterial(this.mat);
+  }
+}

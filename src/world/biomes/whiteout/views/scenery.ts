@@ -14,6 +14,8 @@ import type { Mountain } from '../../../course';
 import { LANE_HALF } from '../../../../physics/obstacles';
 import { StormSky } from './sky';
 import { BlowingSnow } from './blowingSnow';
+import { RidgeRocks } from './ridgeRocks';
+import { ROCK_ORIGIN } from '../../../art/rockMaterial';
 import { buildCorniceGeometry, corniceMaterial, corniceSamples, wandGeometry, wandSpots } from './cornice';
 
 export const MARKER = {
@@ -98,13 +100,16 @@ export class WhiteoutScenery implements SceneryView {
   private m: Mountain;
   private sky = new StormSky();
   private snow: BlowingSnow;
+  private rocks: RidgeRocks;
+  private win: [number, number] = [0, -1];
   private camR = new THREE.Vector3();
 
   constructor(ctx: SceneryContext) {
     this.m = ctx.mountain;
     this.group.name = 'whiteout-scenery';
     this.snow = new BlowingSnow(ctx.quality);
-    this.group.add(this.sky.group, this.snow.mesh);
+    this.rocks = new RidgeRocks(ctx.mountain, ctx.quality);
+    this.group.add(this.sky.group, this.snow.mesh, this.rocks.group);
     // a slim pole with reflective orange/black bands (vertex colours)
     const g = new THREE.CylinderGeometry(0.045, 0.06, MARKER.pole, 6, 8);
     g.translate(0, MARKER.pole / 2, 0);
@@ -126,6 +131,8 @@ export class WhiteoutScenery implements SceneryView {
     const c1 = Math.floor(z / CHUNK) + AHEAD;
     for (const [k, ch] of this.chunks) if (k < c0 || k > c1) this.drop(k, ch);
     for (let k = Math.max(0, c0); k <= c1; k++) if (!this.chunks.has(k)) this.build(k);
+    this.win = [c0, c1];
+    this.rocks.stream(c0, c1);
   }
 
   flush(): void {}
@@ -197,6 +204,9 @@ export class WhiteoutScenery implements SceneryView {
 
   update(dt: number, time: number, f: SceneryFrame): void {
     this.sky.update(dt, time, f);
+    ROCK_ORIGIN.value.copy(f.origin);
+    // (a scan that arrived since the last stream: place the rocks of the live chunks)
+    this.rocks.stream(this.win[0], this.win[1]);
     // (render space: the scene is drawn shifted by −origin)
     this.snow.update(this.camR.copy(f.camPos).sub(f.origin), f.windX ?? 0, f.windZ ?? 0, f.storm ?? 0, f.clock ?? time);
     // brighter and larger as the storm closes in (they matter most then)
@@ -210,7 +220,7 @@ export class WhiteoutScenery implements SceneryView {
   stats(): Record<string, number> {
     let n = 0;
     for (const c of this.chunks.values()) n += c.poles.count;
-    return { chunks: this.chunks.size, markers: n, snowGrains: this.snow.count };
+    return { chunks: this.chunks.size, markers: n, snowGrains: this.snow.count, ridgeRocks: this.rocks.count() };
   }
 
   dispose(): void {
@@ -220,6 +230,7 @@ export class WhiteoutScenery implements SceneryView {
     this.wandMat.dispose();
     this.sky.dispose();
     this.snow.dispose();
+    this.rocks.dispose();
   }
 }
 
