@@ -153,10 +153,12 @@ if (want('vista')) {
   await skiAt(zr, 6, 0);
   await ev(() => window.__skifree.autopilot(null));
   // the corniced rim: from just inside it, along the edge, the flank falling away
-  await P(`(w, m, k) => { const z = ${zr}; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cx = rx - s * 9, cz = z - 26; k.freeCam([cx, m.heightAt(cx, cz) + 2.2, cz], [rx + s * 6, m.heightAt(rx, z + 30) - 3, z + 30], 58); }`);
+  // (from the inside the raised lip hides the drop: the cornice is framed from just off the edge,
+  // looking back along the rim — the overhang, its break-offs, the wands behind it on the piste side)
+  await P(`(w, m, k) => { const z = ${zr}; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cx = rx + s * 14, cz = z - 40; const ry = m.heightAt(rx, z); k.freeCam([cx, ry + 4, cz], [rx - s * 4, ry - 1, z + 25], 58); }`);
   await settle(2500);
-  await shot('08_cornice_edge', 'The corniced rim (drop side): the lip curling over the flank, rim wands set back from it');
-  await P(`(w, m, k) => { const z = ${zr} + 60; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cx = rx - s * 4, cz = z; k.freeCam([cx, m.heightAt(cx, cz) + 3.5, cz], [rx + s * 900, m.heightAt(rx, z) - 420, z + 380], 60); }`);
+  await shot('08_cornice_edge', 'The corniced rim (drop side), from just off the edge: the lip curling over the flank, rim wands set back from it');
+  await P(`(w, m, k) => { const z = ${zr} + 60; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cx = rx + s * 8, cz = z; k.freeCam([cx, m.heightAt(rx, cz) + 6, cz], [rx + s * 900, m.heightAt(rx, z) - 420, z + 380], 60); }`);
   await settle(2500);
   await shot('09_valley_view', 'Over the edge: the flank falling ~500 m into the valley, far ranges across it');
   await P(`(w, m, k) => { const z = ${zr} + 120; const s = m.biome.terrain.ridge.dropSide; const cx = m.routeX(z) + s * 12, cz = z - 30; const tx = m.profile.centerX(z) - s * (m.profile.halfWidth(z) + 140); k.freeCam([cx, m.heightAt(cx, cz) + 2.6, cz], [tx, m.heightAt(tx, z + 40) + 20, z + 40], 58); }`);
@@ -169,6 +171,8 @@ if (want('vista')) {
 
 // ---- the cave encounter (squall, emergence, roar burst, leap)
 if (want('cave') && G.cave) {
+  // a fresh run: an earlier section may already have started the chase (the encounter is then over)
+  await startRun('normal');
   await ev(() => { window.__skifree.freeCam(null); window.__skifree.hud(false); window.__skifree.autopilot('skilled'); });
   await ev(() => window.__skifree.toCave());
   const r = await framesUntil('(s) => s.phase === "cinematic"', 900);
