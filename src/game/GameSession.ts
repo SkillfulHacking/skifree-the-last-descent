@@ -1355,6 +1355,7 @@ export class GameSession implements Stage {
     this.snowView = null;
     for (const t of this.timers) clearTimeout(t);
     this.world.env.setAmbientScale(1);
+    this.world.env.setSunScale(1);
     this.timers = [];
     this.yeti.onFootstep = null;
     // an abandoned run (restart / exit) still reports its last partial pizza chunk and open drift

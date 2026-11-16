@@ -2,6 +2,7 @@
  * Application shell: renderer, loading, menus, settings, run lifecycle, perf overlay, debug harness.
  */
 import * as THREE from 'three';
+import { atmosphere } from '../world/look/atmosphere';
 import { World } from './World';
 import { GameSession } from './GameSession';
 import { autoUiScale } from '../ui/scale';
@@ -936,6 +937,7 @@ export class App {
 
   // --- debug harness (only with ?debug in the URL; never shown in the UI) ---------
   private installDebug() {
+    let debugVeils: THREE.Object3D[] = [];
     const api = {
       state: () => ({ mode: this.mode, menu: this.menu.current?.id ?? null, session: this.session?.debugState() ?? null, records: this.records, course: this.world ? { id: this.world.id, label: courseLabel(this.world.course), seed: this.world.seed, finishZ: this.world.mountain.finishZ } : null }),
       /** select a course like the menu does (persists to settings), e.g. setCourse('daily','sprint',{date}) */
@@ -1018,6 +1020,127 @@ export class App {
       },
       /** (diagnostics) hide/show scene objects by name; returns how many matched (kept hidden by a flag
        *  the game does not reset: hidden objects stay hidden until shown again) */
+      /** (diagnostics, W-031) shared-atmosphere debug view: see atmosphere.uAtmDebug */
+      atmoDebug: (mode: number) => {
+        atmosphere.uAtmDebug.value = mode;
+      },
+      /** (diagnostics, W-031) set a scalar shared-atmosphere uniform (it is rewritten by the game's own updates) */
+      atmoSet: (key: string, v: number) => {
+        const u = (atmosphere as unknown as Record<string, { value: unknown }>)[key];
+        if (u && typeof u.value === 'number') u.value = v;
+        return u?.value;
+      },
+      /**
+       * (diagnostics, W-031) the render transform as the next frame will use it: the camera in
+       * simulation (absolute) coordinates, the render origin, the camera as the shader will see it
+       * (absolute − origin), whether matrixWorld agrees with position/quaternion, the projection, the
+       * fog uniforms, and named objects' world positions (absolute)
+       */
+      renderProbe: (names: string[] = []) => {
+        const w = this.world;
+        const c = this.camera;
+        const o = w?.origin ?? new THREE.Vector3();
+        c.updateMatrixWorld();
+        const mp = new THREE.Vector3().setFromMatrixPosition(c.matrixWorld);
+        const dir = c.getWorldDirection(new THREE.Vector3());
+        const objs: Record<string, number[][]> = {};
+        if (w)
+          for (const n of names) {
+            const list: number[][] = [];
+            w.scene.traverse((ob) => {
+              if (ob.name === n || (n.endsWith('*') && ob.name.startsWith(n.slice(0, -1)))) {
+                const box = new THREE.Box3().setFromObject(ob);
+                const ctr = box.isEmpty() ? ob.getWorldPosition(new THREE.Vector3()) : box.getCenter(new THREE.Vector3());
+                list.push([...ctr.toArray(), ob.visible ? 1 : 0]);
+              }
+            });
+            objs[n] = list.slice(0, 8);
+          }
+        const fog = w?.scene.fog as THREE.FogExp2 | null;
+        // every visible transparent / non-depth-writing drawable, nearest first (what could veil the frame)
+        const veils: { name: string; type: string; mat: string; parent: string; dist: number; size: number; opacity: number; renderOrder: number; ref?: THREE.Object3D }[] = [];
+        if (w)
+          w.scene.traverseVisible((ob) => {
+            const m = (ob as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+            if (!m) return;
+            const mats = Array.isArray(m) ? m : [m];
+            if (!mats.some((x) => x.transparent || !x.depthWrite)) return;
+            const box = new THREE.Box3().setFromObject(ob);
+            if (box.isEmpty()) return;
+            const sph = box.getBoundingSphere(new THREE.Sphere());
+            veils.push({
+              name: ob.name || '(unnamed)',
+              type: ob.type,
+              mat: mats.map((x) => x.type + (x.name ? ':' + x.name : '')).join('+'),
+              parent: ob.parent?.name || ob.parent?.type || '',
+              dist: Math.max(0, sph.center.distanceTo(c.position) - sph.radius),
+              size: sph.radius,
+              opacity: (mats[0] as THREE.MeshBasicMaterial).opacity ?? 1,
+              renderOrder: ob.renderOrder,
+              ref: ob,
+            });
+          });
+        veils.sort((a, b) => a.dist - b.dist);
+        debugVeils = veils.map((v) => v.ref!);
+        return {
+          snow: (w?.env as unknown as { debugSnow?: (c: THREE.Vector3) => unknown })?.debugSnow?.(c.position) ?? null,
+          veils: veils.slice(0, 40).map(({ ref: _r, ...v }) => v),
+          camAbs: c.position.toArray(),
+          camMatrixPos: mp.toArray(),
+          matrixAgrees: mp.distanceTo(c.position) < 1e-3,
+          camRender: c.position.clone().sub(o).toArray(),
+          origin: o.toArray(),
+          dir: dir.toArray(),
+          near: c.near,
+          far: c.far,
+          fov: c.fov,
+          parent: c.parent ? c.parent.name || c.parent.type : null,
+          fogDensity: fog?.density ?? null,
+          uFogExp: atmosphere.uFogExp.value,
+          uFogLin: atmosphere.uFogLin.value,
+          uFogFalloff: atmosphere.uFogFalloff.value,
+          uFogColor: atmosphere.uFogColor.value.toArray(),
+          uCloudK: atmosphere.uCloudK.value,
+          uDriftK: atmosphere.uDriftK.value,
+          objs,
+        };
+      },
+      /** (diagnostics, W-031) disable frustum culling scene-wide (is something culled that should draw?) */
+      noCull: () => {
+        let n = 0;
+        this.world?.scene.traverse((o) => {
+          if (o.frustumCulled) {
+            o.frustumCulled = false;
+            n++;
+          }
+        });
+        return n;
+      },
+      /** (diagnostics, W-031) terrain chunks: how many, how many visible, the nearest to a point */
+      terrainProbe: (x: number, z: number) => {
+        const out: { n: number; visible: number; nearest: number[][] } = { n: 0, visible: 0, nearest: [] };
+        const list: number[][] = [];
+        this.world?.scene.traverse((o) => {
+          if (o.name !== 'terrain-chunk' && o.name !== 'terrain-far') return;
+          out.n++;
+          if (o.visible && o.parent?.visible !== false) out.visible++;
+          const p = o.getWorldPosition(new THREE.Vector3());
+          const g = (o as THREE.Mesh).geometry;
+          g.computeBoundingSphere();
+          list.push([Math.hypot(p.x + 32 - x, p.z + 32 - z), p.x, p.y, p.z, o.visible ? 1 : 0, o.name === 'terrain-far' ? 1 : 0, g.boundingSphere?.radius ?? -1, g.boundingSphere?.center.y ?? 0]);
+        });
+        list.sort((a, b) => a[0]! - b[0]!);
+        out.nearest = list.slice(0, 6);
+        return out;
+      },
+      /** (diagnostics, W-031) hide the i-th drawable of the last renderProbe's veil list */
+      hideVeil: (i: number) => {
+        const o = debugVeils[i];
+        if (!o) return null;
+        o.visible = false;
+        o.userData.debugHidden = true;
+        return `${o.type} ${(o as THREE.Mesh).material ? ((o as THREE.Mesh).material as THREE.Material).type : ''} parent=${o.parent?.name || o.parent?.type}`;
+      },
       setVisible: (name: string, v: boolean) => {
         let n = 0;
         this.world?.scene.traverse((o) => {

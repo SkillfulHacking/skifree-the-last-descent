@@ -74,6 +74,10 @@ export class Environment {
     (ground.material as THREE.Material).dispose();
 
     this.sun = new THREE.DirectionalLight(new THREE.Color(...L.sunColor), L.sunIntensity);
+    // the bases every weather / cinematic scaling is applied to: the location's own look, fixed for this
+    // environment's life (W-031: captured lazily from the live, already-scaled values they compounded —
+    // a second run's flakes grew to 3·10²⁶ m and whited out the screen)
+    this.sunBase = L.sunIntensity;
     this.sun.castShadow = true;
     const mapSize = { low: 1024, medium: 2048, high: 2048, ultra: 4096 }[quality];
     this.shadowSize = { low: 70, medium: 90, high: 110, ultra: 130 }[quality];
@@ -104,6 +108,8 @@ export class Environment {
     atmosphere.uSunHaze.value.setRGB(...A.sunHaze);
     atmosphere.uFogLin.value = A.linear;
     atmosphere.uFogFalloff.value = A.falloff;
+    this.falloffBase = A.falloff;
+    this.fogClear.copy(this.fog.color);
 
     // distant skyline beyond the playable terrain + horizon haze (follows the viewer)
     this.ranges = new DistantRanges(this.sunDir, new THREE.Color(...L.sunColor), new THREE.Color(...B.ranges.skyColor), B.ranges);
@@ -122,9 +128,11 @@ export class Environment {
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    this.flakeBase = W.flakeSize;
     const flake = new THREE.PointsMaterial({ size: W.flakeSize, color: W.flakeColor, transparent: true, opacity: W.flakeOpacity, depthWrite: false, map: makeFlakeTexture(), sizeAttenuation: true });
     this.snow = new THREE.Points(g, flake);
     this.snow.frustumCulled = false;
+    this.snow.name = 'env-snow';
     scene.add(this.snow);
   }
 
@@ -174,18 +182,40 @@ export class Environment {
     pos.needsUpdate = true;
   }
 
+  /** (diagnostics, W-031) the ambient snowfall and the storm bases this environment captured */
+  debugSnow(cam: THREE.Vector3) {
+    const m = this.snow.material as THREE.PointsMaterial;
+    const a = this.snow.geometry.getAttribute('position').array as Float32Array;
+    const d: number[] = [];
+    let nan = 0;
+    for (let i = 0; i < a.length; i += 3) {
+      const v = Math.hypot(a[i]! - cam.x, a[i + 1]! - cam.y, a[i + 2]! - cam.z);
+      if (Number.isFinite(v)) d.push(v);
+      else nan++;
+    }
+    d.sort((x, y) => x - y);
+    return { n: a.length / 3, nan, sun: this.sun.intensity, hemi: this.hemi.intensity, size: m.size, opacity: m.opacity, visible: this.snow.visible, flakeBase: this.flakeBase, sunBase: this.sunBase, falloffBase: this.falloffBase, storm: this.storm, snowfall: this.snowfall, dMin: d[0], d1: d[Math.floor(d.length * 0.01)], dMed: d[Math.floor(d.length / 2)], within2m: d.filter((x) => x < 2).length };
+  }
+
   /** Scale sky/ambient light (1 = normal). Used by the cave reveal. */
   setAmbientScale(k: number) {
     this.ambientK = k;
     this.applyLight();
   }
 
+  /** Scale the sun (1 = normal), composed with the storm's dimming. Used by the cave reveal. */
+  setSunScale(k: number) {
+    this.sunK = k;
+    this.applyLight();
+  }
+
   private ambientK = 1;
+  private sunK = 1;
   private storm = 0;
-  private sunBase = 0;
+  private readonly sunBase: number;
   private readonly fogClear = new THREE.Color();
-  private flakeBase = 0;
-  private falloffBase = 0;
+  private readonly flakeBase: number;
+  private readonly falloffBase: number;
   private stormDome: THREE.Mesh | null = null;
 
   /** storm (0..1) dims the sun and the sky light (Whiteout fronts); 0 leaves every light at its base */
@@ -193,7 +223,7 @@ export class Environment {
     const s = this.storm;
     this.hemi.intensity = this.hemiBase * this.ambientK * (1 - 0.12 * s);
     this.scene.environmentIntensity = this.envBase * this.ambientK * (1 - 0.3 * s);
-    this.sun.intensity = this.sunBase * (1 - 0.78 * s);
+    this.sun.intensity = this.sunBase * this.sunK * (1 - 0.78 * s);
   }
 
   /** Show/hide the ambient falling snow (hidden in the dark cave shots, where it reads as stars). */
@@ -230,12 +260,6 @@ export class Environment {
     if (storm !== this.storm) {
       // (Pass 5, Whiteout) a front greys the air, hides the sky and the far ranges behind a dome of
       // storm cloud, thickens the driven snow and dims the sun; at 0 nothing changes
-      if (this.sunBase === 0) {
-        this.sunBase = this.sun.intensity;
-        this.fogClear.copy(this.fog.color);
-        this.flakeBase = (this.snow.material as THREE.PointsMaterial).size;
-        this.falloffBase = atmosphere.uFogFalloff.value;
-      }
       // inside a front the fog is a uniform cloud: no thinning with height (else the slopes above the
       // camera show through the storm with a hard edge against the dome)
       atmosphere.uFogFalloff.value = this.falloffBase * (1 - storm);

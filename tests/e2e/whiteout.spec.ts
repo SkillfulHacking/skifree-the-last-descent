@@ -62,7 +62,7 @@ const findPhase = (page: Page, phase: Front['phase'], from: number) =>
     [phase, from] as const,
   );
 
-const WHITEOUT = { course: 'custom', customText: 'WO-E2E', courseLength: 'sprint', showTutorial: false, biome: 'whiteout', quality: 'low' };
+const WHITEOUT = { course: 'custom', customSeed: 'WO-E2E', courseLength: 'sprint', showTutorial: false, biome: 'whiteout', quality: 'low' };
 
 test.describe.configure({ mode: 'serial' });
 
@@ -94,7 +94,7 @@ test('boots clean; a front is announced on the HUD before it arrives and while i
 
 test('Hard: the Yeti throws in the storm and the landing marks are up', async ({ page }) => {
   test.setTimeout(30 * 60 * 1000);
-  await boot(page, { ...WHITEOUT, difficulty: 'hard', customText: 'WO-E2E-H' });
+  await boot(page, { ...WHITEOUT, difficulty: 'hard', customSeed: 'WO-E2E-H' });
   await api(page, (w) => w.startRun(true));
   await api(page, (w) => w.seenCave(true));
   await api(page, (w) => w.autopilot('skilled'));
@@ -117,7 +117,7 @@ test('Hard: the Yeti throws in the storm and the landing marks are up', async ({
 
 test('storm cave encounter plays through to the chase; the rescue station finish saves the visit', async ({ page }) => {
   test.setTimeout(40 * 60 * 1000);
-  await boot(page, { ...WHITEOUT, customText: 'WO-E2E-C' });
+  await boot(page, { ...WHITEOUT, customSeed: 'WO-E2E-C' });
   await api(page, (w) => w.startRun(true));
   await api(page, (w) => w.seenCave(false));
   await api(page, (w) => w.toCave());

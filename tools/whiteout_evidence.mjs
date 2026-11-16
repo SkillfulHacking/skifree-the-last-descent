@@ -89,7 +89,7 @@ async function findPhase(phase, from, into = null, left = null) {
 async function startRun(difficulty) {
   await ev(() => { window.__skifree.hold(false); window.__skifree.freeCam(null); window.__skifree.toMenu(); });
   await settle(1500);
-  await ev(([l, d, sd]) => window.__skifree.setCourse('custom', l, { difficulty: d, biome: 'whiteout', customText: sd }), [length, difficulty, seed]);
+  manifest.courseId = await ev(([l, d, sd]) => window.__skifree.setCourse('custom', l, { difficulty: d, biome: 'whiteout', custom: sd }), [length, difficulty, seed]);
   await ev(() => window.__skifree.startRun(true));
   await settle(2500);
   await ev(() => window.__skifree.hold(true));

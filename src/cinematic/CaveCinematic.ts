@@ -57,7 +57,6 @@ export class CaveCinematic {
   private shakeLevel = 0;
   private dim = 0;
   private dimShade = 1;
-  private sunBase: number;
   private leap: { t: number; from: THREE.Vector3; vel: THREE.Vector3; heading: number; landed: boolean; runV: number; justLanded?: boolean } | null = null;
   onRunPrompt: (() => void) | null = null;
 
@@ -70,7 +69,6 @@ export class CaveCinematic {
       ep.forEach((p, i) => this.path.push({ s: i === ep.length - 1 ? LEDGE_AT : 14 - 0.75 * i, p }));
     }
     const { world, camera, follow, phys } = st;
-    this.sunBase = world.env.sun.intensity;
     const cave = world.cave;
     const M = cave.mouth.clone();
     const O = cave.outward.clone(); // toward the piste (-X)
@@ -301,7 +299,7 @@ export class CaveCinematic {
     this.applyShade();
     // a cloud crosses the sun while we stare into the cave: low sun would otherwise reach in
     // through the mouth and light the Yeti like a stage (the reveal needs darkness and eyes)
-    st.world.env.sun.intensity = this.sunBase * (1 - 0.82 * this.dim);
+    st.world.env.setSunScale(1 - 0.82 * this.dim);
     st.world.terrain.uniforms.uCloudShadow.value = 1 + 1.5 * this.dim;
     // no sun glints and no falling flakes against the black interior (they read as stars, C9/A8)
     st.world.terrain.uniforms.uGlint.value = 1 - this.dim;
@@ -354,7 +352,7 @@ export class CaveCinematic {
     st.yeti.setEyeGlow(0);
     st.yeti.setShade(1);
     st.world.env.setAmbientScale(1);
-    st.world.env.sun.intensity = this.sunBase;
+    st.world.env.setSunScale(1);
     st.world.terrain.uniforms.uCloudShadow.value = 1;
     st.world.terrain.uniforms.uGlint.value = 1;
     st.world.env.setFlakes(true);

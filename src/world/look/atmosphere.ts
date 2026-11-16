@@ -38,6 +38,13 @@ export const atmosphere = {
   uDriftDir: { value: new THREE.Vector2(1, 0) },
   uDriftS: { value: 0 },
   uDriftOrigin: { value: new THREE.Vector2() },
+  /**
+   * (diagnostics only, debug API `atmoDebug`) 0 = normal. 1 = no fog; 2 = fog amount (grey);
+   * 3 = view distance heatmap (blue 0 m → green 100 m → red 400 m+); 4 = height factor hf / 3;
+   * 5 = world-position bands (render-space x, y, z every 10 m); 6 = flat magenta (marks every
+   * surface drawn through sf_atmosphere); 7 = optical-depth terms (r = linear, g = exp², b = hf / 3)
+   */
+  uAtmDebug: { value: 0 },
 };
 
 export type AtmosphereUniforms = typeof atmosphere;
@@ -76,6 +83,7 @@ uniform float uCloudK;
 uniform vec2 uCloudOff;
 uniform float uCloudCov;
 uniform float uCloudH;
+uniform float uAtmDebug;
 uniform float uDriftK;
 uniform vec2 uDriftDir;
 uniform float uDriftS;
@@ -117,6 +125,18 @@ vec3 sf_atmosphere(vec3 col, vec3 wp) {
   vec3 rel = wp - cameraPosition;
   float d = length(rel);
   vec3 v = rel / max(d, 1e-3);
+  if (uAtmDebug > 0.5) {
+    float k = uFogFalloff * rel.y;
+    float hf = clamp(abs(k) < 1e-3 ? 1.0 - 0.5 * k : (1.0 - exp(-k)) / k, 0.0, 3.0);
+    if (uAtmDebug < 1.5) return col;
+    if (uAtmDebug < 2.5) return vec3(sf_fogAmount(rel, d));
+    if (uAtmDebug < 3.5) return d < 100.0 ? mix(vec3(0.0, 0.0, 1.0), vec3(0.0, 1.0, 0.0), d / 100.0) : mix(vec3(0.0, 1.0, 0.0), vec3(1.0, 0.0, 0.0), clamp((d - 100.0) / 300.0, 0.0, 1.0));
+    if (uAtmDebug < 4.5) return vec3(hf / 3.0);
+    if (uAtmDebug < 5.5) return fract(wp / 10.0);
+    if (uAtmDebug < 6.5) return vec3(1.0, 0.0, 1.0);
+    float e = uFogExp * d;
+    return vec3(clamp(uFogLin * d, 0.0, 1.0), clamp(e * e, 0.0, 1.0), hf / 3.0);
+  }
   return mix(col, sf_fogColor(v), sf_fogAmount(rel, d));
 }
 `;
