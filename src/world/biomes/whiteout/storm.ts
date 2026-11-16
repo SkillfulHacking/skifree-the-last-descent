@@ -171,11 +171,12 @@ export function whiteoutExposure(m: ExposureQuery, x: number, z: number): number
   return al > 0 ? base + (1 - base) * al : base;
 }
 
+
 const W = { calm: 2.5, storm: 12.5, along: 1.2 } as const;
 
 export const WHITEOUT_WEATHER: WeatherModel = {
   id: 'whiteout',
-  coupling: { airborne: 0.13, balance: 0.4, headwind: { relaxed: 0.0002, normal: 0.001, hard: 0.001 } },
+  coupling: { airborne: 0.13, balance: 0.4, headwind: { relaxed: 0.0002, normal: 0.001, hard: 0.001 }, groundSlip: 0.075, skidDrag: 0.0028 },
   exposure: whiteoutExposure,
   front: (t, seed) => frontAt(t, seed, forecast),
   sample(x: number, z: number, t: number, seed: number, out: WeatherSample): WeatherSample {

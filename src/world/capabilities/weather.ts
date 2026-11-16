@@ -40,6 +40,19 @@ export interface WeatherCoupling {
    * Keep ≤ ~0.003.
    */
   headwind?: Readonly<Record<'relaxed' | 'normal' | 'hard', number>>;
+  /**
+   * Optional (Whiteout, W-014): grounded crosswind side-slip (m/s per m/s of exposure-scaled
+   * crosswind): the wind blows a skier on open, wind-scoured snow sideways — more on low-grip hard
+   * pack (× (2 − grip)), resisted by the edges like any side-slip (SLIP_EDGE: a tuck gives it more,
+   * pizza and edging less). Absent/0 = none. Keep the result ≤ ~2 m/s.
+   */
+  groundSlip?: number;
+  /**
+   * Optional (Whiteout, W-014): extra drag per m/s of that crosswind slip — holding a line against a
+   * crosswind on hard pack means skidding the edges, which costs speed. With `groundSlip`: exposed
+   * hard pack is fast in fair weather and slow in a storm (the sheltered line's case). 0 = none.
+   */
+  skidDrag?: number;
 }
 
 export interface WeatherModel {
@@ -53,7 +66,7 @@ export interface WeatherModel {
    * BiomeEnvironment scales the airborne, balance and headwind couplings by it, so sheltered lines
    * (trees, gullies) ski calmer than exposed ones. Pure; given the course.
    */
-  exposure?(m: ExposureQuery, x: number, z: number): number;
+  exposure?(m: ExposureQuery, x: number, z: number, t?: number, seed?: number): number;
   /**
    * Optional storm-front forecast at time t (Whiteout): what the HUD and the captions telegraph —
    * the phase, seconds until it changes, which side the wind blows from (+1 = from the skier's
@@ -72,6 +85,7 @@ export interface WeatherFront {
 /** what an exposure model may read from the course (a Mountain satisfies it) */
 export interface ExposureQuery {
   routeX(z: number): number;
+  centerX?(z: number): number;
   halfWidth(z: number): number;
   altLane(x: number, z: number): number;
   readonly profile: { segmentAt(z: number): string; finishZ: number };

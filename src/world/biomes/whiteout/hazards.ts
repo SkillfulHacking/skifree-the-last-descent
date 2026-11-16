@@ -22,8 +22,10 @@ import { whiteoutExposure } from './storm';
 
 export const DRIFT = {
   /** extra drag and × friction at a drift's core (on Normal) */
-  drag: 0.035,
-  friction: 2.2,
+  // (W-014: ploughing through a drift must cost clearly more than taking the gap — deep wind-loaded
+  // snow, not a speed bump)
+  drag: 0.07,
+  friction: 2.7,
   /** rows per 256 m band on exposed ground (× density) */
   rowChance: 1,
   /** share of rows that drift over the racing line (the gap is off to one side) */
@@ -46,6 +48,10 @@ export const BLIZZARD = {
   slip: 2.1,
   /** airborne push (m/s²) */
   push: 4.5,
+  /** the gust knock (W-014): cell strength, skier speed (m/s) and the share of speed kept */
+  knockAt: 0.7,
+  knockSpeed: 17,
+  knockKeep: 0.58,
   /** extra fog inside the active cell (× the weather's) */
   fog: 4.2,
   /** one cell per this many metres of exposed course, on average */
@@ -117,7 +123,8 @@ export const WIND_DRIFT: HazardKind<DriftParams> = {
 export const BLIZZARD_CELL: HazardKind<BlizzardParams> = {
   id: 'blizzard',
   label: 'Blizzard',
-  severity: 'slow',
+  // (W-014) it can knock a tucked skier off balance; never a crash, and the lane need not be clear
+  severity: 'knock',
   timing: { kind: 'periodic', ...BLIZZARD_TIMING },
   reach: BLIZZARD.reach,
   keepLaneClear: false,
@@ -142,12 +149,17 @@ export const BLIZZARD_CELL: HazardKind<BlizzardParams> = {
     const I = c.intensity ?? 1;
     const e: HazardEffect = { visibility: 1 + (BLIZZARD.fog - 1) * w };
     const dir = h.params.dir;
-    if (c.grounded) e.slipX = dir * Math.min(4, BLIZZARD.slip * w * I);
+    if (c.grounded) {
+      e.slipX = dir * Math.min(4, BLIZZARD.slip * w * I);
+      // (W-014) a skier still tucked and fast when the cell blows at full strength is knocked off
+      // balance by the gust (once per cell); standing up or checking speed rides it out
+      if (w > BLIZZARD.knockAt && (c.tuck ?? 0) > 0.5 && c.speed > BLIZZARD.knockSpeed) e.knock = { keep: BLIZZARD.knockKeep, wobble: 0.7 * I };
+    }
     else e.airPushX = dir * Math.min(8, BLIZZARD.push * w * I);
     e.windX = dir * 9 * w;
     return e;
   },
-  audio: { telegraph: 'blizzard-build', active: 'blizzard-roar' },
+  audio: { telegraph: 'blizzard-build', active: 'blizzard-roar', hit: 'blizzard-roar' },
   view: 'blizzard',
 };
 

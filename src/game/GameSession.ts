@@ -813,8 +813,9 @@ export class GameSession implements Stage {
         }
         if (e.type === 'hazard-telegraph' && e.kind === 'blizzard') {
           const dir = (e.hazard.params as { dir?: number }).dir ?? 1;
-          this.envCaption(`[a blizzard sweeps across the piste ahead — it will push you ${dir > 0 ? 'left' : 'right'}]`, 2.6, `blizzard:${e.hazard.id}`, CAPTION_PRIORITY.warning);
+          this.envCaption(`[a blizzard sweeps across the piste ahead — stand up out of the tuck; it will push you ${dir > 0 ? 'left' : 'right'}]`, 2.8, `blizzard:${e.hazard.id}`, CAPTION_PRIORITY.warning);
         }
+        if (e.type === 'hazard-hit' && e.kind === 'blizzard') this.envCaption('[a gust catches you in the tuck — you stagger]', 2, 'blizzard-hit', CAPTION_PRIORITY.report);
       } else if (e.type === 'hazard-enter' && e.kind === 'wind-drift') {
         this.audio.playCue('drift-plough', null);
         this.envCaption('[skis plough into a deep drift]', 1.4, 'drift', CAPTION_PRIORITY.report);
@@ -1154,7 +1155,7 @@ export class GameSession implements Stage {
     if (f.phase !== this.lastFront.phase) {
       if (f.phase === 'build') {
         this.audio.playCue('blizzard-build', null);
-        this.envCaption(`[a storm front rolls in — the wind will push you ${side}; shelter in the trees or check your speed]`, 3, 'front', CAPTION_PRIORITY.warning);
+        this.envCaption(`[a storm front rolls in — the wind will push you ${side} on the open hard pack; take the sheltered line or check your speed]`, 3.2, 'front', CAPTION_PRIORITY.warning);
       } else if (f.phase === 'ease') this.envCaption('[the storm eases — the view opens up]', 2.2, 'front', CAPTION_PRIORITY.report);
       this.lastFront.phase = f.phase;
     }

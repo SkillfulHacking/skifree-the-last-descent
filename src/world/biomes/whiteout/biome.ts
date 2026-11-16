@@ -144,7 +144,7 @@ export function makeWhiteoutBiome(): Biome {
       surface: WHITEOUT_SURFACE,
       weather: WHITEOUT_WEATHER,
       // drifts and blizzards on every difficulty; Relaxed softer, long courses × 0.85 (as Fjord)
-      hazards: { kinds: ['wind-drift', 'blizzard'], density: 1, intensity: { relaxed: 0.5, normal: 1, hard: 1 }, longCourse: 0.85 },
+      hazards: { kinds: ['wind-drift', 'blizzard'], density: 1, intensity: { relaxed: 0.5, normal: 0.8, hard: 0.65 }, longCourse: 0.85 },
       finish: { id: 'whiteout-rescue' },
       refuge: { id: 'ridge-rescue-hut', name: 'Rescue hut' },
       cave: { id: 'whiteout-storm-cave' },

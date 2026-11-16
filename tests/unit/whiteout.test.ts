@@ -14,6 +14,7 @@ import { BiomeEnvironment } from '../../src/world/capabilities/environment';
 import { ObstacleField, LANE_HALF } from '../../src/physics/obstacles';
 import { simulateCourse } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
+import { whiteoutDriver, INFORMED, BLIND, type WhiteoutPolicy } from '../sim/whiteoutDriver';
 import { collectPlacements } from '../../src/world/hazards/testkit';
 import { getHazardKind, hazardPhase } from '../../src/world/hazards/hazard';
 import { FRONT, frontAt, frontType, FRONT_TYPES, whiteoutExposure, WHITEOUT_WEATHER } from '../../src/world/biomes/whiteout/storm';
@@ -195,13 +196,23 @@ describe('Whiteout Ridge: exposure and snow', () => {
 });
 
 describe('Whiteout Ridge: hazards', () => {
-  it('drift rows leave a gap the width of the lane, on the line or beside it; blizzards never knock or crash', () => {
+  it('drift rows leave a gap the width of the lane, on the line or beside it; a blizzard never crashes, and knocks only a tucked, fast skier at its peak', () => {
     const c = course('standard', 'W4');
     const m = buildMountain(c);
     const drift = getHazardKind('wind-drift');
     const bliz = getHazardKind('blizzard');
-    expect(bliz.severity).toBe('slow');
+    // (W-014) the blizzard's gust knocks a skier who stays tucked and fast through its peak — never a crash
+    expect(bliz.severity).toBe('knock');
     expect(drift.severity).toBe('slow');
+    {
+      const h = { id: 1, kind: 'blizzard', x: 0, y: 0, z: 0, r: 58, rot: 0, seed: 1, band: 0, params: { dir: 1 } } as never;
+      const peak = { phase: 'active', u: 0.4 } as never;
+      const at = (tuck: number, speed: number) => bliz.effect(h, peak, { dx: 0, dz: 0, dist: 0, inside: true, speed, grounded: true, heightAbove: 0, t: 0, intensity: 1, tuck });
+      expect(at(1, 22)?.knock).toBeTruthy();
+      expect(at(0, 22)?.knock).toBeUndefined();
+      expect(at(1, 12)?.knock).toBeUndefined();
+      for (const e of [at(1, 22), at(0, 22), at(1, 30)]) expect(e?.crash).toBeUndefined();
+    }
     expect(BLIZZARD_TIMING.telegraph).toBeGreaterThanOrEqual(4);
     const list = collectPlacements(m, worldSeed(c), [drift], 1, 0, m.finishZ);
     expect(list.length).toBeGreaterThan(10);
@@ -272,13 +283,33 @@ describe('Whiteout Ridge: playability', () => {
       dodge: diff === 'hard' && style === 'skilled',
     });
   };
-  it('a skilled skier finishes Sprint on every difficulty on most seeds; a careless one is caught on Normal', () => {
-    for (const diff of ['relaxed', 'normal'] as const) {
-      const wins = ['WP1', 'WP2', 'WP3', 'WP4'].filter((s) => sim('sprint', s, diff, 'skilled').outcome === 'victory').length;
-      expect(wins, diff).toBeGreaterThanOrEqual(4);
-    }
-    const hard = ['WP1', 'WP2', 'WP3', 'WP4'].filter((s) => sim('sprint', s, 'hard', 'skilled').outcome === 'victory').length;
-    expect(hard).toBeGreaterThanOrEqual(1);
+  // (W-014/W-015) Normal is no longer an automatic escape for a skier who ignores the weather: the
+  // tests drive a player who reads it (tests/sim/whiteoutDriver: 0.25 s reaction, steers round what
+  // it can see) — and one who doesn't — on fixed seeds, recorded in DEFECTS.md.
+  const play = (seed: string, diff: Difficulty, p: WhiteoutPolicy) => {
+    const c = course('sprint', seed, diff);
+    const ws = worldSeed(c);
+    const m = buildMountain(c);
+    const env = new BiomeEnvironment(m, ws, { difficulty: diff });
+    const field = new ObstacleField(m, ws);
+    return simulateCourse(m, field, whiteoutDriver(m, env, ws, p, undefined, 0.25, field), {
+      streaming: true, environment: env, yetiSpeed: DIFFICULTY[diff].yetiSpeed, maxTime: 900,
+      snowballs: diff === 'hard', dodge: diff === 'hard',
+    }).outcome;
+  };
+  it('a skilled skier finishes Relaxed Sprint on every seed; a careless one is caught on Normal', () => {
+    const wins = ['WP1', 'WP2', 'WP3', 'WP4'].filter((s) => sim('sprint', s, 'relaxed', 'skilled').outcome === 'victory').length;
+    expect(wins).toBe(4);
     expect(sim('sprint', 'WP1', 'normal', 'careless').outcome).toBe('caught');
+  }, 900_000);
+  it('Normal rewards reading the weather; Hard is winnable by a skier who reads it', () => {
+    // WD8 Normal: the informed skier escapes, the weather-blind one is caught
+    expect(play('WD8', 'normal', INFORMED)).toBe('victory');
+    expect(play('WD8', 'normal', BLIND)).toBe('caught');
+    for (const s of ['WD2', 'WD3', 'WD5']) expect(play(s, 'normal', INFORMED), s).toBe('victory');
+    // Normal is not automatic: WD1 / WD4 catch even the informed skier
+    expect(play('WD4', 'normal', INFORMED)).toBe('caught');
+    const hard = ['WD3', 'WD6', 'WD9'].filter((s) => play(s, 'hard', INFORMED) === 'victory').length;
+    expect(hard).toBeGreaterThanOrEqual(2);
   }, 900_000);
 });

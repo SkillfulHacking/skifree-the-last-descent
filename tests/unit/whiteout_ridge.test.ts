@@ -144,3 +144,23 @@ describe('Whiteout sky: the storm wall telegraphs every front', () => {
     }
   });
 });
+
+describe('Hazard pass reports (W-023, engine-wide)', () => {
+  it('each hazard is reported passed at most once per run (Fjord and Whiteout)', async () => {
+    const { simulateCourse: sim } = await import('../../src/game/simulate');
+    const { autopilotInput: ap } = await import('../../src/debug/autopilot');
+    for (const biome of ['fjord', 'whiteout'] as const) {
+      const c = makeCourse('custom', 'sprint', { biome, customText: 'HP1', difficulty: 'normal' });
+      const ws = worldSeed(c);
+      const m = buildMountain(c);
+      const env = new BiomeEnvironment(m, ws, { difficulty: 'normal' });
+      const seen = new Map<number, number>();
+      env.listen((e) => {
+        if (e.type === 'hazard-passed') seen.set(e.hazard.id, (seen.get(e.hazard.id) ?? 0) + 1);
+      });
+      sim(m, new ObstacleField(m, ws), (s, t) => ap(m, s, 'skilled', t), { streaming: true, environment: env, yetiSpeed: DIFFICULTY.normal.yetiSpeed, maxTime: 400 });
+      expect(seen.size, biome).toBeGreaterThan(3);
+      for (const [id, n] of seen) expect(n, `${biome} hazard ${id}`).toBe(1);
+    }
+  }, 300_000);
+});

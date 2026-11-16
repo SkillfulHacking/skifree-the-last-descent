@@ -89,6 +89,8 @@ export class BiomeEnvironment implements PhysicsEnvironment {
   clock = 0;
   private listeners = new Set<EnvironmentListener>();
   private tracks = new Map<number, Track>();
+  /** hazards already reported as passed (id → z), never re-tracked */
+  private passed = new Map<number, number>();
   private near: HazardInstance[] = [];
   private lastSurface: SurfaceType | null = null;
   private w = makeWeatherSample();
@@ -174,6 +176,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     this.lastSurface = null;
     this.stall = 0;
     this.stallT = 0;
+    this.passed.clear();
   }
 
   sample(q: EnvQuery, out: EnvSample): void {
@@ -218,7 +221,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       // the breeze's strength relative to its mean (gusts above 1, lulls below)
       gustK = this.meanWind > 0 ? Math.hypot(wx, wz) / this.meanWind : 1;
       // sheltered ground (trees, gullies) takes less of the wind (WeatherModel.exposure; default 1)
-      const ex = caps.weather.exposure ? caps.weather.exposure(this.mountain, q.x, q.z) : 1;
+      const ex = caps.weather.exposure ? caps.weather.exposure(this.mountain, q.x, q.z, q.t, this.seed) : 1;
       this.lastExposure = ex;
       wx *= ex;
       wz *= ex;
@@ -227,6 +230,9 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     }
     // the breeze costs a grounded, upright skier speed whatever their heading (extra drag × its strength)
     if (this.headwind && q.grounded && !q.crashed) S.dragAdd += this.headwind * gustK;
+    // the weather's own wind at the skier (before any hazard's), for the ground crosswind slip
+    const wwx = wx;
+    const wwz = wz;
     // 3) hazards
     let px = 0;
     let pz = 0;
@@ -241,6 +247,17 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     }
     out.airAccelX = q.grounded ? 0 : cpl.airborne * wx + push;
     out.airAccelZ = q.grounded ? 0 : cpl.airborne * wz;
+    // the crosswind on open, wind-scoured snow (W-014): exposure is already folded into wx/wz
+    const gs = cpl.groundSlip ?? 0;
+    if (gs > 0 && q.grounded && !q.crashed) {
+      const k = gs * (2 - S.grip);
+      const sx = Math.max(-2.2, Math.min(2.2, k * wwx));
+      px += sx;
+      pz += Math.max(-1, Math.min(1, 0.3 * k * wwz));
+      // (steeply with exposure: the fully open crest lines pay; part-sheltered ground hardly)
+      // (scaled like the hazards by the game difficulty's environment intensity)
+      if (cpl.skidDrag) S.dragAdd += cpl.skidDrag * Math.abs(sx) * smoothstep(0.86, 1, this.lastExposure) * this.intensity;
+    }
     out.groundSlipX = q.grounded && !q.crashed ? px : 0;
     out.groundSlipZ = q.grounded && !q.crashed ? pz : 0;
     out.balance = q.grounded ? cpl.balance * gust : 0;
@@ -299,6 +316,11 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     const near = this.hazards.near(q.x, q.z + HAZARD_ALERT_RANGE * 0.5, HAZARD_ALERT_RANGE * 0.5 + HAZARD_PASS_RANGE, this.near);
     const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity, tuck: q.tuck };
     for (const h of near) {
+      // (W-023) a hazard already passed (left behind and reported) stays forgotten: the near window
+      // reaches HAZARD_PASS_RANGE behind the skier, so without this it was re-tracked and reported
+      // as passed again every step until it fell out of the window (thousands of HazardSurvived
+      // events per run)
+      if (this.passed.has(h.id)) continue;
       let tr = this.tracks.get(h.id);
       const k = tr?.k ?? getHazardKind(h.kind);
       // markers (e.g. the poles at a gap jump) have no physics and no gameplay events
@@ -357,7 +379,10 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       if (q.z <= h.z + h.r + 2 && this.hazards.hasBand(h.band)) continue;
       if (tr.closest <= HAZARD_PASS_RANGE) this.emit({ type: 'hazard-passed', hazard: h, kind: tr.k.id, hit: tr.hit, entered: tr.entered, closest: Math.max(0, tr.closest), t: q.t });
       this.tracks.delete(id);
+      if (q.z > h.z + h.r + 2) this.passed.set(id, h.z);
     }
+    // forget passed ids far behind (bounded over any course length)
+    if (this.passed.size > 256) for (const [id, z] of this.passed) if (z < q.z - 400) this.passed.delete(id);
     return hw;
   }
 
