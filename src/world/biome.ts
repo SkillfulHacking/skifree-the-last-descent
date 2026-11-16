@@ -177,6 +177,12 @@ export interface BiomeRocks {
   tintDark: RGB;
   /** snow cap colour */
   snow: RGB;
+  /**
+   * Scanned CC0 boulders (art/scanModels ids) for the near-LOD obstacle rocks: when set, the
+   * procedural near rocks are replaced by these once they load (the collision is unchanged —
+   * the scans are normalised to the same unit footprint). Unset: the procedural rocks.
+   */
+  scan?: readonly ('namaqualand_boulder_02' | 'namaqualand_boulder_06' | 'boulder_01')[];
 }
 
 /** Obstacle mix: multipliers on the base placement probabilities (1 = original). */

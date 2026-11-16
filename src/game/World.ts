@@ -145,7 +145,7 @@ export class World {
     } else this.finish = null;
     this.hazardViews = new HazardLayer(this.environment, { mountain: this.mountain, quality, biome: this.biome, terrainMaterial: this.terrain.material });
     this.scene.add(this.hazardViews.group);
-    this.scenery = this.presentation.scenery?.build({ mountain: this.mountain, quality, biome: this.biome, terrain: this.terrain.uniforms, sunDir: this.env.sunDir }) ?? null;
+    this.scenery = this.presentation.scenery?.build({ mountain: this.mountain, quality, biome: this.biome, terrain: this.terrain.uniforms, sunDir: this.env.sunDir, terrainMaterial: this.terrain.material }) ?? null;
     if (this.scenery) this.scene.add(this.scenery.group);
     this.start = new StartArea(this.mountain, quality);
     this.scene.add(this.start.group);

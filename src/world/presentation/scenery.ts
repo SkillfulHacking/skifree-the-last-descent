@@ -24,6 +24,8 @@ export interface SceneryContext {
   terrain: TerrainUniforms;
   /** direction towards the sun (world space, normalised) */
   sunDir: THREE.Vector3;
+  /** the terrain's snow material, for authored snow forms that must read as the same snow */
+  terrainMaterial?: THREE.Material;
 }
 
 export interface SceneryFrame {

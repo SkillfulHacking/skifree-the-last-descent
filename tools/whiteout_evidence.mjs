@@ -104,15 +104,21 @@ const G = await (async () => {
 
 /** put the skier at z skiing (autopilot), clock at t, and run a few frames so the weather settles */
 async function skiAt(z, t, speed = 16) {
-  await ev(([zz, sp]) => { window.__skifree.hold(true); window.__skifree.freeCam(null); window.__skifree.teleport(zz, sp); window.__skifree.autopilot('skilled'); }, [z, speed]);
+  await ev(([zz, sp]) => { window.__skifree.hold(true); window.__skifree.freeCam(null); window.__skifree.teleport(zz, sp); window.__skifree.autopilot('skilled'); window.__skifree.placeYeti(260); }, [z, speed]);
   await ev((tt) => window.__skifree.setTime(tt), t);
   await framesUntil('(s) => false', 45);
+  await ev(() => window.__skifree.placeYeti(260));
 }
 
 // ---- weather phases from the normal third-person camera (HUD on)
 if (want('weather')) {
   await ev(() => window.__skifree.hud(true));
-  const z = Math.min(Math.max(140, (G.cave?.caveZ ?? 300) - 140), G.L * 0.4);
+  // past the encounter (teleporting over its trigger would start the cave cinematic): the chase is
+  // on, the Yeti held 260 m back so the weather shots are not chase shots
+  await ev(() => window.__skifree.toChase());
+  await framesUntil('(s) => s.phase === "chase"', 300);
+  await framesUntil('(s) => false', 240); // the RUN. banner clears
+  const z = Math.min((G.cave?.triggerZ ?? 0) + 120, G.L * 0.4);
   await skiAt(z, 8);
   await shot('01_clear_window', 'Third-person, clear window (start): broken cloud deck, cloud shadows on the snow, the ridge in sun');
   const tb = await findPhase('build', 20);
@@ -141,6 +147,8 @@ if (want('weather')) {
 // ---- vistas (free camera; clear window)
 if (want('vista')) {
   await ev(() => window.__skifree.hud(false));
+  await ev(() => window.__skifree.toChase());
+  await framesUntil('(s) => s.phase === "chase"', 300);
   const zr = Math.round(G.L * 0.55);
   await skiAt(zr, 6, 0);
   await ev(() => window.__skifree.autopilot(null));

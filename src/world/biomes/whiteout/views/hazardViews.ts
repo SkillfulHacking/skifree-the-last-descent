@@ -12,8 +12,13 @@ import type { Mountain } from '../../../course';
 import type { HazardInstance, HazardPhaseState } from '../../../hazards/hazard';
 import { registerHazardView, type HazardView } from '../../../presentation/hazardViews';
 import { makeFlakeTexture } from '../../../Environment';
+import { ATMOSPHERE_GLSL, addAtmosphereUniforms, atmosphere } from '../../../look/atmosphere';
 import { BLIZZARD, blizzardStrength, type BlizzardParams, type DriftParams } from '../hazards';
 
+const smoothstep01 = (x: number) => {
+  const k = Math.min(1, Math.max(0, x));
+  return k * k * (3 - 2 * k);
+};
 let shared: { drift: THREE.MeshStandardMaterial; plume: THREE.PointsMaterial; curtain: THREE.ShaderMaterial; flake: THREE.Texture } | null = null;
 
 /**
@@ -41,13 +46,32 @@ function curtainMaterial(): THREE.ShaderMaterial {
     side: THREE.DoubleSide,
   });
 }
+/**
+ * Spindrift off a drift crest: the shared atmosphere (not three's scene fog, which tinted the far
+ * plumes the warm horizon colour — "tan arcs" in the first renders).
+ */
+function plumeMaterial(flake: THREE.Texture): THREE.PointsMaterial {
+  const m = new THREE.PointsMaterial({ size: 0.9, color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false, map: flake, sizeAttenuation: true, fog: false });
+  m.onBeforeCompile = (shader) => {
+    addAtmosphereUniforms(shader.uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vPW;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvPW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying vec3 vPW;\n${ATMOSPHERE_GLSL}`)
+      .replace('#include <premultiplied_alpha_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vPW);\n#include <premultiplied_alpha_fragment>');
+  };
+  m.customProgramCacheKey = () => 'whiteout-plume-v1';
+  return m;
+}
+
 function mats() {
   if (shared) return shared;
   const flake = makeFlakeTexture();
   shared = {
     // fresh wind-loaded snow: brighter and smoother than the piste around it
     drift: new THREE.MeshStandardMaterial({ color: new THREE.Color(0.97, 0.985, 1.0), roughness: 0.62, metalness: 0, vertexColors: true }),
-    plume: new THREE.PointsMaterial({ size: 0.9, color: 0xffffff, transparent: true, opacity: 0.55, depthWrite: false, map: flake, sizeAttenuation: true }),
+    plume: plumeMaterial(flake),
     curtain: curtainMaterial(),
     flake,
   };
@@ -115,7 +139,14 @@ function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMat?: THR
   const n = 70;
   const pp = new Float32Array(n * 3);
   const seedU = new Float32Array(n);
-  for (let i = 0; i < n; i++) seedU[i] = (((h.seed * 31 + i * 977) % 1000) / 1000) * 2 - 1;
+  const phase = new Float32Array(n);
+  const jit = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    seedU[i] = (((h.seed * 31 + i * 977) % 1000) / 1000) * 2 - 1;
+    // independent of u (a phase tied to the index lined the grains up into visible parabolas)
+    phase[i] = (Math.sin(h.seed * 0.71 + i * 91.7) * 43758.5453) % 1;
+    jit[i] = ((Math.sin(h.seed * 1.37 + i * 47.3) * 24634.6345) % 1) * 2;
+  }
   const pg = new THREE.BufferGeometry();
   pg.setAttribute('position', new THREE.BufferAttribute(pp, 3));
   const plume = new THREE.Points(pg, M.plume);
@@ -125,11 +156,14 @@ function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMat?: THR
   return {
     object: obj,
     update(_ph: HazardPhaseState, t: number) {
+      // the plume streams only when the wind is up (the surface-spindrift strength, 0..0.6)
+      M.plume.opacity = 0.55 * smoothstep01(atmosphere.uDriftK.value / 0.6);
+      plume.visible = M.plume.opacity > 0.02;
       for (let i = 0; i < n; i++) {
         const u = seedU[i]!;
-        const life = (t * 0.55 + (i * 0.137) % 1) % 1;
-        const lx = u * L * 0.85;
-        const lz = crestZ + life * 6;
+        const life = (((t * 0.55 + Math.abs(phase[i]!)) % 1) + 1) % 1;
+        const lx = u * L * 0.85 + jit[i]! * (0.6 + life * 1.8);
+        const lz = crestZ + life * 6 + jit[i]! * 0.8;
         const x = h.x + lx * c - lz * s;
         const z = h.z + lx * s + lz * c;
         pp[i * 3] = x + life * 2.5;

@@ -82,6 +82,7 @@ uniform float uFade;
 uniform vec3 uCam;
 uniform vec2 uWallN;
 uniform float uWallD;
+uniform float uDeckH;
 varying vec3 vW;
 ${CLOUD_NOISE_GLSL}
 void main() {
@@ -95,10 +96,18 @@ void main() {
   // self-shadowing: thicker cloud is darker underneath
   vec3 col = mix(uLit, uShade, clamp(0.35 + 0.9 * d2 - 0.3 * d, 0.0, 1.0));
   float dist = length(rel);
-  // fade into the fog toward the horizon (no hard deck edge)
+  // seen at a grazing angle the cloud field minifies into a hard ceiling line with stretched
+  // "drips": toward the horizon the deck becomes its own average — an even overcast of the same
+  // coverage, graded into the horizon haze — instead of the aliased noise
+  float elev = uDeckH / max(dist, 1.0);
+  float g = smoothstep(0.05, 0.32, elev);
+  float mean = smoothstep(0.25, 0.95, cov);
+  d = mix(mean * 0.9, d, g);
+  col = mix(mix(uLit, uShade, 0.35 + 0.5 * mean), col, g);
+  // and fade into the fog toward the edge of the deck (no hard deck edge)
   float h = smoothstep(${SKY.deckR.toFixed(1)}, ${(SKY.deckR * 0.35).toFixed(1)}, dist);
-  col = mix(uFog, col, 0.35 + 0.65 * h);
-  gl_FragColor = vec4(col, d * h * uFade);
+  col = mix(uFog, col, 0.25 + 0.75 * g * h);
+  gl_FragColor = vec4(col, d * mix(0.6, 1.0, h) * uFade);
 }`;
 
 const WALL_FS = /* glsl */ `
@@ -106,21 +115,27 @@ uniform float uTime;
 uniform vec3 uTop;
 uniform vec3 uBase;
 uniform float uVis;
+uniform float uHaze;
+uniform vec3 uFog;
 varying vec2 vUv;
 ${CLOUD_NOISE_GLSL}
 void main() {
   // vUv.x along the wall (0..1), vUv.y up (0..1)
   vec2 p = vec2(vUv.x * 28000.0, vUv.y * 1800.0);
-  // billowing top edge and falling-snow streaks under it
-  float top = 0.62 + 0.22 * sf_cNoise(vec2(vUv.x * 18.0, uTime * 0.02)) + 0.12 * sf_cNoise(vec2(vUv.x * 61.0, 2.0));
-  float body = 1.0 - smoothstep(top - 0.18, top, vUv.y);
-  float streak = 0.75 + 0.25 * sf_cNoise(vec2(vUv.x * 900.0, vUv.y * 6.0 - uTime * 0.6));
+  // a towering, rounded cumuliform top (low frequencies only: the higher ones aliased into spikes and
+  // hanging "drips" kilometres away) that rises as the front comes on
+  float top = (0.5 + 0.2 * sf_cNoise(vec2(vUv.x * 9.0, uTime * 0.015)) + 0.08 * sf_cNoise(vec2(vUv.x * 23.0, 2.0 + uTime * 0.01))) * mix(0.55, 1.0, uVis);
+  float body = 1.0 - smoothstep(top - 0.22, top, vUv.y);
+  // precipitation under the base: broad, soft shafts (no sub-pixel streak texture)
+  float shafts = 0.85 + 0.15 * sf_cNoise(vec2(vUv.x * 70.0, vUv.y * 2.0 - uTime * 0.05));
   float billow = sf_cloudDensity(p * 0.25 + vec2(uTime * 6.0, 0.0), 0.8);
-  float alpha = body * mix(0.7, 1.0, billow) * streak;
+  float alpha = body * mix(0.75, 1.0, billow) * shafts;
   // soft ends along the wall
-  alpha *= smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
+  alpha *= smoothstep(0.0, 0.15, vUv.x) * smoothstep(1.0, 0.85, vUv.x);
   vec3 col = mix(uBase, uTop, smoothstep(0.0, 0.9, vUv.y) * (0.6 + 0.4 * billow));
-  gl_FragColor = vec4(col, alpha * uVis);
+  // aerial perspective: kilometres off, the wall is a blue-grey mass in the haze, not a dark smear
+  col = mix(col, uFog, uHaze);
+  gl_FragColor = vec4(col, min(1.0, alpha * uVis * 1.2));
 }`;
 
 export class StormSky {
@@ -145,6 +160,7 @@ export class StormSky {
       uCam: { value: new THREE.Vector3() },
       uWallN: { value: new THREE.Vector2(-1, 0) },
       uWallD: { value: 0 },
+      uDeckH: { value: SKY.deckH[0] },
     };
     const dg = new THREE.CircleGeometry(SKY.deckR, 64, 0, Math.PI * 2);
     dg.rotateX(Math.PI / 2); // face down (seen from below)
@@ -156,6 +172,8 @@ export class StormSky {
       uTop: { value: new THREE.Color(0.62, 0.66, 0.73) },
       uBase: { value: new THREE.Color(0.36, 0.4, 0.47) },
       uVis: { value: 0 },
+      uHaze: { value: 0 },
+      uFog: { value: new THREE.Color(0.74, 0.79, 0.86) },
     };
     const wg = new THREE.PlaneGeometry(SKY.wallW, SKY.wallH, 1, 1);
     wg.translate(0, SKY.wallH / 2 - 120, 0);
@@ -201,6 +219,7 @@ export class StormSky {
     const U = this.deckU;
     (U.uOff!.value as THREE.Vector2).set(this.off.x + o.x, this.off.y + o.z);
     U.uCov!.value = cov;
+    U.uDeckH!.value = deckY - focus.y;
     (U.uCam!.value as THREE.Vector3).set(focus.x - o.x, 0, focus.z - o.z);
     (U.uFog!.value as THREE.Color).copy(atmosphere.uFogColor.value);
     // inside the storm the fog is the cloud: the deck fades out (no ceiling seen through the snow)
@@ -216,6 +235,8 @@ export class StormSky {
       this.wall.position.set(x, focus.y - 200, focus.z + 1500);
       this.wall.rotation.set(0, Math.PI / 2, 0);
       this.wallU.uVis!.value = w.vis;
+      this.wallU.uHaze!.value = 0.6 * smoothstep(600, SKY.wallFar, Math.abs(w.dist));
+      (this.wallU.uFog!.value as THREE.Color).copy(atmosphere.uFogColor.value);
       this.wallU.uTime!.value = t;
     }
     // cloud shadows on the terrain and props: the same field, at the deck's height (render space)

@@ -981,6 +981,8 @@ export class App {
         if (e) this.session?.debugTeleport(e.triggerZ - 12, 16);
       },
       advance: (sec: number) => this.session?.debugAdvance(sec),
+      /** (tests) what the HUD tells the player about the weather: the pill and the caption on screen */
+      weatherHud: () => ({ pill: this.hud.weatherPillText, caption: this.hud.captionText }),
       /** (captures/tests) buttons held while frames() steps the game, e.g. { recoverHeld: true } */
       holdInput: (inp: Partial<GameplayInput>) => {
         if (this.session) this.session.debugHeld = { ...inp };

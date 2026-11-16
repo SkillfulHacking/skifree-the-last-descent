@@ -3,6 +3,7 @@
  * storm wall's timing. Pure (no three.js rendering).
  */
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import '../../src/world/biomes';
 import { buildMountain, DIFFICULTY, makeCourse, worldSeed, type Difficulty, type LengthMode } from '../../src/game/CourseConfig';
 import { BiomeEnvironment, RIDGE_GUARD } from '../../src/world/capabilities/environment';
@@ -10,7 +11,7 @@ import { ObstacleField } from '../../src/physics/obstacles';
 import { simulateCourse } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
 import { corniceSamples, wandSpots } from '../../src/world/biomes/whiteout/views/cornice';
-import { ridgeRockPlacements } from '../../src/world/biomes/whiteout/views/ridgeRocks';
+import { ridgeRockPlacements, rockBaseRing } from '../../src/world/biomes/whiteout/views/ridgeRocks';
 import { stormWall, SKY } from '../../src/world/biomes/whiteout/views/sky';
 import { frontAt } from '../../src/world/biomes/whiteout/storm';
 import { SkierPhysics, NO_INPUT } from '../../src/physics/SkierPhysics';
@@ -64,6 +65,12 @@ describe('Whiteout ridge rock', () => {
         fam[p.family]++;
         // bedded: the base is below the terrain at the centre by ≥ 25 % of the block's height
         expect(p.y).toBeLessThanOrEqual(m.heightAt(p.x, p.z) - 0.25 * p.sy + 1e-6);
+        // and no point of its base stands above the snow (no gap underneath on a slope)
+        for (const [bx, by, bz] of rockBaseRing(p)) expect(by).toBeLessThanOrEqual(m.heightAt(bx, bz) + 1e-6);
+        // it shows: the block is seated on its slope, not buried to a sliver on the uphill side —
+        // the top of the block (base + sy along its up axis) stands clear of the snow at the centre
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(new THREE.Quaternion(...p.q));
+        expect(p.y + up.y * p.sy - m.heightAt(p.x + up.x * p.sy, p.z + up.z * p.sy), `${p.family} at ${p.z.toFixed(0)}`).toBeGreaterThan(0.35 * p.sy);
         // off the piste (beyond its edge by more than the block's half size)
         expect(Math.abs(p.x - m.profile.centerX(p.z))).toBeGreaterThan(m.profile.halfWidth(p.z) + 0.3 * Math.max(p.sx, p.sz));
         // rim blocks stand past the rim (the rim guard's ground), never inside it
@@ -163,4 +170,50 @@ describe('Hazard pass reports (W-023, engine-wide)', () => {
       for (const [id, n] of seen) expect(n, `${biome} hazard ${id}`).toBe(1);
     }
   }, 300_000);
+});
+
+describe('Whiteout Ridge: scanned obstacle rocks (W-003)', () => {
+  it('a scan is normalised to the procedural rock frame (footprint ~1 m, base buried), all variants', async () => {
+    const THREE = await import('three');
+    const { scanRockGeometry } = await import('../../src/world/props');
+    const { getBiome } = await import('../../src/world/biome');
+    expect(getBiome('whiteout').rocks.scan?.length).toBe(3);
+    const unit = new THREE.SphereGeometry(0.5, 12, 8).translate(0, 0.5, 0);
+    for (let v = 0; v < 6; v++) {
+      const g = scanRockGeometry(unit, v, [0.2, 0.2, 0.2]);
+      g.computeBoundingBox();
+      const b = g.boundingBox!;
+      expect(Math.max(-b.min.x, b.max.x, -b.min.z, b.max.z)).toBeLessThan(1.1);
+      expect(Math.max(-b.min.x, b.max.x, -b.min.z, b.max.z)).toBeGreaterThan(0.9);
+      expect(b.min.y).toBeLessThan(-0.6);
+      expect(b.max.y).toBeGreaterThan(0.8);
+      expect(g.getAttribute('color').count).toBe(g.getAttribute('position').count);
+    }
+  });
+});
+
+describe('Whiteout Ridge: the cornice is drawn with the terrain snow (front faces only)', () => {
+  it('its faces wind outward: the top of the lip faces up, the overhang faces down', async () => {
+    const { buildCorniceGeometry } = await import('../../src/world/biomes/whiteout/views/cornice');
+    for (const seed of ['WR1', 'WR2']) {
+      const m = buildMountain(makeCourse('custom', 'standard', { biome: 'whiteout', customText: seed }));
+      const g = buildCorniceGeometry(m, corniceSamples(m, 600, 1400))!;
+      expect(g).toBeTruthy();
+      expect(g.getAttribute('aSurf')).toBeTruthy();
+      // area-weighted face normals: the strip is mostly a cap seen from above
+      const p = g.getAttribute('position');
+      const idx = g.getIndex()!;
+      let up = 0, down = 0;
+      for (let i = 0; i < idx.count; i += 3) {
+        const [a, b, c] = [idx.getX(i), idx.getX(i + 1), idx.getX(i + 2)];
+        const ux = p.getX(b) - p.getX(a), uy = p.getY(b) - p.getY(a), uz = p.getZ(b) - p.getZ(a);
+        const vx = p.getX(c) - p.getX(a), vy = p.getY(c) - p.getY(a), vz = p.getZ(c) - p.getZ(a);
+        const ny = uz * vx - ux * vz;
+        void uy; void vy;
+        if (ny > 0) up += ny;
+        else down -= ny;
+      }
+      expect(up, seed).toBeGreaterThan(down * 1.5);
+    }
+  });
 });

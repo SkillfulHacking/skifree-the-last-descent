@@ -104,8 +104,10 @@ export class WhiteoutScenery implements SceneryView {
   private win: [number, number] = [0, -1];
   private camR = new THREE.Vector3();
 
+  private snowMat: THREE.Material | null;
   constructor(ctx: SceneryContext) {
     this.m = ctx.mountain;
+    this.snowMat = ctx.terrainMaterial ?? null;
     this.group.name = 'whiteout-scenery';
     this.snow = new BlowingSnow(ctx.quality);
     this.rocks = new RidgeRocks(ctx.mountain, ctx.quality);
@@ -171,7 +173,7 @@ export class WhiteoutScenery implements SceneryView {
     let cornice: THREE.Mesh | null = null;
     const cg = buildCorniceGeometry(this.m, corniceSamples(this.m, k * CHUNK - 3, (k + 1) * CHUNK + 3));
     if (cg) {
-      cornice = new THREE.Mesh(cg, corniceMaterial());
+      cornice = new THREE.Mesh(cg, this.snowMat ?? corniceMaterial());
       cornice.receiveShadow = true;
       cornice.castShadow = false;
       group.add(cornice);

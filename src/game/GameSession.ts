@@ -993,10 +993,15 @@ export class GameSession implements Stage {
       this.yetiAnim.speed = this.yetiAI.speed;
       this.yetiAnim.turn = this.yetiAI.turn;
       if (this.run.phase === 'chase') this.setYetiMode(this.yetiAI.mode);
-      // (Pass 5, Whiteout) a white Yeti in a white storm: in the chase he darkens to a grey silhouette
-      // with distance in proportion to the storm, so he stays readable in the fog (close up he is himself)
+      // (W-009) a white Yeti in a white storm. Not a colour that changes as he closes in (the slice's
+      // distance darkening read as a fake): the storm's flat, dim light takes the pelt down with
+      // everything else — the same at 10 m as at 60 m, changing only as slowly as the weather — and
+      // his eyes burn through the snow as they do in the cave, the pair of points that finds him first
       const storm = this.world.weather.storm ?? 0;
-      if (this.run.phase === 'chase') this.yeti.setShade(1 - 0.5 * storm * smoothstep(14, 45, this.yetiAI.distance));
+      if (this.run.phase === 'chase') {
+        this.yeti.setShade(1 - 0.36 * storm);
+        this.yeti.setEyeGlow(0.75 * smoothstep(0.25, 0.7, storm));
+      }
     }
     this.yetiAnim.modeTime += dt;
     if (this.yetiAnim.throwT !== undefined) {

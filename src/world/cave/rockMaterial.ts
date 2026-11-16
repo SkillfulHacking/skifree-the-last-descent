@@ -270,19 +270,26 @@ float cv_fracture(vec3 p, float tw){
   if (uRime > 0.0) {
     float outside = smoothstep(0.2, 0.45, cv_vis);
     // dark frost-shattered granite
-    col = mix(col, col * vec3(0.72, 0.76, 0.82), uRime * (1.0 - cv_snow) * (1.0 - kind));
-    // rime feathers on faces into the wind (grown out toward it: streaky, broken)
-    float feather = cv_f3(ap * vec3(1.6, 0.7, 1.6) + 4.0);
-    float windward = smoothstep(-0.1, 0.55, dot(wn, uRimeDir) + 0.35 * (feather - 0.5));
-    float rime = uRime * windward * outside * smoothstep(0.38, 0.62, feather) * (1.0 - kind) * (1.0 - cv_claw);
-    col = mix(col, vec3(0.85, 0.9, 0.97), rime * (1.0 - cv_snow));
+    col = mix(col, col * vec3(0.8, 0.83, 0.88), uRime * (1.0 - cv_snow) * (1.0 - kind));
+    // rime: a fine frosting grown out into the wind, streaked along it (feathers ~10–30 cm), thicker
+    // on the edges facing the wind — a texture over the rock, never broad white blotches (art: the
+    // first renders read as camouflage)
+    vec3 wq = ap * 5.5;
+    float along = dot(wq, uRimeDir);
+    float feather = cv_n3(wq - uRimeDir * along * 0.72 + 4.0) * 0.65 + cv_n3(wq * 2.3 + 11.0) * 0.35;
+    // (band-limited: far away the frosting is its average, no shimmer)
+    feather = mix(feather, 0.5, smoothstep(0.35, 1.1, length(fwidth(wq))));
+    float windward = smoothstep(-0.05, 0.6, dot(wn, uRimeDir));
+    float rime = uRime * windward * outside * smoothstep(0.42, 0.68, feather) * (1.0 - kind) * (1.0 - cv_claw);
+    col = mix(col, vec3(0.84, 0.89, 0.95), 0.7 * rime * (1.0 - cv_snow));
     // clear ice glaze and frozen drips on steep faces near the sky (vertical streaks)
     float steep = 1.0 - smoothstep(0.2, 0.55, abs(wn.y));
     float drip = smoothstep(0.55, 0.8, cv_n3(vec3(ap.x * 2.6, ap.y * 0.22, ap.z * 2.6)));
     float glaze = uRime * steep * outside * drip * (1.0 - kind) * (1.0 - cv_snow);
-    col = mix(col, vec3(0.5, 0.6, 0.72), 0.55 * glaze);
-    cv_rough = mix(cv_rough, 0.62, rime);
-    cv_rough = mix(cv_rough, 0.18, glaze);
+    col = mix(col, vec3(0.5, 0.6, 0.72), 0.4 * glaze);
+    cv_rough = mix(cv_rough, 0.7, rime);
+    // (not mirror-glossy: at 0.18 the drip streaks threw thin specular arcs that read as scratches)
+    cv_rough = mix(cv_rough, 0.42, glaze);
   }
   // baked AO darkens the albedo of the rock a little too (crevices read even in direct light)
   col *= mix(1.0, ao, 0.25 * (1.0 - cv_rim));

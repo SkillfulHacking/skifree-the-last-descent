@@ -147,6 +147,11 @@ export function buildCorniceGeometry(m: Mountain, samples: CorniceSample[]): THR
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  // wind-packed snow for the terrain shader (the cornice is drawn with the terrain's own snow material:
+  // with a plain lit material it read as pale styrofoam slabs beside the snow it grows out of)
+  const surf = new Float32Array(pos.length);
+  for (let i = 0; i < pos.length / 3; i++) surf[i * 3 + 1] = 0.6;
+  g.setAttribute('aSurf', new THREE.BufferAttribute(surf, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
   return g;

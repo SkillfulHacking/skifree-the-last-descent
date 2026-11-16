@@ -10,8 +10,12 @@
  *  - flank buttresses: big slabs half-buried in the upper flank below the rim, seen when the course
  *    swings toward the edge or in the clear windows.
  *
- * Every block is bedded: its base sits 25–40 % of its height below the LOWEST terrain point under its
- * footprint, so no block shows a gap underneath on a slope. Shared triplanar PBR rock material, graded
+ * Every block is bedded on the slope it stands on: its base is tilted to the ground plane fitted under
+ * its footprint (most of the way: a little lean of its own is kept), sunk 25–40 % of its height below
+ * the ground at its centre, and lowered further if any point of its base would stand above the snow,
+ * so no block shows a gap underneath. (Bedded at the LOWEST point of the footprint without the tilt,
+ * a block on the 30–40° crest slopes was buried metres deep on its uphill side: from the course the
+ * tors read as flat pale plates of snow-capped rock — dev renders 08/10/11.) Shared triplanar PBR rock material, graded
  * dark (granite/schist), snow on surfaces flatter than ~40°.
  */
 import * as THREE from 'three';
@@ -34,19 +38,55 @@ export interface RockPlacement {
   yaw: number;
   tilt: number;
   family: 'tor' | 'rim' | 'flank';
+  /** orientation (x, y, z, w): yaw, the block's own lean, then tilted onto the ground plane */
+  q: [number, number, number, number];
 }
 
-/** lowest terrain height under a footprint (centre + 8 points on the ellipse) */
-function lowest(m: Mountain, x: number, z: number, rx: number, rz: number, yaw: number): number {
-  let lo = m.heightAt(x, z);
-  const c = Math.cos(yaw), s = Math.sin(yaw);
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    const u = Math.cos(a) * rx * 0.5, v = Math.sin(a) * rz * 0.5;
-    lo = Math.min(lo, m.heightAt(x + u * c - v * s, z + u * s + v * c));
+const _e = new THREE.Euler();
+const _q = new THREE.Quaternion();
+const _qa = new THREE.Quaternion();
+const _n = new THREE.Vector3();
+const _v = new THREE.Vector3();
+const UP = new THREE.Vector3(0, 1, 0);
+/** how far a block is turned onto its ground plane (1 = fully) */
+const SLOPE_FOLLOW = 0.8;
+const RING = 12;
+
+/**
+ * Seat a block on the ground: orientation (yaw, lean, then onto the fitted ground plane) and the base
+ * height (sunk `sink`·sy at the centre, and below the snow at every point of the footprint's rim).
+ */
+function seat(m: Mountain, x: number, z: number, sx: number, sy: number, sz: number, yaw: number, tilt: number, sink: number) {
+  const a = Math.max(2, 0.5 * Math.max(sx, sz));
+  const gx = (m.heightAt(x + a, z) - m.heightAt(x - a, z)) / (2 * a);
+  const gz = (m.heightAt(x, z + a) - m.heightAt(x, z - a)) / (2 * a);
+  _n.set(-gx, 1, -gz).normalize().lerp(UP, 1 - SLOPE_FOLLOW).normalize();
+  _qa.setFromUnitVectors(UP, _n);
+  _e.set(0, yaw, tilt, 'YXZ');
+  _q.setFromEuler(_e).premultiply(_qa);
+  let y = m.heightAt(x, z) - sink * sy;
+  // the footprint's rim (the scans fill [-0.5, 0.5]² at their base): never above the snow
+  for (let i = 0; i < RING; i++) {
+    const t = (i / RING) * Math.PI * 2;
+    _v.set(Math.cos(t) * 0.5 * sx, 0, Math.sin(t) * 0.5 * sz).applyQuaternion(_q);
+    const over = y + _v.y - m.heightAt(x + _v.x, z + _v.z);
+    if (over > 0) y -= over;
   }
-  return lo;
+  return { y, q: [_q.x, _q.y, _q.z, _q.w] as [number, number, number, number] };
 }
+
+/** a block's base points (for the tests): the footprint rim, in world space */
+export function rockBaseRing(p: RockPlacement): [number, number, number][] {
+  const q = new THREE.Quaternion(...p.q);
+  const out: [number, number, number][] = [];
+  for (let i = 0; i < RING; i++) {
+    const t = (i / RING) * Math.PI * 2;
+    const v = new THREE.Vector3(Math.cos(t) * 0.5 * p.sx, 0, Math.sin(t) * 0.5 * p.sz).applyQuaternion(q);
+    out.push([p.x + v.x, p.y + v.y, p.z + v.z]);
+  }
+  return out;
+}
+
 
 /** placements in [z0, z1) (pure; tests check bedding and that none is on the piste) */
 export function ridgeRockPlacements(m: Mountain, z0: number, z1: number): RockPlacement[] {
@@ -57,9 +97,13 @@ export function ridgeRockPlacements(m: Mountain, z0: number, z1: number): RockPl
   const P = m.profile;
   const end = Number.isFinite(m.finishZ) ? m.finishZ - 240 : Infinity;
   const pick = (k: number) => RIDGE_ROCK_IDS[Math.floor(hash2(k, 5, s) * RIDGE_ROCK_IDS.length) % RIDGE_ROCK_IDS.length]!;
-  const add = (pl: Omit<RockPlacement, 'y'>, sink: number) => {
-    const base = lowest(m, pl.x, pl.z, pl.sx, pl.sz, pl.yaw);
-    out.push({ ...pl, y: base - sink * pl.sy });
+  const add = (pl: Omit<RockPlacement, 'y' | 'q'>, sink: number) => {
+    const st = seat(m, pl.x, pl.z, pl.sx, pl.sy, pl.sz, pl.yaw, pl.tilt, sink);
+    // on broken ground (flank ribs and gullies) a block can still end up mostly buried: leave it out
+    // rather than show a sliver
+    _v.set(0, 1, 0).applyQuaternion(_q.set(...st.q));
+    if (st.y + _v.y * pl.sy - m.heightAt(pl.x + _v.x * pl.sy, pl.z + _v.z * pl.sy) < 0.35 * pl.sy) return;
+    out.push({ ...pl, ...st });
   };
   // crest tors (the crest side is −dropSide)
   const cs = -R.dropSide as 1 | -1;
@@ -159,7 +203,6 @@ export class RidgeRocks {
     const list: THREE.InstancedMesh[] = [];
     const M = new THREE.Matrix4();
     const q = new THREE.Quaternion();
-    const e = new THREE.Euler();
     const p = new THREE.Vector3();
     const sc = new THREE.Vector3();
     for (const id of RIDGE_ROCK_IDS) {
@@ -168,8 +211,7 @@ export class RidgeRocks {
       if (!g || !mine.length) continue;
       const im = new THREE.InstancedMesh(g, this.mat, mine.length);
       mine.forEach((pl, i) => {
-        e.set(0, pl.yaw, pl.tilt, 'YXZ');
-        q.setFromEuler(e);
+        q.set(...pl.q);
         M.compose(p.set(pl.x, pl.y, pl.z), q, sc.set(pl.sx, pl.sy, pl.sz));
         im.setMatrixAt(i, M);
       });

@@ -28,7 +28,7 @@ export const FRONT = {
 } as const;
 
 /** fog multipliers over the biome's base density (validateWeather caps visibility at 12) */
-export const STORM_FOG = { clear: 1, storm: 11, bank: 2.4 } as const;
+export const STORM_FOG = { clear: 0.65, storm: 11, bank: 2.4 } as const;
 
 export interface FrontState {
   /** 0..1 storm intensity */

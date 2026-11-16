@@ -424,6 +424,34 @@ export function rockGeometry(variant: number, detailed: boolean, opts: { flatten
 }
 
 /**
+ * A scanned boulder (art/scanModels unit geometry: footprint x, z in [-0.5, 0.5], y in [0, 1]) in the
+ * procedural rock's frame: ~1 m footprint radius, base below the origin (instances are buried by
+ * 20–45 % of their scale, so the scan grows out of the snow), bare-rock vertex colours (the rock
+ * shader adds tint, weathering and the snow cap). Variants beyond the scan count are the same scan
+ * turned a quarter (a rotation, so the winding stays front-facing) and proportioned differently.
+ */
+export function scanRockGeometry(unit: THREE.BufferGeometry, variant: number, color: RGB): THREE.BufferGeometry {
+  const g = unit.clone();
+  const pos = g.getAttribute('position') as THREE.BufferAttribute;
+  const turn = Math.floor(variant / 3) % 4;
+  const [ax, ay, az] = [[2.05, 1.75, 2.0], [1.95, 2.05, 1.85], [2.1, 1.6, 2.05], [2.0, 1.9, 1.95]][turn]!;
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i) * ax;
+    let z = pos.getZ(i) * az;
+    for (let k = 0; k < turn; k++) [x, z] = [z, -x];
+    pos.setXYZ(i, x, pos.getY(i) * ay - 0.45 * ay, z);
+  }
+  g.deleteAttribute('normal');
+  g.computeVertexNormals();
+  g.computeBoundingSphere();
+  return colorize(g, (p) => {
+    const s = 0.55 + 0.45 * gnoise(p.x * 3, p.y * 6 + p.z * 3, 7 + variant);
+    const base = 0.75 + 0.25 * THREE.MathUtils.smoothstep(p.y, -0.1, 0.25);
+    return new THREE.Color(color[0] * s * base, color[1] * s * base, color[2] * s * base);
+  });
+}
+
+/**
  * Rock material: bare-rock vertex colours, tinted per instance towards the terrain's strata tones
  * (cool grey / warm grey-brown / dark), with lichen/weathering detail and a snow cap computed from
  * the *world* normal (so tilted instances still hold snow on top), with a noisy band-limited edge.
