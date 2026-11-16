@@ -274,14 +274,16 @@ float cv_fracture(vec3 p, float tw){
     // rime: a fine frosting grown out into the wind, streaked along it (feathers ~10–30 cm), thicker
     // on the edges facing the wind — a texture over the rock, never broad white blotches (art: the
     // first renders read as camouflage)
-    vec3 wq = ap * 5.5;
+    vec3 wq = ap * 2.6;
     float along = dot(wq, uRimeDir);
-    float feather = cv_n3(wq - uRimeDir * along * 0.72 + 4.0) * 0.65 + cv_n3(wq * 2.3 + 11.0) * 0.35;
+    // smooth fbm stretched along the wind (single-octave value noise at a hard threshold read as
+    // pixelated "digital camo" in dev8)
+    float feather = cv_f3(wq - uRimeDir * along * 0.72 + 4.0);
     // (band-limited: far away the frosting is its average, no shimmer)
     feather = mix(feather, 0.5, smoothstep(0.35, 1.1, length(fwidth(wq))));
     float windward = smoothstep(-0.05, 0.6, dot(wn, uRimeDir));
-    float rime = uRime * windward * outside * smoothstep(0.42, 0.68, feather) * (1.0 - kind) * (1.0 - cv_claw);
-    col = mix(col, vec3(0.84, 0.89, 0.95), 0.7 * rime * (1.0 - cv_snow));
+    float rime = uRime * windward * outside * smoothstep(0.3, 0.8, feather) * (1.0 - kind) * (1.0 - cv_claw);
+    col = mix(col, vec3(0.8, 0.85, 0.91), 0.38 * rime * (1.0 - cv_snow));
     // clear ice glaze and frozen drips on steep faces near the sky (vertical streaks)
     float steep = 1.0 - smoothstep(0.2, 0.55, abs(wn.y));
     float drip = smoothstep(0.55, 0.8, cv_n3(vec3(ap.x * 2.6, ap.y * 0.22, ap.z * 2.6)));

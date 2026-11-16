@@ -23,7 +23,7 @@ export const STORM_CAVE = {
   curtain: 260,
   skate: 220,
   /** the squall in the encounter: ramps in (s), peak weather */
-  squall: { t0: 5.2, t1: 9.0, end: 17.2, release: 7, visibility: 5.2, snowfall: 2.0, storm: 0.62, wind: 9.5 },
+  squall: { t0: 5.2, t1: 9.0, lullT: [12.2, 14.4] as const, lull: 0.7, end: 17.2, release: 7, visibility: 5.2, snowfall: 2.0, storm: 0.62, wind: 9.5 },
   roar: 11.05,
 } as const;
 
@@ -157,7 +157,9 @@ export function stormCaveCinematic(c: CaveCinematicContext): CaveCinematicExtras
   return {
     update(_dt, t) {
       if (released) return;
-      const k = smoothstep(S.t0, S.t1, t);
+      // the squall peaks through the emergence and the roar, then the gust blows through so the leap
+      // (14.6–17 s, past the skier's shoulder) reads — at full squall the Yeti vanished (dev8 15)
+      const k = smoothstep(S.t0, S.t1, t) * (1 - S.lull * smoothstep(S.lullT[0], S.lullT[1], t));
       world.weatherOverride = {
         visibility: base.visibility + (S.visibility - base.visibility) * k,
         snowfall: base.snowfall + (S.snowfall - base.snowfall) * k,
