@@ -52,6 +52,14 @@ export const RIM_GUARD = { reach: 16, updraft: 30, over: 1.5, drop: 10, back: 6 
  * on the piste like the out-of-bounds rule, with its own cue. The cornice snow does not resist
  * heading inland, so this is a backstop (an idle or floundering skier), not the way out.
  */
+/**
+ * The ridge rim (Whiteout): updraft (m/s², toward the ridge) within `reach` m of the rim for an
+ * airborne skier; over by more than `over` m (grounded, or `drop` m below the rim in the air) → put
+ * back on the piste `back` m uphill. The first metres past the rim are the cornice's gentle roll-over,
+ * so a skier who slides onto it sees the edge before the guard acts.
+ */
+export const RIDGE_GUARD = { reach: 14, updraft: 12, over: 8, drop: 8, back: 6 } as const;
+
 export const CORNICE_STALL = { zone: 18, speed: 1, time: 3 } as const;
 
 /** how far ahead (m) a periodic hazard's telegraph/active transitions are reported */
@@ -261,6 +269,19 @@ export class BiomeEnvironment implements PhysicsEnvironment {
         }
       } else this.stall = 0;
     } else this.stall = 0;
+    // 5) a ridge's corniced rim (Whiteout, terrain.ridge): the wind lifting up the flank eases an
+    //    airborne skier back over the ridge; a skier who goes over the rim anyway (grounded past it,
+    //    or airborne and well below it) is put back on the piste, crashed, with a cue — the flank is a
+    //    long fall into the valley, not a route
+    const rb = this.mountain.beyondRidgeRim(q.x, q.z);
+    if (rb === rb && !q.crashed && !out.relocate) {
+      if (!q.grounded && rb > -RIDGE_GUARD.reach) out.airAccelX -= this.mountain.biome.terrain.ridge!.dropSide * RIDGE_GUARD.updraft * smoothstep(-RIDGE_GUARD.reach, 0, rb);
+      const rimY = this.mountain.heightAt(this.mountain.ridgeRimX(q.z), q.z);
+      if (rb > RIDGE_GUARD.over && (q.grounded || q.y < rimY - RIDGE_GUARD.drop)) {
+        const z = q.z - RIDGE_GUARD.back;
+        out.relocate = { x: this.mountain.routeX(z), z, reason: 'over the cornice' };
+      }
+    }
   }
 
   /** wind x/z (m/s, airborne coupling), grounded side-slip x/z (m/s) and airborne push x (m/s²) from hazards this step */

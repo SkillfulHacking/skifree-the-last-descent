@@ -426,7 +426,7 @@ ${coastal ? coastRockGlsl(T, quality === 'low') : ''}
 // skylight is blue: shadowed snow reads cold while the sunlit side stays warm
 reflectedLight.indirectDiffuse *= mix(${v3(T.skylightTint)}, vec3(1.0), sf_rock * 0.5);`,
       )
-      .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vWPos);')
+      .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(sf_spindrift(gl_FragColor.rgb, vWPos, 1.0 - sf_rock), vWPos);')
       .replace(
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>

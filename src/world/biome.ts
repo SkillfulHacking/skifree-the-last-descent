@@ -211,6 +211,16 @@ export interface BiomeTerrain {
    * cave side must be the other side. Absent = a valley on both sides (bit-identical).
    */
   shoulderDrop?: { side: 1 | -1; depth: number; width: number };
+  /**
+   * Optional (Whiteout full production): the course runs along the top of a broad ridge. On
+   * `dropSide` the bank rolls over a corniced rim `rim` m beyond the piste edge (rising `lip` m) and
+   * the flank falls `depth` m over `flank` m into a valley (steepest ≈ 1.5·depth/flank at mid-flank,
+   * rock ribs and couloirs); on the other side a broken rocky crest rises `crest` m (varying along the
+   * course) `crestE` m out and falls `backDrop` m behind it, so there is sky on both sides. Supersedes
+   * `shoulderDrop`; absent = no ridge (bit-identical). Off-piste only: the rim guard
+   * (capabilities/environment.ts) returns a skier who goes over the rim.
+   */
+  ridge?: { dropSide: 1 | -1; rim: number; lip: number; depth: number; flank: number; crest: number; crestE: number; backDrop: number };
   /** valley wall height (m) */
   wallHeight: number;
   /** ridged/fbm relief on the valley walls (m) */

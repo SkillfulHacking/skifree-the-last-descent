@@ -45,6 +45,7 @@ export class Mountain {
   private readonly kWall: number;
   private readonly kRelief: number;
   private readonly kDrop: { side: 1 | -1; depth: number; width: number } | null;
+  private readonly kRidge: NonNullable<Biome['terrain']['ridge']> | null;
   private readonly kRanges: number;
   private readonly kUndulation: number;
   private readonly kDetail: number;
@@ -87,6 +88,7 @@ export class Mountain {
     this.kRollers = t.rollers;
     this.kRangeSoft = t.rangeSoft ?? 0;
     this.kDrop = t.shoulderDrop ?? null;
+    this.kRidge = t.ridge ?? null;
     if (typeof seedOrProfile === 'number') {
       this.seed = seedOrProfile;
       this.profile = new ClassicProfile(seedOrProfile);
@@ -267,6 +269,48 @@ export class Mountain {
     return crest + 0.12 * k * (0.5 + 0.5 * fbm(x / 520, z / 520, s + 12, 3));
   }
 
+  /**
+   * Whiteout ridge (terrain.ridge): the offset beyond the piste bank at `e` m out on `side`.
+   * Drop side: a rounded lip up to the corniced rim, then the flank rolling over and falling into
+   * the valley (ribs and couloirs run down it), then the far ranges. Crest side: a broken rocky
+   * crest, then the ground falls away behind it.
+   */
+  private ridgeSide(x: number, z: number, e: number, es: number, side: 1 | -1, rough: number, s: number): number {
+    const R = this.kRidge!;
+    if (side === R.dropSide) {
+      const t = clamp((e - R.rim) / R.flank, 0, 1);
+      const fall = R.depth * t * t * (3 - 2 * t);
+      const lip = R.lip * smoothstep(0, R.rim, e) * (1 - smoothstep(R.rim, R.rim + 30, e));
+      // ribs and couloirs down the flank (elongated across the course = down the fall line), strongest mid-flank
+      const steep = 4 * t * (1 - t);
+      const rib = (ridged(x / 130, z / 62, s + 41, 2) - 0.5) * 36 * steep;
+      const ranges = this.kRanges * smoothstep(R.rim + R.flank + 500, R.rim + R.flank + 3200, e) * (0.35 + (this.kRangeSoft > 0 ? this.softRange(x, z, s) : ridged(x / 900, z / 900, s + 11, 5)));
+      return lip - fall + rib + 0.35 * rough * smoothstep(R.rim, R.rim + 60, e) + ranges;
+    }
+    // the crest varies along the course (higher buttresses, low saddles where the storms pour over)
+    const ch = R.crest * (0.45 + 0.55 * (0.5 + 0.5 * fbm(z / 620, 3.7, s + 43, 2)));
+    const up = ch * smoothstep(0, R.crestE, es);
+    const back = R.backDrop * smoothstep(R.crestE + 30, R.crestE + 640, es);
+    const ranges = this.kRanges * smoothstep(R.crestE + 900, R.crestE + 3400, e) * (0.35 + (this.kRangeSoft > 0 ? this.softRange(x, z, s) : ridged(x / 900, z / 900, s + 11, 5)));
+    return up - back + 0.55 * rough * (1 - smoothstep(R.crestE + 60, R.crestE + 300, es)) + 0.02 * es + ranges;
+  }
+
+  /** world X of the ridge's corniced rim at z (terrain.ridge), or NaN without one */
+  ridgeRimX(z: number): number {
+    const R = this.kRidge;
+    if (!R) return NaN;
+    const P = this.profile;
+    const w = P.halfWidth(z);
+    return P.centerX(z) + R.dropSide * (Math.max(w, w * P.sideSetback(z, R.dropSide)) + R.rim);
+  }
+
+  /** metres beyond the ridge rim at (x, z) (negative = on the ridge side), NaN without a ridge */
+  beyondRidgeRim(x: number, z: number): number {
+    const R = this.kRidge;
+    if (!R) return NaN;
+    return (x - this.ridgeRimX(z)) * R.dropSide;
+  }
+
   /** Height of the land (everything but a coast's cliffs and sea), at world (x, z). */
   private landHeight(x: number, z: number): number {
     const P = this.profile;
@@ -306,7 +350,9 @@ export class Mountain {
       if (this.kRangeSoft > 0 && rr > 0.5) rr = 0.5 + (rr - 0.5) * (1 - 0.6 * this.kRangeSoft);
       const rf = 0.5 + 0.5 * fbm(x / 210, z / 210, s + 17, 3);
       const rough = (0.55 * rr + 0.45 * rf) * this.kRelief * smoothstep(30, 220, e) * (0.6 + 0.4 * P.rockBias(z));
-      if (this.kDrop && side === this.kDrop.side) {
+      if (this.kRidge) {
+        h += this.ridgeSide(x, z, e, es, side, rough, s);
+      } else if (this.kDrop && side === this.kDrop.side) {
         // a ridge's shoulder: the ground rolls over and falls away (broken by the relief), the far
         // ranges stand across the void
         const D = this.kDrop;

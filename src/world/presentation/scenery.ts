@@ -34,6 +34,14 @@ export interface SceneryFrame {
   origin: THREE.Vector3;
   /** the weather's storm intensity at the focus right now (0..1; 0 where it never storms) */
   storm?: number;
+  /** the weather's physics clock (s) and seed: the same timeline the skier's weather follows */
+  clock?: number;
+  weatherSeed?: number;
+  /** wind at the focus (m/s) */
+  windX?: number;
+  windZ?: number;
+  /** true while a finish cinematic overrides the weather (World.weatherOverride) */
+  override?: boolean;
 }
 
 export interface SceneryView {

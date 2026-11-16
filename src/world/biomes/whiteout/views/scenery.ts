@@ -12,6 +12,9 @@ import * as THREE from 'three';
 import { registerScenery, type SceneryContext, type SceneryFrame, type SceneryView } from '../../../presentation/scenery';
 import type { Mountain } from '../../../course';
 import { LANE_HALF } from '../../../../physics/obstacles';
+import { StormSky } from './sky';
+import { BlowingSnow } from './blowingSnow';
+import { buildCorniceGeometry, corniceMaterial, corniceSamples, wandGeometry, wandSpots } from './cornice';
 
 export const MARKER = {
   step: 28,
@@ -63,6 +66,9 @@ interface Chunk {
   lampMat: THREE.PointsMaterial;
   phase: Float32Array;
   geo: THREE.BufferGeometry;
+  /** the corniced rim and its wands (terrain.ridge) */
+  cornice: THREE.Mesh | null;
+  wands: THREE.InstancedMesh | null;
 }
 
 let lampTex: THREE.Texture | null = null;
@@ -88,11 +94,17 @@ export class WhiteoutScenery implements SceneryView {
   private chunks = new Map<number, Chunk>();
   private poleGeo: THREE.BufferGeometry;
   private poleMat: THREE.MeshStandardMaterial;
+  private wandMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, emissive: new THREE.Color(0.3, 0.22, 0.0), emissiveIntensity: 0.35 });
   private m: Mountain;
+  private sky = new StormSky();
+  private snow: BlowingSnow;
+  private camR = new THREE.Vector3();
 
   constructor(ctx: SceneryContext) {
     this.m = ctx.mountain;
     this.group.name = 'whiteout-scenery';
+    this.snow = new BlowingSnow(ctx.quality);
+    this.group.add(this.sky.group, this.snow.mesh);
     // a slim pole with reflective orange/black bands (vertex colours)
     const g = new THREE.CylinderGeometry(0.045, 0.06, MARKER.pole, 6, 8);
     g.translate(0, MARKER.pole / 2, 0);
@@ -148,8 +160,29 @@ export class WhiteoutScenery implements SceneryView {
     const lamps = new THREE.Points(geo, lampMat);
     lamps.frustumCulled = false;
     group.add(poles, lamps);
+    // the corniced rim (a little overlap between chunks so the strip has no seams)
+    let cornice: THREE.Mesh | null = null;
+    const cg = buildCorniceGeometry(this.m, corniceSamples(this.m, k * CHUNK - 3, (k + 1) * CHUNK + 3));
+    if (cg) {
+      cornice = new THREE.Mesh(cg, corniceMaterial());
+      cornice.receiveShadow = true;
+      cornice.castShadow = false;
+      group.add(cornice);
+    }
+    let wands: THREE.InstancedMesh | null = null;
+    const ws = wandSpots(this.m, k * CHUNK, (k + 1) * CHUNK);
+    if (ws.length) {
+      wands = new THREE.InstancedMesh(wandGeometry(), this.wandMat, ws.length);
+      ws.forEach((w, i) => {
+        // crossed pairs, like a ski area's closed-edge marking
+        M.makeRotationZ(((i % 2 ? 1 : -1) * 14 * Math.PI) / 180).setPosition(w.x, w.y - 0.25, w.z);
+        wands!.setMatrixAt(i, M);
+      });
+      wands.instanceMatrix.needsUpdate = true;
+      group.add(wands);
+    }
     this.group.add(group);
-    this.chunks.set(k, { group, poles, lamps, lampMat, phase, geo });
+    this.chunks.set(k, { group, poles, lamps, lampMat, phase, geo, cornice, wands });
   }
 
   private drop(k: number, ch: Chunk) {
@@ -157,10 +190,15 @@ export class WhiteoutScenery implements SceneryView {
     ch.poles.dispose();
     ch.geo.dispose();
     ch.lampMat.dispose();
+    ch.cornice?.geometry.dispose();
+    ch.wands?.dispose();
     this.chunks.delete(k);
   }
 
-  update(_dt: number, time: number, f: SceneryFrame): void {
+  update(dt: number, time: number, f: SceneryFrame): void {
+    this.sky.update(dt, time, f);
+    // (render space: the scene is drawn shifted by −origin)
+    this.snow.update(this.camR.copy(f.camPos).sub(f.origin), f.windX ?? 0, f.windZ ?? 0, f.storm ?? 0, f.clock ?? time);
     // brighter and larger as the storm closes in (they matter most then)
     const s = f.storm ?? 0;
     for (const ch of this.chunks.values()) {
@@ -172,13 +210,16 @@ export class WhiteoutScenery implements SceneryView {
   stats(): Record<string, number> {
     let n = 0;
     for (const c of this.chunks.values()) n += c.poles.count;
-    return { chunks: this.chunks.size, markers: n };
+    return { chunks: this.chunks.size, markers: n, snowGrains: this.snow.count };
   }
 
   dispose(): void {
     for (const [k, ch] of this.chunks) this.drop(k, ch);
     this.poleGeo.dispose();
     this.poleMat.dispose();
+    this.wandMat.dispose();
+    this.sky.dispose();
+    this.snow.dispose();
   }
 }
 

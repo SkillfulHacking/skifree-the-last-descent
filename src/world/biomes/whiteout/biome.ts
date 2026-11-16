@@ -120,7 +120,11 @@ export function makeWhiteoutBiome(): Biome {
       // the storm visible over them) and big peaks far off across the void, seen in the clear windows
       // the course runs along the ridge's shoulder: on the right the ground rolls over and falls
       // away into open air (the storms come over it); the caves are cut into the left side
-      shoulderDrop: { side: 1, depth: 150, width: 520 },
+      // (full production) the top of a broad ridge: on the right the bank rolls over a corniced rim
+      // and the flank falls ~520 m into the valley; on the left a broken rocky crest (35–75 m) with
+      // the ground falling away behind it — sky and storms on both sides. The caves are cut into
+      // the crest side.
+      ridge: { dropSide: 1, rim: 26, lip: 3.5, depth: 520, flank: 680, crest: 75, crestE: 150, backDrop: 380 },
       caveSide: -1,
       wallHeight: 130,
       wallRelief: 95,
