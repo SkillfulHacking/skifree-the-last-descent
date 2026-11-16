@@ -1,6 +1,7 @@
 /** Whiteout Ridge presentation (three.js), registered under the ids the biome's capabilities name. */
 
-import { registerFinish } from '../../../presentation';
+import { registerCavePresentation, registerFinish } from '../../../presentation';
+import { dressStormCave, stormCaveCinematic } from './stormCave';
 import { RescueStation } from './rescue';
 import { RescueVictory } from './rescueVictory';
 import './hazardViews';
@@ -14,4 +15,7 @@ export const WHITEOUT_RESCUE = registerFinish({
   build: (c) => new RescueStation(c),
   victory: (st, finish, d) => new RescueVictory(st, finish, d),
 });
+
+/** the storm-beaten cave: rimed granite, snow off the brow, a squall around the Yeti's emergence */
+export const WHITEOUT_STORM_CAVE = registerCavePresentation({ id: 'whiteout-storm-cave', dress: dressStormCave, cinematic: stormCaveCinematic });
 

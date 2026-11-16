@@ -97,6 +97,10 @@ export class World {
   /** render-space origin (see header) */
   readonly origin = new THREE.Vector3();
   private caves = new Map<number, CaveSlot>();
+  /** the dressings of the caves currently built (a location's cinematic hook can talk to its own) */
+  *caveDressings() {
+    for (const s of this.caves.values()) if (s.dressing) yield s.dressing;
+  }
   /** caves being built in time slices (one step per frame) */
   private caveJobs = new Map<number, { enc: Encounter; job: Generator<void, Cave, void> }>();
   /** location dressings being built in time slices after their cave (round 3, D2) */
@@ -417,9 +421,22 @@ export class World {
    * of the weather model's while set. Cleared with the trophy at the next run.
    */
   weatherOverride: { visibility: number; snowfall: number; storm: number; windX: number } | null = null;
+  /**
+   * Hand a cinematic's weather back to the model gradually: `releaseWeather(s)` clears the override
+   * and blends from its last values to the live weather over `s` seconds (presentation only; the
+   * physics weather is never overridden).
+   */
+  releaseWeather(seconds: number) {
+    const wo = this.weatherOverride;
+    this.weatherOverride = null;
+    if (!wo || seconds <= 0) return;
+    this.weatherFade = { from: { ...wo }, left: seconds, dur: seconds };
+  }
+  private weatherFade: { from: { visibility: number; snowfall: number; storm: number; windX: number }; left: number; dur: number } | null = null;
 
   resetTrophy() {
     this.weatherOverride = null;
+    this.weatherFade = null;
     if (!this.finish || !this.trophyHome) return;
     const t = this.finish.trophy;
     const h = this.trophyHome;
@@ -565,6 +582,18 @@ export class World {
       this.weather.snowfall = wo.snowfall;
       this.weather.storm = wo.storm;
       this.weather.windX = wo.windX;
+      this.weatherFade = null;
+    } else if (this.weatherFade) {
+      const F = this.weatherFade;
+      F.left -= dt;
+      const k = Math.max(0, F.left / F.dur);
+      const e = k * k * (3 - 2 * k);
+      const w = this.weather;
+      w.visibility += (F.from.visibility - w.visibility) * e;
+      w.snowfall += (F.from.snowfall - w.snowfall) * e;
+      w.storm = (w.storm ?? 0) + (F.from.storm - (w.storm ?? 0)) * e;
+      w.windX += (F.from.windX - w.windX) * e;
+      if (F.left <= 0) this.weatherFade = null;
     }
     this.env.applyWeather(this.weather.visibility * (wo ? 1 : env.hazardVisibility(focus.x, focus.z, env.clock)), this.weather.snowfall, this.weather.storm ?? 0);
     this.env.update(dt, focus, camPos, time, this.weather.windX);

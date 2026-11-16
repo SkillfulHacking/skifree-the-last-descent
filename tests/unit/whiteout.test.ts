@@ -16,7 +16,7 @@ import { simulateCourse } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
 import { collectPlacements } from '../../src/world/hazards/testkit';
 import { getHazardKind, hazardPhase } from '../../src/world/hazards/hazard';
-import { FRONT, frontAt, whiteoutExposure, WHITEOUT_WEATHER } from '../../src/world/biomes/whiteout/storm';
+import { FRONT, frontAt, frontType, FRONT_TYPES, whiteoutExposure, WHITEOUT_WEATHER } from '../../src/world/biomes/whiteout/storm';
 import { HARDPACK, WHITEOUT_SURFACE } from '../../src/world/biomes/whiteout/biome';
 import { BLIZZARD_TIMING } from '../../src/world/biomes/whiteout/hazards';
 
@@ -67,11 +67,36 @@ describe('Whiteout Ridge: storm fronts', () => {
           }
           prev = f.phase;
         }
-        if (f.phase === 'storm') expect(f.s).toBeGreaterThanOrEqual(0.7);
+        // full storms close right in; grazing fronts only partly (FRONT_TYPES)
+        if (f.phase === 'storm') expect(f.s).toBeGreaterThanOrEqual(frontType(f.k, seed) === 'graze' ? 0.44 : 0.59);
       }
-      // a front every ~1.5–2 min: clear vista windows between them
-      expect(storms).toBeGreaterThanOrEqual(8);
-      expect(storms).toBeLessThanOrEqual(14);
+      // a front every ~1.5–2 min on average: clear vista windows between them
+      expect(storms).toBeGreaterThanOrEqual(7);
+      expect(storms).toBeLessThanOrEqual(16);
+    }
+  });
+
+  it('the weather is not a metronome: front types and spacing vary along a long run', () => {
+    for (const seed of [5, 77, 2024]) {
+      const types = new Set<string>();
+      const gaps: number[] = [];
+      let lastBuild = -1;
+      let k = -1;
+      for (let t = 0; t < 3600; t += 0.5) {
+        const f = frontAt(t, seed);
+        if (f.phase === 'build' && f.k !== k) {
+          k = f.k;
+          types.add(frontType(k, seed));
+          if (lastBuild >= 0) gaps.push(t - lastBuild);
+          lastBuild = t;
+        }
+      }
+      expect(types.size, `seed ${seed}`).toBeGreaterThanOrEqual(3);
+      const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
+      const sd = Math.sqrt(gaps.reduce((a, b) => a + (b - mean) ** 2, 0) / gaps.length);
+      // the spacing between storms varies a lot (coefficient of variation ≥ 0.25)
+      expect(sd / mean).toBeGreaterThan(0.25);
+      expect(Object.keys(FRONT_TYPES)).toContain(frontType(3, seed));
     }
   });
 

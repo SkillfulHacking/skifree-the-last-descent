@@ -146,7 +146,7 @@ export function makeWhiteoutBiome(): Biome {
       hazards: { kinds: ['wind-drift', 'blizzard'], density: 1, intensity: { relaxed: 0.5, normal: 1, hard: 1 }, longCourse: 0.85 },
       finish: { id: 'whiteout-rescue' },
       refuge: { id: 'ski-patrol-cabin', name: 'Storm hut' },
-      cave: { id: 'alpine-cave' },
+      cave: { id: 'whiteout-storm-cave' },
       scenery: { id: 'whiteout-ridge' },
       audio: { ambience: ['wind'] },
       rating: { level: 3, label: 'Stormy' },

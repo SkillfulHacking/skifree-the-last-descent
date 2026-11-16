@@ -21,7 +21,7 @@ import type { ExposureQuery, WeatherModel, WeatherSample } from '../../capabilit
 export const FRONT = {
   /** the start is in fair weather for this long (learn the controls in the clear) */
   calmStart: 22,
-  clear: [26, 42] as const,
+  clear: [22, 50] as const,
   build: 9,
   storm: [38, 58] as const,
   ease: 8,
@@ -43,8 +43,30 @@ export interface FrontState {
   k: number;
 }
 
+/**
+ * Front types (full production, brief §8: no weather on a metronome): most are full storms; some only
+ * graze the ridge (the cloud base lifts before it closes in: a shorter, lighter storm); some windows
+ * are long fair spells; and now and then a squall follows hard on the last one (a short window).
+ */
+export const FRONT_TYPES = {
+  full: { peak: 1, storm: 1, clear: 1 },
+  graze: { peak: 0.62, storm: 0.6, clear: 1 },
+  longClear: { peak: 1, storm: 1, clear: 3.1 },
+  backToBack: { peak: 0.85, storm: 0.7, clear: 0.45 },
+} as const;
+export type FrontType = keyof typeof FRONT_TYPES;
+
+/** the type of front k (deterministic): the first is always a full storm (the course's signature) */
+export function frontType(k: number, seed: number): FrontType {
+  if (k === 0) return 'full';
+  const r = hash2(k, 14, seed);
+  return r < 0.45 ? 'full' : r < 0.67 ? 'graze' : r < 0.87 ? 'longClear' : 'backToBack';
+}
+
 interface Front {
   t0: number;
+  /** storm peak (0..1) */
+  peak: number;
   /** clear window, build, storm, ease ends (absolute times) */
   c: number;
   b: number;
@@ -68,8 +90,9 @@ function fronts(seed: number, upTo: number): Front[] {
     const r1 = hash2(k, 11, seed);
     const r2 = hash2(k, 12, seed);
     const r3 = hash2(k, 13, seed);
-    const clear = k === 0 ? FRONT.calmStart : FRONT.clear[0] + (FRONT.clear[1] - FRONT.clear[0]) * r1;
-    const storm = FRONT.storm[0] + (FRONT.storm[1] - FRONT.storm[0]) * r2;
+    const ty = FRONT_TYPES[frontType(k, seed)];
+    const clear = k === 0 ? FRONT.calmStart : (FRONT.clear[0] + (FRONT.clear[1] - FRONT.clear[0]) * r1) * ty.clear;
+    const storm = (FRONT.storm[0] + (FRONT.storm[1] - FRONT.storm[0]) * r2) * ty.storm;
     const c = t0 + clear;
     const b = c + FRONT.build;
     const st = b + storm;
@@ -77,7 +100,7 @@ function fronts(seed: number, upTo: number): Front[] {
     // the first front blows from the left; then it veers to the other side about two times in three
     const prev = k === 0 ? -1 : list[k - 1]!.dir;
     const dir = k === 0 ? 1 : r3 < 0.66 ? -prev : prev;
-    list.push({ t0, c, b, st, e, dir });
+    list.push({ t0, peak: ty.peak, c, b, st, e, dir });
   }
   return list;
 }
@@ -104,16 +127,16 @@ export function frontAt(t: number, seed: number, out?: FrontState): FrontState {
     o.left = f.c - tt;
   } else if (tt < f.b) {
     o.phase = 'build';
-    o.s = smoothstep(f.c, f.b, tt);
+    o.s = f.peak * smoothstep(f.c, f.b, tt);
     o.left = f.b - tt;
   } else if (tt < f.st) {
     o.phase = 'storm';
     // the storm breathes: heavier squalls and short lulls inside it, never below 0.72
-    o.s = 0.86 + 0.14 * gnoise(tt / 7, 3.1 + lo, seed + 301);
+    o.s = f.peak * (0.86 + 0.14 * gnoise(tt / 7, 3.1 + lo, seed + 301));
     o.left = f.st - tt;
   } else {
     o.phase = 'ease';
-    o.s = 1 - smoothstep(f.st, f.e, tt);
+    o.s = f.peak * (1 - smoothstep(f.st, f.e, tt));
     o.left = f.e - tt;
   }
   o.s = clamp(o.s, 0, 1);

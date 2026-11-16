@@ -128,10 +128,13 @@ describe('Whiteout sky: the storm wall telegraphs every front', () => {
         const f = frontAt(t, seed);
         if (f.phase === 'build' && f.k !== lastBuild) {
           lastBuild = f.k;
-          // 20 s earlier the wall was already visible, further out than now
-          const early = stormWall(t - 20, seed);
+          // 20 s earlier (or as early as the clear window allows: a squall hard on the last one) the
+          // wall was already visible, further out than now
+          let w0 = t - 0.5;
+          while (w0 > t - 20 && frontAt(w0 - 0.5, seed).phase === 'clear') w0 -= 0.5;
+          const early = stormWall(Math.max(w0, t - 20), seed);
           const now = stormWall(t, seed);
-          expect(early.vis, `seed ${seed} t ${t}`).toBeGreaterThan(0.5);
+          expect(early.vis, `seed ${seed} t ${t}`).toBeGreaterThan(t - w0 >= 12 ? 0.5 : 0.15);
           expect(early.dist).toBeGreaterThan(now.dist);
           expect(now.dist).toBeLessThanOrEqual(SKY.wallFar * 0.16 + 1);
         }
