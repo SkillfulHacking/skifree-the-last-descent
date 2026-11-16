@@ -155,10 +155,10 @@ if (want('vista')) {
   // the corniced rim: from just inside it, along the edge, the flank falling away
   // (from the inside the raised lip hides the drop: the cornice is framed from just off the edge,
   // looking back along the rim — the overhang, its break-offs, the wands behind it on the piste side)
-  await P(`(w, m, k) => { const z = ${zr}; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cx = rx + s * 14, cz = z - 40; const ry = m.heightAt(rx, z); k.freeCam([cx, ry + 4, cz], [rx - s * 4, ry - 1, z + 25], 58); }`);
+  await P(`(w, m, k) => { const z = ${zr}; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cz = z - 45; const rxc = m.ridgeRimX(cz); const cx = rxc + s * 12; const ry = m.heightAt(rx, z); k.freeCam([cx, Math.max(m.heightAt(cx, cz), m.heightAt(rxc, cz)) + 3, cz], [rx, ry + 0.5, z + 20], 58); }`);
   await settle(2500);
   await shot('08_cornice_edge', 'The corniced rim (drop side), from just off the edge: the lip curling over the flank, rim wands set back from it');
-  await P(`(w, m, k) => { const z = ${zr} + 60; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cx = rx + s * 8, cz = z; k.freeCam([cx, m.heightAt(rx, cz) + 6, cz], [rx + s * 900, m.heightAt(rx, z) - 420, z + 380], 60); }`);
+  await P(`(w, m, k) => { const z = ${zr} + 60; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cx = rx + s * 8, cz = z; k.freeCam([cx, Math.max(m.heightAt(cx, cz), m.heightAt(rx, cz)) + 6, cz], [rx + s * 900, m.heightAt(rx, z) - 420, z + 380], 60); }`);
   await settle(2500);
   await shot('09_valley_view', 'Over the edge: the flank falling ~500 m into the valley, far ranges across it');
   await P(`(w, m, k) => { const z = ${zr} + 120; const s = m.biome.terrain.ridge.dropSide; const cx = m.routeX(z) + s * 12, cz = z - 30; const tx = m.profile.centerX(z) - s * (m.profile.halfWidth(z) + 140); k.freeCam([cx, m.heightAt(cx, cz) + 2.6, cz], [tx, m.heightAt(tx, z + 40) + 20, z + 40], 58); }`);
@@ -174,8 +174,9 @@ if (want('cave') && G.cave) {
   // a fresh run: an earlier section may already have started the chase (the encounter is then over)
   await startRun('normal');
   await ev(() => { window.__skifree.freeCam(null); window.__skifree.hud(false); window.__skifree.autopilot('skilled'); });
-  await ev(() => window.__skifree.toCave());
-  const r = await framesUntil('(s) => s.phase === "cinematic"', 900);
+  // the run is held (frozen) between shots: put the skier just over the trigger, which starts the encounter
+  await ev((tz) => window.__skifree.teleport(tz + 0.5, 16), G.cave.triggerZ);
+  const r = await framesUntil('(s) => s.phase === "caveCinematic"', 900);
   log('cinematic', r.ok);
   for (const [t, name, note] of [
     [3.0, '12_cave_mouth', 'Cave encounter 3 s: the rimed mouth, snow curtain off the brow'],

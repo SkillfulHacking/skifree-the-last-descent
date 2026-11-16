@@ -281,7 +281,11 @@ export class Mountain {
     const R = this.kRidge!;
     if (side === R.dropSide) {
       const t = clamp((e - R.rim) / R.flank, 0, 1);
-      const fall = R.depth * t * t * (3 - 2 * t);
+      // a convex roll-over: a short rounded shoulder at the rim, then straight into the steep upper face
+      // (~54° at its steepest), easing out toward the valley. (A smoothstep fall started so gently —
+      // 1.4 m down 20 m past the rim, 4.5 m at 40 m — that the edge never read as an edge: dev renders.)
+      const ts = (t * t) / (t + 0.02);
+      const fall = R.depth * (1 - Math.pow(1 - Math.min(1, ts), 1.8));
       const lip = R.lip * smoothstep(0, R.rim, e) * (1 - smoothstep(R.rim, R.rim + 30, e));
       // ribs and couloirs down the flank (elongated across the course = down the fall line), strongest mid-flank
       const steep = 4 * t * (1 - t);
