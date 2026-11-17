@@ -16,7 +16,7 @@ import { capabilitiesOf, type BiomeCapabilities, type GameDifficulty } from './i
 import { combineSurface, resetSurface, type SurfaceQuery, type SurfaceWeights } from './surface';
 import { makeWeatherSample, type WeatherSample } from './weather';
 import { HazardField } from '../hazards/field';
-import { getHazardKind, hazardPhase, type HazardContact, type HazardInstance, type HazardKind, type HazardPhase } from '../hazards/hazard';
+import { getHazardKind, hazardPhase, type HazardContact, type HazardEffect, type HazardInstance, type HazardKind, type HazardPhase } from '../hazards/hazard';
 
 export type EnvironmentEvent =
   /** the skier's surface changed (grounded only). Fires on Alpine too. */
@@ -79,6 +79,16 @@ interface Track {
   closest: number;
 }
 
+/** a hazard effect's continuous influence: surface, wind, side-slip, airborne push (not crash / knock) */
+function applyContinuous(e: HazardEffect, out: EnvSample, hw: [number, number, number, number, number]): void {
+  if (e.surface) combineSurface(out.surface, e.surface);
+  if (e.windX) hw[0] += e.windX;
+  if (e.windZ) hw[1] += e.windZ;
+  if (e.slipX) hw[2] += e.slipX;
+  if (e.slipZ) hw[3] += e.slipZ;
+  if (e.airPushX) hw[4] += e.airPushX;
+}
+
 export class BiomeEnvironment implements PhysicsEnvironment {
   readonly caps: BiomeCapabilities;
   readonly hazards: HazardField;
@@ -89,7 +99,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
   clock = 0;
   private listeners = new Set<EnvironmentListener>();
   private tracks = new Map<number, Track>();
-  /** hazards already reported as passed (id → z), never re-tracked */
+  /** hazards already reported as passed (id → z): never tracked or reported again this run */
   private passed = new Map<number, number>();
   private near: HazardInstance[] = [];
   private lastSurface: SurfaceType | null = null;
@@ -316,11 +326,6 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     const near = this.hazards.near(q.x, q.z + HAZARD_ALERT_RANGE * 0.5, HAZARD_ALERT_RANGE * 0.5 + HAZARD_PASS_RANGE, this.near);
     const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity, tuck: q.tuck };
     for (const h of near) {
-      // (W-023) a hazard already passed (left behind and reported) stays forgotten: the near window
-      // reaches HAZARD_PASS_RANGE behind the skier, so without this it was re-tracked and reported
-      // as passed again every step until it fell out of the window (thousands of HazardSurvived
-      // events per run)
-      if (this.passed.has(h.id)) continue;
       let tr = this.tracks.get(h.id);
       const k = tr?.k ?? getHazardKind(h.kind);
       // markers (e.g. the poles at a gap jump) have no physics and no gameplay events
@@ -329,6 +334,22 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       const dz = q.z - h.z;
       const dist = Math.hypot(dx, dz);
       const ph = hazardPhase(k, h, q.t);
+      // A hazard already reported passed is never tracked or reported again (the near window reaches
+      // HAZARD_PASS_RANGE behind the skier: re-tracking it emitted a pass report every step, and a fresh
+      // track's `struck` re-armed its knock). It is reported only once the skier is beyond its whole
+      // reach (below), so this branch is reached only by backtracking into it: its continuous influence
+      // (wind, slip, push, surface) applies as before; no events, and no second crash or knock.
+      if (this.passed.has(h.id)) {
+        if (dist > h.r + k.reach || q.crashed) continue;
+        contact.dx = dx;
+        contact.dz = dz;
+        contact.dist = dist;
+        contact.inside = dist < h.r;
+        contact.heightAbove = q.grounded ? 0 : Math.max(0, q.y - h.y);
+        const e = k.effect(h, ph, contact);
+        if (e) applyContinuous(e, out, hw);
+        continue;
+      }
       if (!tr) {
         tr = { h, k, phase: null, inside: false, entered: false, hit: false, struck: false, closest: Infinity };
         this.tracks.set(h.id, tr);
@@ -359,12 +380,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       contact.heightAbove = q.grounded ? 0 : Math.max(0, q.y - h.y);
       const e = k.effect(h, ph, contact);
       if (!e) continue;
-      if (e.surface) combineSurface(out.surface, e.surface);
-      if (e.windX) hw[0] += e.windX;
-      if (e.windZ) hw[1] += e.windZ;
-      if (e.slipX) hw[2] += e.slipX;
-      if (e.slipZ) hw[3] += e.slipZ;
-      if (e.airPushX) hw[4] += e.airPushX;
+      applyContinuous(e, out, hw);
       if (!tr.struck && (e.crash || e.knock)) {
         tr.struck = true;
         tr.hit = true;
@@ -373,13 +389,16 @@ export class BiomeEnvironment implements PhysicsEnvironment {
         this.emit({ type: 'hazard-hit', hazard: h, kind: k.id, effect: e.crash ? 'crash' : 'knock', cue: k.audio?.hit ?? null, t: q.t });
       }
     }
-    // hazards left behind: report and forget
+    // hazards left behind: report and forget — once the skier is beyond the hazard's whole reach (its
+    // effect still applies up to h.r + k.reach: a sea squall's 4 m), so the track, its `struck` and its
+    // `hit` live through every step the hazard can still act, and the one report carries them
     for (const [id, tr] of this.tracks) {
       const h = tr.h;
-      if (q.z <= h.z + h.r + 2 && this.hazards.hasBand(h.band)) continue;
+      const beyond = q.z > h.z + h.r + Math.max(2, tr.k.reach);
+      if (!beyond && this.hazards.hasBand(h.band)) continue;
       if (tr.closest <= HAZARD_PASS_RANGE) this.emit({ type: 'hazard-passed', hazard: h, kind: tr.k.id, hit: tr.hit, entered: tr.entered, closest: Math.max(0, tr.closest), t: q.t });
       this.tracks.delete(id);
-      if (q.z > h.z + h.r + 2) this.passed.set(id, h.z);
+      if (beyond) this.passed.set(id, h.z);
     }
     // forget passed ids far behind (bounded over any course length)
     if (this.passed.size > 256) for (const [id, z] of this.passed) if (z < q.z - 400) this.passed.delete(id);
