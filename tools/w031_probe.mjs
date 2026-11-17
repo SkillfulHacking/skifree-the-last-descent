@@ -5,6 +5,9 @@
 //   node tools/w031_probe.mjs <outDir> [WxH=640x360] [seed=WO-DEV2] [length=sprint] [biome=whiteout]
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import sharp from 'sharp';
+/** luminance spread / mean of a capture (white-out frames: stdev 5–15, mean ≈ 188) */
+const lum = async (f) => { const s = (await sharp(f).greyscale().stats()).channels[0]; return { stdev: +s.stdev.toFixed(1), mean: +s.mean.toFixed(1) }; };
 
 const [outDir = '/tmp/w031', size = '640x360', seed = 'WO-DEV2', length = 'sprint', biome = 'whiteout'] = process.argv.slice(2);
 const TIMES = (process.env.TIMES ?? '13.7,14.5,14.6,15.0,15.8,16.9').split(',').map(Number);
@@ -42,7 +45,7 @@ await ev(() => { const k = window.__skifree; k.seenCave(false); k.hold(true); k.
 }
 if (process.env.AUTOP) await ev(() => window.__skifree.autopilot('skilled'));
 const ENC = Number(process.env.ENC ?? 0);
-const encs = await ev(() => { const m = window.__skifree.world().mountain; return m.profile.encounters(0, m.finishZ); });
+const encs = await ev(() => { const m = window.__skifree.world().mountain; return m.profile.encounters(0, Number.isFinite(m.finishZ) ? m.finishZ : 30000); });
 log('encounters', JSON.stringify(encs.map((e) => e.triggerZ)), 'using', ENC);
 const enc = encs[ENC];
 // later encounters: ski to just before the trigger (teleport; the earlier encounters are skipped by the chase rule)
@@ -64,6 +67,7 @@ for (const t of TIMES) {
     const f = `${outDir}/t${t.toFixed(1)}_m${mode}.png`;
     await page.screenshot({ path: f, timeout: 1_200_000 });
     entry.shots.push(f);
+    if (mode === 0) entry.lum = await lum(f);
   }
   await ev(() => window.__skifree.atmoDebug(0));
   // interventions on the same frozen frame (held: the game does not rewrite the uniform unless the storm changes)
@@ -83,5 +87,19 @@ for (const t of TIMES) {
   writeFileSync(`${outDir}/probe.json`, JSON.stringify({ ...report, errors }, null, 2));
   log('t', t, 'cam', probe.camAbs.map((v) => v.toFixed(1)).join(','), 'origin', probe.origin.join(','), 'agrees', probe.matrixAgrees);
 }
+// the hand-over into the chase
+if (process.env.CHASE) {
+  const ok = await frames('(s) => s.phase === "chase"', 900);
+  await frames('(s) => false', 45);
+  const f = `${outDir}/chase.png`;
+  await ev(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r)))));
+  await page.screenshot({ path: f, timeout: 1_200_000 });
+  const p = await ev(() => window.__skifree.renderProbe([]));
+  report.chase = { ok, lum: await lum(f), origin: p.origin, snow: p.snow, falloff: p.uFogFalloff };
+  writeFileSync(`${outDir}/probe.json`, JSON.stringify({ ...report, errors }, null, 2));
+}
+report.summary = report.frames.map((e) => ({ t: +e.t.toFixed(2), lum: e.lum, origin: e.probe.origin, flake: e.probe.snow?.size, sunBase: e.probe.snow?.sunBase }));
+writeFileSync(`${outDir}/probe.json`, JSON.stringify({ ...report, errors }, null, 2));
+log('summary', JSON.stringify(report.summary), 'chase', JSON.stringify(report.chase ?? null));
 log('done; errors', errors.length);
 await browser.close();
