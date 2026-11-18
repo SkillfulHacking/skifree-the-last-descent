@@ -1,0 +1,1241 @@
+[
+ {
+  "id": "CLASSIC-SPR-R@WHITE",
+  "mode": "classic",
+  "length": "sprint",
+  "difficulty": "relaxed",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 78,
+    "lastZ": 2476.509584484156
+   },
+   "blizzard": {
+    "n": 7,
+    "lastZ": 2159.356857442856
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 177.3
+  }
+ },
+ {
+  "id": "SEED-3403625622-SPR-R@WHITE",
+  "mode": "custom",
+  "length": "sprint",
+  "difficulty": "relaxed",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 63,
+    "lastZ": 2376.850644762814
+   },
+   "blizzard": {
+    "n": 6,
+    "lastZ": 2410.8888709306716
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 163.8
+  }
+ },
+ {
+  "id": "CLASSIC-SPR@WHITE",
+  "mode": "classic",
+  "length": "sprint",
+  "difficulty": "normal",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 78,
+    "lastZ": 2476.509584484156
+   },
+   "blizzard": {
+    "n": 7,
+    "lastZ": 2159.356857442856
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "caught",
+   "time": 84.6
+  }
+ },
+ {
+  "id": "SEED-3403625622-SPR@WHITE",
+  "mode": "custom",
+  "length": "sprint",
+  "difficulty": "normal",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 63,
+    "lastZ": 2376.850644762814
+   },
+   "blizzard": {
+    "n": 6,
+    "lastZ": 2410.8888709306716
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 172
+  }
+ },
+ {
+  "id": "CLASSIC-SPR-H@WHITE",
+  "mode": "classic",
+  "length": "sprint",
+  "difficulty": "hard",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 78,
+    "lastZ": 2476.509584484156
+   },
+   "blizzard": {
+    "n": 7,
+    "lastZ": 2159.356857442856
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "SEED-3403625622-SPR-H@WHITE",
+  "mode": "custom",
+  "length": "sprint",
+  "difficulty": "hard",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 63,
+    "lastZ": 2376.850644762814
+   },
+   "blizzard": {
+    "n": 6,
+    "lastZ": 2410.8888709306716
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "CLASSIC-STD-R@WHITE",
+  "mode": "classic",
+  "length": "standard",
+  "difficulty": "relaxed",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 227,
+    "lastZ": 9267.075690029655
+   },
+   "blizzard": {
+    "n": 20,
+    "lastZ": 9402.300057196617
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 522
+  }
+ },
+ {
+  "id": "SEED-3403625622-STD-R@WHITE",
+  "mode": "custom",
+  "length": "standard",
+  "difficulty": "relaxed",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 227,
+    "lastZ": 9330.710703369044
+   },
+   "blizzard": {
+    "n": 22,
+    "lastZ": 9283.196641886234
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 531.8
+  }
+ },
+ {
+  "id": "CLASSIC-STD@WHITE",
+  "mode": "classic",
+  "length": "standard",
+  "difficulty": "normal",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 227,
+    "lastZ": 9267.075690029655
+   },
+   "blizzard": {
+    "n": 20,
+    "lastZ": 9402.300057196617
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 553.3
+  }
+ },
+ {
+  "id": "SEED-3403625622-STD@WHITE",
+  "mode": "custom",
+  "length": "standard",
+  "difficulty": "normal",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 227,
+    "lastZ": 9330.710703369044
+   },
+   "blizzard": {
+    "n": 22,
+    "lastZ": 9283.196641886234
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 561
+  }
+ },
+ {
+  "id": "CLASSIC-STD-H@WHITE",
+  "mode": "classic",
+  "length": "standard",
+  "difficulty": "hard",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 227,
+    "lastZ": 9267.075690029655
+   },
+   "blizzard": {
+    "n": 20,
+    "lastZ": 9402.300057196617
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "SEED-3403625622-STD-H@WHITE",
+  "mode": "custom",
+  "length": "standard",
+  "difficulty": "hard",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 227,
+    "lastZ": 9330.710703369044
+   },
+   "blizzard": {
+    "n": 22,
+    "lastZ": 9283.196641886234
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "CLASSIC-END-R@WHITE",
+  "mode": "classic",
+  "length": "endurance",
+  "difficulty": "relaxed",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 20000,
+  "encounters": 3,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 435,
+    "lastZ": 19329.35494120298
+   },
+   "blizzard": {
+    "n": 39,
+    "lastZ": 19273.86851722002
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "SEED-3403625622-END-R@WHITE",
+  "mode": "custom",
+  "length": "endurance",
+  "difficulty": "relaxed",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 20000,
+  "encounters": 3,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 404,
+    "lastZ": 19272.20558200497
+   },
+   "blizzard": {
+    "n": 31,
+    "lastZ": 19344.895269811153
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "CLASSIC-END@WHITE",
+  "mode": "classic",
+  "length": "endurance",
+  "difficulty": "normal",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 20000,
+  "encounters": 3,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 435,
+    "lastZ": 19329.35494120298
+   },
+   "blizzard": {
+    "n": 39,
+    "lastZ": 19273.86851722002
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "SEED-3403625622-END@WHITE",
+  "mode": "custom",
+  "length": "endurance",
+  "difficulty": "normal",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 20000,
+  "encounters": 3,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 404,
+    "lastZ": 19272.20558200497
+   },
+   "blizzard": {
+    "n": 31,
+    "lastZ": 19344.895269811153
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "CLASSIC-END-H@WHITE",
+  "mode": "classic",
+  "length": "endurance",
+  "difficulty": "hard",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 20000,
+  "encounters": 3,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 435,
+    "lastZ": 19329.35494120298
+   },
+   "blizzard": {
+    "n": 39,
+    "lastZ": 19273.86851722002
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "SEED-3403625622-END-H@WHITE",
+  "mode": "custom",
+  "length": "endurance",
+  "difficulty": "hard",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 20000,
+  "encounters": 3,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 404,
+    "lastZ": 19272.20558200497
+   },
+   "blizzard": {
+    "n": 31,
+    "lastZ": 19344.895269811153
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "CLASSIC-EXP-R@WHITE",
+  "mode": "classic",
+  "length": "expedition",
+  "difficulty": "relaxed",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 50000,
+  "encounters": 8,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 1124,
+    "lastZ": 49465.87816243405
+   },
+   "blizzard": {
+    "n": 96,
+    "lastZ": 49494.03604692221
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "SEED-3403625622-EXP-R@WHITE",
+  "mode": "custom",
+  "length": "expedition",
+  "difficulty": "relaxed",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 50000,
+  "encounters": 8,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 1150,
+    "lastZ": 49470.89170850608
+   },
+   "blizzard": {
+    "n": 88,
+    "lastZ": 49544.3098685503
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "CLASSIC-EXP@WHITE",
+  "mode": "classic",
+  "length": "expedition",
+  "difficulty": "normal",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 50000,
+  "encounters": 8,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 1124,
+    "lastZ": 49465.87816243405
+   },
+   "blizzard": {
+    "n": 96,
+    "lastZ": 49494.03604692221
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "SEED-3403625622-EXP@WHITE",
+  "mode": "custom",
+  "length": "expedition",
+  "difficulty": "normal",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 50000,
+  "encounters": 8,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 1150,
+    "lastZ": 49470.89170850608
+   },
+   "blizzard": {
+    "n": 88,
+    "lastZ": 49544.3098685503
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "CLASSIC-EXP-H@WHITE",
+  "mode": "classic",
+  "length": "expedition",
+  "difficulty": "hard",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 50000,
+  "encounters": 8,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 1124,
+    "lastZ": 49465.87816243405
+   },
+   "blizzard": {
+    "n": 96,
+    "lastZ": 49494.03604692221
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "SEED-3403625622-EXP-H@WHITE",
+  "mode": "custom",
+  "length": "expedition",
+  "difficulty": "hard",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": 50000,
+  "encounters": 8,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 1150,
+    "lastZ": 49470.89170850608
+   },
+   "blizzard": {
+    "n": 88,
+    "lastZ": 49544.3098685503
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "CLASSIC-INF-R@WHITE",
+  "mode": "classic",
+  "length": "endless",
+  "difficulty": "relaxed",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 1253,
+    "lastZ": 59811.53350208234
+   },
+   "blizzard": {
+    "n": 112,
+    "lastZ": 59198.493619906905
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "SEED-3403625622-INF-R@WHITE",
+  "mode": "custom",
+  "length": "endless",
+  "difficulty": "relaxed",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 1314,
+    "lastZ": 59740.067032714374
+   },
+   "blizzard": {
+    "n": 117,
+    "lastZ": 59770.25274180174
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "CLASSIC-INF@WHITE",
+  "mode": "classic",
+  "length": "endless",
+  "difficulty": "normal",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 1253,
+    "lastZ": 59811.53350208234
+   },
+   "blizzard": {
+    "n": 112,
+    "lastZ": 59198.493619906905
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "SEED-3403625622-INF@WHITE",
+  "mode": "custom",
+  "length": "endless",
+  "difficulty": "normal",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 1314,
+    "lastZ": 59740.067032714374
+   },
+   "blizzard": {
+    "n": 117,
+    "lastZ": 59770.25274180174
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "CLASSIC-INF-H@WHITE",
+  "mode": "classic",
+  "length": "endless",
+  "difficulty": "hard",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 1253,
+    "lastZ": 59811.53350208234
+   },
+   "blizzard": {
+    "n": 112,
+    "lastZ": 59198.493619906905
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "SEED-3403625622-INF-H@WHITE",
+  "mode": "custom",
+  "length": "endless",
+  "difficulty": "hard",
+  "date": null,
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 1314,
+    "lastZ": 59740.067032714374
+   },
+   "blizzard": {
+    "n": 117,
+    "lastZ": 59770.25274180174
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "DAILY-2026-11-18-SPR@WHITE",
+  "mode": "daily",
+  "length": "sprint",
+  "difficulty": "normal",
+  "date": "2026-11-18",
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 62,
+    "lastZ": 2360.680020542536
+   },
+   "blizzard": {
+    "n": 8,
+    "lastZ": 2433.7972160100935
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 178.5
+  }
+ },
+ {
+  "id": "DAILY-2026-11-18-STD@WHITE",
+  "mode": "daily",
+  "length": "standard",
+  "difficulty": "normal",
+  "date": "2026-11-18",
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "blizzard": {
+    "n": 28,
+    "lastZ": 9296.546684587001
+   },
+   "wind-drift": {
+    "n": 224,
+    "lastZ": 9372.216456986778
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "caught",
+   "time": 243.9
+  }
+ },
+ {
+  "id": "DAILY-2026-11-18-INF@WHITE",
+  "mode": "daily",
+  "length": "endless",
+  "difficulty": "normal",
+  "date": "2026-11-18",
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "blizzard": {
+    "n": 110,
+    "lastZ": 59591.86358921528
+   },
+   "wind-drift": {
+    "n": 1184,
+    "lastZ": 59850.719681161085
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "DAILY-2026-11-17-SPR@WHITE",
+  "mode": "daily",
+  "length": "sprint",
+  "difficulty": "normal",
+  "date": "2026-11-17",
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 11,
+  "hazards": {
+   "wind-drift": {
+    "n": 60,
+    "lastZ": 2481.370806524251
+   },
+   "blizzard": {
+    "n": 5,
+    "lastZ": 2444.257287824154
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 183.4
+  }
+ },
+ {
+  "id": "DAILY-2026-11-17-STD@WHITE",
+  "mode": "daily",
+  "length": "standard",
+  "difficulty": "normal",
+  "date": "2026-11-17",
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 11,
+  "hazards": {
+   "blizzard": {
+    "n": 21,
+    "lastZ": 9409.553893351555
+   },
+   "wind-drift": {
+    "n": 259,
+    "lastZ": 9429.04913603086
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "caught",
+   "time": 445.4
+  }
+ },
+ {
+  "id": "DAILY-2026-11-17-INF@WHITE",
+  "mode": "daily",
+  "length": "endless",
+  "difficulty": "normal",
+  "date": "2026-11-17",
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 11,
+  "hazards": {
+   "blizzard": {
+    "n": 112,
+    "lastZ": 59553.550306928155
+   },
+   "wind-drift": {
+    "n": 1328,
+    "lastZ": 59801.50542952567
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "DAILY-2026-11-16-SPR@WHITE",
+  "mode": "daily",
+  "length": "sprint",
+  "difficulty": "normal",
+  "date": "2026-11-16",
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 11,
+  "hazards": {
+   "wind-drift": {
+    "n": 63,
+    "lastZ": 2360.903724583518
+   },
+   "blizzard": {
+    "n": 5,
+    "lastZ": 2212.8967592835425
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 168.9
+  }
+ },
+ {
+  "id": "DAILY-2026-11-16-STD@WHITE",
+  "mode": "daily",
+  "length": "standard",
+  "difficulty": "normal",
+  "date": "2026-11-16",
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 11,
+  "hazards": {
+   "wind-drift": {
+    "n": 232,
+    "lastZ": 9292.165973337367
+   },
+   "blizzard": {
+    "n": 19,
+    "lastZ": 9299.155796861649
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 555.7
+  }
+ },
+ {
+  "id": "DAILY-2026-11-16-INF@WHITE",
+  "mode": "daily",
+  "length": "endless",
+  "difficulty": "normal",
+  "date": "2026-11-16",
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 11,
+  "hazards": {
+   "wind-drift": {
+    "n": 1292,
+    "lastZ": 59341.50176375285
+   },
+   "blizzard": {
+    "n": 114,
+    "lastZ": 59305.949090743066
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "DAILY-2026-11-15-SPR@WHITE",
+  "mode": "daily",
+  "length": "sprint",
+  "difficulty": "normal",
+  "date": "2026-11-15",
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 10,
+  "hazards": {
+   "wind-drift": {
+    "n": 65,
+    "lastZ": 2504.2135256326756
+   },
+   "blizzard": {
+    "n": 6,
+    "lastZ": 2220.787646651268
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "caught",
+   "time": 91.1
+  }
+ },
+ {
+  "id": "DAILY-2026-11-15-STD@WHITE",
+  "mode": "daily",
+  "length": "standard",
+  "difficulty": "normal",
+  "date": "2026-11-15",
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 10,
+  "hazards": {
+   "wind-drift": {
+    "n": 196,
+    "lastZ": 9268.973865363281
+   },
+   "blizzard": {
+    "n": 15,
+    "lastZ": 8767.357298254967
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "caught",
+   "time": 525.2
+  }
+ },
+ {
+  "id": "DAILY-2026-11-15-INF@WHITE",
+  "mode": "daily",
+  "length": "endless",
+  "difficulty": "normal",
+  "date": "2026-11-15",
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 10,
+  "hazards": {
+   "wind-drift": {
+    "n": 1179,
+    "lastZ": 59772.18658689512
+   },
+   "blizzard": {
+    "n": 111,
+    "lastZ": 59290.38250910044
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "DAILY-2026-11-14-SPR@WHITE",
+  "mode": "daily",
+  "length": "sprint",
+  "difficulty": "normal",
+  "date": "2026-11-14",
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 63,
+    "lastZ": 2482.607006021589
+   },
+   "blizzard": {
+    "n": 6,
+    "lastZ": 2491.9805592417715
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "caught",
+   "time": 79.4
+  }
+ },
+ {
+  "id": "DAILY-2026-11-14-STD@WHITE",
+  "mode": "daily",
+  "length": "standard",
+  "difficulty": "normal",
+  "date": "2026-11-14",
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 195,
+    "lastZ": 9292.82987594828
+   },
+   "blizzard": {
+    "n": 19,
+    "lastZ": 8801.689030194282
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 552
+  }
+ },
+ {
+  "id": "DAILY-2026-11-14-INF@WHITE",
+  "mode": "daily",
+  "length": "endless",
+  "difficulty": "normal",
+  "date": "2026-11-14",
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 12,
+  "hazards": {
+   "wind-drift": {
+    "n": 1316,
+    "lastZ": 59802.61312666675
+   },
+   "blizzard": {
+    "n": 114,
+    "lastZ": 59446.10449318886
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "DAILY-2026-11-13-SPR@WHITE",
+  "mode": "daily",
+  "length": "sprint",
+  "difficulty": "normal",
+  "date": "2026-11-13",
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 43,
+    "lastZ": 1984.722728652414
+   },
+   "blizzard": {
+    "n": 5,
+    "lastZ": 1900.2918391942978
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 178.5
+  }
+ },
+ {
+  "id": "DAILY-2026-11-13-STD@WHITE",
+  "mode": "daily",
+  "length": "standard",
+  "difficulty": "normal",
+  "date": "2026-11-13",
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 213,
+    "lastZ": 8788.688430937193
+   },
+   "blizzard": {
+    "n": 25,
+    "lastZ": 8769.60217255354
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "caught",
+   "time": 457.4
+  }
+ },
+ {
+  "id": "DAILY-2026-11-13-INF@WHITE",
+  "mode": "daily",
+  "length": "endless",
+  "difficulty": "normal",
+  "date": "2026-11-13",
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 13,
+  "hazards": {
+   "wind-drift": {
+    "n": 1262,
+    "lastZ": 59972.29648362678
+   },
+   "blizzard": {
+    "n": 131,
+    "lastZ": 59734.51175918579
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ },
+ {
+  "id": "DAILY-2026-11-12-SPR@WHITE",
+  "mode": "daily",
+  "length": "sprint",
+  "difficulty": "normal",
+  "date": "2026-11-12",
+  "roundTrip": true,
+  "finishZ": 3000,
+  "encounters": 1,
+  "stormFrontsIn20min": 10,
+  "hazards": {
+   "wind-drift": {
+    "n": 39,
+    "lastZ": 2391.2339659392833
+   },
+   "blizzard": {
+    "n": 5,
+    "lastZ": 2390.2399079322813
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 169.2
+  }
+ },
+ {
+  "id": "DAILY-2026-11-12-STD@WHITE",
+  "mode": "daily",
+  "length": "standard",
+  "difficulty": "normal",
+  "date": "2026-11-12",
+  "roundTrip": true,
+  "finishZ": 10000,
+  "encounters": 1,
+  "stormFrontsIn20min": 10,
+  "hazards": {
+   "wind-drift": {
+    "n": 224,
+    "lastZ": 9415.295067657436
+   },
+   "blizzard": {
+    "n": 11,
+    "lastZ": 9398.896226418019
+   }
+  },
+  "deterministic": true,
+  "sim": {
+   "outcome": "victory",
+   "time": 557.1
+  }
+ },
+ {
+  "id": "DAILY-2026-11-12-INF@WHITE",
+  "mode": "daily",
+  "length": "endless",
+  "difficulty": "normal",
+  "date": "2026-11-12",
+  "roundTrip": true,
+  "finishZ": null,
+  "encounters": 11,
+  "stormFrontsIn20min": 10,
+  "hazards": {
+   "wind-drift": {
+    "n": 1278,
+    "lastZ": 59954.7458034751
+   },
+   "blizzard": {
+    "n": 119,
+    "lastZ": 59831.063729441164
+   }
+  },
+  "deterministic": true,
+  "sim": null
+ }
+]
