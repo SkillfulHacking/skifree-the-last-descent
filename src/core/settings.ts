@@ -167,9 +167,26 @@ export function sanitize(s: Settings): Settings {
   return s;
 }
 
+/**
+ * Store the settings. A setting a save has never stored (one added in a later build) is only written
+ * once the player changes it from its default: an older save stays exactly as it was until then
+ * (no rewrite on load, no migration — the defaults fill it in on every load).
+ */
 export function saveSettings(s: Settings, kv: KV | null = storage()) {
   try {
-    kv?.setItem(KEY_S, JSON.stringify(s));
+    let stored: Record<string, unknown> | null = null;
+    try {
+      const raw = kv?.getItem(KEY_S);
+      stored = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+    } catch {
+      stored = null;
+    }
+    const out: Record<string, unknown> = { ...s };
+    if (stored) {
+      const d = DEFAULT_SETTINGS as unknown as Record<string, unknown>;
+      for (const k of Object.keys(out)) if (!(k in stored) && k in d && JSON.stringify(out[k]) === JSON.stringify(d[k])) delete out[k];
+    }
+    kv?.setItem(KEY_S, JSON.stringify(out));
   } catch {
     /* storage full / blocked */
   }
