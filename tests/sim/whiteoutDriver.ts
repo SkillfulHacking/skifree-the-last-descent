@@ -95,7 +95,17 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     const tz = s.pos.z + look;
     const f = frontAt(t, seed);
     const stormy = f.phase === 'storm' || f.phase === 'build' || (f.phase === 'ease' && f.s > 0.4);
-    const useAlt = p.lines === 'always' || (p.lines === 'weather' && !stormy);
+    // (round 2) the line is chosen where the lines fork: a skier already out on an alternate line stays
+    // on it until it rejoins (cutting 40 m across between the lines when a front builds is not a line
+    // anyone skis — round-2 W2H-01 Relaxed); 'weather' takes the fork only in fair weather
+    const aHere = m.profile.altRouteX(s.pos.z);
+    const onAltNow = aHere !== null && aHere !== undefined && Number.isFinite(aHere) && Math.abs(s.pos.x - aHere) < 8 && Math.abs(s.pos.x - m.routeX(s.pos.z)) > 8;
+    // and joins an alternate line only at its fork (where it is still within 8 m of the main line)
+    const atFork = aHere !== null && aHere !== undefined && Number.isFinite(aHere) && Math.abs(aHere - m.routeX(s.pos.z)) < 8;
+    // ('weather' also reads the storm wall on the horizon: no exposed crest line once it is in sight,
+    // ~32 s before the front builds — sky.ts SKY.wallLead — what the player sees coming)
+    const wallInSight = f.phase === 'clear' && f.left < 32;
+    const useAlt = onAltNow || (atFork && (p.lines === 'always' || (p.lines === 'weather' && !stormy && !wallInSight))) || (p.lines === 'always' && (aHere === null || aHere === undefined));
     let tx = m.routeX(tz);
     let onAlt = false;
     if (useAlt) {
@@ -131,13 +141,15 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
       if (row) {
         const q = row.params as DriftParams;
         const rz = q.rowZ!;
-        const base = onAlt ? tx : m.routeX(rz);
+        const altAtRow = onAlt ? m.profile.altRouteX(rz) : null;
+        const base = onAlt && altAtRow !== null && altAtRow !== undefined && Number.isFinite(altAtRow) ? altAtRow : m.routeX(rz);
         const lineAtRow = base + leeOff(rz);
         const covered = Math.abs(lineAtRow - q.gapX!) > q.gapHalf! - 1.5;
         const dz = rz - s.pos.z;
         if (p.drifts === 'gap' || p.drifts === 'gapEarly') {
-          if (covered && dz < 95 && !onAlt) {
-            want = q.gapX! - m.routeX(rz);
+          if (covered && dz < 95) {
+            // (relative to the line being skied: the main line or the alternate line)
+            want = q.gapX! - base;
             tuckTol = 0.3;
             if (stats) stats.gapSteers++;
           }
@@ -153,8 +165,7 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     planT = t;
     const rate = 0.22 * Math.max(8, speed);
     plan += clamp(want - plan, -rate * dtPlan, rate * dtPlan);
-    if (onAlt) plan = 0;
-    else tx = m.routeX(tz) + plan;
+    tx = (onAlt ? tx : m.routeX(tz)) + plan;
     if (stats && Math.abs(plan) > 3 && Math.sign(plan) === Math.sign(f.dir) && p.lee) stats.lee = (stats.lee ?? 0) + 1;
     let edgeUp = false;
     if (p.edge && f.s > 0.5 && s.grounded && whiteoutExposure(m, s.pos.x, s.pos.z, t, seed) > 0.86) edgeUp = true;
