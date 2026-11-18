@@ -5,7 +5,8 @@
  * Per course: the course code round-trips through parseCourseId, the world is deterministic (two
  * builds give the same hazard list), the finish is where the length says, the cave encounter exists,
  * storm fronts are scheduled, drifts and blizzard cells exist along the whole course, and (Sprint and
- * Standard, Normal) the skilled autopilot's outcome. Endless: the mountain and hazards are sampled
+ * Standard, Relaxed and Normal) the weather-reading driver's outcome: every Relaxed course must be won
+ * (W-051 gate); Normal is recorded. Endless: the mountain and hazards are sampled
  * out to 60 km.
  *
  *   OUT=… npx vitest run --config vitest.sim.config.ts tests/sim/courses.measure.test.ts
@@ -73,10 +74,10 @@ it('Whiteout course matrix', async () => {
       }
     }
     let sim: { outcome: string; time: number } | null = null;
-    if ((c.length === 'sprint' || c.length === 'standard') && c.difficulty === 'normal') {
+    if ((c.length === 'sprint' || c.length === 'standard') && c.difficulty !== 'hard') {
       const env = new BiomeEnvironment(a.m, ws, { difficulty: c.difficulty });
       const field = new ObstacleField(a.m, ws);
-      const drv = whiteoutDriver(a.m, env, ws, POLICIES.informed!, undefined, 0.25, field);
+      const drv = whiteoutDriver(a.m, env, ws, POLICIES.informed2NoLee!, undefined, 0.25, field);
       const r = simulateCourse(a.m, field, drv, { streaming: true, environment: env, yetiSpeed: DIFFICULTY[c.difficulty].yetiSpeed, maxTime: c.length === 'sprint' ? 900 : 2400 });
       sim = { outcome: r.outcome, time: Math.round(r.time * 10) / 10 };
     }
@@ -100,6 +101,8 @@ it('Whiteout course matrix', async () => {
     expect(enc.length, id).toBeGreaterThan(0);
     expect(fronts, id).toBeGreaterThan(0);
     if (Number.isFinite(metres)) expect(Math.abs(a.m.finishZ - metres), id).toBeLessThan(metres * 0.05);
+    // (W-051) outcome gate: a skier who reads the weather finishes every Relaxed course
+    if (sim && c.difficulty === 'relaxed') expect(sim.outcome, id).toBe('victory');
     expect(a.kinds['wind-drift']?.n ?? 0, id).toBeGreaterThan(0);
   }
   const fs = (await import('node:fs' as string)) as { writeFileSync: (p: string, s: string) => void };

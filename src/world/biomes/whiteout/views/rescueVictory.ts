@@ -85,8 +85,9 @@ export class RescueVictory implements VictoryScript {
     tl.shot({
       start: B.welcome,
       end: B.lantern,
-      from: () => pose(door.clone().addScaledVector(faces, 7.5).addScaledVector(across, -3.2).add(new THREE.Vector3(0, 1.7, 0)), door.clone().addScaledVector(faces, 1.2).add(new THREE.Vector3(0, 1.5, 0)), 50),
-      to: () => pose(door.clone().addScaledVector(faces, 6.6).addScaledVector(across, -2.6).add(new THREE.Vector3(0, 1.6, 0)), door.clone().addScaledVector(faces, 1.0).add(new THREE.Vector3(0, 1.45, 0)), 46),
+      // (round-2 check: from 7 m and 1.7 m up the camera sat among the sled and the searchlight housing)
+      from: () => pose(door.clone().addScaledVector(faces, 10.5).addScaledVector(across, -1.6).add(new THREE.Vector3(0, 2.6, 0)), door.clone().addScaledVector(faces, 1.5).add(new THREE.Vector3(0, 1.4, 0)), 50),
+      to: () => pose(door.clone().addScaledVector(faces, 9.4).addScaledVector(across, -1.2).add(new THREE.Vector3(0, 2.4, 0)), door.clone().addScaledVector(faces, 1.2).add(new THREE.Vector3(0, 1.4, 0)), 46),
       easing: ease.inOut,
     });
     // 3) the lantern: from the storm side, low; the skier in the warm doorway, the lantern lifted

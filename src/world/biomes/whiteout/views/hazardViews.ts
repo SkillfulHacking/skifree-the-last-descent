@@ -212,13 +212,16 @@ export function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMa
 }
 
 let gapGeo: THREE.BufferGeometry | null = null;
-/** a 2.4 m marker pole with a flag panel near the top (shared) */
+/**
+ * a 3 m marker pole with a 1.1 × 0.9 m panel at the top (shared): a gate panel big enough to read at
+ * ~100 m in a storm at gameplay resolution (round 2 check: a slim flag was ~1 px there)
+ */
 function gapMarkerGeometry(): THREE.BufferGeometry {
   if (gapGeo) return gapGeo;
-  const pole = new THREE.CylinderGeometry(0.07, 0.08, 2.4, 6);
-  pole.translate(0, 1.2, 0);
-  const flag = new THREE.BoxGeometry(0.06, 0.55, 0.75);
-  flag.translate(0, 2.05, 0.38);
+  const pole = new THREE.CylinderGeometry(0.09, 0.1, 3.0, 6);
+  pole.translate(0, 1.5, 0);
+  const flag = new THREE.BoxGeometry(1.1, 0.9, 0.05);
+  flag.translate(0, 2.5, 0);
   const merged = mergeGeometries([pole.toNonIndexed(), flag.toNonIndexed()]);
   pole.dispose();
   flag.dispose();

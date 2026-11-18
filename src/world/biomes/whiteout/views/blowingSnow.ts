@@ -16,9 +16,10 @@ import { weatherFx } from '../../../look/weatherFx';
 export const BLOWING = {
   count: { low: 1400, medium: 3200, high: 6000, ultra: 9000 } as Record<QualityPreset, number>,
   /** box around the camera (m): half-width XZ, height above/below */
-  half: 34,
-  up: 22,
-  down: 9,
+  // (round 2) a tighter box round the camera: the streaks that read are the near ones
+  half: 24,
+  up: 14,
+  down: 7,
   /** share of grains in the low (spindrift) band */
   low: 0.35,
   /** streak length: seconds of motion */

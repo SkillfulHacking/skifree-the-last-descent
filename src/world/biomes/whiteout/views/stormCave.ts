@@ -127,7 +127,7 @@ export function dressStormCave(ctx: CaveDressingContext): CaveDressing {
     gr.life = 2 + rnd() * 1.5;
   });
   group.add(curtain.points, skate.points);
-  const built = buildStormArchitecture(cave.lipTop, cave.mouth, O);
+  const built = buildStormArchitecture(cave.lipTop, cave.mouth, O, rock ?? null);
   group.add(built.group);
   let burst = 0;
   const dressing: CaveDressing & { setWind(w: number): void; roar(): void } = {
@@ -212,7 +212,7 @@ export function stormCaveCinematic(c: CaveCinematicContext): CaveCinematicExtras
  * hangs off the cave's own anchors: `lip` (top of the brow), `mouth` (the entrance, at ground level),
  * `out` (the outward normal).
  */
-function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: THREE.Vector3) {
+function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: THREE.Vector3, rock: THREE.Mesh | null) {
   const C = STORM_CAVE.cornice;
   const group = new THREE.Group();
   group.name = 'storm-cave-architecture';
@@ -227,17 +227,39 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
   const nv = 7;
   const pos: number[] = [];
   const idx: number[] = [];
+  // each column roots on the rock itself, just above the opening: a ray in from outside finds the
+  // face (round-2 check: rooted on the anchor point alone, the lip floated in front of a bulging brow)
+  const ray = new THREE.Raycaster();
+  rock?.updateWorldMatrix(true, false);
+  const rootAt = (a: number): THREE.Vector3 | null => {
+    if (!rock) return lip.clone().addScaledVector(along, a);
+    // (just over the opening: ~55% of the way from the floor to the brow anchor — round-2 check,
+    // the anchor itself is high on the face)
+    const o = lip.clone().addScaledVector(along, a).addScaledVector(out, 8);
+    o.y = mouth.y + 0.58 * (lip.y - mouth.y);
+    ray.set(o, out.clone().negate());
+    ray.far = 16;
+    const hit = ray.intersectObject(rock, false)[0];
+    return hit ? hit.point.clone().addScaledVector(out, -0.15) : null;
+  };
+  const roots: THREE.Vector3[] = [];
+  let lastRoot = lip.clone();
+  for (let i = 0; i <= nu; i++) {
+    const r0 = rootAt((i / nu - 0.5) * C.len);
+    if (r0) lastRoot = r0;
+    roots.push(r0 ?? lastRoot.clone());
+  }
   for (let i = 0; i <= nu; i++) {
     const u = i / nu;
     const a = (u - 0.5) * C.len;
     const taper = Math.pow(Math.sin(Math.PI * u), 0.6);
     const wob = 0.12 * Math.sin(a * 1.7) + 0.08 * Math.sin(a * 3.9 + 1.3);
     for (let j = 0; j <= nv; j++) {
-      const v = j / nv; // 0 = on the brow (back), 1 = the drooping edge
+      const v = j / nv; // 0 = on the rock (back), 1 = the drooping edge
       const th = v * Math.PI * 0.75;
       const reach = (C.overhang * taper + 0.3) * Math.sin(th) * (1 + wob);
       const rise = C.thick * taper * (0.55 * Math.cos(th) + 0.35) - 0.45 * v * v * taper;
-      const p = lip.clone().addScaledVector(along, a).addScaledVector(out, -0.4 + reach).add(new THREE.Vector3(0, rise + 0.05, 0));
+      const p = roots[i]!.clone().addScaledVector(out, reach).add(new THREE.Vector3(0, rise + 0.05, 0));
       pos.push(p.x, p.y, p.z);
     }
   }
