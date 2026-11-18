@@ -17,11 +17,12 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { focusRow, press } from './keyboard-menu';
+import { shotPath } from './shots';
 
 const KEY_S = 'skifree-tld.settings.v1';
 const KEY_P = 'skifree-tld.progress';
 const KEY_R = 'skifree-tld.records.v2';
-const OUT = 'docs/reviews/biomes/fjord/round-4/scenic-journey';
+const OUT = shotPath('docs/reviews/biomes/fjord/round-4/scenic-journey');
 const T0 = Date.parse('2026-11-08T17:30:00Z');
 
 /** a returning Alpine player: Location is still Alpine, so the menu choice below is real */

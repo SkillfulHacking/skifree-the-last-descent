@@ -9,10 +9,11 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { focusRow, press } from './keyboard-menu';
+import { shotPath } from './shots';
 
 const KEY_S = 'skifree-tld.settings.v1';
 const KEY_P = 'skifree-tld.progress';
-const OUT = 'docs/reviews/pass4/release-verification';
+const OUT = shotPath('docs/reviews/pass4/release-verification');
 const T0 = Date.parse('2026-11-08T17:30:00Z');
 
 const SETTINGS = { quality: 'low', course: 'classic', courseLength: 'sprint', showTutorial: false };

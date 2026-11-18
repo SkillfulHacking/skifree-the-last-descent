@@ -4,6 +4,7 @@
  * recolours the skier, and automated ?debug runs never persist achievements.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { shotPath } from './shots';
 
 type Progress = {
   saved: { version: number; achievements: Record<string, { earnedAt: number }>; stats: { counters: Record<string, number> }; cosmetics: { owned: Record<string, unknown>; equipped: Record<string, string> } };
@@ -126,7 +127,7 @@ test('Achievements + Locker: layout, keyboard/mouse/gamepad, v1 save migration, 
     const l = await layout(page);
     expect(l, `achievements ${w}x${h}`).toMatchObject({ panelScroll: 0, overflowX: 0, overflowY: 0, rowsOutside: 0 });
     if (w >= 1366) expect(l, `no inner scrolling at ${w}x${h}`).toMatchObject({ gridScroll: 0, cardsOutside: 0 });
-    await page.screenshot({ path: `docs/reviews/pass4/achievements/achievements_${w}x${h}.png` });
+    await page.screenshot({ path: shotPath(`docs/reviews/pass4/achievements/achievements_${w}x${h}.png`) });
   }
   await page.setViewportSize({ width: 1366, height: 768 });
   // Escape goes back; gamepad A re-enters; gamepad B goes back
@@ -153,7 +154,7 @@ test('Achievements + Locker: layout, keyboard/mouse/gamepad, v1 save migration, 
   p = await api(page);
   expect(p.saved.cosmetics.equipped).toEqual({ jacket: 'jacket.glacier-blue' });
   expect(p.jacket).toBe(0x2f6db5);
-  await page.screenshot({ path: 'docs/reviews/pass4/achievements/locker_glacier_blue.png' });
+  await page.screenshot({ path: shotPath('docs/reviews/pass4/achievements/locker_glacier_blue.png') });
   // only owned jackets cycle: right again wraps to Summit Red, then back to Glacier Blue
   await press(page, 'ArrowRight');
   await expect(page.locator('.menu-row.focus .val')).toHaveText('Summit Red');
