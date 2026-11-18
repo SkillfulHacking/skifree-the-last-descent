@@ -20,6 +20,9 @@
 import type { SurfaceType } from '../core/types';
 import { IDENTITY_SURFACE, type SurfaceModifiers } from '../world/capabilities/surface';
 
+/** How a grounded side-slip (EnvSample.groundSlip*) takes hold, by what the skier is doing (SkierPhysics). */
+export const SLIP_EDGE = { base: 1, tuck: 0.6, brake: 0.45, drift: 0.6 } as const;
+
 export interface EnvQuery {
   x: number;
   y: number;

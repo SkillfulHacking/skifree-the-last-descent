@@ -28,7 +28,9 @@ export const FRONT = {
 } as const;
 
 /** fog multipliers over the biome's base density (validateWeather caps visibility at 12) */
-export const STORM_FOG = { clear: 0.65, storm: 11, bank: 2.4 } as const;
+// (W-039, round 2: a storm reads as a whiteout — ≈ 55% fog at 50 m, ≈ 87% at 80 m, nothing past
+// ~120 m; the drift-gap markers, trail lamps and rim wands carry further: views)
+export const STORM_FOG = { clear: 0.65, storm: 21, bank: 2.4 } as const;
 
 export interface FrontState {
   /** 0..1 storm intensity */
@@ -162,10 +164,52 @@ export const SEGMENT_EXPOSURE: Readonly<Record<string, number>> = {
   classic: 0.75,
 };
 
-/** 0..1 wind exposure at (x, z): the segment's openness (blended over 80 m), full on the alternate lines */
-export function whiteoutExposure(m: ExposureQuery, x: number, z: number): number {
+/**
+ * The lee shoulder in a front (W-035): the groomed racing line runs over the crown of the run, where
+ * the wind is fastest; 3–12 m off it on the downwind side the wind eddies (and drops its snow: the
+ * drift rows). There the wind's grip on the skier — the side-slip, the skid, the headwind — falls
+ * by up to `shelter` × the front's strength. Which side is the lee follows the front's direction,
+ * which the player reads from the blowing snow, the wands and the HUD's wind arrow: moving onto the
+ * lee shoulder in a storm is a line choice (a longer line where the course bends the other way, the
+ * drift rows to read). Both shoulders are kept clear of obstacles on exposed ground
+ * (WHITEOUT_WEATHER.clearZones), and the open crest lines (the alternate lines) take the full wind.
+ */
+export const LEE = {
+  /** the share of the wind the lee shoulder takes away at full storm */
+  shelter: 0.5,
+  /** the shoulder: from `from` to `to` m off the racing line, on the downwind side */
+  from: 3,
+  to: 12,
+  /** the shoulders are kept free of rock and trees: centred this far off the line, ± half */
+  lane: 13,
+  laneHalf: 5,
+} as const;
+
+const leeFront: FrontState = { s: 0, dir: 1, phase: 'clear', left: 0, k: 0 };
+
+/**
+ * Is there a marked, cleared lee shoulder on `side` (+1 = +X) of the racing line at z? On exposed
+ * ground (the open runs where the fronts bite), where the shoulder lies on the piste.
+ */
+export function leeLaneAt(m: ExposureQuery, z: number, side: number): boolean {
+  const rx = m.routeX(z);
+  if (whiteoutExposure(m, rx, z) < 0.6) return false;
+  const cx = m.centerX ? m.centerX(z) : rx;
+  return Math.abs(rx + side * LEE.lane - cx) <= m.halfWidth(z) - LEE.laneHalf - 2;
+}
+
+/**
+ * 0..1 wind exposure at (x, z): the segment's openness (blended over 80 m), full on the alternate
+ * lines. With the time and the course seed, the lee of the piste in a front (LEE) as well; without
+ * them (the snow surface, the hazard placement), the ground's openness only.
+ */
+export function whiteoutExposure(m: ExposureQuery, x: number, z: number, t?: number, seed?: number): number {
   const seg = (zz: number) => SEGMENT_EXPOSURE[m.profile.segmentAt(zz)] ?? 0.75;
-  const base = 0.25 * seg(z - 40) + 0.5 * seg(z) + 0.25 * seg(z + 40);
+  let base = 0.25 * seg(z - 40) + 0.5 * seg(z) + 0.25 * seg(z + 40);
+  if (t !== undefined && seed !== undefined) {
+    const f = frontAt(t, seed, leeFront);
+    if (f.s > 0) base *= 1 - LEE.shelter * f.s * smoothstep(LEE.from, LEE.to, (x - m.routeX(z)) * f.dir);
+  }
   // the fast alternate lines run over the open crest: fully exposed
   const al = m.altLane(x, z);
   return al > 0 ? base + (1 - base) * al : base;
@@ -178,6 +222,16 @@ export const WHITEOUT_WEATHER: WeatherModel = {
   id: 'whiteout',
   coupling: { airborne: 0.13, balance: 0.4, headwind: { relaxed: 0.0002, normal: 0.001, hard: 0.001 }, groundSlip: 0.075, skidDrag: 0.0028 },
   exposure: whiteoutExposure,
+  // the lee shoulders either side of the racing line stay free of rock and trees on exposed ground
+  clearZones(m, z0, z1) {
+    const out: Array<{ x: number; z: number; hx: number; hz: number }> = [];
+    const step = 16;
+    for (let z = Math.floor(z0 / step) * step + step / 2; z < z1; z += step) {
+      const rx = m.routeX(z);
+      for (const side of [-1, 1]) if (leeLaneAt(m, z, side)) out.push({ x: rx + side * LEE.lane, z, hx: LEE.laneHalf, hz: step / 2 + 1 });
+    }
+    return out;
+  },
   front: (t, seed) => frontAt(t, seed, forecast),
   sample(x: number, z: number, t: number, seed: number, out: WeatherSample): WeatherSample {
     const f = frontAt(t, seed, scratch);
@@ -194,7 +248,7 @@ export const WHITEOUT_WEATHER: WeatherModel = {
     const bankN = 0.5 + 0.5 * fbm(x / 340, z / 340, seed + 304, 2);
     const bank = smoothstep(0.66, 0.78, bankN);
     const fog = STORM_FOG.clear + (STORM_FOG.storm - STORM_FOG.clear) * Math.pow(s, 1.3);
-    out.visibility = Math.min(12, fog * (1 + (STORM_FOG.bank - 1) * bank * (1 - 0.6 * s)));
+    out.visibility = Math.min(24, fog * (1 + (STORM_FOG.bank - 1) * bank * (1 - 0.6 * s)));
     out.snowfall = 0.25 + 2.6 * s;
     return out;
   },

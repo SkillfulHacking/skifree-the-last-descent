@@ -12,7 +12,9 @@
  */
 import { Rng } from '../../core/rng';
 import type { Mountain } from '../course';
-import { BAND, LANE_HALF } from '../../physics/obstacles';
+import { BAND, LANE_HALF, setObstacleClearings, type ClearZone } from '../../physics/obstacles';
+import { capabilitiesOf } from '../capabilities/index';
+import { getHazardKind } from './hazard';
 import { keepsLaneClear, type HazardInstance, type HazardKind, type HazardPlacementContext } from './hazard';
 
 export type HazardBandListener = (band: number, hazards: readonly HazardInstance[], added: boolean) => void;
@@ -192,3 +194,36 @@ export class HazardField {
     for (const l of this.listeners) l(b, list, true);
   }
 }
+
+/**
+ * The ground a location's hazards keep clear of obstacles between z0 and z1 (HazardKind.clearZones):
+ * the same bands, seed and kinds the run's HazardField generates (BiomeEnvironment uses the course
+ * seed for both), so the rock the skier meets and the gap the drift row shows always agree. Cached
+ * per mountain and band (pure).
+ */
+const zoneCache = new WeakMap<Mountain, Map<string, readonly ClearZone[]>>();
+export function hazardClearZones(m: Mountain, seed: number, z0: number, z1: number): readonly ClearZone[] {
+  const caps = capabilitiesOf(m.biome);
+  const weather = caps.weather.clearZones ? caps.weather.clearZones(m, z0, z1) : [];
+  if (caps.hazards.kinds.length === 0 || caps.hazards.density <= 0) return weather;
+  const kinds = caps.hazards.kinds.map(getHazardKind);
+  if (!kinds.some((k) => k.clearZones)) return weather;
+  let cache = zoneCache.get(m);
+  if (!cache) zoneCache.set(m, (cache = new Map()));
+  const out: ClearZone[] = [...weather];
+  for (let b = Math.floor(z0 / BAND); b <= Math.floor(z1 / BAND); b++) {
+    const key = `${seed}:${b}`;
+    let zs = cache.get(key);
+    if (!zs) {
+      const list: ClearZone[] = [];
+      for (const h of generateHazardBand(m, seed, kinds, caps.hazards.density, b)) {
+        const k = kinds.find((kk) => kk.id === h.kind);
+        if (k?.clearZones) for (const c of k.clearZones(h)) list.push(c);
+      }
+      cache.set(key, (zs = list));
+    }
+    for (const c of zs) if (c.z + c.hz > z0 && c.z - c.hz < z1) out.push(c);
+  }
+  return out;
+}
+setObstacleClearings(hazardClearZones);

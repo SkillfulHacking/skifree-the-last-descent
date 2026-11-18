@@ -21,6 +21,8 @@ import { smoothstep } from '../../../core/rng';
 import { ALPINE, deriveBiome, type Biome } from '../../biome';
 import { resetSurface, type SurfaceModel } from '../../capabilities';
 import { WHITEOUT_WEATHER, whiteoutExposure } from './storm';
+// the drift rows' gaps are kept clear of obstacles by the hazard field module (it installs the hook)
+import '../../hazards/field';
 
 export const WHITEOUT_ID = 'whiteout';
 
@@ -70,7 +72,7 @@ export function makeWhiteoutBiome(): Biome {
       exposure: 0.82,
     },
     // clear windows still have high-altitude haze; the storm fronts thicken it (WeatherModel)
-    atmosphere: { fogColor: [0.74, 0.79, 0.86], fogDensity: 0.00085, sunHaze: [0.95, 0.92, 0.86], linear: 1 / 26000, falloff: 1 / 1400, maxFogDensity: 0.0105 },
+    atmosphere: { fogColor: [0.74, 0.79, 0.86], fogDensity: 0.00085, sunHaze: [0.95, 0.92, 0.86], linear: 1 / 26000, falloff: 1 / 1400, maxFogDensity: 0.016 },
     weather: { flakeDensity: 1.25, flakeSize: 0.075, flakeOpacity: 0.85, flakeColor: 0xf4f8ff },
     terrainLook: {
       snow: [0.86, 0.9, 0.95],
@@ -144,7 +146,7 @@ export function makeWhiteoutBiome(): Biome {
       surface: WHITEOUT_SURFACE,
       weather: WHITEOUT_WEATHER,
       // drifts and blizzards on every difficulty; Relaxed softer, long courses × 0.85 (as Fjord)
-      hazards: { kinds: ['wind-drift', 'blizzard'], density: 1, intensity: { relaxed: 0.5, normal: 0.8, hard: 0.65 }, longCourse: 0.85 },
+      hazards: { kinds: ['wind-drift', 'blizzard'], density: 1, intensity: { relaxed: 0.5, normal: 0.8, hard: 0.8 }, longCourse: 0.85 },
       finish: { id: 'whiteout-rescue' },
       refuge: { id: 'ridge-rescue-hut', name: 'Rescue hut' },
       cave: { id: 'whiteout-storm-cave' },

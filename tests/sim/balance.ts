@@ -42,6 +42,15 @@ export const POLICIES: Record<string, WhiteoutPolicy> = {
   // route choice with the other decisions informed: always exposed / always sheltered
   exposed: { lines: 'always', drifts: 'gap', blizzard: 'brake' },
   sheltered: { lines: 'never', drifts: 'gap', blizzard: 'brake' },
+  // round 2 (W-035): the full weather reader — storm line, drift gaps, blizzard stance and the lee
+  // of the piste in a front — and its variants; the drift-hop policies (W-045)
+  informed2: { lines: 'weather', drifts: 'gap', blizzard: 'brake', lee: true },
+  informed2Edge: { lines: 'weather', drifts: 'gap', blizzard: 'brake', lee: true, edge: true },
+  leeOnly: { lines: 'always', drifts: 'ignore', blizzard: 'ignore', lee: true },
+  informed2NoLee: { lines: 'weather', drifts: 'gap', blizzard: 'brake' },
+  edgeOnly: { lines: 'always', drifts: 'ignore', blizzard: 'ignore', edge: true },
+  hopTimed: { lines: 'always', drifts: 'hopTimed', blizzard: 'ignore' },
+  hopSpam: { lines: 'always', drifts: 'hopSpam', blizzard: 'ignore' },
 };
 
 export interface RunSpec {
@@ -80,6 +89,10 @@ export interface RunResult extends RunSpec {
   mainSamples: number;
   driftSteers: number;
   blizzardStandUps: number;
+  /** what each crash was (time, z, reason), from the simulation's log */
+  crashLog: string[];
+  /** steps spent on the lee line (round-2 policies) */
+  leeSamples: number;
 }
 
 const r1 = (v: number) => Math.round(v * 10) / 10;
@@ -151,7 +164,9 @@ export function measure(spec: RunSpec): RunResult {
   // ---- Yeti gap trajectory (per chase: the gap at 10 / 20 / 30 s into it) ----
   const gapAt: (number | null)[] = [];
   let mark = 0;
+  const simLog: string[] = [];
   const res = simulateCourse(m, field, driver, {
+    log: simLog,
     streaming: true,
     environment: env,
     yetiSpeed: DIFFICULTY[spec.diff].yetiSpeed,
@@ -197,5 +212,7 @@ export function measure(spec: RunSpec): RunResult {
     mainSamples: stats.main,
     driftSteers: stats.gapSteers,
     blizzardStandUps: stats.brakes,
+    crashLog: simLog.filter((l) => !/encounter/.test(l)),
+    leeSamples: (stats as { lee?: number }).lee ?? 0,
   };
 }

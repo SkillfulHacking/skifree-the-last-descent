@@ -11,7 +11,7 @@
 import { smoothstep } from '../../core/rng';
 import type { SurfaceType } from '../../core/types';
 import type { Mountain } from '../course';
-import type { EnvQuery, EnvSample, PhysicsEnvironment } from '../../physics/environment';
+import { SLIP_EDGE, type EnvQuery, type EnvSample, type PhysicsEnvironment } from '../../physics/environment';
 import { capabilitiesOf, type BiomeCapabilities, type GameDifficulty } from './index';
 import { combineSurface, resetSurface, type SurfaceQuery, type SurfaceWeights } from './surface';
 import { makeWeatherSample, type WeatherSample } from './weather';
@@ -266,7 +266,11 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       pz += Math.max(-1, Math.min(1, 0.3 * k * wwz));
       // (steeply with exposure: the fully open crest lines pay; part-sheltered ground hardly)
       // (scaled like the hazards by the game difficulty's environment intensity)
-      if (cpl.skidDrag) S.dragAdd += cpl.skidDrag * Math.abs(sx) * smoothstep(0.86, 1, this.lastExposure) * this.intensity;
+      // (W-035: the speed it costs follows how much of the slip takes hold — SkierPhysics.SLIP_EDGE —
+      // so a skier who rises onto their edges in an exposed crosswind pays less than one still tucked;
+      // normalised so a full tuck pays what it always did)
+      const take = (1 + SLIP_EDGE.tuck * (q.tuck ?? 1)) / (1 + SLIP_EDGE.tuck);
+      if (cpl.skidDrag) S.dragAdd += cpl.skidDrag * Math.abs(sx) * smoothstep(0.86, 1, this.lastExposure) * this.intensity * take;
     }
     out.groundSlipX = q.grounded && !q.crashed ? px : 0;
     out.groundSlipZ = q.grounded && !q.crashed ? pz : 0;
@@ -324,7 +328,10 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     // physics-critical band must exist even if the caller did not stream (simulations)
     this.hazards.ensure(q.z - 1, q.z + 1);
     const near = this.hazards.near(q.x, q.z + HAZARD_ALERT_RANGE * 0.5, HAZARD_ALERT_RANGE * 0.5 + HAZARD_PASS_RANGE, this.near);
-    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity, tuck: q.tuck };
+    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity, tuck: q.tuck, clearance: 0 };
+    // (airborne: the height over the ground right beneath the skier, measured once per step, only when needed)
+    let clearance = NaN;
+    const clearanceNow = () => (q.grounded ? 0 : Number.isNaN(clearance) ? (clearance = Math.max(0, q.y - this.mountain.heightAt(q.x, q.z))) : clearance);
     for (const h of near) {
       let tr = this.tracks.get(h.id);
       const k = tr?.k ?? getHazardKind(h.kind);
@@ -346,6 +353,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
         contact.dist = dist;
         contact.inside = dist < h.r;
         contact.heightAbove = q.grounded ? 0 : Math.max(0, q.y - h.y);
+        contact.clearance = clearanceNow();
         const e = k.effect(h, ph, contact);
         if (e) applyContinuous(e, out, hw);
         continue;
@@ -378,6 +386,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       contact.dist = dist;
       contact.inside = inside;
       contact.heightAbove = q.grounded ? 0 : Math.max(0, q.y - h.y);
+      contact.clearance = clearanceNow();
       const e = k.effect(h, ph, contact);
       if (!e) continue;
       applyContinuous(e, out, hw);

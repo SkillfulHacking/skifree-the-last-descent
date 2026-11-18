@@ -16,19 +16,33 @@
  * the driver sees the line through any fog, so the cost of low visibility for a human is NOT measured
  * here (stated in the analysis).
  */
-import { clamp, wrapAngle } from '../../src/core/rng';
+import { clamp, smoothstep, wrapAngle } from '../../src/core/rng';
 import type { Mountain } from '../../src/world/course';
 import type { SkierInput, SkierState } from '../../src/physics/SkierPhysics';
 import type { BiomeEnvironment } from '../../src/world/capabilities/environment';
 import { getHazardKind, hazardPhase, type HazardInstance } from '../../src/world/hazards/hazard';
 import { frontAt } from '../../src/world/biomes/whiteout/storm';
-import { BLIZZARD, blizzardStrength } from '../../src/world/biomes/whiteout/hazards';
+import { BLIZZARD, blizzardStrength, type DriftParams } from '../../src/world/biomes/whiteout/hazards';
+import { LEE, leeLaneAt, whiteoutExposure } from '../../src/world/biomes/whiteout/storm';
 import type { ObstacleField } from '../../src/physics/obstacles';
 
 export interface WhiteoutPolicy {
   lines: 'weather' | 'always' | 'never';
-  drifts: 'gap' | 'gapEarly' | 'ignore';
+  /**
+   * 'gap' / 'gapEarly' (round 2: the same): reads the next row from ~110 m off and bends the line
+   * smoothly over to its gap (from 90 m before the row) and back after it, keeping the tuck through
+   * the gentle correction; 'hopTimed': ploughs no detour but charges a full jump timed to be at the
+   * top over the crest; 'hopSpam': taps a hop whenever a drift is close ahead (the round-1 exploit);
+   * 'ignore': skis straight through
+   */
+  drifts: 'gap' | 'gapEarly' | 'ignore' | 'hopTimed' | 'hopSpam';
   blizzard: 'brake' | 'ignore';
+  /** in a front, ski the lee half of the piste (round 2, W-035: the wind is weaker there) */
+  lee?: boolean;
+  /** how far downwind of the racing line the lee line runs (m; default LEE.lane − 1) */
+  leeOff?: number;
+  /** on wind-scoured exposed ground in a storm, rise out of the tuck onto the edges (less skid) */
+  edge?: boolean;
 }
 export const INFORMED: WhiteoutPolicy = { lines: 'weather', drifts: 'gap', blizzard: 'brake' };
 export const BLIND: WhiteoutPolicy = { lines: 'always', drifts: 'ignore', blizzard: 'ignore' };
@@ -40,7 +54,7 @@ const near: HazardInstance[] = [];
  * input in between, with a softer correction (the same for every policy). 0 = the instant, perfect
  * path follower of the 'skilled' autopilot.
  */
-export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number, p: WhiteoutPolicy, stats?: { alt: number; main: number; gapSteers: number; brakes: number }, react = 0.25, field?: ObstacleField) {
+export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number, p: WhiteoutPolicy, stats?: { alt: number; main: number; gapSteers: number; brakes: number; lee?: number }, react = 0.25, field?: ObstacleField) {
   const ids: number[] = [];
   /** a player steers round rock and logs they can see: the nearest clear lateral offset of the aim */
   const clearOf = (sx: number, sz: number, tx: number, tz: number): number => {
@@ -66,6 +80,9 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
   };
   let held: SkierInput | null = null;
   let next = -1;
+  /** the planned offset from the racing line (m) and when it was last moved */
+  let plan = 0;
+  let planT = -1;
   return (s: SkierState, t: number): SkierInput => {
     if (held && t < next && !s.crashed) return held;
     next = t + react;
@@ -80,10 +97,12 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     const stormy = f.phase === 'storm' || f.phase === 'build' || (f.phase === 'ease' && f.s > 0.4);
     const useAlt = p.lines === 'always' || (p.lines === 'weather' && !stormy);
     let tx = m.routeX(tz);
+    let onAlt = false;
     if (useAlt) {
       const a = m.profile.altRouteX(tz);
       if (a !== null && a !== undefined && Number.isFinite(a)) {
         tx = a;
+        onAlt = true;
         if (stats) stats.alt++;
       } else if (stats) stats.main++;
     } else if (stats) stats.main++;
@@ -92,24 +111,53 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     env.hazards.near(s.pos.x, s.pos.z + 60, 110, near);
     // drifts: steer for the nearest clear x across the line ahead
     let tuckTol = 0.16;
-    if (p.drifts === 'gap' || p.drifts === 'gapEarly') {
-      const early = p.drifts === 'gapEarly';
-      const reach = early ? 40 + speed * 2 : 26 + speed * 1.2;
-      const drifts = near.filter((h) => h.kind === 'wind-drift' && h.z > s.pos.z + 4 && h.z < s.pos.z + reach);
-      const blocked = (x: number) => drifts.some((h) => Math.hypot(x - h.x, (h.z - (s.pos.z + 20)) * 0.15) < h.r + 1.2);
-      if (drifts.length && blocked(tx)) {
-        let best = tx;
-        for (let d = 1; d < 40; d += 1) {
-          if (!blocked(tx + d)) { best = tx + d; break; }
-          if (!blocked(tx - d)) { best = tx - d; break; }
+    // ---- the line across the piste (round 2): one plan, an offset from the racing line, that moves
+    // at a rate a skier can carve (≈ 0.22 × speed sideways) — never re-aimed from scratch each look:
+    //  - in a front, onto the marked lee shoulder (where there is one);
+    //  - for a drift row whose mounds cover that line, over to the row's gap from ~95 m before it,
+    //    back after it.
+    const leeOff = (z: number) => (p.lee && !onAlt && f.s > 0.3 && leeLaneAt(m, z, f.dir) ? f.dir * (p.leeOff ?? LEE.lane - 1) * smoothstep(0.3, 0.7, f.s) : 0);
+    let want = leeOff(tz);
+    let pop = false;
+    if (p.drifts !== 'ignore') {
+      // the next drift row ahead (its mounds carry the row's gap)
+      let row: HazardInstance | null = null;
+      for (const h of near) {
+        if (h.kind !== 'wind-drift') continue;
+        const q = h.params as DriftParams;
+        if (q.rowZ === undefined || q.rowZ < s.pos.z - 6 || q.rowZ > s.pos.z + 110) continue;
+        if (!row || q.rowZ < (row.params as DriftParams).rowZ!) row = h;
+      }
+      if (row) {
+        const q = row.params as DriftParams;
+        const rz = q.rowZ!;
+        const base = onAlt ? tx : m.routeX(rz);
+        const lineAtRow = base + leeOff(rz);
+        const covered = Math.abs(lineAtRow - q.gapX!) > q.gapHalf! - 1.5;
+        const dz = rz - s.pos.z;
+        if (p.drifts === 'gap' || p.drifts === 'gapEarly') {
+          if (covered && dz < 95 && !onAlt) {
+            want = q.gapX! - m.routeX(rz);
+            tuckTol = 0.3;
+            if (stats) stats.gapSteers++;
+          }
+        } else if (p.drifts === 'hopTimed') {
+          // charge fully (0.45 s), release so the top of the jump (~0.45 s) is over the crest
+          if (covered && s.grounded && dz > speed * 0.45 && dz < speed * 0.95) pop = true;
+        } else if (p.drifts === 'hopSpam') {
+          if (s.grounded && dz > -12 && dz < 10 && Math.floor(t * 4) % 2 === 0) pop = true;
         }
-        const hw = m.profile.halfWidth(tz);
-        const cx = m.profile.centerX(tz);
-        tx = clamp(best, cx - hw + 4, cx + hw - 4);
-        if (early) tuckTol = 0.3;
-        if (stats) stats.gapSteers++;
       }
     }
+    const dtPlan = planT < 0 ? 0 : Math.min(0.5, t - planT);
+    planT = t;
+    const rate = 0.22 * Math.max(8, speed);
+    plan += clamp(want - plan, -rate * dtPlan, rate * dtPlan);
+    if (onAlt) plan = 0;
+    else tx = m.routeX(tz) + plan;
+    if (stats && Math.abs(plan) > 3 && Math.sign(plan) === Math.sign(f.dir) && p.lee) stats.lee = (stats.lee ?? 0) + 1;
+    let edgeUp = false;
+    if (p.edge && f.s > 0.5 && s.grounded && whiteoutExposure(m, s.pos.x, s.pos.z, t, seed) > 0.86) edgeUp = true;
     // blizzard cells blowing across the line ahead
     if (p.blizzard === 'brake') {
       for (const h of near) {
@@ -128,6 +176,8 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     const desired = Math.atan2(tx - s.pos.x, tz - s.pos.z);
     const err = wrapAngle(desired - s.heading);
     const steer = clamp(-err * (react > 0 ? 2.2 : 3.2), -1, 1);
-    return { steer, tuck: tuckOk && Math.abs(err) < tuckTol ? 1 : 0, brake, drift: false, pop: false, recover: s.crashTime > 1.4 };
+    // (every policy) a skier who has bogged down poles out, as the game's hint teaches
+    const pole = s.grounded && !s.crashed && speed < 4;
+    return { steer, tuck: tuckOk && !edgeUp && Math.abs(err) < tuckTol ? 1 : 0, brake, drift: false, pop, recover: s.crashTime > 1.4, pole, polePressed: pole && Math.floor(t * 2) % 2 === 0 };
   }
 }

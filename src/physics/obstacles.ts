@@ -39,6 +39,24 @@ export const LANE_HALF = 6;
 /** coastal locations: extra clearance (m) between a rock's edge and the obstacle-free lane */
 const EDGE_CLEAR = 1.0;
 export const BAND = 256;
+
+/** a rectangle (centre, half-extents) the obstacle field keeps free of rock and trees */
+export interface ClearZone {
+  x: number;
+  z: number;
+  hx: number;
+  hz: number;
+}
+/**
+ * The location's hazards that ask the skier to ski somewhere off the racing line (a drift row's gap)
+ * keep that ground clear (HazardKind.clearZones). Installed by the hazard field module
+ * (world/hazards/field.ts) so this module stays free of the hazard layer; pure in (m, seed, z0, z1).
+ */
+type ClearingsFn = (m: Mountain, seed: number, z0: number, z1: number) => readonly ClearZone[];
+let clearings: ClearingsFn | null = null;
+export function setObstacleClearings(fn: ClearingsFn | null): void {
+  clearings = fn;
+}
 const CELL = 6.5;
 const X_MIN = -560;
 const X_MAX = 560;
@@ -258,6 +276,8 @@ export function* generateBandSteps(m: Mountain, seed: number, band: number): Gen
   const hasAlt = P.altRoutes(zA - 10, zB + 10).length > 0;
   const coast = m.coast;
   const lookouts = coast ? coast.lookouts(zA - 70, zB + 70) : [];
+  const zones = clearings ? clearings(m, seed, zA - 60, zB + 60) : [];
+  const inZone = (x: number, z: number) => zones.some((c) => Math.abs(x - c.x) < c.hx && Math.abs(z - c.z) < c.hz);
   const nearKicker = (x: number, z: number) => kickers.some((k) => z > k.z - k.run - 18 && z < k.z + 26 && Math.abs(x - (m.centerX(k.z) + k.d)) < k.width * 0.5 + 6);
   let local = 0;
   const add = (o: Omit<Obstacle, 'id' | 'collidable' | 'y'>) => {
@@ -288,6 +308,7 @@ export function* generateBandSteps(m: Mountain, seed: number, band: number): Gen
       if (z < 40 && z > -60 && ad < 40) continue; // start platform
       if (caves.some((c) => Math.hypot(x - c.x, z - c.z) < 26)) continue; // cave mouth
       if (nearKicker(x, z)) continue;
+      if (inZone(x, z)) continue; // a hazard's clear line (a drift row's gap)
       if (caves.some((c) => d * c.side > c.d - 16 && Math.abs(z - c.z) < 40)) continue; // keep cave clearing open
       // coast: nothing on the cornice, the cliff or in the water; viewpoints stay clear
       if (coast && (coast.beyondRim(x, z) > -5 || lookouts.some((l) => Math.hypot(x - l.x, z - l.z) < 13))) continue;

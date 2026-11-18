@@ -73,6 +73,12 @@ export interface WeatherModel {
    * right, toward +X) and the intensity. Null/absent: no fronts.
    */
   front?(t: number, seed: number): WeatherFront | null;
+  /**
+   * Optional: ground the obstacle field keeps free of rock and trees between z0 and z1 because the
+   * weather asks the skier to ski there (Whiteout: the lee shoulders either side of the racing line).
+   * Pure in (m, z0, z1).
+   */
+  clearZones?(m: ExposureQuery, z0: number, z1: number): ReadonlyArray<{ x: number; z: number; hx: number; hz: number }>;
 }
 
 export interface WeatherFront {
@@ -172,7 +178,7 @@ export function validateWeather(m: WeatherModel, seed = 1): string[] {
     for (let z = 0; z < 6000; z += 1300) {
       m.sample(0, z, t, seed, s);
       if (![s.windX, s.windZ, s.visibility, s.snowfall, s.gust].every(Number.isFinite)) out.push(`non-finite sample at z=${z} t=${t}`);
-      else if (s.visibility <= 0 || s.visibility > 12) out.push(`visibility=${s.visibility} outside (0, 12] at z=${z} t=${t}`);
+      else if (s.visibility <= 0 || s.visibility > 24) out.push(`visibility=${s.visibility} outside (0, 24] at z=${z} t=${t}`);
       else if (s.snowfall < 0 || s.snowfall > 4) out.push(`snowfall=${s.snowfall} outside [0, 4]`);
       else if (Math.hypot(s.windX, s.windZ) > 40) out.push(`wind ${Math.hypot(s.windX, s.windZ).toFixed(1)} m/s > 40`);
       else if (s.storm !== undefined && !(s.storm >= 0 && s.storm <= 1)) out.push(`storm=${s.storm} outside [0, 1]`);

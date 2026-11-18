@@ -14,10 +14,13 @@ import { BiomeEnvironment } from '../../src/world/capabilities/environment';
 import { ObstacleField, LANE_HALF } from '../../src/physics/obstacles';
 import { simulateCourse } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
-import { whiteoutDriver, INFORMED, BLIND, type WhiteoutPolicy } from '../sim/whiteoutDriver';
+import { whiteoutDriver, BLIND, type WhiteoutPolicy } from '../sim/whiteoutDriver';
+import { WEATHER_FX_FOG_KEEP } from '../../src/world/look/weatherFx';
+/** the round-2 full weather reader (tests/sim/balance.ts POLICIES.informed2) */
+const INFORMED2: WhiteoutPolicy = { lines: 'weather', drifts: 'gap', blizzard: 'brake', lee: true };
 import { collectPlacements } from '../../src/world/hazards/testkit';
 import { getHazardKind, hazardPhase } from '../../src/world/hazards/hazard';
-import { FRONT, frontAt, frontType, FRONT_TYPES, whiteoutExposure, WHITEOUT_WEATHER } from '../../src/world/biomes/whiteout/storm';
+import { FRONT, frontAt, frontType, FRONT_TYPES, STORM_FOG, whiteoutExposure, WHITEOUT_WEATHER } from '../../src/world/biomes/whiteout/storm';
 import { HARDPACK, WHITEOUT_SURFACE } from '../../src/world/biomes/whiteout/biome';
 import { BLIZZARD_TIMING } from '../../src/world/biomes/whiteout/hazards';
 
@@ -109,10 +112,15 @@ describe('Whiteout Ridge: storm fronts', () => {
       WHITEOUT_WEATHER.sample(0, 1000, t, 3, s);
       maxVis = Math.max(maxVis, s.visibility);
     }
-    expect(maxVis).toBeGreaterThan(8);
-    // FogExp2 ceiling: half the contrast is still there at ≥ 75 m
+    expect(maxVis).toBeGreaterThan(16);
+    // (round 2, W-039) a storm reads as a whiteout: half the contrast gone by ~50 m (FogExp2) — the
+    // ceiling still keeps it there (≥ 50 m), the drift-gap markers keep ~45% of their colour through
+    // it, and Reduce Weather Effects keeps the round-1 ceiling: half the contrast at ≥ 75 m
     const max = b.atmosphere.maxFogDensity!;
-    expect(Math.sqrt(Math.LN2) / max).toBeGreaterThanOrEqual(75);
+    expect(Math.sqrt(Math.LN2) / max).toBeGreaterThanOrEqual(50);
+    expect(Math.sqrt(Math.LN2) / max).toBeLessThan(60);
+    const reduced = b.atmosphere.fogDensity * (1 + (STORM_FOG.storm - 1) * WEATHER_FX_FOG_KEEP);
+    expect(Math.sqrt(Math.LN2) / Math.min(max, reduced)).toBeGreaterThanOrEqual(75);
   });
 });
 
@@ -303,13 +311,15 @@ describe('Whiteout Ridge: playability', () => {
     expect(sim('sprint', 'WP1', 'normal', 'careless').outcome).toBe('caught');
   }, 900_000);
   it('Normal rewards reading the weather; Hard is winnable by a skier who reads it', () => {
-    // WD8 Normal: the informed skier escapes, the weather-blind one is caught
-    expect(play('WD8', 'normal', INFORMED)).toBe('victory');
-    expect(play('WD8', 'normal', BLIND)).toBe('caught');
-    for (const s of ['WD2', 'WD3', 'WD5']) expect(play(s, 'normal', INFORMED), s).toBe('victory');
-    // Normal is not automatic: WD1 / WD4 catch even the informed skier
-    expect(play('WD4', 'normal', INFORMED)).toBe('caught');
-    const hard = ['WD3', 'WD6', 'WD9'].filter((s) => play(s, 'hard', INFORMED) === 'victory').length;
-    expect(hard).toBeGreaterThanOrEqual(2);
+    // (round 2, W-035: the full weather reader — storm line, drift gaps, blizzard stance, the lee —
+    // balance/w035-final) WD8 / WD2 Normal: the informed skier escapes, the weather-blind one is caught
+    for (const s of ['WD2', 'WD8']) {
+      expect(play(s, 'normal', INFORMED2), s).toBe('victory');
+      expect(play(s, 'normal', BLIND), s).toBe('caught');
+    }
+    for (const s of ['WD3', 'WD5']) expect(play(s, 'normal', INFORMED2), s).toBe('victory');
+    // Hard: a skier who reads the weather can win (WD3); not automatic for the blind one (WD1, WD2)
+    expect(play('WD3', 'hard', INFORMED2)).toBe('victory');
+    for (const s of ['WD1', 'WD2']) expect(play(s, 'hard', BLIND), s).toBe('caught');
   }, 900_000);
 });
