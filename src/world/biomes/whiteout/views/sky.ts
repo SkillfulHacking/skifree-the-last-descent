@@ -199,7 +199,8 @@ export class StormSky {
     const seed = fr.weatherSeed ?? 0;
     const f = frontAt(t, seed, this.f);
     // a finish cinematic drives the weather itself (the storm held, then the break): follow its storm
-    const s = fr.override ? fr.storm ?? 0 : f.s;
+    // (and while that weather is handed back, the blended storm the fog and snow use: W-043)
+    const s = fr.override || fr.blend ? fr.storm ?? 0 : f.s;
     const o = fr.origin;
     const focus = fr.focus;
     // drift with the wind (clamped dt: no jump after a teleport or a pause)

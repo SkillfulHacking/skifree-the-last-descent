@@ -44,6 +44,11 @@ export interface SceneryFrame {
   windZ?: number;
   /** true while a finish cinematic overrides the weather (World.weatherOverride) */
   override?: boolean;
+  /**
+   * true while a cinematic's weather is being handed back to the model (World.releaseWeather): `storm`
+   * is the blended value the fog and snow use, so the sky follows it too (W-043)
+   */
+  blend?: boolean;
 }
 
 export interface SceneryView {

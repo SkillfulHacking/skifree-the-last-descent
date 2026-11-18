@@ -84,7 +84,7 @@ function mats() {
  * white material it read as a smooth grey berm), with sastrugi grooves cut along the wind and a plume
  * of spindrift off the crest.
  */
-function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMat?: THREE.Material): HazardView {
+export function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMat?: THREE.Material): HazardView {
   const M = mats();
   const obj = new THREE.Group();
   obj.name = 'wind-drift';
@@ -147,6 +147,23 @@ function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMat?: THR
     phase[i] = (Math.sin(h.seed * 0.71 + i * 91.7) * 43758.5453) % 1;
     jit[i] = ((Math.sin(h.seed * 1.37 + i * 47.3) * 24634.6345) % 1) * 2;
   }
+  // ground under each grain's crest track, sampled once (W-038): the grain slides along the crest by
+  // jit·(0.6 … 2.4) m over its life, so the height is sampled at K points along that track and
+  // interpolated, instead of querying the terrain for every grain every frame
+  const crest0 = 0.35 * W;
+  const K = 5;
+  const base = new Float32Array(n * K);
+  for (let i = 0; i < n; i++)
+    for (let k = 0; k < K; k++) {
+      const lx = seedU[i]! * L * 0.85 + jit[i]! * (0.6 + (1.8 * k) / (K - 1));
+      base[i * K + k] = m.heightAt(h.x + lx * c - crest0 * s, h.z + lx * s + crest0 * c);
+    }
+  const groundAt = (i: number, life: number) => {
+    const f = life * (K - 1);
+    const k = Math.min(K - 2, Math.floor(f));
+    const a = base[i * K + k]!;
+    return a + (base[i * K + k + 1]! - a) * (f - k);
+  };
   const pg = new THREE.BufferGeometry();
   pg.setAttribute('position', new THREE.BufferAttribute(pp, 3));
   const plume = new THREE.Points(pg, M.plume);
@@ -159,6 +176,7 @@ function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMat?: THR
       // the plume streams only when the wind is up (the surface-spindrift strength, 0..0.6)
       M.plume.opacity = 0.55 * smoothstep01(atmosphere.uDriftK.value / 0.6);
       plume.visible = M.plume.opacity > 0.02;
+      if (!plume.visible) return; // nothing drawn: nothing to animate (W-038)
       for (let i = 0; i < n; i++) {
         const u = seedU[i]!;
         const life = (((t * 0.55 + Math.abs(phase[i]!)) % 1) + 1) % 1;
@@ -167,7 +185,7 @@ function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMat?: THR
         const x = h.x + lx * c - lz * s;
         const z = h.z + lx * s + lz * c;
         pp[i * 3] = x + life * 2.5;
-        pp[i * 3 + 1] = m.heightAt(h.x + lx * c - crestZ * s, h.z + lx * s + crestZ * c) + H * Math.pow(Math.max(0, 1 - u * u), 0.8) + 0.2 + life * 1.4 - life * life * 1.6;
+        pp[i * 3 + 1] = groundAt(i, life) + H * Math.pow(Math.max(0, 1 - u * u), 0.8) + 0.2 + life * 1.4 - life * life * 1.6;
         pp[i * 3 + 2] = z;
       }
       (pg.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;

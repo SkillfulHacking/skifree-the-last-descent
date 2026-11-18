@@ -577,6 +577,7 @@ export class World {
     const env = this.environment;
     env.weatherAt(focus.x, focus.z, env.clock, this.weather);
     const wo = this.weatherOverride;
+    const blending = !wo && !!this.weatherFade;
     if (wo) {
       this.weather.visibility = wo.visibility;
       this.weather.snowfall = wo.snowfall;
@@ -598,7 +599,7 @@ export class World {
     this.env.applyWeather(this.weather.visibility * (wo ? 1 : env.hazardVisibility(focus.x, focus.z, env.clock)), this.weather.snowfall, this.weather.storm ?? 0);
     this.env.update(dt, focus, camPos, time, this.weather.windX);
     this.hazardViews.update(dt, focus.z);
-    this.scenery?.update(dt, time, { focus, camPos, origin: this.origin, storm: this.weather.storm ?? 0, clock: env.clock, weatherSeed: env.seed, windX: this.weather.windX, windZ: this.weather.windZ, override: !!wo });
+    this.scenery?.update(dt, time, { focus, camPos, origin: this.origin, storm: this.weather.storm ?? 0, clock: env.clock, weatherSeed: env.seed, windX: this.weather.windX, windZ: this.weather.windZ, override: !!wo, blend: blending });
     for (const s of this.caves.values()) s.dressing?.update?.(dt, time);
     this.particles.update(dt);
   }
