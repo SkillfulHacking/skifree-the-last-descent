@@ -9,7 +9,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 type Front = { s: number; dir: number; phase: 'clear' | 'build' | 'storm' | 'ease'; left: number; k: number };
-type Sess = { phase: string; outcome: string | null; z: number; time: number; snowballMarker: boolean; cinematicTime: number; finishZ: number; yetiDistance: number; crashes: number };
+type Sess = { phase: string; outcome: string | null; z: number; time: number; snowballMarker: boolean; cinematicTime: number; finishZ: number; yetiDistance: number; crashes: number; yetiLook: { shade: number; eyeGlow: number } };
 type W = {
   __ready?: boolean;
   __skifree: {
@@ -115,7 +115,7 @@ test('Hard: the Yeti throws in the storm and the landing marks are up', async ({
   expect(errors).toEqual([]);
 });
 
-test('storm cave encounter plays through to the chase; the rescue station finish reports the visit', async ({ page }) => {
+test('storm cave encounter plays through to the chase; the storm look leaves the Yeti at the finish; the rescue station finish reports the visit', async ({ page }) => {
   test.setTimeout(40 * 60 * 1000);
   await boot(page, { ...WHITEOUT, customSeed: 'WO-E2E-C' });
   await api(page, (w) => w.startRun(true));
@@ -130,6 +130,13 @@ test('storm cave encounter plays through to the chase; the rescue station finish
   }
   expect(saw).toBe(true);
   expect((await sess(page)).phase).toBe('chase');
+  // a storm on the chase: the Yeti takes the storm look (W-009) — dimmed pelt, eyes glowing
+  const storm = await findPhase(page, 'storm', Math.ceil((await sess(page)).time));
+  await api(page, (w, t) => w.setTime(t + 2), storm);
+  await frames(page, 20);
+  const inStorm = (await sess(page)).yetiLook;
+  expect(inStorm.shade, JSON.stringify(inStorm)).toBeLessThan(0.95);
+  expect(inStorm.eyeGlow, JSON.stringify(inStorm)).toBeGreaterThan(0.05);
   // to the rescue station, the Yeti far behind
   const fz = (await sess(page)).finishZ;
   await api(page, (w, z) => w.teleport(z - 60, 20), fz);
@@ -139,6 +146,10 @@ test('storm cave encounter plays through to the chase; the rescue station finish
   expect((await sess(page)).outcome).toBe('victory');
   // the victory sequence runs
   await frames(page, 300);
+  // and the storm look does not follow the Yeti into it (Gitar, PR #9 r4581960912): the victory takes
+  // manual control of him, so only the session's lifecycle can put it back
+  const after = (await sess(page)).yetiLook;
+  expect(after, 'Yeti look in the victory').toEqual({ shade: 1, eyeGlow: 0 });
   // the run reports its location and its finish; a debug-driven run (teleports) never persists, so the
   // saved records are untouched by the test (the tracker's persist policy)
   const p = await api(page, (w) => w.progress());

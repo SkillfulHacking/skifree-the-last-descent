@@ -993,16 +993,8 @@ export class GameSession implements Stage {
       this.yetiAnim.speed = this.yetiAI.speed;
       this.yetiAnim.turn = this.yetiAI.turn;
       if (this.run.phase === 'chase') this.setYetiMode(this.yetiAI.mode);
-      // (W-009) a white Yeti in a white storm. Not a colour that changes as he closes in (the slice's
-      // distance darkening read as a fake): the storm's flat, dim light takes the pelt down with
-      // everything else — the same at 10 m as at 60 m, changing only as slowly as the weather — and
-      // his eyes burn through the snow as they do in the cave, the pair of points that finds him first
-      const storm = this.world.weather.storm ?? 0;
-      if (this.run.phase === 'chase') {
-        this.yeti.setShade(1 - 0.36 * storm);
-        this.yeti.setEyeGlow(0.75 * smoothstep(0.25, 0.7, storm));
-      }
     }
+    this.updateYetiStormLook();
     this.yetiAnim.modeTime += dt;
     if (this.yetiAnim.throwT !== undefined) {
       this.yetiAnim.throwT += dt;
@@ -1141,6 +1133,33 @@ export class GameSession implements Stage {
   }
 
   private lastFront: { k: string; phase: string } = { k: '', phase: 'clear' };
+
+  /**
+   * (W-009) A white Yeti in a white storm. Not a colour that changes as he closes in (the slice's
+   * distance darkening read as a fake): the storm's flat, dim light takes the pelt down with everything
+   * else — the same at 10 m as at 60 m, changing only as slowly as the weather — and his eyes burn
+   * through the snow as they do in the cave, the pair of points that finds him first.
+   *
+   * It applies while he is out in the weather on the course (the chase, and the catch). Once the run
+   * moves on to anything else it is put back exactly once (Gitar, PR #9 r4581960912: it used to carry
+   * into the rescue victory — the searchlight beat, the clearing — because the victory takes manual
+   * control of the Yeti and nothing reset it). The cave cinematic owns the Yeti's look in its phase and
+   * restores it itself.
+   */
+  private yetiStormLook = false;
+  private updateYetiStormLook() {
+    const ph = this.run.phase;
+    if ((ph === 'chase' || ph === 'caught') && this.run.yetiReleased) {
+      const storm = this.world.weather.storm ?? 0;
+      this.yeti.setShade(1 - 0.36 * storm);
+      this.yeti.setEyeGlow(0.75 * smoothstep(0.25, 0.7, storm));
+      this.yetiStormLook = true;
+    } else if (this.yetiStormLook && ph !== 'caveCinematic') {
+      this.yeti.setShade(1);
+      this.yeti.setEyeGlow(0);
+      this.yetiStormLook = false;
+    }
+  }
   /** the storm-front forecast on the HUD and in the captions (locations whose weather has fronts) */
   private updateWeatherHud() {
     const env = this.world.environment;
@@ -1320,6 +1339,7 @@ export class GameSession implements Stage {
       speed: s.speed,
       /** (evidence) a Hard snowball in flight, i.e. its landing ring is up */
       snowballMarker: (this.snowballs?.balls.length ?? 0) > 0,
+      yetiLook: this.yeti.look,
       grounded: s.grounded,
       crashed: s.crashed,
       heading: s.heading,
