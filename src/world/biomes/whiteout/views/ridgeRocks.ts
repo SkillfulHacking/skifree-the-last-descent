@@ -218,7 +218,10 @@ export class RidgeRocks {
       im.instanceMatrix.needsUpdate = true;
       im.castShadow = true;
       im.receiveShadow = true;
-      im.frustumCulled = false;
+      // (round 2, W-052) culled per chunk against the view and the shadow camera: round 1 drew all
+      // ~140 scans (≈ 700k triangles) in both passes whether in view or not
+      im.computeBoundingSphere();
+      im.frustumCulled = true;
       this.group.add(im);
       list.push(im);
     }
