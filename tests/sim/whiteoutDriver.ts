@@ -5,8 +5,10 @@
  *  - lines:   'weather' takes the exposed fast alternate lines in fair weather and keeps to the
  *             sheltered main line once a front is building or blowing; 'always' / 'never' are the
  *             weather-blind fixed policies;
- *  - drifts:  'gap' steers for the gap in a drift row (the shown gap: hazard footprints), 'ignore'
- *             skis straight through;
+ *  - drifts:  'gap' steers for the gap in a drift row (the shown gap: hazard footprints) once the row
+ *             is close (~45 m at speed); 'gapEarly' reads the row from further off (40 m + 2 s of
+ *             travel) and drifts across to the gap gradually, keeping the tuck through gentle
+ *             corrections (W-034: what a competent player does); 'ignore' skis straight through;
  *  - blizzard: 'brake' stands up and checks speed while a blizzard cell is blowing across the line
  *             ahead (no tuck in the side-slip), 'ignore' keeps tucking.
  * It only uses what the game shows: hazard positions and phases (the telegraph), the front's phase
@@ -25,7 +27,7 @@ import type { ObstacleField } from '../../src/physics/obstacles';
 
 export interface WhiteoutPolicy {
   lines: 'weather' | 'always' | 'never';
-  drifts: 'gap' | 'ignore';
+  drifts: 'gap' | 'gapEarly' | 'ignore';
   blizzard: 'brake' | 'ignore';
 }
 export const INFORMED: WhiteoutPolicy = { lines: 'weather', drifts: 'gap', blizzard: 'brake' };
@@ -89,8 +91,11 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     let tuckOk = true;
     env.hazards.near(s.pos.x, s.pos.z + 60, 110, near);
     // drifts: steer for the nearest clear x across the line ahead
-    if (p.drifts === 'gap') {
-      const drifts = near.filter((h) => h.kind === 'wind-drift' && h.z > s.pos.z + 4 && h.z < s.pos.z + 26 + speed * 1.2);
+    let tuckTol = 0.16;
+    if (p.drifts === 'gap' || p.drifts === 'gapEarly') {
+      const early = p.drifts === 'gapEarly';
+      const reach = early ? 40 + speed * 2 : 26 + speed * 1.2;
+      const drifts = near.filter((h) => h.kind === 'wind-drift' && h.z > s.pos.z + 4 && h.z < s.pos.z + reach);
       const blocked = (x: number) => drifts.some((h) => Math.hypot(x - h.x, (h.z - (s.pos.z + 20)) * 0.15) < h.r + 1.2);
       if (drifts.length && blocked(tx)) {
         let best = tx;
@@ -101,6 +106,7 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
         const hw = m.profile.halfWidth(tz);
         const cx = m.profile.centerX(tz);
         tx = clamp(best, cx - hw + 4, cx + hw - 4);
+        if (early) tuckTol = 0.3;
         if (stats) stats.gapSteers++;
       }
     }
@@ -122,6 +128,6 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     const desired = Math.atan2(tx - s.pos.x, tz - s.pos.z);
     const err = wrapAngle(desired - s.heading);
     const steer = clamp(-err * (react > 0 ? 2.2 : 3.2), -1, 1);
-    return { steer, tuck: tuckOk && Math.abs(err) < 0.16 ? 1 : 0, brake, drift: false, pop: false, recover: s.crashTime > 1.4 };
+    return { steer, tuck: tuckOk && Math.abs(err) < tuckTol ? 1 : 0, brake, drift: false, pop: false, recover: s.crashTime > 1.4 };
   }
 }
