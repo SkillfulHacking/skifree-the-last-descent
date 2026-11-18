@@ -18,6 +18,7 @@
  * terrain/prop shaders; no textures.
  */
 import * as THREE from 'three';
+import { weatherFx } from '../../../look/weatherFx';
 import { clamp, smoothstep } from '../../../../core/rng';
 import { atmosphere, CLOUD_NOISE_GLSL } from '../../../look/atmosphere';
 import type { SceneryFrame } from '../../../presentation/scenery';
@@ -230,12 +231,15 @@ export class StormSky {
     const n = U.uWallN!.value as THREE.Vector2;
     n.set(-f.dir, 0);
     U.uWallD!.value = w.vis > 0 ? w.dist : 0;
-    this.wall.visible = w.vis > 0.01 && Math.abs(w.dist) > 60;
+    this.wall.visible = w.vis > 0.01 && Math.abs(w.dist) > 300;
     if (this.wall.visible) {
       const x = focus.x - f.dir * w.dist;
       this.wall.position.set(x, focus.y - 200, focus.z + 1500);
       this.wall.rotation.set(0, Math.PI / 2, 0);
-      this.wallU.uVis!.value = w.vis;
+      // (W-040) a flat plane up close shows its own outline (round 1, frame 04: a hard grey wedge
+      // during the build): within ~1 km the wall hands over to the storm fog and dome, which are
+      // already closing in by then
+      this.wallU.uVis!.value = w.vis * smoothstep(300, 1100, Math.abs(w.dist));
       this.wallU.uHaze!.value = 0.6 * smoothstep(600, SKY.wallFar, Math.abs(w.dist));
       (this.wallU.uFog!.value as THREE.Color).copy(atmosphere.uFogColor.value);
       this.wallU.uTime!.value = t;
@@ -247,7 +251,7 @@ export class StormSky {
     atmosphere.uCloudH.value = deckY - o.y;
     // surface spindrift: snow snakes stream over the snow once the wind is up
     const ws = Math.hypot(wx, wz);
-    atmosphere.uDriftK.value = 0.6 * smoothstep(4, 11, ws);
+    atmosphere.uDriftK.value = 0.6 * smoothstep(4, 11, ws) * weatherFx.scale;
     if (ws > 1e-3) atmosphere.uDriftDir.value.set(wx / ws, wz / ws);
     this.driftS += ws * 1.7 * step;
     atmosphere.uDriftS.value = this.driftS % 100000;

@@ -175,6 +175,35 @@ if (want('vista')) {
   await shot('11_ridge_overview', 'The ridge from above the piste: the course along the top, the drop on one side, the crest on the other');
 }
 
+// ---- (round 2) the gameplay camera itself on the ridge: the real follow camera and HUD, the run
+// held only between shots — what a player sees where the course runs along the rim, clear and in a
+// storm, and a marked drift row coming up in a storm
+if (want('play')) {
+  await ev(() => { window.__skifree.hud(true); window.__skifree.freeCam(null); window.__skifree.toChase(); });
+  await framesUntil('(s) => s.phase === "chase"', 300);
+  // where the racing line runs closest to the rim (the drop in view), in the middle of the course
+  const zRim = await P(`(w, m) => { let best = null, bd = 1e9; for (let z = 300; z < m.finishZ - 300; z += 20) { const d = Math.abs(m.routeX(z) - m.ridgeRimX(z)); if (d < bd) { bd = d; best = z; } } return { z: best, d: bd }; }`);
+  log('rim', JSON.stringify(zRim));
+  const clearT = await findPhase('clear', 30, 4);
+  await skiAt(zRim.z - 60, clearT ?? 8);
+  await framesUntil('(s) => false', 90);
+  await shot('27_play_rim_clear', `Gameplay camera, clear window, where the line runs ${zRim.d.toFixed(0)} m from the rim`);
+  const stormT = await findPhase('storm', 40, 8);
+  await skiAt(zRim.z - 60, stormT ?? 60);
+  await ev(() => window.__skifree.settleWeather());
+  await framesUntil('(s) => false', 90);
+  await shot('28_play_rim_storm', 'Gameplay camera, full storm, same stretch of rim');
+  // a drift row whose gap is off the line, approached in a storm (its gap markers)
+  const row = await P(`(w, m) => { const H = w.environment.hazards; H.ensure(300, m.finishZ - 200); for (const h of H.peek(300, m.finishZ - 200)) { const p = h.params; if (h.kind === 'wind-drift' && p.lead && Math.abs(p.gapX - m.routeX(p.rowZ)) > 10) return { z: p.rowZ, gap: p.gapX, line: m.routeX(p.rowZ) }; } return null; }`);
+  log('row', JSON.stringify(row));
+  if (row) {
+    await skiAt(row.z - 95, stormT ?? 60);
+    await ev(() => window.__skifree.settleWeather());
+    await framesUntil('(s) => false', 30);
+    await shot('29_play_drift_row_storm', `Gameplay camera, storm: a drift row ~${(row.z).toFixed(0)} m, its gap ${(row.gap - row.line).toFixed(0)} m off the line, marked by the orange poles`);
+  }
+}
+
 // ---- the cave encounter (squall, emergence, roar burst, leap)
 if (want('cave') && G.cave) {
   // a fresh run: an earlier section may already have started the chase (the encounter is then over)
@@ -208,6 +237,8 @@ if (want('chase')) {
   await ev(() => { window.__skifree.freeCam(null); window.__skifree.hud(true); window.__skifree.autopilot('skilled'); window.__skifree.toChase(); });
   const ts = await findPhase('storm', 40, 10);
   if (ts !== null) await ev((tt) => window.__skifree.setTime(tt), ts);
+  // (round 1 captured these mid-blend: the cave's weather hand-back still showing a clear sky) — end it
+  await ev(() => window.__skifree.settleWeather());
   const r = await framesUntil('(s) => s.yetiDistance < 34 && s.yetiDistance > 18', 900);
   log('gap', r.ok);
   await shot('16_storm_chase', 'Chase in a storm (third-person): the Yeti 18–34 m behind, rear view, distance bar, captions');
@@ -246,16 +277,24 @@ if (want('victory')) {
   await shot('19_station_approach', 'Approaching the rescue station through the storm (gameplay camera)');
   const r = await framesUntil('(s) => s.phase === "victory" || s.phase === "finish"', 1200);
   log('finish', r.ok);
+  // (round 2) one frame per beat at the beat's mid-point, plus the beat changes that matter; the
+  // notes say what each frame was framed to show — check every one against the image
   const beats = [
-    [1.8, '20_v_arrive', 'Victory 1.8 s: into the light — porch light, beacon, searchlight beam, rescuers waving'],
-    [5.0, '21_v_welcome', 'Victory 5.0 s: safety and welcome — door open, warm light on the snow'],
-    [7.9, '22_v_lantern', 'Victory 7.9 s: THE LANTERN BEAT — the storm lantern raised in the doorway (frame-accurate)'],
-    [10.4, '23_v_yeti_light', 'Victory 10.4 s: the Yeti at the edge of the light, the searchlight on him'],
-    [12.0, '24_v_yeti_flinch', 'Victory 12.0 s: he flinches from the light and backs into the storm'],
-    [15.0, '25_v_break', 'Victory 15.0 s: the storm breaking over the station'],
-    [19.3, '26_v_reveal', 'Victory 19.3 s: the ridge revealed behind the station'],
+    [1.8, '20_v_arrive', 'Victory 1.8 s (beat 1, into the light): behind the skier toward the hut through the storm; letterbox on'],
+    [5.2, '21_v_welcome', 'Victory 5.2 s (beat 2, welcome): in front of the porch looking at the door as it opens, skier arriving'],
+    [8.2, '22_v_lantern', 'Victory 8.2 s (beat 3, the lantern raised in the doorway: halo + light)'],
+    [10.2, '23_v_yeti_white', 'Victory 10.2 s (beat 4): past the skier and lantern, the Yeti coming in from the white'],
+    [11.9, '24_v_yeti_flinch', 'Victory 11.9 s (beat 5): close on the Yeti in the searchlight beam, flinching'],
+    [13.4, '24b_v_yeti_leaves', 'Victory 13.4 s (beat 5 end): turning back into the storm'],
+    [16.0, '25_v_break', 'Victory 16.0 s (beat 6): the storm breaking, the camera rising off the station'],
+    [20.5, '26_v_reveal', 'Victory 20.5 s (beat 7): settled reveal — station, ridge behind, title'],
   ];
   const onlyBeats = process.env.BEATS ? process.env.BEATS.split(',') : null;
+  // STRIP=1: the whole cinematic, one frame a second (a continuity strip, at the run's viewport)
+  if (process.env.STRIP) {
+    beats.length = 0;
+    for (let t = 0.5; t <= 23.5; t += 1) beats.push([t, `strip_${String(t.toFixed(1)).padStart(4, '0')}`, `Victory ${t.toFixed(1)} s`]);
+  }
   for (const [t, name, note] of beats) {
     await framesUntil(`(s) => s.cinematicTime >= ${t}`, 900);
     if (onlyBeats && !onlyBeats.includes(name)) continue;

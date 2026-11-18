@@ -2,6 +2,7 @@
  * Application shell: renderer, loading, menus, settings, run lifecycle, perf overlay, debug harness.
  */
 import * as THREE from 'three';
+import { weatherFx, WEATHER_FX_REDUCED } from '../world/look/weatherFx';
 import { atmosphere } from '../world/look/atmosphere';
 import { World } from './World';
 import { GameSession } from './GameSession';
@@ -97,6 +98,7 @@ export class App {
     this.hud = new Hud(this.ui, this.settings.bindings);
     this.applyUiScale();
     this.hud.reduceFlashes = this.settings.reduceFlashes;
+    weatherFx.scale = this.settings.reduceWeather ? WEATHER_FX_REDUCED : 1;
     this.hud.showFps(this.settings.showFps);
     this.menu = new MenuSystem(this.ui);
     this.initProgress();
@@ -155,6 +157,7 @@ export class App {
     this.input.settings = this.inputSettings();
     this.hud.bindings = this.settings.bindings;
     this.hud.reduceFlashes = this.settings.reduceFlashes;
+    weatherFx.scale = this.settings.reduceWeather ? WEATHER_FX_REDUCED : 1;
     this.hud.showFps(this.settings.showFps);
     this.hud.captionsOn = this.settings.captions;
     if (this.session) {
@@ -651,6 +654,8 @@ export class App {
       { kind: 'slider', label: 'Camera shake', min: 0, max: 1, step: 0.1, get: () => s.cameraShake, set: (v) => ((s.cameraShake = v), changed()), fmt: pct },
       { kind: 'toggle', label: 'Reduce camera motion', get: () => s.reduceCameraMotion, set: (v) => ((s.reduceCameraMotion = v), changed()) },
       { kind: 'toggle', label: 'Reduce flashes & pulsing', get: () => s.reduceFlashes, set: (v) => ((s.reduceFlashes = v), changed()) },
+      // (W-049) presentation only: hazards, physics and every warning are unchanged
+      { kind: 'toggle', label: 'Reduce weather effects', get: () => s.reduceWeather, set: (v) => ((s.reduceWeather = v), changed()) },
       { kind: 'slider', label: 'Interface text size', min: 0.85, max: 1.5, step: 0.05, get: () => s.uiScale, set: (v) => ((s.uiScale = v), changed()), fmt: pct },
       { kind: 'toggle', label: 'Sound captions', get: () => s.captions, set: (v) => ((s.captions = v), changed()) },
       { kind: 'toggle', label: 'Tutorial prompts', get: () => s.showTutorial, set: (v) => ((s.showTutorial = v), changed()) },
@@ -971,6 +976,8 @@ export class App {
       teleport: (z: number, speed = 18, x?: number, heading?: number) => this.session?.debugTeleport(z, speed, x, heading),
       /** (evidence captures) set the physics clock (s): the weather timeline jumps with it */
       setTime: (t: number) => this.session?.debugSetTime(t),
+      /** (evidence captures) end a cinematic's weather hand-back now (World.finishWeatherBlend) */
+      settleWeather: () => this.session?.world.finishWeatherBlend(),
       /** (evidence captures) the weather front at physics time t (Whiteout), or null */
       front: (t: number) => {
         const env = this.session?.world.environment;

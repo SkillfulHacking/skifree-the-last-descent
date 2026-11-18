@@ -11,6 +11,7 @@
  */
 import * as THREE from 'three';
 import type { QualityPreset } from '../../../../core/types';
+import { weatherFx } from '../../../look/weatherFx';
 
 export const BLOWING = {
   count: { low: 1400, medium: 3200, high: 6000, ultra: 9000 } as Record<QualityPreset, number>,
@@ -131,8 +132,13 @@ export class BlowingSnow {
     U.uTime!.value = time % 3600;
     (U.uCam!.value as THREE.Vector3).copy(cam);
     (U.uWind!.value as THREE.Vector3).set(windX, 0, windZ);
-    U.uDensity!.value = 0.08 + 0.92 * Math.min(1, storm * 1.15);
-    U.uOpacity!.value = 0.45 + 0.4 * storm;
+    // (W-039: round 1's grains read as dots) longer, thicker streaks the harder it blows; bright
+    // white against the darker, greyer storm air. Reduce Weather Effects thins them (weatherFx).
+    const fx = weatherFx.scale;
+    U.uDensity!.value = (0.08 + 0.92 * Math.min(1, storm * 1.15)) * (0.35 + 0.65 * fx);
+    U.uOpacity!.value = (0.5 + 0.45 * storm) * (0.6 + 0.4 * fx);
+    U.uStreak!.value = BLOWING.streak * (1 + 1.4 * storm) * (0.5 + 0.5 * fx);
+    U.uSize!.value = 0.035 * (1 + 0.6 * storm);
     this.mesh.visible = U.uDensity!.value > 0.02 && !this.mesh.userData.debugHidden;
   }
 

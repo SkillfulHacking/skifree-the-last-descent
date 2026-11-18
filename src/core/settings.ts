@@ -12,6 +12,8 @@ export interface Settings {
   sfxVolume: number;
   cameraShake: number; // 0..1
   reduceFlashes: boolean;
+  /** thinner snow, lighter storm fog, less blowing motion (presentation only: W-049) */
+  reduceWeather: boolean;
   reduceCameraMotion: boolean;
   invertCameraY: boolean;
   invertCameraX: boolean;
@@ -60,6 +62,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sfxVolume: 0.9,
   cameraShake: 1,
   reduceFlashes: false,
+  reduceWeather: false,
   reduceCameraMotion: false,
   invertCameraY: false,
   invertCameraX: false,
@@ -137,6 +140,7 @@ export function sanitize(s: Settings): Settings {
   s.deadzone = num(s.deadzone, d.deadzone, 0.02, 0.4);
   s.uiScale = num(s.uiScale, d.uiScale, 0.85, 1.5);
   s.reduceFlashes = bool(s.reduceFlashes, d.reduceFlashes);
+  s.reduceWeather = bool(s.reduceWeather, d.reduceWeather);
   s.reduceCameraMotion = bool(s.reduceCameraMotion, d.reduceCameraMotion);
   s.invertCameraX = bool(s.invertCameraX, d.invertCameraX);
   s.invertCameraY = bool(s.invertCameraY, d.invertCameraY);

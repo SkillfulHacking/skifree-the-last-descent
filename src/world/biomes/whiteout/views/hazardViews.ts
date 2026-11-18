@@ -8,12 +8,14 @@
  *    piste, then it blows through and thins out.
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { weatherFx, WEATHER_FX_TELEGRAPH_FLOOR } from '../../../look/weatherFx';
 import type { Mountain } from '../../../course';
 import type { HazardInstance, HazardPhaseState } from '../../../hazards/hazard';
 import { registerHazardView, type HazardView } from '../../../presentation/hazardViews';
 import { makeFlakeTexture } from '../../../Environment';
 import { ATMOSPHERE_GLSL, addAtmosphereUniforms, atmosphere } from '../../../look/atmosphere';
-import { BLIZZARD, blizzardStrength, type BlizzardParams, type DriftParams } from '../hazards';
+import { BLIZZARD, blizzardStrength, driftShape, type BlizzardParams, type DriftParams } from '../hazards';
 
 const smoothstep01 = (x: number) => {
   const k = Math.min(1, Math.max(0, x));
@@ -88,9 +90,8 @@ export function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMa
   const M = mats();
   const obj = new THREE.Group();
   obj.name = 'wind-drift';
-  const L = h.r * h.params.len;
-  const W = h.r * 0.75;
-  const H = 1.7 + 0.5 * ((h.seed % 97) / 97);
+  // the same shape the physics reads (hazards.ts driftShape / driftProfile)
+  const { L, W, H } = driftShape(h);
   const nu = 26;
   const nv = 14;
   const pos: number[] = [];
@@ -170,6 +171,19 @@ export function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMa
   plume.frustumCulled = false;
   obj.add(plume);
   const crestZ = 0.35 * W;
+  // (W-035) the row's gap is marked: an orange marker pole each side of it, on the lead mound of the
+  // row, readable in a storm well beyond the fog that hides the mounds themselves (gapMarkerMaterial)
+  const p = h.params;
+  if (p.lead && p.gapX !== undefined && p.rowZ !== undefined) {
+    for (const side of [-1, 1]) {
+      const x = p.gapX + side * ((p.gapHalf ?? 6.5) + 0.6);
+      const z = p.rowZ - 2;
+      const pole = new THREE.Mesh(gapMarkerGeometry(), gapMarkerMaterial());
+      pole.position.set(x, m.heightAt(x, z), z);
+      pole.name = 'drift-gap-marker';
+      obj.add(pole);
+    }
+  }
   return {
     object: obj,
     update(_ph: HazardPhaseState, t: number) {
@@ -195,6 +209,47 @@ export function driftView(h: HazardInstance<DriftParams>, m: Mountain, terrainMa
       pg.dispose();
     },
   };
+}
+
+let gapGeo: THREE.BufferGeometry | null = null;
+/** a 2.4 m marker pole with a flag panel near the top (shared) */
+function gapMarkerGeometry(): THREE.BufferGeometry {
+  if (gapGeo) return gapGeo;
+  const pole = new THREE.CylinderGeometry(0.07, 0.08, 2.4, 6);
+  pole.translate(0, 1.2, 0);
+  const flag = new THREE.BoxGeometry(0.06, 0.55, 0.75);
+  flag.translate(0, 2.05, 0.38);
+  const merged = mergeGeometries([pole.toNonIndexed(), flag.toNonIndexed()]);
+  pole.dispose();
+  flag.dispose();
+  gapGeo = merged ?? new THREE.BufferGeometry();
+  return gapGeo;
+}
+let gapMat: THREE.MeshBasicMaterial | null = null;
+/**
+ * Hi-vis orange that keeps 45% of its colour through the fog (a fluorescent marker against the
+ * white): in a full storm the drift rows themselves fade out at ~60 m, the markers carry ~2× as far.
+ */
+export const GAP_MARKER_FOG_KEEP = 0.45;
+function gapMarkerMaterial(): THREE.MeshBasicMaterial {
+  if (gapMat) return gapMat;
+  const m = new THREE.MeshBasicMaterial({ color: 0xff5a14 });
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace(
+      '#include <fog_fragment>',
+      `#ifdef USE_FOG
+        #ifdef FOG_EXP2
+          float fogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
+        #else
+          float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );
+        #endif
+        gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor * ${(1 - GAP_MARKER_FOG_KEEP).toFixed(2)} );
+      #endif`,
+    );
+  };
+  m.customProgramCacheKey = () => 'drift-gap-marker';
+  gapMat = m;
+  return m;
 }
 
 /** A blizzard cell: streaking flakes in a box over the piste + pale curtains, driven by the cell's phase. */
@@ -242,7 +297,8 @@ function blizzardView(h: HazardInstance<BlizzardParams>, m: Mountain): HazardVie
       const visible = ph.phase !== 'dormant' && w > 0.005;
       obj.visible = visible || ph.phase === 'telegraph';
       if (!obj.visible) return;
-      flakeMat.opacity = Math.min(0.95, 0.25 + 0.9 * Math.max(w, ph.phase === 'telegraph' ? 0.35 * ph.u : 0));
+      // (Reduce Weather Effects thins the wall, never below WEATHER_FX_TELEGRAPH_FLOOR of it: the cue stays)
+      flakeMat.opacity = Math.min(0.95, 0.25 + 0.9 * Math.max(w, ph.phase === 'telegraph' ? 0.35 * ph.u : 0)) * Math.max(WEATHER_FX_TELEGRAPH_FLOOR, weatherFx.scale);
       const speed = 16;
       for (let i = 0; i < n; i++) {
         let x = base[i * 3]! + dir * ((t * speed + i * 0.73) % (2 * R));

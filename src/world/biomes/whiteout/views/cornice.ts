@@ -167,7 +167,8 @@ let wandGeo: THREE.BufferGeometry | null = null;
 /** a bamboo-style rim wand: yellow with black bands, a small red flag */
 export function wandGeometry(): THREE.BufferGeometry {
   if (wandGeo) return wandGeo;
-  const g = new THREE.CylinderGeometry(0.03, 0.04, CORNICE.wandH, 5, 6);
+  // (W-054: round 1's 3–4 cm wands were ~1 px at 30 m) a 6–7 cm pole, as real piste-edge markers
+  const g = new THREE.CylinderGeometry(0.06, 0.07, CORNICE.wandH, 6, 6);
   g.translate(0, CORNICE.wandH / 2, 0);
   const pos = g.getAttribute('position') as THREE.BufferAttribute;
   const col: number[] = [];

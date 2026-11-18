@@ -4,6 +4,7 @@
  * shadows, soft haze. Every colour/intensity comes from the biome (src/world/biome.ts).
  */
 import * as THREE from 'three';
+import { weatherFx } from './look/weatherFx';
 import { Sky } from 'three/examples/jsm/objects/Sky.js';
 import type { QualityPreset } from '../core/types';
 import { atmosphere } from './look/atmosphere';
@@ -160,12 +161,14 @@ export class Environment {
     const pos = this.snow.geometry.getAttribute('position') as THREE.BufferAttribute;
     const arr = pos.array as Float32Array;
     const n = pos.count;
+    // Reduce Weather Effects: the snow streams sideways less (motion), W-049
+    const windMotion = 0.4 + 0.6 * weatherFx.scale;
     for (let i = 0; i < n; i++) {
       let x = arr[i * 3]!;
       let y = arr[i * 3 + 1]!;
       let z = arr[i * 3 + 2]!;
       y -= this.snowVel[i]! * dt;
-      x += (Math.sin(time * 0.7 + i) * 0.4 + windX * 0.8) * dt;
+      x += (Math.sin(time * 0.7 + i) * 0.4 + windX * 0.8 * windMotion) * dt;
       z += Math.cos(time * 0.5 + i * 1.3) * 0.3 * dt;
       // world-locked flakes, wrapped into a box around the camera (they stream past at speed)
       const cx = camPos.x, cy = camPos.y, cz = camPos.z;
@@ -221,9 +224,11 @@ export class Environment {
   /** storm (0..1) dims the sun and the sky light (Whiteout fronts); 0 leaves every light at its base */
   private applyLight() {
     const s = this.storm;
-    this.hemi.intensity = this.hemiBase * this.ambientK * (1 - 0.12 * s);
-    this.scene.environmentIntensity = this.envBase * this.ambientK * (1 - 0.3 * s);
-    this.sun.intensity = this.sunBase * this.sunK * (1 - 0.78 * s);
+    // (W-039) inside a front the light goes flat: no sun to speak of, the sky light dimmed — the
+    // whiteout's lost contrast (the trail markers and lamps stay bright: their own materials)
+    this.hemi.intensity = this.hemiBase * this.ambientK * (1 - 0.3 * s);
+    this.scene.environmentIntensity = this.envBase * this.ambientK * (1 - 0.45 * s);
+    this.sun.intensity = this.sunBase * this.sunK * (1 - 0.92 * s);
   }
 
   /** Show/hide the ambient falling snow (hidden in the dark cave shots, where it reads as stars). */

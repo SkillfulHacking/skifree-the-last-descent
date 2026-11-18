@@ -1,22 +1,22 @@
 /**
- * "whiteout-rescue" victory: from storm to shelter (full production, brief §7).
+ * "whiteout-rescue" victory: from storm to shelter (round 2, W-042 — full production treatment).
  *
- *  0.0  Into the light: the storm still rages (the finish holds the weather at full storm). Low,
- *       behind the skier through the driving snow; the hut's warm windows, the porch light, the red
- *       beacon and the sweeping searchlight the only colour ahead. The rescuers on the porch are
- *       already waving them in.
- *  3.4  Safety and welcome: from beside the porch, the skier glides up to the deck; the door swings
- *       open (3.8) and warm light spills over the snow; the rescuers wave.
- *  6.6  The storm lantern: the brass lantern lifts off its plinth into the skier's hand and is held
- *       up in the doorway (the lantern beat — RESCUE_BEATS.lantern), the rescuers cheer.
- *  9.4  The Yeti at the edge of the light: past the skier's shoulder, the lantern raised toward him;
- *       the searchlight swings onto him; he flinches from the light (disgust), raises an arm, and
- *       backs off into the white.
- * 12.8  The storm breaks: the wind drops, the snow thins and the cloud tears open over ~4 s (the
- *       cloud deck and its shadows break up, the sun comes out) while the camera rises and pulls back
- *       from the hut —
- * 16.8  — until the whole ridge the skier came down stands in low sun behind the station.
- * 19.6  Results.
+ *  0.0  Into the light: letterbox, the gameplay HUD away, the chase music hands over to the victory
+ *       theme. The storm still rages (held at full storm, as thick as the run's). Low behind the
+ *       skier through the driving snow toward the hut: the warm windows, the porch light, the red
+ *       beacon and the sweeping searchlight the only colour; the rescuers wave them in.
+ *  3.4  Safety and welcome: from the snow in front of the porch, looking at the door — the skier
+ *       glides into frame and up to the deck as the door swings open (3.8) and warm light spills out.
+ *  6.6  The storm lantern: from the storm side, low; the skier in the warm doorway lifts the brass
+ *       lantern off its plinth and holds it up (it swells: halo and light), the rescuers cheer.
+ *  9.4  Out in the white, past the skier's shoulder and the raised lantern: a shape comes in from
+ *       the storm — the Yeti (hidden until 8.8, so he is first seen here).
+ * 11.0  The searchlight swings onto him; close on his face as the light hits him — he flinches
+ *       (11.4), throws an arm up, and at 13.0 turns and lumbers back into the white.
+ * 13.6  The storm breaks over ~5 s (the fanfare): the wind drops, the snow thins, the cloud tears
+ *       open while the camera rises and pulls back over the station —
+ * 18.6  — and settles: the station in the lower third, the whole ridge the skier came down behind it
+ *       in low sun; the title (19.2) and a hold before the results (23.6).
  */
 import * as THREE from 'three';
 import { ease, pose } from '../../../../cinematic/Timeline';
@@ -26,7 +26,9 @@ import type { FinishEnvironment, VictoryDirector, VictoryScript } from '../../..
 import { TrophyHandoff } from '../../../../cinematic/victory/trophy';
 import type { RescueStation } from './rescue';
 
-export const RESCUE_BEATS = { arrive: 0, welcome: 3.4, door: 3.8, lantern: 6.6, yeti: 9.4, yetiStart: 5.2, clear: 12.8, clearEnd: 16.8, results: 19.6 } as const;
+export const RESCUE_BEATS = { arrive: 0, welcome: 3.4, door: 3.8, lantern: 6.6, yetiShow: 8.8, yeti: 9.4, light: 11.0, flinch: 11.4, leave: 13.0, clear: 13.6, clearEnd: 18.6, title: 19.2, results: 23.6 } as const;
+/** the storm the finish holds until the break (as thick as the run's full storm: storm.ts STORM_FOG) */
+export const RESCUE_STORM = { visibility: 20, snowfall: 2.6, storm: 1, windX: 10 } as const;
 
 export class RescueVictory implements VictoryScript {
   private trophy: TrophyHandoff;
@@ -52,71 +54,98 @@ export class RescueVictory implements VictoryScript {
     const sk = () => st.skier.root.position.clone();
     const tl = d.tl;
     st.yetiManual = true;
-    // the Yeti starts out in the white, up the slope beyond his stop point
+    const B = RESCUE_BEATS;
+    // the Yeti waits out in the white, hidden until his beat (round 1: visible at 5 s)
     const ya = st.yetiAI;
-    const start = this.yetiStop.clone().addScaledVector(faces, 26);
+    const start = this.yetiStop.clone().addScaledVector(faces, 38);
     ya.pos.set(start.x, st.world.mountain.heightAt(start.x, start.z), start.z);
+    st.yeti.root.visible = false;
     // the storm holds at full strength until the break
-    st.world.weatherOverride = { visibility: 9, snowfall: 2.6, storm: 1, windX: 10 };
+    st.world.weatherOverride = { ...RESCUE_STORM };
+
+    tl.at(0, () => {
+      // (W-042) the cinematic frame: letterbox, gameplay HUD away, the victory theme
+      st.hud.gameplayWidgets(false);
+      st.hud.letterbox(true);
+      st.audio.setMusicMode('victory');
+    });
 
     // 1) into the light: low, behind and beside the skier, looking at the door
     tl.shot({
       start: 0,
-      end: RESCUE_BEATS.welcome,
+      end: B.welcome,
       from: () => pose(sk().addScaledVector(faces, 9).addScaledVector(across, 2.5).add(new THREE.Vector3(0, 1.6, 0)), door.clone().add(new THREE.Vector3(0, 1.6, 0)), 50),
       to: () => pose(sk().addScaledVector(faces, 6.5).addScaledVector(across, 2.0).add(new THREE.Vector3(0, 1.5, 0)), door.clone().add(new THREE.Vector3(0, 1.8, 0)), 46),
       easing: ease.inOut,
       handheld: 0.02,
     });
     tl.at(0.8, () => (S.welcome = 1));
-    // 2) safety and welcome: from beside the porch, the skier arriving, the door swinging open
+    // 2) safety and welcome: from the snow in front of the porch, looking at the door (it opens in
+    //    frame), the skier gliding in from the slope side
+    tl.shot({
+      start: B.welcome,
+      end: B.lantern,
+      from: () => pose(door.clone().addScaledVector(faces, 7.5).addScaledVector(across, -3.2).add(new THREE.Vector3(0, 1.7, 0)), door.clone().addScaledVector(faces, 1.2).add(new THREE.Vector3(0, 1.5, 0)), 50),
+      to: () => pose(door.clone().addScaledVector(faces, 6.6).addScaledVector(across, -2.6).add(new THREE.Vector3(0, 1.6, 0)), door.clone().addScaledVector(faces, 1.0).add(new THREE.Vector3(0, 1.45, 0)), 46),
+      easing: ease.inOut,
+    });
+    // 3) the lantern: from the storm side, low; the skier in the warm doorway, the lantern lifted
     const toHut = () => door.clone().sub(sk()).setY(0).normalize();
     const side = () => new THREE.Vector3(toHut().z, 0, -toHut().x);
     tl.shot({
-      start: RESCUE_BEATS.welcome,
-      end: RESCUE_BEATS.lantern,
-      from: () => pose(door.clone().addScaledVector(faces, 3.2).addScaledVector(across, 5.4).add(new THREE.Vector3(0, 1.5, 0)), sk().lerp(door, 0.5).add(new THREE.Vector3(0, 1.4, 0)), 48),
-      to: () => pose(door.clone().addScaledVector(faces, 3.6).addScaledVector(across, 4.6).add(new THREE.Vector3(0, 1.45, 0)), sk().lerp(door, 0.6).add(new THREE.Vector3(0, 1.45, 0)), 44),
-      easing: ease.inOut,
-    });
-    // 3) the lantern: from the storm side, low; the skier in front of the warm doorway, the lantern lifted
-    tl.shot({
-      start: RESCUE_BEATS.lantern,
-      end: RESCUE_BEATS.yeti,
+      start: B.lantern,
+      end: B.yeti,
       from: () => pose(sk().addScaledVector(toHut(), -3.9).addScaledVector(side(), 1.6).add(new THREE.Vector3(0, 1.35, 0)), sk().addScaledVector(toHut(), 1.0).add(new THREE.Vector3(0, 1.75, 0)), 40),
       to: () => pose(sk().addScaledVector(toHut(), -3.1).addScaledVector(side(), 1.2).add(new THREE.Vector3(0, 1.3, 0)), sk().addScaledVector(toHut(), 0.6).add(new THREE.Vector3(0, 1.95, 0)), 36),
       easing: ease.inOut,
     });
-    tl.at(RESCUE_BEATS.lantern, () => this.trophy.start());
-    tl.at(RESCUE_BEATS.lantern + 1.0, () => (S.cheer = 1));
-    // 4) the Yeti at the edge of the light, past the skier's shoulder and the raised lantern…
+    tl.at(B.lantern, () => this.trophy.start());
+    tl.at(B.lantern + 1.0, () => (S.cheer = 1));
+    tl.at(B.yetiShow, () => (st.yeti.root.visible = true));
+    // 4) a shape in the white, past the skier's shoulder and the raised lantern
     tl.shot({
-      start: RESCUE_BEATS.yeti,
-      end: RESCUE_BEATS.yeti + 1.9,
+      start: B.yeti,
+      end: B.light,
       from: () => pose(sk().addScaledVector(toHut(), 1.6).addScaledVector(side(), -0.9).add(new THREE.Vector3(0, 2.0, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.0, 0)), 34),
       to: () => pose(sk().addScaledVector(toHut(), 1.4).addScaledVector(side(), -0.8).add(new THREE.Vector3(0, 1.95, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.0, 0)), 28),
       handheld: 0.015,
     });
-    tl.at(RESCUE_BEATS.yeti, () => (S.searchTarget = st.yetiAI.pos.clone().add(new THREE.Vector3(0, 1.6, 0))));
-    // …and close on him as the light hits him: he flinches and backs into the storm
+    // 5) the searchlight swings onto him; close on his face (from the station side) as it hits
+    tl.at(B.light - 0.6, () => (S.searchTarget = this.yetiStop.clone().add(new THREE.Vector3(0, 1.8, 0))));
     const toDoor = () => door.clone().sub(st.yetiAI.pos).setY(0).normalize();
     tl.shot({
-      start: RESCUE_BEATS.yeti + 1.9,
-      end: RESCUE_BEATS.clear,
-      from: () => pose(st.yetiAI.pos.clone().addScaledVector(toDoor(), 7).add(new THREE.Vector3(0, 1.7, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.3, 0)), 36),
-      to: () => pose(st.yetiAI.pos.clone().addScaledVector(toDoor(), 6).add(new THREE.Vector3(0, 1.6, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.3, 0)), 32),
+      start: B.light,
+      end: B.clear,
+      from: () => pose(this.yetiStop.clone().addScaledVector(toDoor(), 7).add(new THREE.Vector3(0, 1.8, 0)), this.yetiStop.clone().add(new THREE.Vector3(0, 2.4, 0)), 36),
+      to: () => pose(this.yetiStop.clone().addScaledVector(toDoor(), 5.8).add(new THREE.Vector3(0, 1.7, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.3, 0)), 32),
       handheld: 0.02,
     });
-    // 5–6) the storm breaks: rise and pull back from the hut until the ridge stands behind it
-    const back = () => S.hut.clone().addScaledVector(faces, -1);
+    // 6) the storm breaks (fanfare): rise and pull back over the station…
+    tl.at(B.clear + 0.4, () => {
+      st.audio.playVictoryFanfare();
+      st.audio.playCrowdCheer(0.8);
+    });
+    // …and settle: the station in the lower third, the ridge the skier came down behind it in sun
+    const endPos = () => S.hut.clone().addScaledVector(faces, -48).addScaledVector(across, 22).add(new THREE.Vector3(0, 16, 0));
+    const endLook = () => S.hut.clone().addScaledVector(faces, 150).add(new THREE.Vector3(0, 6, 0));
     tl.shot({
-      start: RESCUE_BEATS.clear,
-      end: RESCUE_BEATS.results,
-      from: () => pose(back().addScaledVector(faces, -14).addScaledVector(across, 6).add(new THREE.Vector3(0, 4, 0)), S.hut.clone().addScaledVector(faces, 30).add(new THREE.Vector3(0, 10, 0)), 50),
-      to: () => pose(back().addScaledVector(faces, -60).addScaledVector(across, 26).add(new THREE.Vector3(0, 38, 0)), S.hut.clone().addScaledVector(faces, 320).add(new THREE.Vector3(0, 150, 0)), 54),
+      start: B.clear,
+      end: B.clearEnd,
+      from: () => pose(S.hut.clone().addScaledVector(faces, 16).addScaledVector(across, 7).add(new THREE.Vector3(0, 3.5, 0)), S.hut.clone().add(new THREE.Vector3(0, 2.5, 0)), 50),
+      to: () => pose(endPos(), endLook(), 54),
       easing: ease.inOut,
     });
-    tl.at(RESCUE_BEATS.results, () => d.results());
+    tl.shot({
+      start: B.clearEnd,
+      end: B.results + 0.2,
+      from: () => pose(endPos(), endLook(), 54),
+      to: () => pose(endPos().addScaledVector(across, 3).add(new THREE.Vector3(0, 1.2, 0)), endLook(), 53),
+    });
+    tl.at(B.title, () => st.hud.title('RESCUED', 'Whiteout Ridge — through the storm to the rescue station', 'victory scrim', B.results - B.title + 0.4));
+    tl.at(B.results, () => {
+      st.hud.letterbox(false);
+      d.results();
+    });
   }
 
   update(dt: number): void {
@@ -124,54 +153,65 @@ export class RescueVictory implements VictoryScript {
     const t = this.t;
     const st = this.st;
     const d = this.d;
+    const B = RESCUE_BEATS;
     d.autopilot = 1;
-    // the storm: full until the break, then it clears over 4 s (the sun comes out over the ridge)
-    const k = THREE.MathUtils.smoothstep(t, RESCUE_BEATS.clear, RESCUE_BEATS.clearEnd);
+    // the storm: full until the break, then it clears over 5 s (the sun comes out over the ridge)
+    const k = THREE.MathUtils.smoothstep(t, B.clear, B.clearEnd);
     const wo = st.world.weatherOverride;
     if (wo) {
       wo.storm = 1 - k;
-      wo.visibility = 9 * (1 - k) + 1 * k;
-      wo.snowfall = 2.6 * (1 - k) + 0.15 * k;
-      wo.windX = 10 * (1 - k) + 1 * k;
+      wo.visibility = RESCUE_STORM.visibility * (1 - k) + 1 * k;
+      wo.snowfall = RESCUE_STORM.snowfall * (1 - k) + 0.15 * k;
+      wo.windX = RESCUE_STORM.windX * (1 - k) + 1 * k;
     }
-    this.station.doorOpen = THREE.MathUtils.smoothstep(t, RESCUE_BEATS.door, RESCUE_BEATS.door + 0.9);
+    this.station.doorOpen = THREE.MathUtils.smoothstep(t, B.door, B.door + 0.9);
+    // the lantern swells as it is raised (and stays up)
+    this.station.lanternUp = THREE.MathUtils.smoothstep(t, B.lantern + 0.6, B.lantern + 1.8);
     this.trophy.update(dt);
-    // the Yeti: approach his stop at the edge of the light, flinch, back off into the white
+    // the Yeti: out of sight until his beat; walks in to the edge of the light, flinches when the
+    // searchlight hits him, then turns and lumbers back into the white
     const ya = st.yetiAI;
     const m = st.world.mountain;
     this.yetiT += dt;
-    if (t < RESCUE_BEATS.yetiStart) {
-      // waiting out in the white, unseen
+    if (t < B.yetiShow) {
       st.yetiAnim.speed = 0;
       st.setYetiMode('walk');
     } else if (this.yetiState === 'approach') {
       const to = this.yetiStop.clone().sub(ya.pos).setY(0);
       const dist = to.length();
-      if (dist < 0.6 || t > RESCUE_BEATS.yeti + 1.6) {
+      if (t >= B.flinch) {
         this.yetiState = 'flinch';
         this.yetiT = 0;
         st.setYetiMode('disgust');
         st.audio.playYetiGrowl(ya.pos, false);
-      } else {
+      } else if (dist > 0.4) {
         to.normalize();
-        const v = Math.min(dist, 5.5 * dt);
-        st.yetiAnim.speed = 5.5;
+        // reach the stop just before the light hits him
+        const v = Math.min(dist, Math.max(2.5, dist / Math.max(0.3, B.flinch - 0.3 - t)) * dt);
+        st.yetiAnim.speed = 5;
         ya.pos.addScaledVector(to, v);
         ya.heading = damp(ya.heading, ya.heading + wrapAngle(Math.atan2(to.x, to.z) - ya.heading), 8, dt);
         st.setYetiMode('walk');
+      } else {
+        st.yetiAnim.speed = 0;
+        const face = this.station.door.clone().sub(ya.pos).setY(0);
+        ya.heading = damp(ya.heading, ya.heading + wrapAngle(Math.atan2(face.x, face.z) - ya.heading), 6, dt);
       }
     } else if (this.yetiState === 'flinch') {
       st.yetiAnim.speed = 0;
-      if (this.yetiT > 1.2) {
+      if (t >= B.leave) {
         this.yetiState = 'leave';
         this.yetiT = 0;
+        this.station.searchTarget = null;
       }
     } else {
       const away = ya.pos.clone().sub(this.station.door).setY(0).normalize();
-      ya.pos.addScaledVector(away, 2.2 * dt);
-      st.yetiAnim.speed = 2.2;
+      ya.pos.addScaledVector(away, 2.6 * dt);
+      st.yetiAnim.speed = 2.6;
       ya.heading = damp(ya.heading, ya.heading + wrapAngle(Math.atan2(away.x, away.z) - ya.heading), 4, dt);
       st.setYetiMode('turnAway');
+      // gone into the white (and out of the reveal)
+      if (this.yetiT > 4) st.yeti.root.visible = false;
     }
     ya.pos.y = m.heightAt(ya.pos.x, ya.pos.z);
     st.yeti.root.position.copy(ya.pos);

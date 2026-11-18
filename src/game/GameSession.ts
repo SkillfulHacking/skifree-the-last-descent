@@ -177,6 +177,9 @@ export class GameSession implements Stage {
     this.world.tracks.clear();
     this.world.particles.clear();
     this.world.yetiPrints.clear();
+    // (a finish cinematic may have hidden the Yeti — Whiteout's rescue keeps him out of sight until
+    // his beat): every run starts with him visible
+    this.yeti.root.visible = true;
     this.hud.reset();
     this.audio.setMusicMode('explore');
     this.follow.snap(this.followTarget());
@@ -811,9 +814,14 @@ export class GameSession implements Stage {
           const text = P.gate ? '[a squall builds off the sea — take the lee of the rocks, or the notch in the lull]' : (P.slip ?? 0) > 0 ? '[a squall builds off the sea — it will push you left]' : '[a squall gusts across the jump ahead]';
           this.envCaption(text, 2.4, `squall:${e.hazard.id}`, CAPTION_PRIORITY.warning);
         }
-        if (e.type === 'hazard-telegraph' && e.kind === 'blizzard') {
+        // every blizzard cell gets its warning once: when it builds ahead, or — a cell already blowing
+        // when it comes into range — when it is first seen (W-046: round 1 left those uncaptioned)
+        if ((e.type === 'hazard-telegraph' || e.type === 'hazard-active') && e.kind === 'blizzard' && !this.blizzardWarned.has(e.hazard.id)) {
+          this.blizzardWarned.add(e.hazard.id);
+          if (this.blizzardWarned.size > 64) this.blizzardWarned.delete(this.blizzardWarned.values().next().value!);
           const dir = (e.hazard.params as { dir?: number }).dir ?? 1;
-          this.envCaption(`[a blizzard sweeps across the piste ahead — stand up out of the tuck; it will push you ${dir > 0 ? 'left' : 'right'}]`, 2.8, `blizzard:${e.hazard.id}`, CAPTION_PRIORITY.warning);
+          const what = e.type === 'hazard-telegraph' ? 'a blizzard builds ahead' : 'a blizzard is blowing across the piste ahead';
+          this.envCaption(`[${what} — stand up out of the tuck; it pushes you ${dir > 0 ? 'left' : 'right'}]`, 2.8, `blizzard:${e.hazard.id}`, CAPTION_PRIORITY.warning, 3.5);
         }
         if (e.type === 'hazard-hit' && e.kind === 'blizzard') this.envCaption('[a gust catches you in the tuck — you stagger]', 2, 'blizzard-hit', CAPTION_PRIORITY.report);
       } else if (e.type === 'hazard-enter' && e.kind === 'wind-drift') {
@@ -829,6 +837,8 @@ export class GameSession implements Stage {
   }
 
   private pendingSurfCaption = false;
+  /** blizzard cells already warned about this run (one warning per cell) */
+  private blizzardWarned = new Set<number>();
   /** last time each kind of location caption was shown (separate throttles: round 2, E3) */
   private envCaptionAt = new Map<string, number>();
   /**
@@ -836,10 +846,11 @@ export class GameSession implements Stage {
    * warning that asks for a decision (a squall ahead) replaces a report (rock under the skis) that is
    * still on screen; each kind at most once every 3 s, so one kind never mutes another.
    */
-  private envCaption(text: string, seconds: number, kind: string, priority: number = CAPTION_PRIORITY.report) {
+  private envCaption(text: string, seconds: number, kind: string, priority: number = CAPTION_PRIORITY.report, ttl = 4) {
     const t = this.phys.s.time;
     if (t - (this.envCaptionAt.get(kind) ?? -Infinity) < 3) return;
-    if (this.hud.caption(text, seconds, { soft: true, priority })) this.envCaptionAt.set(kind, t);
+    // warnings wait for the caption line (Hud queue) for up to `ttl` s; reports are dropped if busy
+    if (this.hud.caption(text, seconds, { soft: true, priority, queue: priority >= CAPTION_PRIORITY.warning, ttl })) this.envCaptionAt.set(kind, t);
   }
 
   /** Optional viewpoints on a coast's rim: reaching one reports ScenicLocationDiscovered once per run. */
@@ -1178,8 +1189,12 @@ export class GameSession implements Stage {
     else this.hud.setWeather(null);
     if (f.phase !== this.lastFront.phase) {
       if (f.phase === 'build') {
-        this.audio.playCue('blizzard-build', null);
-        this.envCaption(`[a storm front rolls in — the wind will push you ${side} on the open hard pack; take the sheltered line or check your speed]`, 3.2, 'front', CAPTION_PRIORITY.warning);
+        // (W-048) heard from upwind: the front rolls in from the side it will blow from
+        const sp = this.phys.s.pos;
+        this.audio.playCue('blizzard-build', new THREE.Vector3(sp.x - f.dir * 60, sp.y + 8, sp.z + 20));
+        // (W-047: short enough to read at 15 characters a second while the front builds; the lee is the
+        // side the wind pushes you toward: storm.ts LEE)
+        this.envCaption(`[a storm front rolls in — the wind pushes you ${side}; the ${side} shoulder is the lee]`, 3.2, 'front', CAPTION_PRIORITY.warning, 6);
       } else if (f.phase === 'ease') this.envCaption('[the storm eases — the view opens up]', 2.2, 'front', CAPTION_PRIORITY.report);
       this.lastFront.phase = f.phase;
     }
@@ -1231,8 +1246,28 @@ export class GameSession implements Stage {
       crowdLevel: this.world.resort ? smoothstep(this.world.mountain.finishZ - 400, this.world.mountain.finishZ, s.pos.z) : 0,
       eerie: this.run.phase === 'caveCinematic' ? 1 : this.eerie,
       coast: this.coastLevel(),
+      weather: this.weatherAudio(),
     };
     this.audio.update(dt, st);
+  }
+
+  /**
+   * The storm for the wind bed (W-048): the front's strength, the shelter where the skier is, and
+   * where the wind comes from relative to the camera (it blows toward +X when dir = +1).
+   */
+  private weatherAudio(): AudioFrameState['weather'] {
+    const env = this.world.environment;
+    const f = capabilitiesOf(this.world.biome).weather.front?.(env.clock, env.seed) ?? null;
+    if (!f) return undefined;
+    const fwd = this.camera.getWorldDirection(this.vFwd);
+    // the listener's right (Web Audio pan +1) is forward × up = (−fwd.z, 0, fwd.x); the wind comes
+    // from −dir·X
+    const rx = -fwd.z;
+    const rz = fwd.x;
+    const len = Math.hypot(rx, rz) || 1;
+    const pan = (-f.dir * rx) / len;
+    void rz;
+    return { storm: this.run.simulating || this.victory ? f.s : 0, exposure: env.lastExposure ?? 1, pan };
   }
 
   /** 0..1 closeness to the sea for the surf/gull beds (coastal locations) */

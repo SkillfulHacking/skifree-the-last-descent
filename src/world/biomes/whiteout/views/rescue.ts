@@ -196,6 +196,11 @@ export class RescueStation implements FinishEnvironment {
   cheer = 0;
   /** where the searchlight points (world); null: it sweeps the slope */
   searchTarget: THREE.Vector3 | null = null;
+  /** 0..1 the lantern raised (the lantern beat): its glow and light swell (W-042) */
+  lanternUp = 0;
+  private aimCur: THREE.Vector3 | null = null;
+  private flame: THREE.PointLight | null = null;
+  private halo: THREE.Sprite | null = null;
 
   constructor(ctx: FinishBuildContext) {
     const H = ctx.heightAt;
@@ -520,6 +525,31 @@ export class RescueStation implements FinishEnvironment {
     const flame = new THREE.PointLight(0xffa850, 4, 7, 1.8);
     flame.position.set(0, 0.25, 0);
     lantern.add(flame);
+    this.flame = flame;
+    // (W-042) a warm halo round the glass — the lantern reads as a light, not a brass object, in the
+    // storm and at gameplay resolution
+    const haloC = document.createElement('canvas');
+    haloC.width = haloC.height = 64;
+    const hg = haloC.getContext('2d');
+    if (hg) {
+      const grad = hg.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0, 'rgba(255,214,150,1)');
+      grad.addColorStop(0.25, 'rgba(255,170,80,0.55)');
+      grad.addColorStop(1, 'rgba(255,140,40,0)');
+      hg.fillStyle = grad;
+      hg.fillRect(0, 0, 64, 64);
+    }
+    const haloT = new THREE.CanvasTexture(haloC);
+    haloT.colorSpace = THREE.SRGBColorSpace;
+    this.disposables.push(haloT);
+    const haloM = new THREE.SpriteMaterial({ map: haloT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, opacity: 0.55 });
+    this.disposables.push(haloM);
+    const halo = new THREE.Sprite(haloM);
+    halo.position.set(0, 0.26, 0);
+    halo.scale.setScalar(0.9);
+    halo.renderOrder = 9;
+    lantern.add(halo);
+    this.halo = halo;
     tro.add(lantern);
     const plinth = new THREE.Group();
     add(new THREE.BoxGeometry(0.6, 1.1, 0.6), stone, 0, -0.55, 0, plinth);
@@ -596,8 +626,21 @@ export class RescueStation implements FinishEnvironment {
       ? this.searchTarget.clone()
       : this.door.clone().addScaledVector(this.faces, 42 + 10 * Math.sin(time * 0.31)).add(new THREE.Vector3(this.faces.z, 0, -this.faces.x).multiplyScalar(18 * Math.sin(time * 0.45)));
     if (!this.searchTarget) aim.y = this.door.y;
-    P.lookAt(aim);
-    (this.beam.material as THREE.ShaderMaterial).uniforms.uK!.value = 0.1;
+    // (W-042) the light swings onto a target (≈ 0.6 s), it does not snap; on a target the beam is
+    // bright in the driving snow, so the beat reads
+    if (!this.aimCur) this.aimCur = aim.clone();
+    else this.aimCur.lerp(aim, 1 - Math.exp(-(this.searchTarget ? 4.5 : 8) * Math.max(0, dt)));
+    P.lookAt(this.aimCur);
+    const uK = (this.beam.material as THREE.ShaderMaterial).uniforms.uK!;
+    uK.value += ((this.searchTarget ? 0.42 : 0.12) - uK.value) * (1 - Math.exp(-3 * Math.max(0, dt)));
+    this.search.intensity = this.searchTarget ? 420 : 220;
+    // the lantern swells as it is raised
+    if (this.flame) this.flame.intensity = 4 + 14 * this.lanternUp;
+    if (this.flame) this.flame.distance = 7 + 9 * this.lanternUp;
+    if (this.halo) {
+      this.halo.scale.setScalar(0.9 + 1.3 * this.lanternUp + 0.08 * Math.sin(time * 11));
+      (this.halo.material as THREE.SpriteMaterial).opacity = 0.55 + 0.4 * this.lanternUp;
+    }
     void pos;
     const p = (this.smoke.geometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
     for (let i = 0; i < 48; i++) {

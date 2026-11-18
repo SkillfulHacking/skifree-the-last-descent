@@ -188,7 +188,7 @@ export class Ambience {
   }
 
   private applyParams(s: AudioFrameState, now: number): void {
-    const w = windTargets(s.speed, s.eerie, gustValue(this.time));
+    const w = windTargets(s.speed, s.eerie, gustValue(this.time), s.weather);
     target(this.windLowG.gain, w.lowGain * this.windGain, now, 0.25);
     target(this.windLowF.frequency, w.lowFreq * this.windPitch, now, 0.25);
     target(this.windHiG.gain, w.whistleGain * this.windGain, now, 0.3);

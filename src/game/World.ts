@@ -17,6 +17,7 @@
  * focus), so GPU float32 maths always works with small numbers — no jitter 50 km down the hill.
  */
 import type { ExtraCollider } from '../physics/SkierPhysics';
+import { weatherFx, WEATHER_FX_FOG_KEEP } from '../world/look/weatherFx';
 import * as THREE from 'three';
 import type { QualityPreset } from '../core/types';
 import type { Encounter, Mountain } from '../world/course';
@@ -433,6 +434,10 @@ export class World {
     this.weatherFade = { from: { ...wo }, left: seconds, dur: seconds };
   }
   private weatherFade: { from: { visibility: number; snowfall: number; storm: number; windX: number }; left: number; dur: number } | null = null;
+  /** (debug/evidence) end a weather hand-back now, so a capture after a clock jump shows the live weather */
+  finishWeatherBlend() {
+    this.weatherFade = null;
+  }
 
   resetTrophy() {
     this.weatherOverride = null;
@@ -596,7 +601,14 @@ export class World {
       w.windX += (F.from.windX - w.windX) * e;
       if (F.left <= 0) this.weatherFade = null;
     }
-    this.env.applyWeather(this.weather.visibility * (wo ? 1 : env.hazardVisibility(focus.x, focus.z, env.clock)), this.weather.snowfall, this.weather.storm ?? 0);
+    let vis = this.weather.visibility * (wo ? 1 : env.hazardVisibility(focus.x, focus.z, env.clock));
+    let snowfall = this.weather.snowfall;
+    if (weatherFx.scale < 1) {
+      // Reduce Weather Effects: only the storm's excess over clear air is thinned (presentation)
+      vis = vis > 1 ? 1 + (vis - 1) * WEATHER_FX_FOG_KEEP : vis;
+      snowfall *= 0.3 + 0.7 * weatherFx.scale;
+    }
+    this.env.applyWeather(vis, snowfall, this.weather.storm ?? 0);
     this.env.update(dt, focus, camPos, time, this.weather.windX);
     this.hazardViews.update(dt, focus.z);
     this.scenery?.update(dt, time, { focus, camPos, origin: this.origin, storm: this.weather.storm ?? 0, clock: env.clock, weatherSeed: env.seed, windX: this.weather.windX, windZ: this.weather.windZ, override: !!wo, blend: blending });
