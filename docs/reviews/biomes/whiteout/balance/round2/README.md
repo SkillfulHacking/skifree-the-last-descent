@@ -1,6 +1,6 @@
 # Round 2 — weather-reading skill (W-035, W-037, W-045, W-051)
 
-**Build:** `pass5-whiteout` through `ad77fde` + rim change `see git log` (same physics as the round-2 candidate). Raw rows, one JSON object per run with the exact `courseId`, are in this folder (`whiteout_*`, `compare_*`).
+**Build:** `pass5-whiteout` at `0de65b7` (driver `ad77fde`, ridge rim change included; every later commit is presentation only). Raw rows, one JSON object per run with the exact `courseId`, are in this folder (`whiteout_*`, `compare_*`).
 
 **Seeds.**
 - **Tuning:** `W034-01..24` (Sprint) and `W034-01..12` (Standard), the round-1 set used while tuning.
