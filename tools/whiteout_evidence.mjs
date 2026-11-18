@@ -93,6 +93,12 @@ async function startRun(difficulty) {
   await ev(() => window.__skifree.startRun(true));
   await settle(2500);
   await ev(() => window.__skifree.hold(true));
+  // seed verification (W-032): the course the world actually built must be the requested one
+  const built = await ev(() => ({ world: window.__skifree.world().id, course: window.__skifree.currentCourse() }));
+  const ok = built.world === manifest.courseId && built.course.mode === 'custom' && built.course.difficulty === difficulty && built.course.biome === 'whiteout' && /@WHITE/.test(built.world);
+  (manifest.runs ??= []).push({ difficulty, requestedSeed: seed, courseId: manifest.courseId, builtWorldId: built.world, seed: built.course.seed, verified: ok });
+  if (!ok) throw new Error(`course verification failed: requested ${seed}/${difficulty} → ${JSON.stringify(built)}`);
+  log('course verified', built.world, difficulty);
 }
 const G = await (async () => {
   await startRun('normal');
