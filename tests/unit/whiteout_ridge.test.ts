@@ -45,7 +45,9 @@ describe('Whiteout ridge terrain', () => {
     let broken = 0;
     for (const s of S) {
       expect(Math.abs(s.y - m.heightAt(s.x, s.z))).toBeLessThan(1e-6);
-      expect(Math.abs(s.x - m.routeX(s.z))).toBeGreaterThan(m.profile.halfWidth(s.z));
+      // (off the piste: the piste is centred on centerX — round 2 brought the rim to 10 m beyond its edge,
+      // so the racing line, which wanders across the piste, can come closer than a half-width)
+      expect(Math.abs(s.x - m.profile.centerX(s.z))).toBeGreaterThan(m.profile.halfWidth(s.z));
       if (s.k < 0.05) broken++;
     }
     expect(broken).toBeGreaterThan(10);

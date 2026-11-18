@@ -126,7 +126,9 @@ export function makeWhiteoutBiome(): Biome {
       // and the flank falls ~520 m into the valley; on the left a broken rocky crest (35–75 m) with
       // the ground falling away behind it — sky and storms on both sides. The caves are cut into
       // the crest side.
-      ridge: { dropSide: 1, rim: 26, lip: 3.5, depth: 520, flank: 680, crest: 75, crestE: 150, backDrop: 380 },
+      // (round 2, W-041) the rim 10 m off the piste (was 26) behind a low 1.5 m lip (was 3.5): where the line
+      // runs on the drop side the fall-away is in the gameplay camera's view, not hidden by a bank
+      ridge: { dropSide: 1, rim: 10, lip: 1.5, depth: 520, flank: 680, crest: 75, crestE: 150, backDrop: 380 },
       caveSide: -1,
       wallHeight: 130,
       wallRelief: 95,
