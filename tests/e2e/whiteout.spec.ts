@@ -151,6 +151,13 @@ test('storm cave encounter plays through to the chase; the storm look leaves the
   // manual control of him, so only the session's lifecycle can put it back
   const after = (await sess(page)).yetiLook;
   expect(after, 'Yeti look in the victory').toEqual({ shade: 1, eyeGlow: 0 });
+  // the run reports its location and its finish; a debug-driven run (teleports) never persists, so the
+  // saved records are untouched by the test (the tracker's persist policy)
+  const p = await api(page, (w) => w.progress());
+  expect(p.events).toContain('BiomeVisited');
+  expect(p.events).toContain('RunFinished');
+  expect(p.persisting).toBe(false);
+  expect(p.saved.stats.sets.biomesVisited ?? []).not.toContain('whiteout');
   // (round 2) the rescue keeps the Yeti out of sight until his beat; the next run must not inherit
   // that, nor show him before his chase (Gitar, PR #9: an earlier fix forced him visible at run start)
   await api(page, (w) => w.startRun(true));
@@ -160,12 +167,5 @@ test('storm cave encounter plays through to the chase; the storm look leaves the
   await api(page, (w) => w.toChase());
   await frames(page, 60);
   expect((await sess(page)).yetiVisible, 'Yeti visible in the chase on the next run').toBe(true);
-  // the run reports its location and its finish; a debug-driven run (teleports) never persists, so the
-  // saved records are untouched by the test (the tracker's persist policy)
-  const p = await api(page, (w) => w.progress());
-  expect(p.events).toContain('BiomeVisited');
-  expect(p.events).toContain('RunFinished');
-  expect(p.persisting).toBe(false);
-  expect(p.saved.stats.sets.biomesVisited ?? []).not.toContain('whiteout');
   expect(errors).toEqual([]);
 });
