@@ -9,7 +9,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 type Front = { s: number; dir: number; phase: 'clear' | 'build' | 'storm' | 'ease'; left: number; k: number };
-type Sess = { phase: string; outcome: string | null; z: number; time: number; snowballMarker: boolean; cinematicTime: number; finishZ: number; yetiDistance: number; crashes: number; yetiLook: { shade: number; eyeGlow: number } };
+type Sess = { phase: string; outcome: string | null; z: number; time: number; snowballMarker: boolean; cinematicTime: number; finishZ: number; yetiDistance: number; crashes: number; yetiLook: { shade: number; eyeGlow: number }; yetiVisible: boolean };
 type W = {
   __ready?: boolean;
   __skifree: {
@@ -21,6 +21,7 @@ type W = {
     front(t: number): Front | null;
     weatherHud(): { pill: string | null; caption: string | null };
     toCave(): void;
+    toChase(): void;
     seenCave(v: boolean): void;
     autopilot(style: string | null): void;
     placeYeti(gap: number): void;
@@ -150,6 +151,15 @@ test('storm cave encounter plays through to the chase; the storm look leaves the
   // manual control of him, so only the session's lifecycle can put it back
   const after = (await sess(page)).yetiLook;
   expect(after, 'Yeti look in the victory').toEqual({ shade: 1, eyeGlow: 0 });
+  // (round 2) the rescue keeps the Yeti out of sight until his beat; the next run must not inherit
+  // that, nor show him before his chase (Gitar, PR #9: an earlier fix forced him visible at run start)
+  await api(page, (w) => w.startRun(true));
+  await frames(page, 30);
+  expect((await sess(page)).phase).not.toBe('chase');
+  expect((await sess(page)).yetiVisible, 'Yeti hidden before the chase on the next run').toBe(false);
+  await api(page, (w) => w.toChase());
+  await frames(page, 60);
+  expect((await sess(page)).yetiVisible, 'Yeti visible in the chase on the next run').toBe(true);
   // the run reports its location and its finish; a debug-driven run (teleports) never persists, so the
   // saved records are untouched by the test (the tracker's persist policy)
   const p = await api(page, (w) => w.progress());

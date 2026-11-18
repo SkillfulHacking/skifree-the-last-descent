@@ -17,7 +17,7 @@
  */
 import { clamp, smoothstep } from '../../../core/rng';
 import { registerHazardKind, type HazardEffect, type HazardKind, type HazardSpot } from '../../hazards/hazard';
-import { whiteoutExposure } from './storm';
+import { skiableAcross, whiteoutExposure } from './storm';
 
 export const DRIFT = {
   /**
@@ -151,6 +151,13 @@ export const WIND_DRIFT: HazardKind<DriftParams> = {
       const side = rx - cx > 0 ? -1 : 1;
       gapX = clamp(rx + side * ctx.rng.range(16, 22), cx - hw + 8, cx + hw - 8);
       if (Math.abs(gapX - rx) < 12) gapX = rx + side * 12;
+      // (round 2) the way over to the gap and through it must be smooth snow (no terrain step on the
+      // line into it — B F8): checked across at the row and on the approach, and along the gap
+      const ok = (x: number) => [z, z - 30, z - 60].every((zz) => skiableAcross(m, m.routeX(zz), x, zz)) && skiableAcross(m, x, x, z - 20, 40);
+      if (!ok(gapX)) {
+        const other = clamp(rx - side * Math.abs(gapX - rx), cx - hw + 8, cx + hw - 8);
+        gapX = Math.abs(other - rx) >= 12 && ok(other) ? other : rx;
+      }
     }
     const gapHalf = DRIFT.gapHalf;
     // mounds of r 6–9 m along the row, skipping the gap: the whole drawn mound (len × r each way)

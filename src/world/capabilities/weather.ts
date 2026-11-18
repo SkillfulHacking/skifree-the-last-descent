@@ -91,6 +91,8 @@ export interface WeatherFront {
 /** what an exposure model may read from the course (a Mountain satisfies it) */
 export interface ExposureQuery {
   routeX(z: number): number;
+  /** terrain height (a Mountain has it; optional so light test doubles need not) */
+  heightAt?(x: number, z: number): number;
   centerX?(z: number): number;
   halfWidth(z: number): number;
   altLane(x: number, z: number): number;

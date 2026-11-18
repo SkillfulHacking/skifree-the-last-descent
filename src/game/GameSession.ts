@@ -177,9 +177,6 @@ export class GameSession implements Stage {
     this.world.tracks.clear();
     this.world.particles.clear();
     this.world.yetiPrints.clear();
-    // (a finish cinematic may have hidden the Yeti — Whiteout's rescue keeps him out of sight until
-    // his beat): every run starts with him visible
-    this.yeti.root.visible = true;
     this.hud.reset();
     this.audio.setMusicMode('explore');
     this.follow.snap(this.followTarget());
@@ -1375,6 +1372,7 @@ export class GameSession implements Stage {
       /** (evidence) a Hard snowball in flight, i.e. its landing ring is up */
       snowballMarker: (this.snowballs?.balls.length ?? 0) > 0,
       yetiLook: this.yeti.look,
+      yetiVisible: this.yeti.root.visible,
       grounded: s.grounded,
       crashed: s.crashed,
       heading: s.heading,

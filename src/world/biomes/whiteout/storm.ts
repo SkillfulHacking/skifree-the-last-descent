@@ -188,14 +188,51 @@ export const LEE = {
 const leeFront: FrontState = { s: 0, dir: 1, phase: 'clear', left: 0, k: 0 };
 
 /**
+ * Smooth, skiable snow between two points across the piste (and along it at the far end): no
+ * terrain step or kink a skier would hit (round 2: a 5 m step beside the racing line on some seeds —
+ * reviewer B F8 — made a drift gap beyond it a trap). Steps of 1.5 m: no grade change over
+ * `kink` between neighbours, no grade over `grade`.
+ */
+export const SKIABLE = { step: 1.5, kink: 0.45, grade: 0.9 } as const;
+export function skiableAcross(m: ExposureQuery & { heightAt?(x: number, z: number): number }, x0: number, x1: number, z: number, along = 0): boolean {
+  const h = m.heightAt;
+  if (!h) return true;
+  const S = SKIABLE;
+  const check = (pts: Array<[number, number]>) => {
+    let prev = NaN;
+    for (let i = 1; i < pts.length; i++) {
+      const [ax, az] = pts[i - 1]!;
+      const [bx, bz] = pts[i]!;
+      const g = (h.call(m, bx, bz) - h.call(m, ax, az)) / Math.hypot(bx - ax, bz - az);
+      if (Math.abs(g) > S.grade) return false;
+      if (!Number.isNaN(prev) && Math.abs(g - prev) > S.kink) return false;
+      prev = g;
+    }
+    return true;
+  };
+  const n = Math.max(2, Math.ceil(Math.abs(x1 - x0) / S.step));
+  const across: Array<[number, number]> = [];
+  for (let i = 0; i <= n; i++) across.push([x0 + ((x1 - x0) * i) / n, z]);
+  if (!check(across)) return false;
+  if (along > 0) {
+    const pts: Array<[number, number]> = [];
+    for (let dz = -along; dz <= along + 1e-6; dz += S.step) pts.push([x1, z + dz]);
+    if (!check(pts)) return false;
+  }
+  return true;
+}
+
+/**
  * Is there a marked, cleared lee shoulder on `side` (+1 = +X) of the racing line at z? On exposed
- * ground (the open runs where the fronts bite), where the shoulder lies on the piste.
+ * ground (the open runs where the fronts bite), where the shoulder lies on the piste and the snow
+ * out to it is smooth (skiableAcross).
  */
 export function leeLaneAt(m: ExposureQuery, z: number, side: number): boolean {
   const rx = m.routeX(z);
   if (whiteoutExposure(m, rx, z) < 0.6) return false;
   const cx = m.centerX ? m.centerX(z) : rx;
-  return Math.abs(rx + side * LEE.lane - cx) <= m.halfWidth(z) - LEE.laneHalf - 2;
+  if (Math.abs(rx + side * LEE.lane - cx) > m.halfWidth(z) - LEE.laneHalf - 2) return false;
+  return skiableAcross(m, rx, rx + side * (LEE.lane + LEE.laneHalf), z, 8);
 }
 
 /**
@@ -228,7 +265,9 @@ export const WHITEOUT_WEATHER: WeatherModel = {
     const step = 16;
     for (let z = Math.floor(z0 / step) * step + step / 2; z < z1; z += step) {
       const rx = m.routeX(z);
-      for (const side of [-1, 1]) if (leeLaneAt(m, z, side)) out.push({ x: rx + side * LEE.lane, z, hx: LEE.laneHalf, hz: step / 2 + 1 });
+      // (each stretch reaches 12 m past its ends: a skier moving onto or off the shoulder crosses
+      // that ground too)
+      for (const side of [-1, 1]) if (leeLaneAt(m, z, side)) out.push({ x: rx + side * (LEE.lane - 2), z, hx: LEE.laneHalf + 2, hz: step / 2 + 12 });
     }
     return out;
   },
