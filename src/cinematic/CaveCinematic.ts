@@ -143,7 +143,7 @@ export class CaveCinematic {
       for (let k = 0; k < 24 && blocked(leapCam); k++) leapCam.y += 0.5;
     }
     const yetiLook = () => st.yeti.root.position.clone().add(new THREE.Vector3(0, 1.6, 0)).lerp(skierHead, 0.34);
-    // Beat 10b (round 3): over the skier's shoulder, the Yeti crouched on the ledge — he leaps as the
+    // Beat 10b (round 3): from behind the skier's position toward the cave, the Yeti on the ledge — he leaps as the
     // chase begins (CAVE_LEAP_AT): the leap itself is the chase's first second, played by the Yeti AI
     // from the canonical start (caveHandoff.ts) while the camera swings back to third person
     // (GameSession's blend-out). Watched or skipped, the chase starts from the same state.

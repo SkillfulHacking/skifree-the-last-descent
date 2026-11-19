@@ -1238,7 +1238,7 @@ export class App {
       scenery: () => this.world?.scenery?.stats?.() ?? null,
       renderer: this.renderer,
       camera: this.camera,
-      cameraPose: () => ({ pos: this.camera.position.toArray(), fov: this.camera.fov }),
+      cameraPose: () => ({ pos: this.camera.position.toArray(), fov: this.camera.fov, dir: this.camera.getWorldDirection(new THREE.Vector3()).toArray() }),
     };
     (window as unknown as { __skifree: typeof api }).__skifree = api;
     (window as unknown as { __THREE: unknown }).__THREE = { Raycaster: THREE.Raycaster };

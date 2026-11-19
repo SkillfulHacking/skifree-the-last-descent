@@ -19,6 +19,7 @@ import { RunState } from './RunState';
 import { FollowCamera } from '../camera/FollowCamera';
 import { CaveCinematic } from '../cinematic/CaveCinematic';
 import { yetiSpawnAfterCinematic } from '../yeti/spawn';
+import { applyHandoffBlend, type HandoffBlend } from '../camera/handoffBlend';
 import { DefeatCinematic, VictoryCinematic } from '../cinematic/EndCinematics';
 import { Timeline, ease, pose } from '../cinematic/Timeline';
 import { autopilotInput, type AutopilotStyle } from '../debug/autopilot';
@@ -293,7 +294,9 @@ export class GameSession implements Stage {
         // (over the leap's flight, so the swing ends as he lands: W-076 review F F1)
         if (!skipped) {
           const sp = yetiSpawnAfterCinematic(this.world.mountain, this.world.focusEncounter?.anchor, this.world.cave.ledge);
-          this.cineBlend = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone(), fov: this.camera.fov, t: 0, dur: Math.max(1.2, sp.flight) };
+          // (to 0.45 s past the landing, so the touchdown is seen before the aim settles: review C, C2)
+          const aim = this.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(Math.max(5, this.camera.position.distanceTo(sp.pos))).add(this.camera.position);
+          this.cineBlend = { pos: this.camera.position.clone(), look: aim, fov: this.camera.fov, t: 0, dur: Math.max(1.2, sp.flight + 0.45) };
         }
         this.finishCave();
         // the cinematic already moved the Yeti this frame: start simulating next frame (C13)
@@ -353,12 +356,7 @@ export class GameSession implements Stage {
       if (B && this.run.phase !== 'chase') this.cineBlend = null;
       else if (B) {
         B.t += dt;
-        const k = smoothstep(0, 1, B.t / B.dur);
-        this.camera.position.lerpVectors(B.pos, this.camera.position, k);
-        this.camera.quaternion.slerpQuaternions(B.quat, this.camera.quaternion, k);
-        this.camera.fov = B.fov + (this.camera.fov - B.fov) * k;
-        this.camera.updateProjectionMatrix();
-        if (k >= 1) this.cineBlend = null;
+        if (!applyHandoffBlend(this.camera, B, this.yetiAI.pos)) this.cineBlend = null;
       }
     }
     this.updateTutorial(dt);
@@ -380,7 +378,7 @@ export class GameSession implements Stage {
     this.audio.playRunPrompt();
   }
   /** the camera's blend from the cave cinematic's last shot back to the follow camera (watched hand-off) */
-  private cineBlend: { pos: THREE.Vector3; quat: THREE.Quaternion; fov: number; t: number; dur: number } | null = null;
+  private cineBlend: HandoffBlend | null = null;
 
   /** Rear-view framing (skier in the foreground, the yeti behind), or null when not needed. */
   rearView(out: { pos: THREE.Vector3; look: THREE.Vector3 }): number {
@@ -1433,6 +1431,8 @@ export class GameSession implements Stage {
       yetiPhase: this.yetiAI.phase,
       yetiMode: this.yetiAnim.mode,
       yetiPos: [this.yetiAI.pos.x, this.yetiAI.pos.y, this.yetiAI.pos.z],
+      /** the Yeti model's root (in a cinematic the script moves the model, not the AI) */
+      yetiRoot: this.yeti.root.position.toArray(),
       /** (round 3) the chase hand-off state: velocity (x, vy, z), speed, airborne, start delay, heading */
       yetiVel: [this.yetiAI.vel.x, this.yetiAI.vy, this.yetiAI.vel.z],
       yetiSpeed: this.yetiAI.speed,
