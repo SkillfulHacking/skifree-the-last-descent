@@ -57,8 +57,11 @@ export const FOG_READ = 60;
  * input in between, with a softer correction (the same for every policy). 0 = the instant, perfect
  * path follower of the 'skilled' autopilot.
  */
-export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number, p: WhiteoutPolicy, stats?: { alt: number; main: number; gapSteers: number; brakes: number; lee?: number }, react = 0.25, field?: ObstacleField) {
+export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number, p: WhiteoutPolicy, stats?: { alt: number; main: number; gapSteers: number; brakes: number; lee?: number; maxAimJump?: number }, react = 0.25, field?: ObstacleField) {
   const ids: number[] = [];
+  /** on an alternate line (from its fork until the lines rejoin); the last planned aim (checks) */
+  let stickyAlt = false;
+  let lastAim = NaN;
   /** a player steers round rock and logs they can see: the nearest clear lateral offset of the aim */
   const clearOf = (sx: number, sz: number, tx: number, tz: number): number => {
     if (!field) return tx;
@@ -102,7 +105,10 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     // on it until it rejoins (cutting 40 m across between the lines when a front builds is not a line
     // anyone skis — round-2 W2H-01 Relaxed); 'weather' takes the fork only in fair weather
     const aHere = m.profile.altRouteX(s.pos.z);
-    const onAltNow = aHere !== null && aHere !== undefined && Number.isFinite(aHere) && Math.abs(s.pos.x - aHere) < 8 && Math.abs(s.pos.x - m.routeX(s.pos.z)) > 8;
+    // (Gitar, round 3) membership is sticky — held from the fork until the lines rejoin — not re-tested
+    // from the skier's position (a gap steer moved the skier >8 m off the alt line mid-line and
+    // dropped it, with the plan offset still built against the alt line)
+    const onAltNow = stickyAlt && aHere !== null && aHere !== undefined && Number.isFinite(aHere) && Math.abs(aHere - m.routeX(s.pos.z)) >= 8;
     // and joins an alternate line only at its fork (where it is still within 8 m of the main line)
     const atFork = aHere !== null && aHere !== undefined && Number.isFinite(aHere) && Math.abs(aHere - m.routeX(s.pos.z)) < 8;
     // ('weather' also reads the storm wall on the horizon: no exposed crest line once it is in sight,
@@ -119,6 +125,12 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
         if (stats) stats.alt++;
       } else if (stats) stats.main++;
     } else if (stats) stats.main++;
+    if (onAlt !== stickyAlt) {
+      // re-base the plan so the absolute aim stays where it was when the reference line changes
+      const a = m.profile.altRouteX(tz);
+      if (a !== null && a !== undefined && Number.isFinite(a)) plan += onAlt ? m.routeX(tz) - a : a - m.routeX(tz);
+      stickyAlt = onAlt;
+    }
     let brake = 0;
     let tuckOk = true;
     env.hazards.near(s.pos.x, s.pos.z + 60, 110, near);
@@ -172,6 +184,9 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     const rate = 0.22 * Math.max(8, speed);
     plan += clamp(want - plan, -rate * dtPlan, rate * dtPlan);
     tx = (onAlt ? tx : m.routeX(tz)) + plan;
+    // (regression check) how far the planned aim jumps between two reads
+    if (stats && lastAim === lastAim) stats.maxAimJump = Math.max(stats.maxAimJump ?? 0, Math.abs(tx - lastAim));
+    lastAim = tx;
     if (stats && Math.abs(plan) > 3 && Math.sign(plan) === Math.sign(f.dir) && p.lee) stats.lee = (stats.lee ?? 0) + 1;
     let edgeUp = false;
     if (p.edge && f.s > 0.5 && s.grounded && whiteoutExposure(m, s.pos.x, s.pos.z, t, seed) > 0.86) edgeUp = true;

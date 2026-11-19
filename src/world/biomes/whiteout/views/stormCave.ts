@@ -262,6 +262,33 @@ export function browTriangles(rock: THREE.Mesh, lip: THREE.Vector3, along: THREE
   return new Float32Array(res);
 }
 
+/**
+ * The cornice's root points: column i at `a = (i/nu − 0.5)·len` along the brow. A column whose ray
+ * misses takes its own position along the brow at the depth of the nearest hit column (before or
+ * after it); with no hit at all, the lip line itself.
+ */
+export function corniceRoots(nu: number, len: number, lip: THREE.Vector3, along: THREE.Vector3, rootAt: (a: number) => THREE.Vector3 | null): THREE.Vector3[] {
+  const base: THREE.Vector3[] = [];
+  const hits: Array<THREE.Vector3 | null> = [];
+  for (let i = 0; i <= nu; i++) {
+    const a = (i / nu - 0.5) * len;
+    base.push(lip.clone().addScaledVector(along, a));
+    hits.push(rootAt(a));
+  }
+  return hits.map((h, i) => {
+    if (h) return h;
+    let best = -1;
+    for (let d = 1; d <= nu && best < 0; d++) {
+      if (i - d >= 0 && hits[i - d]) best = i - d;
+      else if (i + d <= nu && hits[i + d]) best = i + d;
+    }
+    if (best < 0) return base[i]!.clone();
+    const depth = hits[best]!.clone().sub(base[best]!);
+    // the hit's offset from its own brow point, applied at this column's brow point
+    return base[i]!.clone().add(depth.sub(along.clone().multiplyScalar(depth.dot(along))));
+  });
+}
+
 /** nearest hit distance (≤ far) of a ray against a flat triangle list, or null (Möller–Trumbore) */
 export function rayTris(o: THREE.Vector3, dir: THREE.Vector3, tris: Float32Array, far: number): number | null {
   let best: number | null = null;
@@ -319,13 +346,9 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
     const t = rayTris(o, out.clone().negate(), tris, 16);
     return t === null ? null : o.addScaledVector(out, -t).addScaledVector(out, -0.15);
   };
-  const roots: THREE.Vector3[] = [];
-  let lastRoot = lip.clone();
-  for (let i = 0; i <= nu; i++) {
-    const r0 = rootAt((i / nu - 0.5) * C.len);
-    if (r0) lastRoot = r0;
-    roots.push(r0 ?? lastRoot.clone());
-  }
+  // (Gitar, round 3) a column whose ray misses keeps its own place along the brow and borrows only
+  // the depth (along `out`) of the nearest hit — never another column's point (degenerate strips)
+  const roots = corniceRoots(nu, C.len, lip, along, rootAt);
   for (let i = 0; i <= nu; i++) {
     const u = i / nu;
     const a = (u - 0.5) * C.len;
