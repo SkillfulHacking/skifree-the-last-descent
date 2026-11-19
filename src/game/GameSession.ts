@@ -378,6 +378,13 @@ export class GameSession implements Stage {
     this.shake(0.5);
     this.audio.playYetiFootstep(p, 1);
     this.world.particles.emit({ x: p.x, y: p.y + 0.2, z: p.z, vx: 0, vy: 2, vz: 0, spread: 2.5, size: 0.7, life: 1.4, count: 60, gravity: 0.5, drag: 1.6, grow: 1.4, alpha: 0.85 });
+    // the title after the touchdown has been seen (it sits mid-frame, where the look-back puts him)
+    this.runTitleIn = this.cineBlend ? 0.6 : 0;
+    if (this.runTitleIn === 0) this.showRunTitle();
+  }
+  private runTitleIn = -1;
+  private showRunTitle() {
+    this.runTitleIn = -1;
     this.hud.title('RUN.', '', 'run', 1.6);
     this.audio.playRunPrompt();
   }
@@ -483,6 +490,7 @@ export class GameSession implements Stage {
       const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded, down: s.crashed || s.recoverTime > 0 };
       this.yetiAI.update(PHYS_DT, target);
       if (this.leapPending && !this.yetiAI.airborne) this.yetiLanded();
+      if (this.runTitleIn > 0 && (this.runTitleIn -= PHYS_DT) <= 0) this.showRunTitle();
       this.stepSnowballs();
       if (this.yetiAI.phase === 'chase' && !this.yetiAI.airborne) this.chaseMinGap = Math.min(this.chaseMinGap, this.yetiAI.distance);
       if (this.yetiAI.canCatch(target) && this.run.catchPlayer()) this.beginDefeat();
