@@ -1,0 +1,190 @@
+/**
+ * Pursuit tension across locations (W-076, owner's decision 3): with the canonical chase start, how
+ * present and threatening the Yeti is for six kinds of player, on Alpine, Fjord and Whiteout.
+ *
+ * Players (all from the canonical hand-off; the headless game, simulate.ts):
+ *   skilled      the autopilot's racing line, tucked (a clean expert run)
+ *   competent    the autopilot's 'intermediate' style, scrubbing speed for 1 s every 12 s (a sloppy turn:
+ *                no tuck, half brake) — competent but imperfect (the 'intermediate' style alone skis the
+ *                chase exactly like 'skilled': measured, baseline_872ac4d.jsonl)
+ *   cautious     the skilled line, braking whenever faster than 13 m/s (≈47 km/h)
+ *   crash        the skilled line, one crash 5 s into the first chase (a realistic mistake)
+ *   lateCrash    the same crash 20 s into the chase (once the Yeti is running)
+ *   poorRoute    the competent style, wandering ±12 m off the racing line (worse lines, more obstacles)
+ *   slowArrival  the skilled line, but at 3 m/s when the chase begins (came into the cave slow)
+ *
+ * Per first chase: the skier's speed and the Yeti's distance at the start (first grounded frame), the
+ * minimum gap, the time the Yeti is within 110 m (rear-view inset, chase music), 45 m (the footsteps
+ * caption, the 'near' widget from 40 m), 25 m ('MOVE!') and 13 m (lunge range), the lunges, the outcome
+ * and time to catch; for 'crash', the gap at the crash and the minimum after it; and the presence cues
+ * (yeti/presence.ts, presentation only): distant calls heard, seconds of 'CLOSING' shown.
+ *   OUT=… LENS=sprint,standard DIFFS=normal,hard npx vitest run --config vitest.sim.config.ts tests/sim/tension.measure.test.ts
+ */
+import { it } from 'vitest';
+import '../../src/world/biomes';
+import { buildMountain, DIFFICULTY, makeCourse, worldSeed, type Difficulty, type LengthMode } from '../../src/game/CourseConfig';
+import { ObstacleField } from '../../src/physics/obstacles';
+import { simulateCourse } from '../../src/game/simulate';
+import { BiomeEnvironment } from '../../src/world/capabilities/environment';
+import { autopilotInput } from '../../src/debug/autopilot';
+import { NO_INPUT, PHYS_DT, type SkierInput, type SkierState } from '../../src/physics/SkierPhysics';
+import { clamp, wrapAngle } from '../../src/core/rng';
+import type { Mountain } from '../../src/world/course';
+import type { BiomeId } from '../../src/world/biome';
+import { ChasePresence } from '../../src/yeti/presence';
+
+const P = (globalThis as unknown as { process: { env: Record<string, string | undefined>; stdout: { write(s: string): void } } }).process;
+
+export const BEHAVIOURS = ['skilled', 'competent', 'cautious', 'crash', 'lateCrash', 'poorRoute', 'slowArrival'] as const;
+export type Behaviour = (typeof BEHAVIOURS)[number];
+
+function driver(m: Mountain, b: Behaviour): (s: SkierState, t: number) => SkierInput {
+  if (b === 'competent')
+    return (s, t) => {
+      const i = autopilotInput(m, s, 'intermediate', t);
+      return t % 12 < 1 ? { ...i, tuck: 0, brake: 0.5 } : i;
+    };
+  if (b === 'cautious')
+    return (s, t) => {
+      const i = autopilotInput(m, s, 'skilled', t);
+      return s.speed > 13 ? { ...i, tuck: 0, brake: 1 } : { ...i, tuck: Math.min(i.tuck, 0.3) };
+    };
+  if (b === 'poorRoute')
+    return (s) => {
+      const look = 7 + s.speed * 0.55;
+      const tz = s.pos.z + look;
+      const tx = m.routeX(tz) + 12 * Math.sin(tz / 45);
+      const err = wrapAngle(Math.atan2(tx - s.pos.x, look) - s.heading);
+      return { ...NO_INPUT, steer: clamp(-err * 2.6, -1, 1), tuck: s.speed < 18 ? 0.8 : 0.2, recover: s.crashTime > 1.4 };
+    };
+  return (s, t) => autopilotInput(m, s, 'skilled', t);
+}
+
+export interface TensionRow {
+  biome: string;
+  len: string;
+  diff: string;
+  behaviour: Behaviour;
+  v0: number;
+  startGap: number;
+  minGap: number;
+  t110: number;
+  t45: number;
+  t25: number;
+  t13: number;
+  lunges: number;
+  chaseTime: number;
+  outcome: string;
+  captureT: number | null;
+  crashGap: number | null;
+  minAfterCrash: number | null;
+  calls: number;
+  closingS: number;
+}
+
+export function runTension(biome: BiomeId, len: LengthMode, diff: Difficulty, b: Behaviour): TensionRow {
+  const course = makeCourse('classic', len, { biome, difficulty: diff });
+  const ws = worldSeed(course);
+  const m = buildMountain(course);
+  const f = new ObstacleField(m, ws);
+  const env = new BiomeEnvironment(m, ws, { difficulty: diff });
+  const enc = m.profile.encounters(0, Number.isFinite(m.finishZ) ? m.finishZ : 30000)[0]!;
+  const crashAt = b === 'crash' ? 5 : b === 'lateCrash' ? 20 : null;
+  let v0 = NaN;
+  let startGap = NaN;
+  let minGap = Infinity;
+  const tin = { 110: 0, 45: 0, 25: 0, 13: 0 } as Record<number, number>;
+  let lunges = 0;
+  let wasLunging = false;
+  let lastCt = 0;
+  let crashGap: number | null = null;
+  let minAfterCrash: number | null = null;
+  const pres = new ChasePresence(1);
+  let calls = 0;
+  let closingS = 0;
+  const r = simulateCourse(m, f, driver(m, b), {
+    streaming: true,
+    environment: env,
+    yetiSpeed: DIFFICULTY[diff].yetiSpeed,
+    snowballs: diff === 'hard',
+    dodge: diff === 'hard',
+    maxZ: Math.min(enc.triggerZ + 1500, Number.isFinite(m.finishZ) ? m.finishZ + 50 : Infinity),
+    crashAtChase: crashAt !== null ? [crashAt] : [],
+    maxTime: 900,
+    trace: (e, ct, s, y, start) => {
+      if (e.index !== enc.index) return;
+      if (start) {
+        if (b === 'slowArrival') {
+          const sp = s.vel.length();
+          if (sp > 1e-3) s.vel.multiplyScalar(3 / sp);
+          else s.vel.set(Math.sin(s.heading) * 3, 0, Math.cos(s.heading) * 3);
+        }
+        v0 = s.vel.length();
+        return;
+      }
+      lastCt = ct;
+      const d = y.distance;
+      if (!y.airborne || ct > 1.5) {
+        const cue = pres.update(PHYS_DT, d);
+        if (cue.call) calls++;
+        if (cue.closing) closingS += PHYS_DT;
+      }
+      if (!y.airborne) {
+        if (Number.isNaN(startGap)) startGap = d;
+        minGap = Math.min(minGap, d);
+      }
+      for (const k of [110, 45, 25, 13]) if (d < k) tin[k]! += PHYS_DT;
+      const lunging = y.lungeTimer > 0;
+      if (lunging && !wasLunging) lunges++;
+      wasLunging = lunging;
+      if (crashAt !== null) {
+        if (crashGap === null && ct >= crashAt) crashGap = d;
+        if (crashGap !== null) minAfterCrash = Math.min(minAfterCrash ?? Infinity, d);
+      }
+    },
+  });
+  const f1 = (x: number) => +x.toFixed(1);
+  return {
+    biome,
+    len,
+    diff,
+    behaviour: b,
+    v0: +v0.toFixed(2),
+    startGap: f1(startGap),
+    minGap: Number.isFinite(minGap) ? f1(minGap) : -1,
+    t110: f1(tin[110]!),
+    t45: f1(tin[45]!),
+    t25: f1(tin[25]!),
+    t13: f1(tin[13]!),
+    lunges,
+    chaseTime: f1(lastCt),
+    outcome: r.outcome === 'caught' ? 'caught' : 'escaped',
+    captureT: r.outcome === 'caught' ? f1(lastCt) : null,
+    crashGap: crashGap === null ? null : f1(crashGap),
+    minAfterCrash: minAfterCrash === null ? null : f1(minAfterCrash),
+    calls,
+    closingS: f1(closingS),
+  };
+}
+
+it('pursuit tension', async () => {
+  const fs = (await import('node:fs' as string)) as { writeFileSync: (p: string, d: string) => void; appendFileSync: (p: string, d: string) => void; existsSync: (p: string) => boolean; readFileSync: (p: string, e: string) => string };
+  const out = P.env.OUT ?? '/tmp/tension.jsonl';
+  // resumable: rows already in OUT are kept
+  const done = new Set<string>();
+  if (fs.existsSync(out)) for (const l of fs.readFileSync(out, 'utf8').split('\n').filter(Boolean)) {
+    const r = JSON.parse(l) as TensionRow;
+    done.add(`${r.biome}|${r.len}|${r.diff}|${r.behaviour}`);
+  }
+  const biomes = (P.env.BIOMES ?? 'alpine,fjord,whiteout').split(',') as BiomeId[];
+  for (const biome of biomes)
+    for (const len of (P.env.LENS ?? 'sprint').split(',') as LengthMode[])
+      for (const diff of (P.env.DIFFS ?? 'normal,hard').split(',') as Difficulty[])
+        for (const b of (P.env.BEHAVIOURS?.split(',') as Behaviour[] | undefined) ?? BEHAVIOURS) {
+          const key = `${biome}|${len}|${diff}|${b}`;
+          if (done.has(key)) continue;
+          const row = runTension(biome, len, diff, b);
+          fs.appendFileSync(out, JSON.stringify(row) + '\n');
+          P.stdout.write(`${key}: ${row.outcome} start ${row.startGap} m @ ${row.v0} m/s, min ${row.minGap} m, <45 m ${row.t45} s, <25 m ${row.t25} s, lunges ${row.lunges}\n`);
+        }
+});

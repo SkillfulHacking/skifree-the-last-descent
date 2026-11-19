@@ -15,6 +15,8 @@ export interface HudFrame {
   score: number;
   multiplier: number;
   yetiDistance: number | null;
+  /** the player is losing ground to the Yeti (yeti/presence.ts) */
+  yetiClosing?: boolean;
   chase: boolean;
   crashed: boolean;
   canRecover: boolean;
@@ -385,8 +387,9 @@ export class Hud {
       const d = f.yetiDistance;
       const threat = Math.max(0, Math.min(1, 1 - (d - 3) / 120));
       this.yetiBar.style.width = `${(threat * 100).toFixed(1)}%`;
-      this.yetiLabel.textContent = d < 25 ? `YETI  ${Math.round(d)} m  — MOVE!` : `YETI  ${Math.round(d)} m`;
-      this.yetiWrap.classList.toggle('near', d < 40);
+      const closing = !!f.yetiClosing;
+      this.yetiLabel.textContent = d < 25 ? `YETI  ${Math.round(d)} m  — MOVE!` : closing ? `YETI  ${Math.round(d)} m  ▲ CLOSING` : `YETI  ${Math.round(d)} m`;
+      this.yetiWrap.classList.toggle('near', d < 40 || closing);
       const pulse = this.reduceFlashes ? 0.55 : 0.5 + 0.5 * Math.sin(performance.now() / (d < 25 ? 90 : 160));
       this.danger.style.opacity = String(Math.max(0, threat - 0.55) * 2.0 * (0.6 + 0.4 * pulse));
       const total = f.progress > 0 ? (f.distance ?? 0) / f.progress : 3000;

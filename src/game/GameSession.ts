@@ -20,6 +20,7 @@ import { FollowCamera } from '../camera/FollowCamera';
 import { CaveCinematic } from '../cinematic/CaveCinematic';
 import { DefeatCinematic, VictoryCinematic } from '../cinematic/EndCinematics';
 import { Timeline, ease, pose, type CamPose } from '../cinematic/Timeline';
+import { ChasePresence, type PresenceCue } from '../yeti/presence';
 import { autopilotInput, type AutopilotStyle } from '../debug/autopilot';
 import { clamp, damp, smoothstep, wrapAngle } from '../core/rng';
 import { victorySteer } from './victorySteer';
@@ -357,6 +358,7 @@ export class GameSession implements Stage {
       this.follow.avoid = this.run.phase === 'chase' && this.yeti.root.visible ? this.yeti.root.position : null;
       this.follow.update(dt, this.followTarget(true));
     }
+    this.updatePresence(dt);
     this.updateTutorial(dt);
     this.updateHud(dt);
     this.updateAudio(dt);
@@ -760,6 +762,7 @@ export class GameSession implements Stage {
     this.recordsSeenCave = true;
     this.onCaveSeen?.();
     this.chaseMinGap = Infinity;
+    this.presence = new ChasePresence(this.world.seed + (this.run.encounter?.index ?? 0));
     if (this.run.encounter) this.events.emit({ type: 'YetiEncountered', encounter: this.run.encounter.index, difficulty: this.world.course.difficulty });
     this.hud.setSkipHint(null);
     // (W-076, decision 1) the danger is announced at once — RUN. on the first controllable frame —
@@ -1239,6 +1242,21 @@ export class GameSession implements Stage {
     }
   }
 
+  /** the Yeti's presence cues (presentation only: yeti/presence.ts) */
+  private presence = new ChasePresence(1);
+  private presenceCue: PresenceCue = { call: false, closing: false };
+  private updatePresence(dt: number) {
+    if (this.run.phase !== 'chase' || this.leapPending) {
+      this.presenceCue = { call: false, closing: false };
+      return;
+    }
+    this.presenceCue = this.presence.update(dt, this.yetiAI.distance);
+    if (this.presenceCue.call) {
+      this.audio.playYetiGrowl(this.yeti.root.position, true);
+      this.hud.caption('[a roar, far behind you]', 2);
+    }
+  }
+
   private updateHud(dt: number) {
     this.updateWeatherHud();
     const s = this.phys.s;
@@ -1255,6 +1273,7 @@ export class GameSession implements Stage {
       score: this.liveScore(),
       multiplier: this.multiplier,
       yetiDistance: this.run.phase === 'chase' ? this.yetiAI.distance : null,
+      yetiClosing: this.run.phase === 'chase' && this.presenceCue.closing,
       chase: this.run.phase === 'chase',
       crashed: s.crashed,
       canRecover: s.crashTime > 1,
