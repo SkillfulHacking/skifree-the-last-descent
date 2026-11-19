@@ -134,7 +134,9 @@ test('storm cave encounter plays through to the chase; the storm look leaves the
   // a storm on the chase: the Yeti takes the storm look (W-009) — dimmed pelt, eyes glowing
   const storm = await findPhase(page, 'storm', Math.ceil((await sess(page)).time));
   await api(page, (w, t) => w.setTime(t + 2), storm);
-  await frames(page, 20);
+  // (round 3, W-076: the cinematic now ends at the leap, 14.6 s, while the cave's squall still holds
+  // the weather; it is handed back over 7 s — World.releaseWeather — so the look is read after that)
+  await frames(page, 240);
   const inStorm = (await sess(page)).yetiLook;
   expect(inStorm.shade, JSON.stringify(inStorm)).toBeLessThan(0.95);
   expect(inStorm.eyeGlow, JSON.stringify(inStorm)).toBeGreaterThan(0.05);
