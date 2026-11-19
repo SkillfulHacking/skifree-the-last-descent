@@ -32,6 +32,15 @@ export function lookBackAt(B: HandoffBlend): number | null {
   return 1 - smoothstep(0, 1, u);
 }
 
+/**
+ * (W-076 reviews E N1 / F N1) the look-back is the player's to end: when they act (steer, brake, move
+ * the camera) — or 3 s pass without a landing — the turn to the run starts at once.
+ */
+export function releaseHandoffOnInput(B: HandoffBlend, acting: boolean): void {
+  if (!acting && B.t <= 3) return;
+  if (B.landedAt === null || B.landedAt > B.t - HANDOFF_CAM.landHold) B.landedAt = B.t - HANDOFF_CAM.landHold;
+}
+
 const q = new THREE.Quaternion();
 const p = new THREE.Vector3();
 

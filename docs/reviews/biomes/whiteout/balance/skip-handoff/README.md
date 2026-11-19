@@ -35,7 +35,10 @@ The table gives the state on the first controllable frame, then the Yeti gap aft
 
 ## The fix: one canonical chase start (`src/cinematic/caveHandoff.ts`)
 - **The start:** the generous one the skip gave. The Yeti is on the ledge, and his leap toward the piste begins on the first controllable frame. The AI's usual start delay (0.6 s, from the landing) and the slow-start rules then apply. Speed, Hard modifiers and slow-start are unchanged.
-- **Watching:** the cinematic now ends at the leap beat (14.6 s). A shot from behind the skier's position toward the ledge, with the Yeti on it about to leap, leads into it; the camera swings back to third person over the leap's flight (at least 1.2 s) while the AI flies it, and his landing (shake, snow burst, footstep, then the RUN. title and the rear view) is played by the chase. That swing is presentation only, and it is not applied after a skip.
+- **Watching:** the cinematic now ends at the leap beat (14.6 s); a shot from behind the skier's position toward the ledge leads into it. The chase starts at once.
+  - **Camera (not presentation only; see the open decision below):** the follow camera's look-back view shows the leap and the landing over the skier (turned toward the Yeti), then turns to the run over 2.3 s. Steering, braking or moving the camera starts that turn at once; it never lasts past 3 s without a landing; with Reduce Camera Motion there is no look-back. Without input the camera faces back up the hill for ~3.5–4 s of chase (reviews E r2 N1, F r2 N1).
+  - **The landing:** shake, snow burst and thud; RUN. 0.6 s later; the rear-view inset is off during the look-back.
+  - **Trees:** the obstacle field keeps the sight line from the route's first 45 m after the trigger to the landing point clear (`balance/round3-cave/`: no outcome changes).
 - **Skipping:** at any moment, skipping removes only the presentation. No sound or particle is replayed, the skier's physics is not fast-forwarded, and no distance is awarded.
 - **Simulation:** `simulate.ts` calls the same `startCanonicalChase`.
 
@@ -55,3 +58,8 @@ The balance results in `balance/round3/` stand, because they already used this s
   - **What it does:** the real keyboard Escape and the controller's Start button, at 1 s, 9 s and just before the leap, against the watched run.
   - **What it checks:** the hand-off frame and 2 s into the chase, both within 1e-3; the first viewing still pauses on Escape; and a skip is not a pause.
   - **Where:** Alpine and Whiteout, in the production build.
+
+## Open product decisions (for the product owner)
+- **The head start (reviews F N2/N3):** every shipped player's first chase used the watched hand-off (the first viewing cannot be skipped). The canonical start makes it 3–9× longer to be caught (e.g. Whiteout skilled 4.1 → 21.9 s; Fjord cautious 6.0 → 31.5 s; on Hard 3.9 → 14.5 s). It is the start the balance was tuned on, but it is a difficulty change for those players.
+- **Tension (review F N4):** a skilled player on Alpine and Fjord is never closer than 53.6 m / 38.8 m (Hard 20.4 m).
+- **The look-back (reviews E/F N1 vs C):** the watcher sees the leap's payoff over the skier, at the cost of up to ~3.5 s without a forward view unless they steer. Alternatives: release at the landing; no look-back (the skip path's camera, as with Reduce Camera Motion); or keep drift rows out of that stretch.

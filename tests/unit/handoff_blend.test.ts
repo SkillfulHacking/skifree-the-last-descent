@@ -12,7 +12,7 @@ import '../../src/world/biomes';
 import { buildMountain, makeCourse, worldSeed } from '../../src/game/CourseConfig';
 import { ObstacleField } from '../../src/physics/obstacles';
 import { FollowCamera } from '../../src/camera/FollowCamera';
-import { HANDOFF_CAM, lookBackAt, shotBlend, type HandoffBlend } from '../../src/camera/handoffBlend';
+import { HANDOFF_CAM, lookBackAt, releaseHandoffOnInput, shotBlend, type HandoffBlend } from '../../src/camera/handoffBlend';
 import { YetiAI } from '../../src/yeti/YetiAI';
 import { yetiSpawnAfterCinematic } from '../../src/yeti/spawn';
 import { startCanonicalChase } from '../../src/cinematic/caveHandoff';
@@ -162,4 +162,23 @@ describe('cave hand-off camera', () => {
       }
       expect(deg(A.cam.getWorldDirection(new THREE.Vector3()).angleTo(N.cam.getWorldDirection(new THREE.Vector3())))).toBeLessThan(1);
     });
+
+  it('the player ends the look-back: steering starts the turn to the run at once; it never lasts past 3 s without a landing (reviews E N1, F N1)', () => {
+    const B: HandoffBlend = { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fov: 46, t: 0.8, landedAt: null };
+    releaseHandoffOnInput(B, false);
+    expect(lookBackAt(B)).toBe(1);
+    releaseHandoffOnInput(B, true);
+    // the release begins now: just under 1 this frame, done HANDOFF_CAM.release s later
+    expect(lookBackAt(B)!).toBeLessThanOrEqual(1);
+    B.t += HANDOFF_CAM.release + 1e-6;
+    expect(lookBackAt(B)).toBeNull();
+    const C: HandoffBlend = { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fov: 46, t: 3.01, landedAt: null };
+    releaseHandoffOnInput(C, false);
+    expect(C.landedAt).not.toBeNull();
+    // already releasing: acting again does not restart it
+    const at = C.landedAt;
+    C.t += 0.5;
+    releaseHandoffOnInput(C, true);
+    expect(C.landedAt).toBe(at);
+  });
 });

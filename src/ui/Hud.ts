@@ -376,7 +376,8 @@ export class Hud {
       this.air.classList.add('on');
     } else this.air.classList.remove('on');
 
-    const chase = f.chase && f.yetiDistance !== null;
+    // (no widget until the chase has a distance: no stale text from the last run on its first frame)
+    const chase = f.chase && f.yetiDistance !== null && Number.isFinite(f.yetiDistance);
     this.yetiWrap.classList.toggle('hidden', !chase);
     this.progressYeti.classList.toggle('hidden', !chase);
     // (a chase's first frame, before the Yeti's first update, has no distance yet: W-076 review)

@@ -18,7 +18,7 @@ import { YetiAI } from '../yeti/YetiAI';
 import { RunState } from './RunState';
 import { FollowCamera } from '../camera/FollowCamera';
 import { CaveCinematic } from '../cinematic/CaveCinematic';
-import { lookBackAt, shotBlend, type HandoffBlend } from '../camera/handoffBlend';
+import { lookBackAt, releaseHandoffOnInput, shotBlend, type HandoffBlend } from '../camera/handoffBlend';
 import { DefeatCinematic, VictoryCinematic } from '../cinematic/EndCinematics';
 import { Timeline, ease, pose } from '../cinematic/Timeline';
 import { autopilotInput, type AutopilotStyle } from '../debug/autopilot';
@@ -290,7 +290,8 @@ export class GameSession implements Stage {
         // (round 3) watched to its end, the cinematic hands over as the Yeti leaps: the follow camera
         // looks back over the skier at the leap and the landing, then turns to the run
         // (camera/handoffBlend.ts; presentation only — the chase state is the same either way)
-        if (!skipped) this.cineBlend = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone(), fov: this.camera.fov, t: 0, landedAt: null };
+        // (reduce camera motion: no look-back and no swing — the skip path's camera, W-076 review E N2)
+        if (!skipped && !this.settings.reduceCameraMotion) this.cineBlend = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone(), fov: this.camera.fov, t: 0, landedAt: null };
         this.finishCave();
         // the cinematic already moved the Yeti this frame: start simulating next frame (C13)
         this.handoffFrame = true;
@@ -352,6 +353,11 @@ export class GameSession implements Stage {
       } else if (B) {
         B.t += dt;
         if (B.landedAt === null && !this.leapPending) B.landedAt = B.t;
+        // (W-076 reviews E N1 / F N1) the look-back is the player's to end: steering, braking or
+        // moving the camera starts the turn to the run at once (as if he had just landed); and it
+        // never outlasts 3 s without a landing
+        const acting = Math.abs(gi.steer) > 0.25 || gi.brake > 0.25 || gi.lookBack || Math.abs(gi.camX) + Math.abs(gi.camY) > 0.01;
+        releaseHandoffOnInput(B, acting);
         this.follow.lookBackOverride = lookBackAt(B);
       }
       this.follow.update(dt, this.followTarget(true));
@@ -808,6 +814,9 @@ export class GameSession implements Stage {
   private tmpHeld = new THREE.Vector3();
 
   private beginDefeat() {
+    this.cineBlend = null;
+    this.follow.lookBackOverride = null;
+    this.follow.lookBackAim = null;
     this.emitRunFinished('caught');
     this.hud.setPrompt(null);
     this.yetiAI.phase = 'caught';
