@@ -129,6 +129,17 @@ describe('W-076 decision 1: the hand-off camera faces the run', () => {
       expect(deg(d.angleTo(toAhead)), 'the route 30 m ahead in view').toBeLessThan(25);
     });
 
+  it('(review B, B1) a look-back held into the cave does not survive the hand-off snap', () => {
+    const { tg, fc, cam } = scenario('alpine', 10, 'normal');
+    fc.lookBack = 1;
+    for (let i = 0; i < 90; i++) fc.update(1 / 60, tg);
+    expect(cam.getWorldDirection(new THREE.Vector3()).z).toBeLessThan(-0.3);
+    // finishCave: the look-back is released, then the camera is snapped
+    fc.lookBack = 0;
+    fc.snap(tg);
+    expect(cam.getWorldDirection(new THREE.Vector3()).z, 'forward on the first controllable frame').toBeGreaterThan(0.3);
+  });
+
   it('after the hand-off the follow camera does not look back by itself; held look-back still works and is released', () => {
     const { tg, fc, cam } = scenario('alpine', 10, 'normal');
     const dt = 1 / 60;

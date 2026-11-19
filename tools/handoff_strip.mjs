@@ -45,15 +45,15 @@ for (const biome of list.split(',')) {
       continue;
     }
     // STEP frames of 1/30 s (default 8: 0.27 s) — stopping early on the frame the Yeti lands, so the touchdown itself is captured
-    await page.evaluate(() => {
+    await page.evaluate((step) => {
       const k = window.__skifree;
-      for (let j = 0; j < Number(process.env.STEP ?? 8); j++) {
+      for (let j = 0; j < step; j++) {
         const was = k.state().session.yetiAirborne;
         k.frames(1, 1 / 30);
         const s = k.state().session;
         if (s.phase === 'chase' && was && !s.yetiAirborne) break;
       }
-    });
+    }, Number(process.env.STEP ?? 8));
   }
   await page.close();
 }

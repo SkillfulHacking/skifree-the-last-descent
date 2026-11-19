@@ -19,6 +19,7 @@
  *    model over 7 s (World.releaseWeather), so the chase starts in whatever the front is doing.
  */
 import * as THREE from 'three';
+import { CAVE_LEAP_AT } from '../../../../cinematic/caveHandoff';
 import type { CaveCinematicContext, CaveCinematicExtras, CaveDressing, CaveDressingContext } from '../../../presentation/cave';
 import { makeFlakeTexture } from '../../../Environment';
 import { smoothstep } from '../../../../core/rng';
@@ -175,12 +176,25 @@ export function stormCaveCinematic(c: CaveCinematicContext): CaveCinematicExtras
   let squalled = false;
   let released = false;
   const dir = Math.sign(base.windX || 1);
+  // the squall peaks through the emergence and the roar, then the gust blows through so the leap
+  // (past the skier's shoulder) reads — at full squall the Yeti vanished (dev8 15)
+  const squallAt = (t: number) => smoothstep(S.t0, S.t1, t) * (1 - S.lull * smoothstep(S.lullT[0], S.lullT[1], t));
+  const overrideAt = (k: number) => {
+    const vT = Math.max(base.visibility, S.visibility);
+    const sfT = Math.max(base.snowfall, S.snowfall);
+    const stT = Math.max(base.storm ?? 0, S.storm);
+    const wT = Math.max(Math.abs(base.windX), S.wind);
+    return {
+      visibility: base.visibility + (vT - base.visibility) * k,
+      snowfall: base.snowfall + (sfT - base.snowfall) * k,
+      storm: (base.storm ?? 0) + (stT - (base.storm ?? 0)) * k,
+      windX: base.windX + (dir * wT - base.windX) * k,
+    };
+  };
   return {
     update(_dt, t) {
       if (released) return;
-      // the squall peaks through the emergence and the roar, then the gust blows through so the leap
-      // (14.6–17 s, past the skier's shoulder) reads — at full squall the Yeti vanished (dev8 15)
-      const k = smoothstep(S.t0, S.t1, t) * (1 - S.lull * smoothstep(S.lullT[0], S.lullT[1], t));
+      const k = squallAt(t);
       // (round 2, C-8) the squall only ever thickens the weather: an encounter that begins inside a
       // front keeps its storm (round 1 blended toward fixed values, so it cleared)
       const vT = Math.max(base.visibility, S.visibility);
@@ -209,7 +223,13 @@ export function stormCaveCinematic(c: CaveCinematicContext): CaveCinematicExtras
       }
     },
     dispose() {
-      if (!released) world.releaseWeather(S.release);
+      // (W-076 review B, B2) the chase opens in the same weather watched or skipped at any moment: the
+      // hand-back always starts from the squall as it stands at the hand-off (CAVE_LEAP_AT), not from
+      // wherever the cinematic was left
+      if (!released) {
+        world.weatherOverride = overrideAt(squallAt(Math.min(S.end, CAVE_LEAP_AT)));
+        world.releaseWeather(S.release);
+      }
     },
   };
 }

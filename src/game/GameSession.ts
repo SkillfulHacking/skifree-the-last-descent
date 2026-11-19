@@ -199,8 +199,10 @@ export class GameSession implements Stage {
     const pos = c.position.clone();
     const quat = c.quaternion.clone();
     const fov = c.fov;
+    const held = this.follow.lookBack;
     this.follow.lookBack = 0;
     this.follow.snap(this.followTarget());
+    this.follow.lookBack = held;
     const out: CamPose = { pos: c.position.clone(), look: this.follow.lookTarget.clone(), fov: c.fov };
     c.position.copy(pos);
     c.quaternion.copy(quat);
@@ -755,6 +757,8 @@ export class GameSession implements Stage {
 
   private finishCave() {
     if (!this.cave) return;
+    // (W-076 review B, B1) control returns facing the run, whatever was held as the cave triggered
+    this.follow.lookBack = 0;
     this.cave.finish();
     this.cave = null;
     this.run.endCaveCinematic();
@@ -1253,7 +1257,8 @@ export class GameSession implements Stage {
     this.presenceCue = this.presence.update(dt, this.yetiAI.distance);
     if (this.presenceCue.call) {
       this.audio.playYetiGrowl(this.yeti.root.position, true);
-      this.hud.caption('[a roar, far behind you]', 2);
+      // (W-076 review B, B3) never over another caption (Hard's snowball instruction shares the line)
+      if (!this.hud.captionText) this.hud.caption('[a roar, far behind you]', 2);
     }
   }
 

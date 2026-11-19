@@ -81,6 +81,8 @@ export class FollowCamera {
   /** Snap to the ideal pose immediately (after cuts / teleports). */
   snap(t: FollowTarget) {
     this.initialized = false;
+    // (W-076 review B, B1) a cut: the look-back is wherever the input says now, not mid-damp
+    this.lookBackS = this.lookBack;
     this.update(1 / 60, t);
   }
 
