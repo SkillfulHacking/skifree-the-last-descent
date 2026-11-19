@@ -273,7 +273,9 @@ export class GameSession implements Stage {
     } else if (this.run.phase === 'caveCinematic' && this.cave) {
       const canSkip = this.recordsSeenCave;
       this.hud.setSkipHint(canSkip ? `Skip  ${this.hud.g('skip')}` : null);
+      let skipped = false;
       if (canSkip && gi.skipPressed) {
+        skipped = true;
         this.cave.tl.skip();
         this.follow.consumeTrauma(100);
         this.audio.setMusicMode('tension');
@@ -284,6 +286,10 @@ export class GameSession implements Stage {
         this.applyCineShake(dt);
       }
       if (this.cave.tl.done) {
+        // (round 3) watched to its end, the cinematic hands over as the Yeti leaps: the camera swings
+        // from the over-the-shoulder shot back to third person over the chase's first second
+        // (presentation only — the chase state is the same either way: caveHandoff.ts)
+        if (!skipped) this.cineBlend = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone(), fov: this.camera.fov, t: 0, dur: 1.2 };
         this.finishCave();
         // the cinematic already moved the Yeti this frame: start simulating next frame (C13)
         this.handoffFrame = true;
@@ -338,6 +344,17 @@ export class GameSession implements Stage {
       this.follow.lookBack = gi.lookBack && this.run.controllable ? 1 : 0;
       this.follow.avoid = this.run.phase === 'chase' && this.yeti.root.visible ? this.yeti.root.position : null;
       this.follow.update(dt, this.followTarget(true));
+      const B = this.cineBlend;
+      if (B && this.run.phase !== 'chase') this.cineBlend = null;
+      else if (B) {
+        B.t += dt;
+        const k = smoothstep(0, 1, B.t / B.dur);
+        this.camera.position.lerpVectors(B.pos, this.camera.position, k);
+        this.camera.quaternion.slerpQuaternions(B.quat, this.camera.quaternion, k);
+        this.camera.fov = B.fov + (this.camera.fov - B.fov) * k;
+        this.camera.updateProjectionMatrix();
+        if (k >= 1) this.cineBlend = null;
+      }
     }
     this.updateTutorial(dt);
     this.updateHud(dt);
@@ -346,6 +363,8 @@ export class GameSession implements Stage {
 
   recordsSeenCave = false;
   private handoffFrame = false;
+  /** the camera's blend from the cave cinematic's last shot back to the follow camera (watched hand-off) */
+  private cineBlend: { pos: THREE.Vector3; quat: THREE.Quaternion; fov: number; t: number; dur: number } | null = null;
 
   /** Rear-view framing (skier in the foreground, the yeti behind), or null when not needed. */
   rearView(out: { pos: THREE.Vector3; look: THREE.Vector3 }): number {
@@ -1395,6 +1414,13 @@ export class GameSession implements Stage {
       yetiPhase: this.yetiAI.phase,
       yetiMode: this.yetiAnim.mode,
       yetiPos: [this.yetiAI.pos.x, this.yetiAI.pos.y, this.yetiAI.pos.z],
+      /** (round 3) the chase hand-off state: velocity (x, vy, z), speed, airborne, start delay, heading */
+      yetiVel: [this.yetiAI.vel.x, this.yetiAI.vy, this.yetiAI.vel.z],
+      yetiSpeed: this.yetiAI.speed,
+      yetiAirborne: this.yetiAI.airborne,
+      yetiDelay: this.yetiAI.delay,
+      yetiHeading: this.yetiAI.heading,
+      vel: [s.vel.x, s.vel.y, s.vel.z],
       yetiThrowT: this.yetiAnim.throwT ?? null,
       chaseTime: this.run.chaseTime,
       cinematicTime: this.cave?.tl.time ?? this.victory?.tl.time ?? this.defeat?.tl.time ?? -1,

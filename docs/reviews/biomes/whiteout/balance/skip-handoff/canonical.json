@@ -1,0 +1,1478 @@
+[
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "watched",
+  "skipT": null,
+  "skier": {
+   "x": 53.06,
+   "z": 282,
+   "speed": 14.91,
+   "vx": -5.4,
+   "vz": 13.49
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 14.53,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 56.83,
+   "3": 64.12,
+   "5": 78.07,
+   "10": 96.74
+  },
+  "outcome": "victory",
+  "time": 157,
+  "minGap": 53.6
+ },
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip before emergence (3.0 s)",
+  "skipT": 3,
+  "skier": {
+   "x": 53.06,
+   "z": 282,
+   "speed": 14.91,
+   "vx": -5.4,
+   "vz": 13.49
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 14.53,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 56.83,
+   "3": 64.12,
+   "5": 78.07,
+   "10": 96.74
+  },
+  "outcome": "victory",
+  "time": 157,
+  "minGap": 53.6
+ },
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip during emergence (9.0 s)",
+  "skipT": 9,
+  "skier": {
+   "x": 53.06,
+   "z": 282,
+   "speed": 14.91,
+   "vx": -5.4,
+   "vz": 13.49
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 14.53,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 56.83,
+   "3": 64.12,
+   "5": 78.07,
+   "10": 96.74
+  },
+  "outcome": "victory",
+  "time": 157,
+  "minGap": 53.6
+ },
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip just before the leap",
+  "skipT": 14.5,
+  "skier": {
+   "x": 53.06,
+   "z": 282,
+   "speed": 14.91,
+   "vx": -5.4,
+   "vz": 13.49
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 14.53,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 56.83,
+   "3": 64.12,
+   "5": 78.07,
+   "10": 96.74
+  },
+  "outcome": "victory",
+  "time": 157,
+  "minGap": 53.6
+ },
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip while airborne (+0.4 s)",
+  "skipT": 15,
+  "skier": {
+   "x": 53.06,
+   "z": 282,
+   "speed": 14.91,
+   "vx": -5.4,
+   "vz": 13.49
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 14.53,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 56.83,
+   "3": 64.12,
+   "5": 78.07,
+   "10": 96.74
+  },
+  "outcome": "victory",
+  "time": 157,
+  "minGap": 53.6
+ },
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip after landing (+1.9 s)",
+  "skipT": 16.5,
+  "skier": {
+   "x": 53.06,
+   "z": 282,
+   "speed": 14.91,
+   "vx": -5.4,
+   "vz": 13.49
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 14.53,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 56.83,
+   "3": 64.12,
+   "5": 78.07,
+   "10": 96.74
+  },
+  "outcome": "victory",
+  "time": 157,
+  "minGap": 53.6
+ },
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "watched",
+  "skipT": null,
+  "skier": {
+   "x": 53.08,
+   "z": 282.05,
+   "speed": 11.09,
+   "vx": -3.97,
+   "vz": 10.05
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 10.81,
+   "extraDelay": 0.06
+  },
+  "gapAt": {
+   "1": 53.67,
+   "3": 52.82,
+   "5": 59.32,
+   "10": 49.58
+  },
+  "outcome": "caught",
+  "time": 77.9,
+  "minGap": 3
+ },
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip before emergence (3.0 s)",
+  "skipT": 3,
+  "skier": {
+   "x": 53.08,
+   "z": 282.05,
+   "speed": 11.09,
+   "vx": -3.97,
+   "vz": 10.05
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 10.81,
+   "extraDelay": 0.06
+  },
+  "gapAt": {
+   "1": 53.67,
+   "3": 52.82,
+   "5": 59.32,
+   "10": 49.58
+  },
+  "outcome": "caught",
+  "time": 77.9,
+  "minGap": 3
+ },
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip during emergence (9.0 s)",
+  "skipT": 9,
+  "skier": {
+   "x": 53.08,
+   "z": 282.05,
+   "speed": 11.09,
+   "vx": -3.97,
+   "vz": 10.05
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 10.81,
+   "extraDelay": 0.06
+  },
+  "gapAt": {
+   "1": 53.67,
+   "3": 52.82,
+   "5": 59.32,
+   "10": 49.58
+  },
+  "outcome": "caught",
+  "time": 77.9,
+  "minGap": 3
+ },
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip just before the leap",
+  "skipT": 14.5,
+  "skier": {
+   "x": 53.08,
+   "z": 282.05,
+   "speed": 11.09,
+   "vx": -3.97,
+   "vz": 10.05
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 10.81,
+   "extraDelay": 0.06
+  },
+  "gapAt": {
+   "1": 53.67,
+   "3": 52.82,
+   "5": 59.32,
+   "10": 49.58
+  },
+  "outcome": "caught",
+  "time": 77.9,
+  "minGap": 3
+ },
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip while airborne (+0.4 s)",
+  "skipT": 15,
+  "skier": {
+   "x": 53.08,
+   "z": 282.05,
+   "speed": 11.09,
+   "vx": -3.97,
+   "vz": 10.05
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 10.81,
+   "extraDelay": 0.06
+  },
+  "gapAt": {
+   "1": 53.67,
+   "3": 52.82,
+   "5": 59.32,
+   "10": 49.58
+  },
+  "outcome": "caught",
+  "time": 77.9,
+  "minGap": 3
+ },
+ {
+  "biome": "alpine",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip after landing (+1.9 s)",
+  "skipT": 16.5,
+  "skier": {
+   "x": 53.08,
+   "z": 282.05,
+   "speed": 11.09,
+   "vx": -3.97,
+   "vz": 10.05
+  },
+  "yeti": {
+   "x": 109.01,
+   "y": -33.52,
+   "z": 261,
+   "vx": -14.97,
+   "vy": 5.5,
+   "vz": 6.24,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": -1.176
+  },
+  "separation": 61.06,
+  "slowStart": {
+   "startSkierSpeed": 10.81,
+   "extraDelay": 0.06
+  },
+  "gapAt": {
+   "1": 53.67,
+   "3": 52.82,
+   "5": 59.32,
+   "10": 49.58
+  },
+  "outcome": "caught",
+  "time": 77.9,
+  "minGap": 3
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "watched",
+  "skipT": null,
+  "skier": {
+   "x": -21.27,
+   "z": 282.03,
+   "speed": 14.02,
+   "vx": -0.33,
+   "vz": 13.77
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.3,
+  "slowStart": {
+   "startSkierSpeed": 13.77,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 37.6,
+   "3": 50.01,
+   "5": 63.98,
+   "10": 78.11
+  },
+  "outcome": "victory",
+  "time": 177,
+  "minGap": 38.8
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip before emergence (3.0 s)",
+  "skipT": 3,
+  "skier": {
+   "x": -21.27,
+   "z": 282.03,
+   "speed": 14.02,
+   "vx": -0.33,
+   "vz": 13.77
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.3,
+  "slowStart": {
+   "startSkierSpeed": 13.77,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 37.6,
+   "3": 50.01,
+   "5": 63.98,
+   "10": 78.11
+  },
+  "outcome": "victory",
+  "time": 177,
+  "minGap": 38.8
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip during emergence (9.0 s)",
+  "skipT": 9,
+  "skier": {
+   "x": -21.27,
+   "z": 282.03,
+   "speed": 14.02,
+   "vx": -0.33,
+   "vz": 13.77
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.3,
+  "slowStart": {
+   "startSkierSpeed": 13.77,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 37.6,
+   "3": 50.01,
+   "5": 63.98,
+   "10": 78.11
+  },
+  "outcome": "victory",
+  "time": 177,
+  "minGap": 38.8
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip just before the leap",
+  "skipT": 14.5,
+  "skier": {
+   "x": -21.27,
+   "z": 282.03,
+   "speed": 14.02,
+   "vx": -0.33,
+   "vz": 13.77
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.3,
+  "slowStart": {
+   "startSkierSpeed": 13.77,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 37.6,
+   "3": 50.01,
+   "5": 63.98,
+   "10": 78.11
+  },
+  "outcome": "victory",
+  "time": 177,
+  "minGap": 38.8
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip while airborne (+0.4 s)",
+  "skipT": 15,
+  "skier": {
+   "x": -21.27,
+   "z": 282.03,
+   "speed": 14.02,
+   "vx": -0.33,
+   "vz": 13.77
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.3,
+  "slowStart": {
+   "startSkierSpeed": 13.77,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 37.6,
+   "3": 50.01,
+   "5": 63.98,
+   "10": 78.11
+  },
+  "outcome": "victory",
+  "time": 177,
+  "minGap": 38.8
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip after landing (+1.9 s)",
+  "skipT": 16.5,
+  "skier": {
+   "x": -21.27,
+   "z": 282.03,
+   "speed": 14.02,
+   "vx": -0.33,
+   "vz": 13.77
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.3,
+  "slowStart": {
+   "startSkierSpeed": 13.77,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 37.6,
+   "3": 50.01,
+   "5": 63.98,
+   "10": 78.11
+  },
+  "outcome": "victory",
+  "time": 177,
+  "minGap": 38.8
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "watched",
+  "skipT": null,
+  "skier": {
+   "x": -21.24,
+   "z": 282.07,
+   "speed": 10.54,
+   "vx": -0.25,
+   "vz": 10.35
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.35,
+  "slowStart": {
+   "startSkierSpeed": 10.35,
+   "extraDelay": 0.18
+  },
+  "gapAt": {
+   "1": 34.82,
+   "3": 39.49,
+   "5": 49.75,
+   "10": 41.52
+  },
+  "outcome": "caught",
+  "time": 64.1,
+  "minGap": 2.9
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip before emergence (3.0 s)",
+  "skipT": 3,
+  "skier": {
+   "x": -21.24,
+   "z": 282.07,
+   "speed": 10.54,
+   "vx": -0.25,
+   "vz": 10.35
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.35,
+  "slowStart": {
+   "startSkierSpeed": 10.35,
+   "extraDelay": 0.18
+  },
+  "gapAt": {
+   "1": 34.82,
+   "3": 39.49,
+   "5": 49.75,
+   "10": 41.52
+  },
+  "outcome": "caught",
+  "time": 64.1,
+  "minGap": 2.9
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip during emergence (9.0 s)",
+  "skipT": 9,
+  "skier": {
+   "x": -21.24,
+   "z": 282.07,
+   "speed": 10.54,
+   "vx": -0.25,
+   "vz": 10.35
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.35,
+  "slowStart": {
+   "startSkierSpeed": 10.35,
+   "extraDelay": 0.18
+  },
+  "gapAt": {
+   "1": 34.82,
+   "3": 39.49,
+   "5": 49.75,
+   "10": 41.52
+  },
+  "outcome": "caught",
+  "time": 64.1,
+  "minGap": 2.9
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip just before the leap",
+  "skipT": 14.5,
+  "skier": {
+   "x": -21.24,
+   "z": 282.07,
+   "speed": 10.54,
+   "vx": -0.25,
+   "vz": 10.35
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.35,
+  "slowStart": {
+   "startSkierSpeed": 10.35,
+   "extraDelay": 0.18
+  },
+  "gapAt": {
+   "1": 34.82,
+   "3": 39.49,
+   "5": 49.75,
+   "10": 41.52
+  },
+  "outcome": "caught",
+  "time": 64.1,
+  "minGap": 2.9
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip while airborne (+0.4 s)",
+  "skipT": 15,
+  "skier": {
+   "x": -21.24,
+   "z": 282.07,
+   "speed": 10.54,
+   "vx": -0.25,
+   "vz": 10.35
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.35,
+  "slowStart": {
+   "startSkierSpeed": 10.35,
+   "extraDelay": 0.18
+  },
+  "gapAt": {
+   "1": 34.82,
+   "3": 39.49,
+   "5": 49.75,
+   "10": 41.52
+  },
+  "outcome": "caught",
+  "time": 64.1,
+  "minGap": 2.9
+ },
+ {
+  "biome": "fjord",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip after landing (+1.9 s)",
+  "skipT": 16.5,
+  "skier": {
+   "x": -21.24,
+   "z": 282.07,
+   "speed": 10.54,
+   "vx": -0.25,
+   "vz": 10.35
+  },
+  "yeti": {
+   "x": -53.83,
+   "y": -34.34,
+   "z": 261,
+   "vx": 12.81,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 40.35,
+  "slowStart": {
+   "startSkierSpeed": 10.35,
+   "extraDelay": 0.18
+  },
+  "gapAt": {
+   "1": 34.82,
+   "3": 39.49,
+   "5": 49.75,
+   "10": 41.52
+  },
+  "outcome": "caught",
+  "time": 64.1,
+  "minGap": 2.9
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "watched",
+  "skipT": null,
+  "skier": {
+   "x": 19.51,
+   "z": 282.04,
+   "speed": 14.22,
+   "vx": -2.43,
+   "vz": 13.68
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.76,
+  "slowStart": {
+   "startSkierSpeed": 13.89,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 44.09,
+   "3": 41.7,
+   "5": 43.69,
+   "10": 32.04
+  },
+  "outcome": "caught",
+  "time": 50.8,
+  "minGap": 2.8
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip before emergence (3.0 s)",
+  "skipT": 3,
+  "skier": {
+   "x": 19.51,
+   "z": 282.04,
+   "speed": 14.22,
+   "vx": -2.43,
+   "vz": 13.68
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.76,
+  "slowStart": {
+   "startSkierSpeed": 13.89,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 44.09,
+   "3": 41.7,
+   "5": 43.69,
+   "10": 32.04
+  },
+  "outcome": "caught",
+  "time": 50.8,
+  "minGap": 2.8
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip during emergence (9.0 s)",
+  "skipT": 9,
+  "skier": {
+   "x": 19.51,
+   "z": 282.04,
+   "speed": 14.22,
+   "vx": -2.43,
+   "vz": 13.68
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.76,
+  "slowStart": {
+   "startSkierSpeed": 13.89,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 44.09,
+   "3": 41.7,
+   "5": 43.69,
+   "10": 32.04
+  },
+  "outcome": "caught",
+  "time": 50.8,
+  "minGap": 2.8
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip just before the leap",
+  "skipT": 14.5,
+  "skier": {
+   "x": 19.51,
+   "z": 282.04,
+   "speed": 14.22,
+   "vx": -2.43,
+   "vz": 13.68
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.76,
+  "slowStart": {
+   "startSkierSpeed": 13.89,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 44.09,
+   "3": 41.7,
+   "5": 43.69,
+   "10": 32.04
+  },
+  "outcome": "caught",
+  "time": 50.8,
+  "minGap": 2.8
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip while airborne (+0.4 s)",
+  "skipT": 15,
+  "skier": {
+   "x": 19.51,
+   "z": 282.04,
+   "speed": 14.22,
+   "vx": -2.43,
+   "vz": 13.68
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.76,
+  "slowStart": {
+   "startSkierSpeed": 13.89,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 44.09,
+   "3": 41.7,
+   "5": 43.69,
+   "10": 32.04
+  },
+  "outcome": "caught",
+  "time": 50.8,
+  "minGap": 2.8
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "skilled",
+  "case": "skip after landing (+1.9 s)",
+  "skipT": 16.5,
+  "skier": {
+   "x": 19.51,
+   "z": 282.04,
+   "speed": 14.22,
+   "vx": -2.43,
+   "vz": 13.68
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.76,
+  "slowStart": {
+   "startSkierSpeed": 13.89,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 44.09,
+   "3": 41.7,
+   "5": 43.69,
+   "10": 32.04
+  },
+  "outcome": "caught",
+  "time": 50.8,
+  "minGap": 2.8
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "watched",
+  "skipT": null,
+  "skier": {
+   "x": 19.12,
+   "z": 282.07,
+   "speed": 11.38,
+   "vx": -1.76,
+   "vz": 10.98
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.44,
+  "slowStart": {
+   "startSkierSpeed": 11.12,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 42.18,
+   "3": 36.73,
+   "5": 33.4,
+   "10": 7.37
+  },
+  "outcome": "caught",
+  "time": 47.2,
+  "minGap": 2.9
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip before emergence (3.0 s)",
+  "skipT": 3,
+  "skier": {
+   "x": 19.12,
+   "z": 282.07,
+   "speed": 11.38,
+   "vx": -1.76,
+   "vz": 10.98
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.44,
+  "slowStart": {
+   "startSkierSpeed": 11.12,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 42.18,
+   "3": 36.73,
+   "5": 33.4,
+   "10": 7.37
+  },
+  "outcome": "caught",
+  "time": 47.2,
+  "minGap": 2.9
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip during emergence (9.0 s)",
+  "skipT": 9,
+  "skier": {
+   "x": 19.12,
+   "z": 282.07,
+   "speed": 11.38,
+   "vx": -1.76,
+   "vz": 10.98
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.44,
+  "slowStart": {
+   "startSkierSpeed": 11.12,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 42.18,
+   "3": 36.73,
+   "5": 33.4,
+   "10": 7.37
+  },
+  "outcome": "caught",
+  "time": 47.2,
+  "minGap": 2.9
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip just before the leap",
+  "skipT": 14.5,
+  "skier": {
+   "x": 19.12,
+   "z": 282.07,
+   "speed": 11.38,
+   "vx": -1.76,
+   "vz": 10.98
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.44,
+  "slowStart": {
+   "startSkierSpeed": 11.12,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 42.18,
+   "3": 36.73,
+   "5": 33.4,
+   "10": 7.37
+  },
+  "outcome": "caught",
+  "time": 47.2,
+  "minGap": 2.9
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip while airborne (+0.4 s)",
+  "skipT": 15,
+  "skier": {
+   "x": 19.12,
+   "z": 282.07,
+   "speed": 11.38,
+   "vx": -1.76,
+   "vz": 10.98
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.44,
+  "slowStart": {
+   "startSkierSpeed": 11.12,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 42.18,
+   "3": 36.73,
+   "5": 33.4,
+   "10": 7.37
+  },
+  "outcome": "caught",
+  "time": 47.2,
+  "minGap": 2.9
+ },
+ {
+  "biome": "whiteout",
+  "diff": "normal",
+  "len": "sprint",
+  "style": "cautious",
+  "case": "skip after landing (+1.9 s)",
+  "skipT": 16.5,
+  "skier": {
+   "x": 19.12,
+   "z": 282.07,
+   "speed": 11.38,
+   "vx": -1.76,
+   "vz": 10.98
+  },
+  "yeti": {
+   "x": -25.33,
+   "y": -36.77,
+   "z": 261,
+   "vx": 12.8,
+   "vy": 5.5,
+   "vz": 6.25,
+   "speed": 0,
+   "airborne": true,
+   "delay": 0.6,
+   "heading": 1.117
+  },
+  "separation": 50.44,
+  "slowStart": {
+   "startSkierSpeed": 11.12,
+   "extraDelay": 0
+  },
+  "gapAt": {
+   "1": 42.18,
+   "3": 36.73,
+   "5": 33.4,
+   "10": 7.37
+  },
+  "outcome": "caught",
+  "time": 47.2,
+  "minGap": 2.9
+ }
+]

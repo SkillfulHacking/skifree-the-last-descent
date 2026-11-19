@@ -3,7 +3,6 @@
  * Mirrors the rules in GameSession without any rendering. Works for any course: classic,
  * generated finite lengths, and Endless (bounded by `maxZ`).
  */
-import * as THREE from 'three';
 import { Mountain, SEED_DEFAULT, type Encounter } from '../world/course';
 import { ObstacleField, generateObstacles } from '../physics/obstacles';
 import { PHYS_DT, SkierPhysics, type SkierInput, type SkierState } from '../physics/SkierPhysics';
@@ -11,6 +10,7 @@ import { BiomeEnvironment } from '../world/capabilities/environment';
 import { YetiAI } from '../yeti/YetiAI';
 import { yetiSpawnAfterCinematic } from '../yeti/spawn';
 import { SnowballBarrage, SNOWBALL, clampToPiste, type SnowballEvent } from '../yeti/Snowballs';
+import { startCanonicalChase, type CaveSpawn } from '../cinematic/caveHandoff';
 
 export interface SimResult {
   outcome: 'victory' | 'caught' | 'timeout' | 'distance';
@@ -67,6 +67,8 @@ export interface SimOptions {
    * with `start` true): the encounter, the time into the chase, the skier and the Yeti
    */
   trace?: (e: Encounter, ct: number, s: SkierState, yeti: YetiAI, start: boolean) => void;
+  /** start each chase (default: the canonical hand-off, caveHandoff.ts) — measurement of other hand-offs */
+  handoff?: (yeti: YetiAI, spawn: CaveSpawn, e: Encounter) => void;
 }
 
 export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierState, t: number) => SkierInput, opts: SimOptions = {}): SimResult {
@@ -164,8 +166,8 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
         // cinematic happens here (simulation frozen) — then the yeti leaps out of the cave
         const sp = yetiSpawnAfterCinematic(m, e.anchor);
         yeti.speedMul = Math.min(1.33, e.speedMul * (opts.yetiSpeed ?? 1));
-        yeti.place(sp.pos.x, sp.pos.z, sp.heading, sp.pos.y - m.heightAt(sp.pos.x, sp.pos.z));
-        yeti.startChase(new THREE.Vector3(sp.leap.x, sp.leap.y, sp.leap.z));
+        if (opts.handoff) opts.handoff(yeti, sp, e);
+        else startCanonicalChase(yeti, sp, (x, z) => m.heightAt(x, z));
         balls?.reset();
         chaseStart = t;
         if (firstChase < 0) firstChase = t;

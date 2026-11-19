@@ -1019,6 +1019,18 @@ export class App {
       },
       input: this.input,
       frames: (n: number, dt = 1 / 30) => this.session?.debugFrames(n, dt),
+      /**
+       * (tests) step n frames at a fixed dt through the REAL input pipeline (keyboard, pads), as the
+       * loop does when playing — with hold(true) the loop itself steps nothing, so the run is
+       * deterministic while a real key press or pad button still goes through Input (round 3, the
+       * cinematic-skip test). Stops when the game leaves 'playing' (a pause).
+       */
+      framesLive: (n: number, dt = 1 / 30) => {
+        for (let i = 0; i < n && this.session && this.mode === 'playing'; i++) {
+          this.input.poll();
+          this.session.frame(dt, this.input.gameplay(dt), this.input.activeDevice);
+        }
+      },
       hold: (v: boolean) => {
         this.hold = v;
       },

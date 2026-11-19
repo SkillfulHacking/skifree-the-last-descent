@@ -20,8 +20,9 @@ await p.evaluate(() => window.__skifree.startRun(true));
 await p.evaluate(() => { window.__skifree.seenCave(false); window.__skifree.hold(true); window.__skifree.toCave(); });
 // step until the cinematic starts
 await p.evaluate(() => { for (let i = 0; i < 400 && window.__skifree.state().session.phase !== 'caveCinematic'; i++) window.__skifree.frames(1); });
-const beats = [0.1, 3.8, 5.4, 6.6, 7.9, 9.5, 11.0, 14.6, 15.8, 16.6];
-// SHOTS=none (grounding only) or SHOTS=14.6,15.8 (screenshot only these beats); default: all
+// (round 3: the cinematic ends at the leap beat, 14.6 s)
+const beats = [0.1, 3.8, 5.4, 6.6, 7.9, 9.5, 11.0, 14.3];
+// SHOTS=none (grounding only) or SHOTS=11.0,14.3 (screenshot only these beats); default: all
 const shotsEnv = process.env.SHOTS;
 const wantShot = (T) => !shotsEnv || (shotsEnv !== 'none' && shotsEnv.split(',').map(Number).includes(T));
 const report = [];

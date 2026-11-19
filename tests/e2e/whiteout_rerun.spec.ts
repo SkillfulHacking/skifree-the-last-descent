@@ -61,7 +61,9 @@ test('Whiteout: a second run keeps its environment bases; the cave leap is not a
   await k(page, '(k) => { for (let t = 20; t < 80; t += 0.5) { k.setTime(t); k.frames(1, 1 / 30); } }');
   const tz = await k<number>(page, '(k) => { const m = k.world().mountain; return m.profile.encounters(0, m.finishZ)[0].triggerZ; }');
   await k(page, '(k, z) => k.teleport(z + 0.5, 16)', tz);
-  const reached = await k<boolean>(page, '(k) => { for (let i = 0; i < 2000; i++) { const s = k.state().session; if (s && s.phase === "caveCinematic" && s.cinematicTime >= 15.2) return true; k.frames(1, 1 / 30); } return false; }');
+  // (round 3: the cinematic ends as the Yeti leaps — the leap is the chase's first second) the frame
+  // 0.6 s into the leap, as the original W-031 white-out frame was
+  const reached = await k<boolean>(page, '(k) => { for (let i = 0; i < 2000; i++) { const s = k.state().session; if (s && s.phase === "chase") { k.frames(18, 1 / 30); return k.state().session.yetiAirborne === true; } k.frames(1, 1 / 30); } return false; }');
   expect(reached).toBe(true);
 
   const snow = (await k<{ snow: Snow }>(page, '(k) => k.renderProbe([])')).snow;
