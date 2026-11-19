@@ -1,0 +1,62 @@
+# Round 2 browser e2e (Playwright, SwiftShader software rendering, 1 worker), branch pass5-whiteout
+# Candidate src b70a793. game and menu ran on 49bb459 (src = b70a793); release, whiteout, whiteout_rerun, migration and progression on 68aba34 / f51fd74 (src = b70a793 + the settings fix below).
+
+## game.spec.ts
+✓  1 tests/e2e/game.spec.ts:58:1 › main menu loads with a rendered 3D background and no fatal errors (2.7m)
+✓  2 tests/e2e/game.spec.ts:72:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory (16.1m)
+✓  3 tests/e2e/game.spec.ts:191:1 › pause/resume and gamepad hot-plug do not break the game (2.9m)
+  3 passed (21.8m)
+
+## menu.spec.ts
+✓  1 tests/e2e/menu.spec.ts:78:3 › main menu fits 1920x1080 without scrolling, title intact (2.2m)
+✓  2 tests/e2e/menu.spec.ts:78:3 › main menu fits 1920x900 without scrolling, title intact (2.2m)
+✓  3 tests/e2e/menu.spec.ts:78:3 › main menu fits 1366x768 without scrolling, title intact (1.5m)
+✓  4 tests/e2e/menu.spec.ts:78:3 › main menu fits 2560x1440 without scrolling, title intact (3.8m)
+✓  5 tests/e2e/menu.spec.ts:91:1 › browser zoom 125% and UI scale 150% keep the menu usable (scroll only if needed) (3.2m)
+✓  6 tests/e2e/menu.spec.ts:117:1 › keyboard, mouse and gamepad drive the course controls; the choice persists (8.5m)
+✓  7 tests/e2e/menu.spec.ts:156:1 › a course code typed into the menu selects that course (19.4m)
+✓  8 tests/e2e/menu.spec.ts:197:1 › the Location row (Alpine, Fjord Coast) shows name, rating and description and the menu still fits (14.3m)
+  8 passed (55.2m)
+
+## release.spec.ts
+✓  1 tests/e2e/release.spec.ts:44:1 › all 12 achievements display at 1366x768, 1920x1080 and 2560x1440 (7.8m)
+✓  2 tests/e2e/release.spec.ts:87:1 › an equipped jacket persists across reloads (no ?debug) (7.6m)
+✓  3 tests/e2e/release.spec.ts:116:1 › a real unlock through keyboard play (Pizza Party) persists, grants its jacket and survives a reload (no ?debug) (33.9m)
+  3 passed (49.3m)
+
+## whiteout.spec.ts
+✓  1 tests/e2e/whiteout.spec.ts:70:1 › boots clean; a front is announced on the HUD before it arrives and while it blows (2.1m)
+✓  2 tests/e2e/whiteout.spec.ts:96:1 › Hard: the Yeti throws in the storm and the landing marks are up (6.1m)
+✓  3 tests/e2e/whiteout.spec.ts:119:1 › storm cave encounter plays through to the chase; the storm look leaves the Yeti at the finish; the rescue station finish reports the visit (7.0m)
+  3 passed (15.5m)
+
+## whiteout_rerun.spec.ts
+✓  1 tests/e2e/whiteout_rerun.spec.ts:45:1 › Whiteout: a second run keeps its environment bases; the cave leap is not a white-out (W-031) (7.2m)
+✓  2 tests/e2e/whiteout_rerun.spec.ts:86:3 › alpine: a retry keeps the sun (W-031 root cause) (2.4m)
+✓  3 tests/e2e/whiteout_rerun.spec.ts:86:3 › fjord: a retry keeps the sun (W-031 root cause) (2.9m)
+  3 passed (12.6m)
+
+## migration.spec.ts
+✓  1 tests/e2e/migration.spec.ts:103:1 › a Pass 3 save (settings + per-course records, no progress key) loads unchanged in the pass-4 build and stays playable (10.2m)
+✓  2 tests/e2e/migration.spec.ts:188:1 › a v1 progress save migrates to v2 without ?debug: reward granted, unknown data kept, written back as v2 (4.8m)
+  2 passed (15.1m)
+
+## progression.spec.ts
+✓  1 tests/e2e/progression.spec.ts:88:1 › Achievements + Locker: layout, keyboard/mouse/gamepad, v1 save migration, equip persists and recolours the skier (13.5m)
+✓  2 tests/e2e/progression.spec.ts:174:1 › an automated ?debug run reports unlocks but never persists them (3.4m)
+  2 passed (17.0m)
+
+## Not run in round 2
+- scenic.spec.ts (Fjord viewpoint route, ~52 min) and poles.spec.ts (~18 min): the machine restarts long jobs; both cover
+  code Whiteout round 2 did not change (Fjord scenic route, pole push). They run in the round-3 suite.
+
+## Failures found in the first round-2 run, and their fixes
+1. migration.spec.ts:103 "a Pass 3 save ... loads unchanged": the stored settings gained "reduceWeather": false on open.
+   Fix 68aba34: saveSettings leaves out a setting the stored object lacks while it still equals its default (no
+   migration, no key change); unit test in tests/unit/reduce_weather.test.ts. The later check in the same test (after a
+   real save by the player) then expected the Pass 6 rule for new settings: f51fd74 allows reduceWeather at its default
+   there, as for controlHints.
+2. progression.spec.ts:117 expected 3 future achievement cards; Whiteout's achievement is now earnable (W-050), so 2.
+   Fix 68aba34 (test), as release.spec.ts already did.
+3. progression.spec.ts:130 once timed out taking a screenshot (120 s) while two simulation jobs shared the 2 CPUs;
+   re-run alone: pass.
