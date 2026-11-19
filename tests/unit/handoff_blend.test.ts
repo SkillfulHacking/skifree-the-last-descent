@@ -55,7 +55,8 @@ function scenario(biome: 'alpine' | 'fjord' | 'whiteout') {
   const toCave = new THREE.Vector3(sp.pos.x - P.x, 0, sp.pos.z - P.z).normalize();
   const shotPos = P.clone().addScaledVector(toCave, -3.6).add(new THREE.Vector3(0, 1.35, 1.3));
   const shotLook = sp.pos.clone().add(new THREE.Vector3(0, 1.6, 0)).lerp(P.clone().add(new THREE.Vector3(0, 1.5, 0)), 0.34);
-  return { mk, target, yetiAt, shotPos, shotLook };
+  f.ensure(e.triggerZ - 300, e.triggerZ + 300);
+  return { mk, target, yetiAt, shotPos, shotLook, f };
 }
 
 describe('cave hand-off camera', () => {
@@ -79,7 +80,7 @@ describe('cave hand-off camera', () => {
 
   for (const biome of ['alpine', 'fjord', 'whiteout'] as const)
     it(`${biome}: the skier stays in frame, the view looks back up at the leap until the landing, and turns ≤ 3.6°/frame (the ease out of the shot included) to end on the follow camera`, () => {
-      const { mk, target, yetiAt, shotPos, shotLook } = scenario(biome);
+      const { mk, target, yetiAt, shotPos, shotLook, f } = scenario(biome);
       const A = mk(); // the hand-off camera
       const N = mk(); // a follow camera with no hand-off (the reference it must end on)
       const B: HandoffBlend = { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fov: 46, t: 0, landedAt: null };
@@ -123,6 +124,23 @@ describe('cave hand-off camera', () => {
         if (B.t > HANDOFF_CAM.shot) expect(deg(d.angleTo(toSkier))).toBeLessThan(40);
         // until the landing the view faces back up the hill (the leap is behind the skier)
         if (B.t > HANDOFF_CAM.shot && B.t < landing + HANDOFF_CAM.landHold) expect(d.z).toBeLessThan(-0.3);
+        // (review C, C11) no tree crown on the line from the camera to the Yeti, from 0.6 s to the touchdown
+        if (B.t > 0.6 && B.t <= landing) {
+          const ids: number[] = [];
+          const a = A.cam.position;
+          const b = yeti.pos.clone().add(new THREE.Vector3(0, 1.5, 0));
+          f.grid.query((a.x + b.x) / 2, (a.z + b.z) / 2, a.distanceTo(b) / 2 + 4, ids);
+          for (const id of ids) {
+            const o = f.get(id)!;
+            if (o.kind !== 'tree') continue;
+            const dx = b.x - a.x;
+            const dz = b.z - a.z;
+            const u = Math.max(0, Math.min(1, ((o.x - a.x) * dx + (o.z - a.z) * dz) / (dx * dx + dz * dz)));
+            const off = Math.hypot(a.x + dx * u - o.x, a.z + dz * u - o.z);
+            const lineY = a.y + (b.y - a.y) * u;
+            expect(off < o.softR + 0.5 && lineY < o.y + o.height + 3, `a tree at ${o.x.toFixed(1)}, ${o.z.toFixed(1)} hides the Yeti at ${B.t.toFixed(2)} s`).toBe(false);
+          }
+        }
         // the touchdown in view: within the horizontal half-angle of view, with a margin (48° at 16:9 / fov 64)
         if (Math.abs(B.t - landing) < 1e-9) {
           const toYeti = yeti.pos.clone().add(new THREE.Vector3(0, 1.5, 0)).sub(A.cam.position).normalize();

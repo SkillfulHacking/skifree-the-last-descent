@@ -273,6 +273,17 @@ export function* generateBandSteps(m: Mountain, seed: number, band: number): Gen
   const cps = P.checkpoints(zA - 200, zB + 200);
   const kickers = P.kickersNear(zA - 40, zB + 40, []);
   const caves = P.encounters(zA - 60, zB + 60).map((e) => ({ x: e.anchor.centerX + e.anchor.side * e.anchor.d, z: e.anchor.z, side: e.anchor.side, d: e.anchor.d }));
+  // (W-076, review C C11) the sight line of the chase's opening: from the skier's first ~45 m after a
+  // cave's trigger back to where the Yeti lands (yeti/spawn.ts) stays clear of trees — a tree there
+  // hid his whole leap and landing from the look-back camera
+  const leapViews = P.encounters(zA - 120, zB + 120).map((e) => {
+    const lz = e.anchor.z + 14;
+    const L = { x: m.centerX(lz) + 18 * e.anchor.side, z: lz };
+    const a = { x: m.routeX(e.triggerZ), z: e.triggerZ };
+    const b = { x: m.routeX(e.triggerZ + 45), z: e.triggerZ + 45 };
+    return [L, a, b] as const;
+  });
+  const inLeapView = (x: number, z: number) => leapViews.some((t) => inTriangle(x, z, t, 4));
   const hasAlt = P.altRoutes(zA - 10, zB + 10).length > 0;
   const coast = m.coast;
   const lookouts = coast ? coast.lookouts(zA - 70, zB + 70) : [];
@@ -307,6 +318,7 @@ export function* generateBandSteps(m: Mountain, seed: number, band: number): Gen
       if (cps.some((c) => Math.abs(z - c) < 120 && ad < 110)) continue; // Endless checkpoint lodges
       if (z < 40 && z > -60 && ad < 40) continue; // start platform
       if (caves.some((c) => Math.hypot(x - c.x, z - c.z) < 26)) continue; // cave mouth
+      if (inLeapView(x, z)) continue; // the leap's sight line
       if (nearKicker(x, z)) continue;
       if (inZone(x, z)) continue; // a hazard's clear line (a drift row's gap)
       if (caves.some((c) => d * c.side > c.d - 16 && Math.abs(z - c.z) < 40)) continue; // keep cave clearing open
@@ -415,4 +427,21 @@ export function laneClearance(field: ObstacleField, z0: number, z1: number): num
     best = Math.min(best, dist);
   }
   return clamp(best, -1e9, 1e9);
+}
+
+/** (x, z) inside the triangle t, or within `pad` m of one of its edges */
+function inTriangle(x: number, z: number, t: readonly [{ x: number; z: number }, { x: number; z: number }, { x: number; z: number }], pad: number): boolean {
+  const [a, b, c] = t;
+  const cross = (p: { x: number; z: number }, q: { x: number; z: number }) => (q.x - p.x) * (z - p.z) - (q.z - p.z) * (x - p.x);
+  const d1 = cross(a, b);
+  const d2 = cross(b, c);
+  const d3 = cross(c, a);
+  if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) return true;
+  const seg = (p: { x: number; z: number }, q: { x: number; z: number }) => {
+    const dx = q.x - p.x;
+    const dz = q.z - p.z;
+    const u = Math.max(0, Math.min(1, ((x - p.x) * dx + (z - p.z) * dz) / (dx * dx + dz * dz || 1)));
+    return Math.hypot(p.x + dx * u - x, p.z + dz * u - z);
+  };
+  return seg(a, b) < pad || seg(b, c) < pad || seg(c, a) < pad;
 }
