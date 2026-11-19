@@ -89,7 +89,11 @@ export class Timeline {
     let active: Shot | null = null;
     for (const s of this.shots) if (this.time >= s.start && this.time < s.end) active = s;
     if (!active) {
-      const last = this.shots[this.shots.length - 1];
+      // past every shot: hold the one that ends last (on a tie, the later-pushed one, as above) — not
+      // the last pushed (Gitar, round 3: a location's earlier shots, pushed after the base ones,
+      // snapped the camera back to the roar close-up on the cinematic's final frame)
+      let last: Shot | null = null;
+      for (const s of this.shots) if (!last || s.end >= last.end) last = s;
       if (!last || this.time < last.end) return false;
       active = last;
     }
