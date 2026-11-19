@@ -1,7 +1,7 @@
 // Round 3 (W-076): the watched cave cinematic's hand-off into the chase, frame by frame — the last
-// second of the cinematic and the chase's first 1.6 s (the camera's swing back to third person while
-// the Yeti leaps), every 0.2 s, HUD on, for each location's Classic Sprint. Production build,
-// SwiftShader. manifest.json records the session state of every frame.
+// second of the cinematic and the chase's first ~4.3 s (the look-back at the leap, the landing, the
+// turn to the run), every 0.27 s, HUD on, for each location's Classic Sprint. Production build,
+// SwiftShader. manifest.json records the session state and the camera (position, fov, direction).
 //   node tools/handoff_strip.mjs <outDir> [WxH=960x540] [biomes=alpine,fjord,whiteout]
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -21,7 +21,7 @@ for (const biome of list.split(',')) {
   await page.waitForFunction(() => window.__ready === true, null, { timeout: 900_000, polling: 1000 });
   await page.evaluate(async () => { const k = window.__skifree; await k.startRun(true); k.hold(true); k.autopilot('skilled'); k.advance(200); k.autopilot(null); });
   await page.evaluate(() => { const k = window.__skifree; while (k.state().session.phase === 'caveCinematic' && k.state().session.cinematicTime < 13.6) k.frames(1, 1 / 30); });
-  for (let i = 0; i < 17; i++) {
+  for (let i = 0; i < 21; i++) {
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     const s = await page.evaluate(() => window.__skifree.state().session);
     const name = `${biome}_${String(i).padStart(2, '0')}`;
