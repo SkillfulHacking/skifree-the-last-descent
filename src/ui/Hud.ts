@@ -293,6 +293,20 @@ export class Hud {
     return parts.length ? parts.join('\n') : null;
   }
 
+  /**
+   * Take back a soft caption that no longer holds (round 3, R2 A N8: "a storm front rolls in" stayed
+   * up into the clearing): drops it from the queue, and ends it if it is on screen.
+   */
+  withdrawCaption(match: (text: string) => boolean) {
+    for (let i = this.softQueue.length - 1; i >= 0; i--) if (match(this.softQueue[i]!.text)) this.softQueue.splice(i, 1);
+    if (this.softTimer > 0 && match(this.capSoft.textContent ?? '')) {
+      this.softTimer = 0;
+      this.softPriority = 0;
+      this.capSoft.classList.remove('on');
+      this.refreshCaption();
+    }
+  }
+
   clearCaption() {
     this.hardTimer = 0;
     this.softTimer = 0;

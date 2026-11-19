@@ -1181,7 +1181,12 @@ export class GameSession implements Stage {
         // a net win (it crosses the drift rows) — but to the marked drift gaps, the move that is
         // (balance/round2: +12/−0 on held-out Normal Sprint seeds)
         this.envCaption(`[a storm front rolls in — the wind pushes you ${side}; ski the flagged gaps in the drifts]`, 3.2, 'front', CAPTION_PRIORITY.warning, 6);
-      } else if (f.phase === 'ease') this.envCaption('[the storm eases — the view opens up]', 2.2, 'front', CAPTION_PRIORITY.report);
+      } else if (f.phase === 'ease') {
+        // (round 3, R2 A N8) the front's warning is taken back as it eases
+        this.hud.withdrawCaption((t) => t.startsWith('[a storm front rolls in'));
+        this.envCaptionAt.delete('front');
+        this.envCaption('[the storm eases — the view opens up]', 2.2, 'front', CAPTION_PRIORITY.report);
+      }
       this.lastFront.phase = f.phase;
     }
   }

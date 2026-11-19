@@ -35,7 +35,7 @@ describe('captions (round 2)', () => {
 
   it('a warning that cannot show waits, then shows when the line frees — highest priority first, oldest first', () => {
     const h = hud();
-    h.caption('[a storm front rolls in — the wind pushes you left; the left shoulder is the lee]', 3.2, { soft: true, priority: 2 });
+    h.caption('[a storm front rolls in — the wind pushes you left; ski the flagged gaps in the drifts]', 3.2, { soft: true, priority: 2 });
     h.caption('[a blizzard is blowing across the piste ahead — stand up out of the tuck; it pushes you right]', 2.8, { soft: true, priority: 2, ttl: 30 });
     h.caption('[skis plough into a deep drift]', 1.4, { soft: true, priority: 1 }); // a report: dropped, not queued
     expect(h.captionQueue).toEqual(['[a blizzard is blowing across the piste ahead — stand up out of the tuck; it pushes you right]']);
@@ -45,7 +45,7 @@ describe('captions (round 2)', () => {
 
   it('a queued warning that goes stale is dropped (no warning for a cell already passed)', () => {
     const h = hud();
-    h.caption('[a storm front rolls in — the wind pushes you left; the left shoulder is the lee]', 3.2, { soft: true, priority: 2 });
+    h.caption('[a storm front rolls in — the wind pushes you left; ski the flagged gaps in the drifts]', 3.2, { soft: true, priority: 2 });
     h.caption('[a blizzard builds ahead — stand up out of the tuck; it pushes you left]', 2.8, { soft: true, priority: 2, ttl: 1 });
     step(h, 10);
     expect(h.captionText).toBeNull();
@@ -60,7 +60,7 @@ describe('captions (round 2)', () => {
   });
 
   it('every caption stays up for its reading time (15 characters a second, + 1 s)', () => {
-    const text = '[a storm front rolls in — the wind pushes you left; the left shoulder is the lee]';
+    const text = '[a storm front rolls in — the wind pushes you left; ski the flagged gaps in the drifts]';
     expect(Hud.readSeconds(text, 3.2)).toBeCloseTo(1 + text.length / 15, 5);
     const h = hud();
     h.caption(text, 3.2, { soft: true, priority: 2 });
@@ -68,5 +68,23 @@ describe('captions (round 2)', () => {
     expect(h.captionText).toBe(text);
     step(h, 0.6);
     expect(h.captionText).toBeNull();
+  });
+});
+
+describe('captions (round 3)', () => {
+  it('a front warning is taken back when the storm eases (R2 A N8): on screen or queued', () => {
+    const h = hud();
+    const front = '[a storm front rolls in — the wind pushes you left; ski the flagged gaps in the drifts]';
+    h.caption(front, 3.2, { soft: true, priority: 2 });
+    expect(h.captionText).toContain('storm front');
+    h.withdrawCaption((t) => t.startsWith('[a storm front rolls in'));
+    expect(h.captionText).toBeNull();
+    // queued behind another warning: dropped from the queue as well
+    h.caption('[a blizzard builds ahead — stand up out of the tuck; it pushes you left]', 2.8, { soft: true, priority: 2 });
+    h.caption(front, 3.2, { soft: true, priority: 2 });
+    expect(h.captionQueue).toContain(front);
+    h.withdrawCaption((t) => t.startsWith('[a storm front rolls in'));
+    expect(h.captionQueue).not.toContain(front);
+    expect(h.captionText).toContain('blizzard');
   });
 });
