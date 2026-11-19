@@ -167,7 +167,8 @@ test('a Pass 3 save (settings + per-course records, no progress key) loads uncha
   // the pole hint may or may not have been shown during the run)
   const savedS = JSON.parse(after[KEY_S]!);
   expect(typeof savedS.seenPoleHint).toBe('boolean');
-  expect(savedS).toEqual({ ...PASS3_SETTINGS, course: 'classic', controlHints: true, seenPoleHint: savedS.seenPoleHint });
+  // (Whiteout round 2: Reduce Weather Effects, written at its default by a save, never on load)
+  expect(savedS).toEqual({ ...PASS3_SETTINGS, course: 'classic', controlHints: true, seenPoleHint: savedS.seenPoleHint, ...('reduceWeather' in savedS ? { reduceWeather: false } : {}) });
   if (after[KEY_P] !== undefined) {
     const p = JSON.parse(after[KEY_P]!);
     expect(p.version).toBe(2);
