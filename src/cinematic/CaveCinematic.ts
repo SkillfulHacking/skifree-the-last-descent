@@ -3,9 +3,9 @@
  * Yeti leaps from the ledge and the chase begins. Storyboard beats are annotated inline.
  */
 import * as THREE from 'three';
-import { Timeline, ease, pose } from './Timeline';
+import { Timeline, ease, pose, type CamPose } from './Timeline';
 import type { Stage } from '../game/Stage';
-import { CAVE_LEAP_AT, startCanonicalChase } from './caveHandoff';
+import { CAVE_GATHER_AT, CAVE_LEAP_AT, CAVE_TURN_AT, startCanonicalChase } from './caveHandoff';
 import { yetiSpawnAfterCinematic } from '../yeti/spawn';
 import type { CaveCinematicExtras } from '../world/presentation/cave';
 
@@ -143,11 +143,21 @@ export class CaveCinematic {
       for (let k = 0; k < 24 && blocked(leapCam); k++) leapCam.y += 0.5;
     }
     const yetiLook = () => st.yeti.root.position.clone().add(new THREE.Vector3(0, 1.6, 0)).lerp(skierHead, 0.34);
-    // Beat 10b (round 3): from behind the skier's position toward the cave, the Yeti on the ledge — he leaps as the
-    // chase begins (CAVE_LEAP_AT): the leap itself is the chase's first second, played by the Yeti AI
-    // from the canonical start (caveHandoff.ts) while the camera swings back to third person
-    // (GameSession's blend-out). Watched or skipped, the chase starts from the same state.
-    tl.shot({ start: 14.2, end: CAVE_LEAP_AT, from: () => pose(leapCam, yetiLook(), 44), to: () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.15, 0)), yetiLook(), 46) });
+    // Beat 10b: from behind the skier's position toward the cave, the Yeti gathering on the ledge
+    tl.shot({ start: CAVE_GATHER_AT, end: CAVE_TURN_AT, from: () => pose(leapCam, yetiLook(), 44), to: () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.1, 0)), yetiLook(), 45) });
+    // Beat 11 (W-076, owner's decision 1): the camera swings around the skier from the Yeti to the run
+    // and lands on the follow camera's own forward pose, so control returns looking downhill — the
+    // same gameplay camera a skip gives. The leap is the chase's first second (caveHandoff.ts).
+    // Reduce Camera Motion: no swing — a hold on the Yeti, then a cut to the forward view.
+    let fwd: CamPose | null = null;
+    const forward = () => (fwd ??= st.gameplayPose());
+    const turnFrom = () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.1, 0)), yetiLook(), 45);
+    const pivot = P.clone().add(new THREE.Vector3(0, 1.2, 0));
+    if (st.settings.reduceCameraMotion) {
+      const cutAt = (CAVE_TURN_AT + CAVE_LEAP_AT) / 2;
+      tl.shot({ start: CAVE_TURN_AT, end: cutAt, from: turnFrom, to: turnFrom });
+      tl.shot({ start: cutAt, end: CAVE_LEAP_AT, from: forward, to: forward });
+    } else tl.shot({ start: CAVE_TURN_AT, end: CAVE_LEAP_AT, from: turnFrom, to: forward, orbit: () => pivot, easing: ease.inOut });
 
     // --- actors & sound
     tl.at(0, () => {
@@ -209,13 +219,19 @@ export class CaveCinematic {
       st.audio.playExertion('gasp');
       st.audio.setMusicMode('tension');
     });
-    tl.at(CAVE_LEAP_AT, () => {
-      // he gathers for the leap: on the ledge, facing the piste (the chase AI takes him from here)
+    tl.at(CAVE_GATHER_AT, () => {
+      // (at the cut) he takes his place for the leap: on the ledge, facing the piste — the chase AI
+      // takes him from here; the leap's crouch and launch play when control returns
       const sp = yetiSpawnAfterCinematic(st.world.mountain, st.world.focusEncounter?.anchor, st.world.cave.ledge);
       st.yeti.root.position.copy(sp.pos);
       st.yeti.root.rotation.set(0, sp.heading, 0);
-      st.setYetiMode('leap');
+      st.setYetiMode('stand');
       st.audio.playYetiGrowl(sp.pos, false);
+    });
+    tl.at(CAVE_TURN_AT, () => {
+      // the skier turns to face the run and the bars open as the camera comes round (0.7 s transition)
+      st.poseOverride = { lookBack: 0, wobble: 0.2 };
+      st.hud.letterbox(false);
     });
 
     // location beats (Fjord: gulls, spray, its own shot overrides); none for Alpine
@@ -282,7 +298,7 @@ export class CaveCinematic {
   private curS = 0;
   private applyShade() {
     const s = this.curS;
-    this.st.yeti.setShade(this.tl.time >= CAVE_LEAP_AT ? 1 : Math.min(this.dimShade, 1 - 0.88 * Math.min(1, Math.max(0, (s - 0.5) / 6))));
+    this.st.yeti.setShade(this.tl.time >= CAVE_GATHER_AT ? 1 : Math.min(this.dimShade, 1 - 0.88 * Math.min(1, Math.max(0, (s - 0.5) / 6))));
   }
 
   private placeAt(s: number) {

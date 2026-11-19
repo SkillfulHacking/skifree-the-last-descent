@@ -18,9 +18,8 @@ import { YetiAI } from '../yeti/YetiAI';
 import { RunState } from './RunState';
 import { FollowCamera } from '../camera/FollowCamera';
 import { CaveCinematic } from '../cinematic/CaveCinematic';
-import { lookBackAt, releaseHandoffOnInput, shotBlend, type HandoffBlend } from '../camera/handoffBlend';
 import { DefeatCinematic, VictoryCinematic } from '../cinematic/EndCinematics';
-import { Timeline, ease, pose } from '../cinematic/Timeline';
+import { Timeline, ease, pose, type CamPose } from '../cinematic/Timeline';
 import { autopilotInput, type AutopilotStyle } from '../debug/autopilot';
 import { clamp, damp, smoothstep, wrapAngle } from '../core/rng';
 import { victorySteer } from './victorySteer';
@@ -193,6 +192,22 @@ export class GameSession implements Stage {
     this.follow.addTrauma(amount * this.settings.cameraShake);
   }
 
+  gameplayPose(): CamPose {
+    // exactly the pose finishCave's snap gives the first controllable frame (W-076, decision 1)
+    const c = this.camera;
+    const pos = c.position.clone();
+    const quat = c.quaternion.clone();
+    const fov = c.fov;
+    this.follow.lookBack = 0;
+    this.follow.snap(this.followTarget());
+    const out: CamPose = { pos: c.position.clone(), look: this.follow.lookTarget.clone(), fov: c.fov };
+    c.position.copy(pos);
+    c.quaternion.copy(quat);
+    c.fov = fov;
+    c.updateProjectionMatrix();
+    return out;
+  }
+
   setYetiMode(m: YetiMode) {
     if (this.yetiAnim.mode !== m) {
       this.yetiAnim.mode = m;
@@ -274,9 +289,7 @@ export class GameSession implements Stage {
     } else if (this.run.phase === 'caveCinematic' && this.cave) {
       const canSkip = this.recordsSeenCave;
       this.hud.setSkipHint(canSkip ? `Skip  ${this.hud.g('skip')}` : null);
-      let skipped = false;
       if (canSkip && gi.skipPressed) {
-        skipped = true;
         this.cave.tl.skip();
         this.follow.consumeTrauma(100);
         this.audio.setMusicMode('tension');
@@ -287,11 +300,8 @@ export class GameSession implements Stage {
         this.applyCineShake(dt);
       }
       if (this.cave.tl.done) {
-        // (round 3) watched to its end, the cinematic hands over as the Yeti leaps: the follow camera
-        // looks back over the skier at the leap and the landing, then turns to the run
-        // (camera/handoffBlend.ts; presentation only — the chase state is the same either way)
-        // (reduce camera motion: no look-back and no swing — the skip path's camera, W-076 review E N2)
-        if (!skipped && !this.settings.reduceCameraMotion) this.cineBlend = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone(), fov: this.camera.fov, t: 0, landedAt: null };
+        // (W-076, owner's decision 1) watched or skipped, control returns on the follow camera's
+        // forward view: the cinematic's last beat swings round to exactly that pose (CaveCinematic)
         this.finishCave();
         // the cinematic already moved the Yeti this frame: start simulating next frame (C13)
         this.handoffFrame = true;
@@ -345,29 +355,7 @@ export class GameSession implements Stage {
       this.follow.orbit(gi.camX, gi.camY);
       this.follow.lookBack = gi.lookBack && this.run.controllable ? 1 : 0;
       this.follow.avoid = this.run.phase === 'chase' && this.yeti.root.visible ? this.yeti.root.position : null;
-      const B = this.cineBlend;
-      if (B && this.run.phase !== 'chase') {
-        this.cineBlend = null;
-        this.follow.lookBackOverride = null;
-        this.follow.lookBackAim = null;
-      } else if (B) {
-        B.t += dt;
-        if (B.landedAt === null && !this.leapPending) B.landedAt = B.t;
-        // (W-076 reviews E N1 / F N1) the look-back is the player's to end: steering, braking or
-        // moving the camera starts the turn to the run at once (as if he had just landed); and it
-        // never outlasts 3 s without a landing
-        const acting = Math.abs(gi.steer) > 0.25 || gi.brake > 0.25 || gi.lookBack || Math.abs(gi.camX) + Math.abs(gi.camY) > 0.01;
-        releaseHandoffOnInput(B, acting);
-        this.follow.lookBackOverride = lookBackAt(B);
-      }
       this.follow.update(dt, this.followTarget(true));
-      if (B && this.cineBlend) {
-        shotBlend(this.camera, B);
-        if (this.follow.lookBackOverride === null) {
-          this.cineBlend = null;
-          this.follow.lookBackAim = null;
-        }
-      }
     }
     this.updateTutorial(dt);
     this.updateHud(dt);
@@ -384,23 +372,17 @@ export class GameSession implements Stage {
     this.shake(0.5);
     this.audio.playYetiFootstep(p, 1);
     this.world.particles.emit({ x: p.x, y: p.y + 0.2, z: p.z, vx: 0, vy: 2, vz: 0, spread: 2.5, size: 0.7, life: 1.4, count: 60, gravity: 0.5, drag: 1.6, grow: 1.4, alpha: 0.85 });
-    // the title after the touchdown has been seen (it sits mid-frame, where the look-back puts him)
-    this.runTitleIn = this.cineBlend ? 0.6 : 0;
-    if (this.runTitleIn === 0) this.showRunTitle();
   }
-  private runTitleIn = -1;
   private showRunTitle() {
-    this.runTitleIn = -1;
     this.hud.title('RUN.', '', 'run', 1.6);
     this.audio.playRunPrompt();
   }
-  /** the camera's blend from the cave cinematic's last shot back to the follow camera (watched hand-off) */
-  private cineBlend: HandoffBlend | null = null;
 
   /** Rear-view framing (skier in the foreground, the yeti behind), or null when not needed. */
   rearView(out: { pos: THREE.Vector3; look: THREE.Vector3 }): number {
-    // (no inset while the main camera itself looks back at the leap: W-076 review C, C9)
-    if (this.run.phase !== 'chase' || !this.yeti.root.visible || this.leapPending || this.cineBlend) return 0;
+    // (W-076, decision 1) the main camera faces the run from the first controllable frame: the inset
+    // shows the leap and the landing behind the skier
+    if (this.run.phase !== 'chase' || !this.yeti.root.visible) return 0;
     const d = this.yetiAI.distance;
     if (d > 110) return 0;
     const s = this.phys.s;
@@ -496,7 +478,6 @@ export class GameSession implements Stage {
       const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded, down: s.crashed || s.recoverTime > 0 };
       this.yetiAI.update(PHYS_DT, target);
       if (this.leapPending && !this.yetiAI.airborne) this.yetiLanded();
-      if (this.runTitleIn > 0 && (this.runTitleIn -= PHYS_DT) <= 0) this.showRunTitle();
       this.stepSnowballs();
       if (this.yetiAI.phase === 'chase' && !this.yetiAI.airborne) this.chaseMinGap = Math.min(this.chaseMinGap, this.yetiAI.distance);
       if (this.yetiAI.canCatch(target) && this.run.catchPlayer()) this.beginDefeat();
@@ -772,10 +753,6 @@ export class GameSession implements Stage {
 
   private finishCave() {
     if (!this.cave) return;
-    // (W-076 review C, C8) a watched hand-off starts the follow camera already looking back at the
-    // leap (turned toward the Yeti) before it is snapped, so the ease out of the shot has no flip
-    this.follow.lookBackOverride = this.cineBlend ? 1 : null;
-    this.follow.lookBackAim = this.cineBlend ? this.yetiAI.pos : null;
     this.cave.finish();
     this.cave = null;
     this.run.endCaveCinematic();
@@ -785,8 +762,9 @@ export class GameSession implements Stage {
     this.chaseMinGap = Infinity;
     if (this.run.encounter) this.events.emit({ type: 'YetiEncountered', encounter: this.run.encounter.index, difficulty: this.world.course.difficulty });
     this.hud.setSkipHint(null);
-    // (round 3, W-076 review F F1) the leap is the chase's first beat: the RUN. title and the rear
-    // view wait for his landing (yetiLanded), which hits like the filmed one did
+    // (W-076, decision 1) the danger is announced at once — RUN. on the first controllable frame —
+    // and the leap is the chase's first beat: his landing (yetiLanded) hits with a thud and a shake
+    this.showRunTitle();
     this.leapPending = this.yetiAI.airborne;
     if (!this.leapPending) this.yetiLanded();
     this.audio.setMusicMode('chase');
@@ -814,9 +792,6 @@ export class GameSession implements Stage {
   private tmpHeld = new THREE.Vector3();
 
   private beginDefeat() {
-    this.cineBlend = null;
-    this.follow.lookBackOverride = null;
-    this.follow.lookBackAim = null;
     this.emitRunFinished('caught');
     this.hud.setPrompt(null);
     this.yetiAI.phase = 'caught';

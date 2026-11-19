@@ -10,6 +10,7 @@ import type { FollowCamera } from '../camera/FollowCamera';
 import type { Hud } from '../ui/Hud';
 import type { Settings } from '../core/settings';
 import type { SkierPose, YetiAnimState } from '../core/types';
+import type { CamPose } from '../cinematic/Timeline';
 
 export interface Stage {
   world: World;
@@ -31,4 +32,6 @@ export interface Stage {
   /** emit snow falling from tree canopies within radius of a point */
   shakeTrees(center: THREE.Vector3, radius: number, max: number): void;
   setYetiMode(m: YetiAnimState['mode']): void;
+  /** the follow camera's forward gameplay pose for the skier as they stand (camera left untouched) */
+  gameplayPose(): CamPose;
 }

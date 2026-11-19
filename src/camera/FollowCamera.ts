@@ -43,11 +43,6 @@ export class FollowCamera {
   avoid: THREE.Vector3 | null = null;
   /** 0..1 look back over the shoulder (held input) */
   lookBack = 0;
-  /** a scripted look-back (0..1) that replaces the player's, undamped (the cave hand-off: W-076) */
-  lookBackOverride: number | null = null;
-  /** with lookBackOverride: the point to turn the look-back toward (null: straight back) */
-  lookBackAim: THREE.Vector3 | null = null;
-  private tmpAim = new THREE.Vector3();
   private lookBackS = 0;
   private avoidS = 0;
   private avoidSide = 1;
@@ -129,7 +124,7 @@ export class FollowCamera {
     this.airY = damp(this.airY, air, t.grounded ? 6 : 1.8, dt);
     const baseY = t.pos.y - air + this.airY * 0.75 + air * 0.25;
 
-    this.lookBackS = this.lookBackOverride ?? damp(this.lookBackS, this.lookBack, 6, dt);
+    this.lookBackS = damp(this.lookBackS, this.lookBack, 6, dt);
     // keep out of the yeti: when it is close behind, lift the boom and swing to the side so it
     // reads over the skier's shoulder instead of filling the screen
     let avoidK = 0;
@@ -143,13 +138,7 @@ export class FollowCamera {
       if (avoidK > 0.01 && this.avoidS < 0.05) this.avoidSide = lat >= 0 ? -1 : 1;
     }
     this.avoidS = damp(this.avoidS, avoidK, 4, dt);
-    // (W-076) a scripted look-back can be turned toward a point behind (the leaping Yeti), ≤ 0.6 rad
-    let bias = 0;
-    if (this.lookBackAim && this.lookBackOverride !== null) {
-      const want = Math.atan2(this.lookBackAim.x - t.pos.x, this.lookBackAim.z - t.pos.z);
-      bias = THREE.MathUtils.clamp(wrapAngle(want - (this.yaw + Math.PI)), -0.6, 0.6) * this.lookBackS;
-    }
-    const ay = this.yaw + this.orbitYaw + this.avoidSide * this.avoidS * 1.0 + Math.PI * this.lookBackS + bias;
+    const ay = this.yaw + this.orbitYaw + this.avoidSide * this.avoidS * 1.0 + Math.PI * this.lookBackS;
     const boom = this.dist * (1 - 0.15 * this.avoidS) * (1 - 0.15 * this.lookBackS);
     const goal = this.tmp.set(t.pos.x - Math.sin(ay) * boom, baseY + height + this.orbitPitch * this.dist + 2.2 * this.avoidS + 0.6 * this.lookBackS, t.pos.z - Math.cos(ay) * boom);
 
@@ -189,14 +178,11 @@ export class FollowCamera {
 
     const look = new THREE.Vector3();
     const ahead = THREE.MathUtils.lerp(4, 15, smoothstep(0, 30, sp));
-    const lyaw = this.yaw + Math.PI * this.lookBackS + bias;
+    const lyaw = this.yaw + Math.PI * this.lookBackS;
     look.set(t.pos.x + Math.sin(lyaw) * ahead, baseY + 0.6, t.pos.z + Math.cos(lyaw) * ahead);
     // aim slightly down the slope so the upcoming terrain is in view
     const gy = this.mountain.heightAt(look.x, look.z) + 1.2;
     look.y = THREE.MathUtils.lerp(Math.min(look.y, gy), baseY + 1.0, 0.5);
-    // (W-076 review C) looking back at the leap, the aim is pulled 30% of the way onto the Yeti, so he
-    // sits in the middle of the frame (not under the top HUD) with the skier in the foreground
-    if (this.lookBackAim && this.lookBackOverride !== null) look.lerp(this.tmpAim.copy(this.lookBackAim).setY(this.lookBackAim.y + 1.5), 0.3 * this.lookBackS);
 
     if (!this.initialized) {
       this.pos.copy(goal);

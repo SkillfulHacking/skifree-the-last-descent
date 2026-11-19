@@ -17,8 +17,17 @@
 import * as THREE from 'three';
 import type { YetiAI } from '../yeti/YetiAI';
 
-/** the leap beat (s into the cave cinematic): the cinematic ends here and the chase begins */
-export const CAVE_LEAP_AT = 14.6;
+/**
+ * The cinematic's last beats (s), owner's decision 1 (W-076): the Yeti takes his place on the ledge at
+ * CAVE_GATHER_AT (a cut), the camera holds on him, then from CAVE_TURN_AT swings around the skier to
+ * the follow camera's own forward view; at CAVE_LEAP_AT the cinematic ends, control returns facing
+ * downhill and he leaps — the chase's first second, behind the player (rear-view inset, sound, the
+ * landing's thud and shake).
+ */
+export const CAVE_GATHER_AT = 14.2;
+export const CAVE_TURN_AT = 14.7;
+/** the leap beat: the cinematic ends here and the chase begins */
+export const CAVE_LEAP_AT = 15.8;
 
 /** the spawn the chase leaps from (yeti/spawn.ts yetiSpawnAfterCinematic) */
 export interface CaveSpawn {
