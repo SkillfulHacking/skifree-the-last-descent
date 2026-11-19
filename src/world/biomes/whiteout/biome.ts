@@ -133,6 +133,11 @@ export function makeWhiteoutBiome(): Biome {
       // (round 2, W-041) the rim 10 m off the piste (was 26) behind a low 1.5 m lip (was 3.5): where the line
       // runs on the drop side the fall-away is in the gameplay camera's view, not hidden by a bank
       ridge: { dropSide: 1, rim: 10, lip: 1.5, depth: 520, flank: 680, crest: 75, crestE: 150, backDrop: 380 },
+      // (round 3, W-065: the line never came within 37 m of the rim) rim stretches: on the ridge-top
+      // segment types the piste narrows to a ridge run and the racing line eases over (120 m) to run
+      // along the drop-side edge, 4 m inside it — the rim 14 m off the line, the fall-away and the
+      // valley in the gameplay camera's view
+      rimLean: { side: 1, types: ['ridgeline', 'alpine', 'highspeed', 'cliffside'], edge: 4, width: 34, ease: 120 },
       caveSide: -1,
       wallHeight: 130,
       wallRelief: 95,
