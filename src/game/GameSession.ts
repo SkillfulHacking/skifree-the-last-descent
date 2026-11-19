@@ -23,6 +23,7 @@ import { Timeline, ease, pose } from '../cinematic/Timeline';
 import { autopilotInput, type AutopilotStyle } from '../debug/autopilot';
 import { clamp, damp, smoothstep, wrapAngle } from '../core/rng';
 import { victorySteer } from './victorySteer';
+import { blizzardPushDir } from '../world/biomes/whiteout/hazards';
 import type { SkierPose, YetiAnimState, YetiMode, AudioFrameState } from '../core/types';
 import type { World } from './World';
 import type { SkierModel } from '../player/SkierModel';
@@ -801,11 +802,15 @@ export class GameSession implements Stage {
         // every blizzard cell gets its warning once: when it builds ahead, or — a cell already blowing
         // when it comes into range — when it is first seen (W-046: round 1 left those uncaptioned)
         if ((e.type === 'hazard-telegraph' || e.type === 'hazard-active') && e.kind === 'blizzard' && !this.blizzardWarned.has(e.hazard.id)) {
-          this.blizzardWarned.add(e.hazard.id);
-          if (this.blizzardWarned.size > 64) this.blizzardWarned.delete(this.blizzardWarned.values().next().value!);
-          const dir = (e.hazard.params as { dir?: number }).dir ?? 1;
+          // (round 3, R2 E N1) the push named is the one the cell will give (it follows the front in a
+          // storm, as the HUD arrow and the wind do); the cell counts as warned only once its caption is
+          // on screen or waiting, and it may wait as long as the cell takes to arrive (~8 s), not 3.5 s
+          const dir = blizzardPushDir(e.hazard as never, e.t, this.world.environment.seed);
           const what = e.type === 'hazard-telegraph' ? 'a blizzard builds ahead' : 'a blizzard is blowing across the piste ahead';
-          this.envCaption(`[${what} — stand up out of the tuck; it pushes you ${dir > 0 ? 'left' : 'right'}]`, 2.8, `blizzard:${e.hazard.id}`, CAPTION_PRIORITY.warning, 3.5);
+          if (this.envCaption(`[${what} — stand up out of the tuck; it pushes you ${dir > 0 ? 'left' : 'right'}]`, 2.8, `blizzard:${e.hazard.id}`, CAPTION_PRIORITY.warning, 8)) {
+            this.blizzardWarned.add(e.hazard.id);
+            if (this.blizzardWarned.size > 64) this.blizzardWarned.delete(this.blizzardWarned.values().next().value!);
+          }
         }
         if (e.type === 'hazard-hit' && e.kind === 'blizzard') this.envCaption('[a gust catches you in the tuck — you stagger]', 2, 'blizzard-hit', CAPTION_PRIORITY.report);
         // (round 3, R2 B N4) a jump that came down in the snow: say why the skier staggered
@@ -832,11 +837,15 @@ export class GameSession implements Stage {
    * warning that asks for a decision (a squall ahead) replaces a report (rock under the skis) that is
    * still on screen; each kind at most once every 3 s, so one kind never mutes another.
    */
-  private envCaption(text: string, seconds: number, kind: string, priority: number = CAPTION_PRIORITY.report, ttl = 4) {
+  private envCaption(text: string, seconds: number, kind: string, priority: number = CAPTION_PRIORITY.report, ttl = 4): boolean {
     const t = this.phys.s.time;
-    if (t - (this.envCaptionAt.get(kind) ?? -Infinity) < 3) return;
+    if (t - (this.envCaptionAt.get(kind) ?? -Infinity) < 3) return false;
     // warnings wait for the caption line (Hud queue) for up to `ttl` s; reports are dropped if busy
-    if (this.hud.caption(text, seconds, { soft: true, priority, queue: priority >= CAPTION_PRIORITY.warning, ttl })) this.envCaptionAt.set(kind, t);
+    if (this.hud.caption(text, seconds, { soft: true, priority, queue: priority >= CAPTION_PRIORITY.warning, ttl })) {
+      this.envCaptionAt.set(kind, t);
+      return true;
+    }
+    return false;
   }
 
   /** Optional viewpoints on a coast's rim: reaching one reports ScenicLocationDiscovered once per run. */

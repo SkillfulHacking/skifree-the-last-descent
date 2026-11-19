@@ -99,7 +99,8 @@ const r1 = (v: number) => Math.round(v * 10) / 10;
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
 export function measure(spec: RunSpec): RunResult {
-  const c = makeCourse('custom', spec.len, { biome: spec.biome, customText: spec.seed, difficulty: spec.diff });
+  // (round 3) seed 'CLASSIC': the location's Classic course (the default course)
+  const c = spec.seed === 'CLASSIC' ? makeCourse('classic', spec.len, { biome: spec.biome, difficulty: spec.diff }) : makeCourse('custom', spec.len, { biome: spec.biome, customText: spec.seed, difficulty: spec.diff });
   const ws = worldSeed(c);
   const m = buildMountain(c);
   const env = new BiomeEnvironment(m, ws, { difficulty: spec.diff });

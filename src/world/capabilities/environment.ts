@@ -328,7 +328,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     // physics-critical band must exist even if the caller did not stream (simulations)
     this.hazards.ensure(q.z - 1, q.z + 1);
     const near = this.hazards.near(q.x, q.z + HAZARD_ALERT_RANGE * 0.5, HAZARD_ALERT_RANGE * 0.5 + HAZARD_PASS_RANGE, this.near);
-    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity, tuck: q.tuck, clearance: 0 };
+    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity, seed: this.seed, tuck: q.tuck, clearance: 0 };
     // (airborne: the height over the ground right beneath the skier, measured once per step, only when needed)
     let clearance = NaN;
     const clearanceNow = () => (q.grounded ? 0 : Number.isNaN(clearance) ? (clearance = Math.max(0, q.y - this.mountain.heightAt(q.x, q.z))) : clearance);
@@ -422,7 +422,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
   hazardVisibility(x: number, z: number, t: number): number {
     if (this.hazards.empty) return 1;
     let v = 1;
-    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: 0, grounded: true, heightAbove: 0, t, intensity: this.intensity };
+    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: 0, grounded: true, heightAbove: 0, t, intensity: this.intensity, seed: this.seed };
     for (const h of this.hazards.near(x, z, 60, [])) {
       const k = getHazardKind(h.kind);
       contact.dx = x - h.x;

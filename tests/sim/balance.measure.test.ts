@@ -26,8 +26,13 @@ it('measure', async () => {
   const shards = Number(E.SHARDS ?? 1);
   const shard = Number(E.SHARD ?? 0);
   const out = E.OUT ?? '/tmp/w034.jsonl';
+  // (round 3) resume: runs already in OUT are skipped (the cloud machine restarts long jobs)
+  const fsx = (await import('node:fs' as string)) as { existsSync: (p: string) => boolean; readFileSync: (p: string, e: string) => string };
+  const done = new Set<string>();
+  const key = (r: { biome: string; len: string; diff: string; seed: string; policy: string }) => `${r.biome}|${r.len}|${r.diff}|${r.seed}|${r.policy}`;
+  if (fsx.existsSync(out)) for (const line of fsx.readFileSync(out, 'utf8').split('\n')) if (line.trim()) done.add(key(JSON.parse(line)));
   specs.forEach((s, i) => {
-    if (i % shards !== shard) return;
+    if (i % shards !== shard || done.has(key(s))) return;
     appendFileSync(out, JSON.stringify(measure(s)) + '\n');
   });
 }, 86_400_000);

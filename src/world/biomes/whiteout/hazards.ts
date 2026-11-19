@@ -17,7 +17,7 @@
  */
 import { clamp, smoothstep } from '../../../core/rng';
 import { registerHazardKind, type HazardEffect, type HazardKind, type HazardSpot } from '../../hazards/hazard';
-import { skiableAcross, whiteoutExposure } from './storm';
+import { frontAt, skiableAcross, whiteoutExposure, type FrontState } from './storm';
 
 export const DRIFT = {
   /**
@@ -221,6 +221,19 @@ export const WIND_DRIFT: HazardKind<DriftParams> = {
   view: 'wind-drift',
 };
 
+/**
+ * Which way a blizzard cell pushes (+1 toward +X, the skier's left) at time t (round 3, R2 E N1: each
+ * cell's own direction was a coin flip, so in a front about half of them pushed against the HUD's
+ * wind arrow and the wind audio). Inside a front (s > 0.3) a cell is a squall of that front: it blows
+ * the front's way; in a clear window it keeps its own direction. The caption uses the same rule.
+ */
+export function blizzardPushDir(h: { params: BlizzardParams }, t: number, seed: number | undefined): number {
+  if (seed === undefined) return h.params.dir;
+  const f = frontAt(t, seed, pushFront);
+  return f.s > 0.3 ? f.dir : h.params.dir;
+}
+const pushFront: FrontState = { s: 0, dir: 1, phase: 'clear', left: 0, k: 0 };
+
 export const BLIZZARD_CELL: HazardKind<BlizzardParams> = {
   id: 'blizzard',
   label: 'Blizzard',
@@ -249,7 +262,7 @@ export const BLIZZARD_CELL: HazardKind<BlizzardParams> = {
     if (w <= 0.01) return null;
     const I = c.intensity ?? 1;
     const e: HazardEffect = { visibility: 1 + (BLIZZARD.fog - 1) * w };
-    const dir = h.params.dir;
+    const dir = blizzardPushDir(h, c.t, c.seed);
     if (c.grounded) {
       e.slipX = dir * Math.min(4, BLIZZARD.slip * w * I);
       // (W-014) a skier still tucked and fast when the cell blows at full strength is knocked off
