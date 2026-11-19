@@ -147,7 +147,8 @@ export const WIND_DRIFT: HazardKind<DriftParams> = {
     const hw = m.halfWidth(z);
     const cx = m.centerX(z);
     const rx = m.routeX(z);
-    const onLine = ctx.rng.chance(DRIFT.onLine);
+    // (W-056) in a chase's opening stretch the row leaves its gap on the racing line (rng drawn as before)
+    const onLine = ctx.rng.chance(DRIFT.onLine) && !inChaseOpening(m, z - 60, z + 35);
     // the gap: on the line, or ~16–22 m to the side where the piste has room
     let gapX = rx;
     if (onLine) {
@@ -234,6 +235,48 @@ export function blizzardPushDir(h: { params: BlizzardParams }, t: number, seed: 
 }
 const pushFront: FrontState = { s: 0, dir: 1, phase: 'clear', left: 0, k: 0 };
 
+/**
+ * (W-056) Every chase opens on a fair stretch: from the cave trigger to CHASE_OPENING m past it — about
+ * the first 20 s at the chase's usual 16 m/s, the seconds right after control returns, when the Yeti is
+ * closest and nothing ahead has been read yet — no blizzard cell's knock zone reaches the racing line,
+ * and a drift row there leaves its gap on the line. The storm itself still blows; past the opening every
+ * weather decision is as before. A rule for every course and seed (it is what lost the default course:
+ * its first chase opened in the first storm, into a row whose gap was 19 m off the line, under a cell).
+ */
+export const CHASE_OPENING = 320;
+export function inChaseOpening(m: { profile: { encounters(z0: number, z1: number): ReadonlyArray<{ triggerZ: number }> } }, z0: number, z1 = z0): boolean {
+  return m.profile.encounters(z0 - CHASE_OPENING - 50, z1 + 50).some((e) => z1 >= e.triggerZ && z0 <= e.triggerZ + CHASE_OPENING);
+}
+
+/**
+ * How far from a cell's centre its gust can knock a tucked skier (m): where the edge falloff leaves
+ * BLIZZARD.knockAt of full strength (effect: edge = 1 − smoothstep(0.55 r, r + reach, dist)).
+ */
+export const BLIZZARD_KNOCK_R = (() => {
+  const a = BLIZZARD.r * 0.55;
+  const b = BLIZZARD.r + BLIZZARD.reach;
+  for (let d = a; d < b; d += 0.25) if (1 - smoothstep(a, b, d) < BLIZZARD.knockAt) return d;
+  return b;
+})();
+
+/**
+ * (W-056) A drift row's way through, as a rectangle: from 60 m before the row to 35 m after it (the
+ * approach and the rejoin the row's clear zones keep free), across from the racing line to the far
+ * side of the gap. True when a cell centred at (x, z) could knock the skier anywhere in it.
+ */
+export function blizzardOverRow(x: number, z: number, p: DriftParams): boolean {
+  if (p.rowZ === undefined || p.gapX === undefined) return false;
+  const gh = p.gapHalf ?? DRIFT.gapHalf;
+  const lx = p.lineX ?? p.gapX;
+  const x0 = Math.min(lx, p.gapX) - gh;
+  const x1 = Math.max(lx, p.gapX) + gh;
+  const z0 = p.rowZ - 60;
+  const z1 = p.rowZ + 35;
+  const dx = x < x0 ? x0 - x : x > x1 ? x - x1 : 0;
+  const dz = z < z0 ? z0 - z : z > z1 ? z - z1 : 0;
+  return Math.hypot(dx, dz) < BLIZZARD_KNOCK_R;
+}
+
 export const BLIZZARD_CELL: HazardKind<BlizzardParams> = {
   id: 'blizzard',
   label: 'Blizzard',
@@ -248,10 +291,27 @@ export const BLIZZARD_CELL: HazardKind<BlizzardParams> = {
     const zMid = (ctx.z0 + ctx.z1) / 2;
     if (exposedAt(ctx, zMid) < 0.7) return out;
     if (!ctx.rng.chance(Math.min(1, (len / BLIZZARD.spacing) * 1.6 * ctx.density))) return out;
-    const z = ctx.z0 + ctx.rng.range(0.2, 0.8) * len;
+    const u0 = ctx.rng.range(0.2, 0.8);
+    const dir = ctx.rng.chance(0.5) ? 1 : -1;
+    // (W-056) a cell never sits on a drift row's way through, nor on a chase's opening stretch: where
+    // its knock zone would reach a row's flagged gap or the approach to it, or the racing line within a
+    // chase opening, it moves along the band to the nearest place that is clear (or is not placed) —
+    // each weather decision gets its own stretch of piste
+    const rows = ctx.neighbours('wind-drift').filter((h) => (h.params as DriftParams).lead);
+    const clear = (z: number) => !inChaseOpening(ctx.mountain, z - BLIZZARD_KNOCK_R, z + BLIZZARD_KNOCK_R) && rows.every((h) => !blizzardOverRow(ctx.mountain.routeX(z), z, h.params as DriftParams));
+    let z = ctx.z0 + u0 * len;
+    if (!clear(z)) {
+      let best: number | null = null;
+      for (let u = 0.2; u <= 0.8 + 1e-9; u += 0.025) {
+        const zz = ctx.z0 + u * len;
+        if (clear(zz) && (best === null || Math.abs(zz - z) < Math.abs(best - z))) best = zz;
+      }
+      if (best === null) return out;
+      z = best;
+    }
     const x = ctx.mountain.routeX(z);
     if (ctx.reserved(x, z, 30)) return out;
-    out.push({ x, z, r: BLIZZARD.r, params: { dir: ctx.rng.chance(0.5) ? 1 : -1 } });
+    out.push({ x, z, r: BLIZZARD.r, params: { dir } });
     return out;
   },
   effect(h, ph, c) {

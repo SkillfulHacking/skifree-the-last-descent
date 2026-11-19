@@ -44,7 +44,7 @@ export function hazardReserved(m: Mountain, x: number, z: number, r: number): bo
   return false;
 }
 
-export function generateHazardBand(m: Mountain, seed: number, kinds: readonly HazardKind[], density: number, band: number): HazardInstance[] {
+export function generateHazardBand(m: Mountain, seed: number, kinds: readonly HazardKind[], density: number, band: number, only?: string): HazardInstance[] {
   const list: HazardInstance[] = [];
   const z0 = band * BAND;
   const z1 = z0 + BAND;
@@ -64,7 +64,16 @@ export function generateHazardBand(m: Mountain, seed: number, kinds: readonly Ha
       density,
       laneDistance: (x, z) => Math.abs(x - m.routeX(z)),
       reserved: (x, z, r) => hazardReserved(m, x, z, r),
+      neighbours: (id) => {
+        if (only !== undefined || !kinds.some((kk) => kk.id === id)) return [];
+        const out: HazardInstance[] = [];
+        for (let b = band - 1; b <= band + 1; b++) out.push(...generateHazardBand(m, seed, kinds, density, b, id));
+        return out;
+      },
     };
+    // `only`: just this kind's spots (its rng seed depends on its index in `kinds`, so the list is kept
+    // whole); their ids are not the run's ids — neighbours are read for positions and params only
+    if (only !== undefined && k.id !== only) return;
     const lane = keepsLaneClear(k);
     for (const s of k.place(ctx)) {
       if (!(s.z >= z0 && s.z < z1) || !Number.isFinite(s.x) || !(s.r > 0) || s.r > MAX_HAZARD_R) continue;

@@ -77,6 +77,12 @@ export interface HazardPlacementContext {
   laneDistance(x: number, z: number): number;
   /** true where nothing may be placed (start, finish, refuges, cave mouths and clearings) */
   reserved(x: number, z: number, r: number): boolean;
+  /**
+   * W-056: another kind's instances in this band and the two next to it, as that kind places them
+   * (pure, from the same seeds) — for placement rules between kinds (a kind may only look at kinds
+   * that do not look back; empty when the kind is not on this course)
+   */
+  neighbours(kindId: string): readonly HazardInstance[];
 }
 
 /** The skier relative to one instance, for effect rules. */
