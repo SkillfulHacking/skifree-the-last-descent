@@ -11,7 +11,12 @@ import { atmosphere } from './look/atmosphere';
 import { DistantRanges } from './look/ranges';
 import { getBiome, type Biome } from './biome';
 
+/** the storm dome's tint over the fog colour at full storm (calibrated: see applyWeather) */
+const STORM_DOME_TINT = [1.0, 1.45, 1.95] as const;
+const smoothstepS = (a: number, b: number, x: number) => THREE.MathUtils.smoothstep(x, a, b);
+
 export class Environment {
+  private domeTint = new THREE.Color();
   readonly sun: THREE.DirectionalLight;
   readonly hemi: THREE.HemisphereLight;
   readonly sky: Sky;
@@ -280,8 +285,13 @@ export class Environment {
       }
       if (this.stormDome) {
         const m = this.stormDome.material as THREE.MeshBasicMaterial;
-        m.color.copy(this.fog.color);
-        m.opacity = Math.min(0.97, 1.15 * storm);
+        // (round 3, R2 A N1) the dome must display as the fogged ground does at the horizon: the
+        // same fog colour displays duller on the unlit dome than in the snow's fog under AgX, so it
+        // takes a calibrated tint (tools/storm_horizon_probe.mjs, W2 storm peak: dome (188,202,214)
+        // vs fogged bank (189,200,214) displayed; untinted (186,189,192)); opaque at full storm
+        const k = THREE.MathUtils.smoothstep(storm, 0.2, 0.75);
+        m.color.copy(this.fog.color).multiply(this.domeTint.setRGB(1 + (STORM_DOME_TINT[0] - 1) * k, 1 + (STORM_DOME_TINT[1] - 1) * k, 1 + (STORM_DOME_TINT[2] - 1) * k));
+        m.opacity = Math.min(0.97, 1.15 * storm) + 0.03 * smoothstepS(0.7, 0.9, storm);
         this.stormDome.visible = storm > 0.002 && !this.stormDome.userData.debugHidden;
       }
       (this.snow.material as THREE.PointsMaterial).size = this.flakeBase * (1 + 1.3 * storm);

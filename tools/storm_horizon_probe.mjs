@@ -31,7 +31,7 @@ await ev((tt) => window.__skifree.setTime(tt), t);
 await ev(() => { for (let i = 0; i < 60; i++) window.__skifree.frames(1, 1 / 30); window.__skifree.hud(false); });
 for (const [i, v] of VARIANTS.entries()) {
   // hold the run, tint the dome (× fog colour) and its opacity, render
-  await ev((vv) => { window.__skifree.frames(1, 1 / 30); const e = window.__skifree.world().env; const d = e.stormDome; d.material.color.copy(e.fog.color).multiply({ r: vv[0], g: vv[1], b: vv[2] }); if (vv[3] !== undefined) d.material.opacity = vv[3]; window.__skifree.hold(true); }, v);
+  await ev((vv) => { window.__skifree.frames(1, 1 / 30); if (!vv) { window.__skifree.hold(true); return; } const e = window.__skifree.world().env; const d = e.stormDome; d.material.color.copy(e.fog.color).multiply({ r: vv[0], g: vv[1], b: vv[2] }); if (vv[3] !== undefined) d.material.opacity = vv[3]; window.__skifree.hold(true); }, v);
   await page.waitForTimeout(3000);
   const file = `${outDir}/v${i}.png`;
   await page.screenshot({ path: file, timeout: 1_200_000 });
