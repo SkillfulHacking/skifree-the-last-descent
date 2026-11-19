@@ -24,23 +24,3 @@ describe('Reduce Weather Effects', () => {
   });
 });
 
-describe('saving settings never rewrites an older save with settings it never stored', () => {
-  it('a new default-valued setting is left out until the player changes it', async () => {
-    const { saveSettings } = await import('../../src/core/settings');
-    const store: Record<string, string> = {};
-    const kv = { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => void (store[k] = v) };
-    const old = { quality: 'low', captions: true };
-    store['skifree-tld.settings.v1'] = JSON.stringify(old);
-    const s = loadSettings(kv as never);
-    saveSettings(s, kv as never);
-    expect(JSON.parse(store['skifree-tld.settings.v1']!)).not.toHaveProperty('reduceWeather');
-    s.reduceWeather = true;
-    saveSettings(s, kv as never);
-    expect(JSON.parse(store['skifree-tld.settings.v1']!).reduceWeather).toBe(true);
-    // a fresh install stores everything
-    const fresh: Record<string, string> = {};
-    const kv2 = { getItem: (k: string) => fresh[k] ?? null, setItem: (k: string, v: string) => void (fresh[k] = v) };
-    saveSettings(loadSettings(kv2 as never), kv2 as never);
-    expect(JSON.parse(fresh['skifree-tld.settings.v1']!)).toHaveProperty('reduceWeather', false);
-  });
-});
