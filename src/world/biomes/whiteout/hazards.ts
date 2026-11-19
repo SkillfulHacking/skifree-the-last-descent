@@ -39,7 +39,10 @@ export const DRIFT = {
   vCap: 18,
   /** the extra friction fades out below this speed band (m/s): wading out of a drift */
   wade: [1.5, 5] as const,
-  clipKeep: 0.72,
+  // (round 3, R2 B N4) 0.6 (was 0.72): a jump that comes down in the snow costs at least as much as
+  // ploughing (driftRow.measure, 50 rows: mistimed +0.64 s, timed-but-clipped +0.12 s vs plough; the
+  // marked gap −0.35 s). A jump that clears the snow is not knocked: jumping is not banned
+  clipKeep: 0.6,
   /** rows per 256 m band on exposed ground (× density) */
   rowChance: 1,
   /** share of rows that drift over the racing line (the gap is off to one side) */

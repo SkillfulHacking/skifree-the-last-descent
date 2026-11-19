@@ -12,9 +12,10 @@
  *  - blizzard: 'brake' stands up and checks speed while a blizzard cell is blowing across the line
  *             ahead (no tuck in the side-slip), 'ignore' keeps tucking.
  * It only uses what the game shows: hazard positions and phases (the telegraph), the front's phase
- * (sky, HUD pill) and the alternate lines (blue lamps). Visibility itself is not modelled headless:
- * the driver sees the line through any fog, so the cost of low visibility for a human is NOT measured
- * here (stated in the analysis).
+ * (sky, HUD pill) and the alternate lines (blue lamps). Round 3: in a storm it reads drift rows
+ * only within FOG_READ (60 m, where the round-2 storm frames still show the gap flags); the racing
+ * line itself (lamps, wands) is still followed through any fog, so the full cost of low visibility
+ * for a human is not measured here (human playtesting is still needed).
  */
 import { clamp, smoothstep, wrapAngle } from '../../src/core/rng';
 import type { Mountain } from '../../src/world/course';
@@ -48,6 +49,8 @@ export const INFORMED: WhiteoutPolicy = { lines: 'weather', drifts: 'gap', blizz
 export const BLIND: WhiteoutPolicy = { lines: 'always', drifts: 'ignore', blizzard: 'ignore' };
 
 const near: HazardInstance[] = [];
+/** how far ahead a drift row is read in a storm (front s > 0.5), m */
+export const FOG_READ = 60;
 
 /**
  * `react` (s): a human-like driver re-reads the situation and re-aims only this often, holding its
@@ -135,7 +138,10 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
       for (const h of near) {
         if (h.kind !== 'wind-drift') continue;
         const q = h.params as DriftParams;
-        if (q.rowZ === undefined || q.rowZ < s.pos.z - 6 || q.rowZ > s.pos.z + 110) continue;
+        // (round 3, from R2 B/F: the driver read rows through any fog) in a storm a row is read only
+        // within FOG_READ m — where the gap flags still show (round-2 frame 29: the mounds are gone
+        // at ~55 m, the flags remain)
+        if (q.rowZ === undefined || q.rowZ < s.pos.z - 6 || q.rowZ > s.pos.z + (f.s > 0.5 ? FOG_READ : 110)) continue;
         if (!row || q.rowZ < (row.params as DriftParams).rowZ!) row = h;
       }
       if (row) {
@@ -173,7 +179,9 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     if (p.blizzard === 'brake') {
       for (const h of near) {
         if (h.kind !== 'blizzard') continue;
-        if (h.z < s.pos.z - 10 || h.z > s.pos.z + 70) continue;
+        // (round 3, from R2 B: the cell was dropped 10 m past its centre, though its knock reaches
+        // ~51 m beyond it — the driver re-tucked inside the knock zone) kept until the skier is out
+        if (h.z < s.pos.z - h.r || h.z > s.pos.z + 70) continue;
         const ph = hazardPhase(getHazardKind(h.kind), h, t);
         const w = blizzardStrength(ph.phase, ph.u);
         // rise out of the tuck while the cell is really blowing at you (what the caption teaches)

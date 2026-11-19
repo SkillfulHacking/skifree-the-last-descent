@@ -2,7 +2,8 @@
  * W-035 drift-row measurement (round 2): for every drift row whose mounds cover the racing line on
  * W034-01..N (Normal Sprint), the same approach (110 m before the row, on the line, 17 m/s, tucked)
  * skied six ways: plough straight through; a smooth line through the marked gap bent over 40 / 70 /
- * 100 m; a full jump timed to top out over the crest; repeated short hops (the round-1 exploit).
+ * 100 m; a full jump timed to top out over the crest; repeated short hops (the round-1 exploit); a
+ * mistimed jump that comes down in the row (round 3).
  * Time to 40 m past the row, exit and minimum speed, path length, time in deep snow, knocks.
  *   N=24 OUT=… npx vitest run --config vitest.sim.config.ts tests/sim/driftRow.measure.test.ts
  */
@@ -19,6 +20,7 @@ it('drift micro', async () => {
   const fs = await import('node:fs' as string);
   if (proc.env.DRAG) (DRIFT as any).drag = Number(proc.env.DRAG);
   if (proc.env.FRIC) (DRIFT as any).friction = Number(proc.env.FRIC);
+  if (proc.env.CLIPK) (DRIFT as any).clipKeep = Number(proc.env.CLIPK);
   const out: any[] = [];
   const crashLog: string[] = [];
   const N = Number(proc.env.N ?? 12);
@@ -42,7 +44,7 @@ it('drift micro', async () => {
       void cx; void hw;
       const gap = P0.gapX as number, a = gap - P0.gapHalf, b = gap + P0.gapHalf;
       const res: any = { seed: i, row, zr: Math.round(zr), offset: +(gap - rx).toFixed(1), gapWidth: +(b - a).toFixed(1) };
-      for (const [name, lead] of [['plough', 0], ['gap40', 40], ['gap70', 70], ['gap100', 100], ['hopTimed', -1], ['hopSpam', -2]] as const) {
+      for (const [name, lead] of [['plough', 0], ['gap40', 40], ['gap70', 70], ['gap100', 100], ['hopTimed', -1], ['hopSpam', -2], ['hopClip', -3]] as const) {
         const env = new BiomeEnvironment(m, ws, { difficulty: 'normal' });
         const field = new ObstacleField(m, ws);
         field.ensure(zr - 300, zr + 300);
@@ -70,6 +72,8 @@ it('drift micro', async () => {
           const dz = zr - s.pos.z;
           if (lead === -1) pop = dz < s.speed * 0.45 + s.speed * 0.45 && dz > s.speed * 0.45 && s.grounded;
           if (lead === -2) pop = s.grounded && dz > -12 && dz < 10 && Math.floor(t * 4) % 2 === 0;
+          // (round 3, R2 B N4) a mistimed jump: released late, so the skis come down into the row
+          if (lead === -3) pop = s.grounded && dz < s.speed * 0.3 && dz > s.speed * 0.1;
           ph.step({ steer: clamp(-err * 3.2, -1, 1), tuck: Math.abs(err) < 0.3 ? 1 : 0, brake: 0, drift: false, pop, recover: s.crashTime > 1.4 }, PHYS_DT);
           for (const ev of ph.drainEvents()) if ((ev as any).type === 'crash') crashLog.push(`${name} seed ${i} row ${row} z=${s.pos.z.toFixed(0)} x=${s.pos.x.toFixed(1)} line=${m.routeX(s.pos.z).toFixed(1)} gap=${gap.toFixed(1)} ${(ev as any).reason}`);
           t += PHYS_DT; path += Math.hypot(s.pos.x - lastX, s.pos.z - lastZ); lastX = s.pos.x; lastZ = s.pos.z;

@@ -808,6 +808,8 @@ export class GameSession implements Stage {
           this.envCaption(`[${what} — stand up out of the tuck; it pushes you ${dir > 0 ? 'left' : 'right'}]`, 2.8, `blizzard:${e.hazard.id}`, CAPTION_PRIORITY.warning, 3.5);
         }
         if (e.type === 'hazard-hit' && e.kind === 'blizzard') this.envCaption('[a gust catches you in the tuck — you stagger]', 2, 'blizzard-hit', CAPTION_PRIORITY.report);
+        // (round 3, R2 B N4) a jump that came down in the snow: say why the skier staggered
+        if (e.type === 'hazard-hit' && e.kind === 'wind-drift') this.envCaption('[the jump falls short — your skis catch the drift]', 2, 'drift-clip', CAPTION_PRIORITY.report);
       } else if (e.type === 'hazard-enter' && e.kind === 'wind-drift') {
         this.audio.playCue('drift-plough', null);
         this.envCaption('[skis plough into a deep drift]', 1.4, 'drift', CAPTION_PRIORITY.report);
