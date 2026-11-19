@@ -45,6 +45,8 @@ export class FollowCamera {
   lookBack = 0;
   /** a scripted look-back (0..1) that replaces the player's, undamped (the cave hand-off: W-076) */
   lookBackOverride: number | null = null;
+  /** with lookBackOverride: the point to turn the look-back toward (null: straight back) */
+  lookBackAim: THREE.Vector3 | null = null;
   private lookBackS = 0;
   private avoidS = 0;
   private avoidSide = 1;
@@ -140,7 +142,13 @@ export class FollowCamera {
       if (avoidK > 0.01 && this.avoidS < 0.05) this.avoidSide = lat >= 0 ? -1 : 1;
     }
     this.avoidS = damp(this.avoidS, avoidK, 4, dt);
-    const ay = this.yaw + this.orbitYaw + this.avoidSide * this.avoidS * 1.0 + Math.PI * this.lookBackS;
+    // (W-076) a scripted look-back can be turned toward a point behind (the leaping Yeti), ≤ 0.6 rad
+    let bias = 0;
+    if (this.lookBackAim && this.lookBackOverride !== null) {
+      const want = Math.atan2(this.lookBackAim.x - t.pos.x, this.lookBackAim.z - t.pos.z);
+      bias = THREE.MathUtils.clamp(wrapAngle(want - (this.yaw + Math.PI)), -0.6, 0.6) * this.lookBackS;
+    }
+    const ay = this.yaw + this.orbitYaw + this.avoidSide * this.avoidS * 1.0 + Math.PI * this.lookBackS + bias;
     const boom = this.dist * (1 - 0.15 * this.avoidS) * (1 - 0.15 * this.lookBackS);
     const goal = this.tmp.set(t.pos.x - Math.sin(ay) * boom, baseY + height + this.orbitPitch * this.dist + 2.2 * this.avoidS + 0.6 * this.lookBackS, t.pos.z - Math.cos(ay) * boom);
 
@@ -180,7 +188,7 @@ export class FollowCamera {
 
     const look = new THREE.Vector3();
     const ahead = THREE.MathUtils.lerp(4, 15, smoothstep(0, 30, sp));
-    const lyaw = this.yaw + Math.PI * this.lookBackS;
+    const lyaw = this.yaw + Math.PI * this.lookBackS + bias;
     look.set(t.pos.x + Math.sin(lyaw) * ahead, baseY + 0.6, t.pos.z + Math.cos(lyaw) * ahead);
     // aim slightly down the slope so the upcoming terrain is in view
     const gy = this.mountain.heightAt(look.x, look.z) + 1.2;

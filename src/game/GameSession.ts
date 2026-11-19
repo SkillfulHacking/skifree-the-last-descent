@@ -348,6 +348,7 @@ export class GameSession implements Stage {
       if (B && this.run.phase !== 'chase') {
         this.cineBlend = null;
         this.follow.lookBackOverride = null;
+        this.follow.lookBackAim = null;
       } else if (B) {
         B.t += dt;
         if (B.landedAt === null && !this.leapPending) B.landedAt = B.t;
@@ -356,7 +357,10 @@ export class GameSession implements Stage {
       this.follow.update(dt, this.followTarget(true));
       if (B && this.cineBlend) {
         shotBlend(this.camera, B);
-        if (this.follow.lookBackOverride === null) this.cineBlend = null;
+        if (this.follow.lookBackOverride === null) {
+          this.cineBlend = null;
+          this.follow.lookBackAim = null;
+        }
       }
     }
     this.updateTutorial(dt);
@@ -382,7 +386,8 @@ export class GameSession implements Stage {
 
   /** Rear-view framing (skier in the foreground, the yeti behind), or null when not needed. */
   rearView(out: { pos: THREE.Vector3; look: THREE.Vector3 }): number {
-    if (this.run.phase !== 'chase' || !this.yeti.root.visible || this.leapPending) return 0;
+    // (no inset while the main camera itself looks back at the leap: W-076 review C, C9)
+    if (this.run.phase !== 'chase' || !this.yeti.root.visible || this.leapPending || this.cineBlend) return 0;
     const d = this.yetiAI.distance;
     if (d > 110) return 0;
     const s = this.phys.s;
@@ -753,7 +758,10 @@ export class GameSession implements Stage {
 
   private finishCave() {
     if (!this.cave) return;
-    this.follow.lookBackOverride = null;
+    // (W-076 review C, C8) a watched hand-off starts the follow camera already looking back at the
+    // leap (turned toward the Yeti) before it is snapped, so the ease out of the shot has no flip
+    this.follow.lookBackOverride = this.cineBlend ? 1 : null;
+    this.follow.lookBackAim = this.cineBlend ? this.yetiAI.pos : null;
     this.cave.finish();
     this.cave = null;
     this.run.endCaveCinematic();

@@ -4,7 +4,7 @@
  * The follow camera's own look-back view carries it: the skier in the foreground, the cave and the
  * leaping Yeti behind them (review C, C6/C7: a free swing from the shot to the follow aim either never
  * turned or whip-panned past both of them, and the landing happened out of frame).
- * - `shotBlend`: the first 0.5 s ease from the cinematic's last shot (behind the skier's position,
+ * - `shotBlend`: the first 0.7 s ease from the cinematic's last shot (behind the skier's position,
  *   looking up at the cave) into that look-back view — both face uphill, so this is a short move;
  * - `lookBackAt`: the look-back held until the landing + LAND_HOLD, then released with a smoothstep
  *   over RELEASE s — at most ~3° of turn per frame at 60 fps (1.5 × 180° / RELEASE peak).
@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 import { smoothstep } from '../core/rng';
 
-export const HANDOFF_CAM = { shot: 0.5, landHold: 0.35, release: 1.5 } as const;
+export const HANDOFF_CAM = { shot: 0.7, landHold: 0.35, release: 1.5 } as const;
 
 export interface HandoffBlend {
   /** the shot's camera when control returned */

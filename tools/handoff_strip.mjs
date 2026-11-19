@@ -29,7 +29,16 @@ for (const biome of list.split(',')) {
     manifest.frames.push({ name, biome, phase: s.phase, cinematicTime: s.cinematicTime, chaseTime: s.chaseTime, yetiPos: s.yetiPos, yetiRoot: s.yetiRoot, yetiAirborne: s.yetiAirborne, yetiVisible: s.yetiVisible, yetiMode: s.yetiMode, z: s.z, cam: await page.evaluate(() => window.__skifree.cameraPose()) });
     writeFileSync(`${outDir}/manifest.json`, JSON.stringify(manifest, null, 2));
     console.log(name, s.phase, s.cinematicTime.toFixed(2), s.chaseTime?.toFixed?.(2));
-    await page.evaluate(() => window.__skifree.frames(8, 1 / 30)); // 0.27 s
+    // 0.27 s — stopping early on the frame the Yeti lands, so the touchdown itself is captured
+    await page.evaluate(() => {
+      const k = window.__skifree;
+      for (let j = 0; j < 8; j++) {
+        const was = k.state().session.yetiAirborne;
+        k.frames(1, 1 / 30);
+        const s = k.state().session;
+        if (s.phase === 'chase' && was && !s.yetiAirborne) break;
+      }
+    });
   }
   await page.close();
 }
