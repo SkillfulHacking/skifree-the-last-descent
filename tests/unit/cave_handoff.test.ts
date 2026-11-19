@@ -1,12 +1,14 @@
 /**
- * Round 3 (owner's report): watching the cave cinematic or skipping it at any moment starts the
- * chase from the same state — position, heading, velocity, airborne flight, start delay and slow-start
- * state — and the pursuit then follows the same trajectory for the same skier input. Checked for
- * every location, slow and fast arrivals, a retry after a finished encounter and each encounter of an
- * Endless course.
+ * Round 3 (W-076): the contract of the canonical chase start (caveHandoff.startCanonicalChase), which
+ * CaveCinematic.finish (watched or skipped) and simulate.ts both call: whatever moment the player left
+ * the cinematic, the chase starts from the same state — position, heading, velocity, airborne flight,
+ * start delay and slow-start state — and the pursuit follows the same trajectory for the same input.
+ * Checked for every location, slow and fast arrivals, a fresh start after a finished encounter and
+ * Endless encounters 1–3; the same check rejects the pre-round-3 hand-off
+ * (tests/support/legacyCaveHandoff.ts), which depended on that moment.
  *
- * The check is run on the game's hand-off and, to prove it catches the bug, on the pre-round-3
- * hand-off (tests/support/legacyCaveHandoff.ts), which it must reject.
+ * This is a model-level check: the real path (the cinematic, the Skip key and pad button, the hand-off
+ * frame in the browser) is tests/e2e/cave_skip.spec.ts.
  */
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
@@ -114,12 +116,13 @@ describe('cave cinematic hand-off: watched = skipped at any moment', () => {
     expect(ai.extraDelay).toBeGreaterThan(1.5);
   });
 
-  it('a retry after a finished encounter starts the same chase again (no state carried over)', () => {
+  it('a fresh start after a finished encounter (the same Yeti, stood down) carries no state over', () => {
     const c = makeCourse('classic', 'sprint', { biome: 'whiteout', difficulty: 'normal' });
     const m = buildMountain(c);
     const f = new ObstacleField(m, worldSeed(c));
     const first = chase(m, f, 0, 18, GAME, Infinity, 6);
-    // the same AI instance, after a chase that ran (as a retry reuses the session's Yeti)
+    // the same AI instance after a chase that ran and stood down (an Endless lodge reuses the session's
+    // Yeti for the next cave; a retry builds a new session and a new Yeti)
     const e = m.profile.encounters(0, 1e6)[0]!;
     const ai = new YetiAI(m, f);
     const sp = yetiSpawnAfterCinematic(m, e.anchor);

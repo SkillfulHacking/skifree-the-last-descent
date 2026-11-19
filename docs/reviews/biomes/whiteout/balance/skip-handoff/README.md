@@ -35,7 +35,7 @@ The table gives the state on the first controllable frame, then the Yeti gap aft
 
 ## The fix: one canonical chase start (`src/cinematic/caveHandoff.ts`)
 - **The start:** the generous one the skip gave. The Yeti is on the ledge, and his leap toward the piste begins on the first controllable frame. The AI's usual start delay (0.6 s, from the landing) and the slow-start rules then apply. Speed, Hard modifiers and slow-start are unchanged.
-- **Watching:** the cinematic now ends at the leap beat (14.6 s). An over-the-shoulder shot of him crouched on the ledge leads into it, and the camera swings back to third person over the chase's first 1.2 s while the AI flies the leap. That swing is presentation only, and it is not applied after a skip.
+- **Watching:** the cinematic now ends at the leap beat (14.6 s). A shot from behind the skier's position toward the ledge, with the Yeti on it about to leap, leads into it; the camera swings back to third person over the leap's flight (at least 1.2 s) while the AI flies it, and his landing (shake, snow burst, footstep, then the RUN. title and the rear view) is played by the chase. That swing is presentation only, and it is not applied after a skip.
 - **Skipping:** at any moment, skipping removes only the presentation. No sound or particle is replayed, the skier's physics is not fast-forwarded, and no distance is awarded.
 - **Simulation:** `simulate.ts` calls the same `startCanonicalChase`.
 

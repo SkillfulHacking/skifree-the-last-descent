@@ -379,7 +379,8 @@ export class Hud {
     const chase = f.chase && f.yetiDistance !== null;
     this.yetiWrap.classList.toggle('hidden', !chase);
     this.progressYeti.classList.toggle('hidden', !chase);
-    if (chase && f.yetiDistance !== null) {
+    // (a chase's first frame, before the Yeti's first update, has no distance yet: W-076 review)
+    if (chase && f.yetiDistance !== null && Number.isFinite(f.yetiDistance)) {
       const d = f.yetiDistance;
       const threat = Math.max(0, Math.min(1, 1 - (d - 3) / 120));
       this.yetiBar.style.width = `${(threat * 100).toFixed(1)}%`;

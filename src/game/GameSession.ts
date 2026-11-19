@@ -18,6 +18,7 @@ import { YetiAI } from '../yeti/YetiAI';
 import { RunState } from './RunState';
 import { FollowCamera } from '../camera/FollowCamera';
 import { CaveCinematic } from '../cinematic/CaveCinematic';
+import { yetiSpawnAfterCinematic } from '../yeti/spawn';
 import { DefeatCinematic, VictoryCinematic } from '../cinematic/EndCinematics';
 import { Timeline, ease, pose } from '../cinematic/Timeline';
 import { autopilotInput, type AutopilotStyle } from '../debug/autopilot';
@@ -289,7 +290,11 @@ export class GameSession implements Stage {
         // (round 3) watched to its end, the cinematic hands over as the Yeti leaps: the camera swings
         // from the over-the-shoulder shot back to third person over the chase's first second
         // (presentation only — the chase state is the same either way: caveHandoff.ts)
-        if (!skipped) this.cineBlend = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone(), fov: this.camera.fov, t: 0, dur: 1.2 };
+        // (over the leap's flight, so the swing ends as he lands: W-076 review F F1)
+        if (!skipped) {
+          const sp = yetiSpawnAfterCinematic(this.world.mountain, this.world.focusEncounter?.anchor, this.world.cave.ledge);
+          this.cineBlend = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone(), fov: this.camera.fov, t: 0, dur: Math.max(1.2, sp.flight) };
+        }
         this.finishCave();
         // the cinematic already moved the Yeti this frame: start simulating next frame (C13)
         this.handoffFrame = true;
@@ -363,12 +368,23 @@ export class GameSession implements Stage {
 
   recordsSeenCave = false;
   private handoffFrame = false;
+  /** the chase began with the Yeti's leap from the cave and he has not landed yet */
+  private leapPending = false;
+  private yetiLanded() {
+    this.leapPending = false;
+    const p = this.yetiAI.pos;
+    this.shake(0.5);
+    this.audio.playYetiFootstep(p, 1);
+    this.world.particles.emit({ x: p.x, y: p.y + 0.2, z: p.z, vx: 0, vy: 2, vz: 0, spread: 2.5, size: 0.7, life: 1.4, count: 60, gravity: 0.5, drag: 1.6, grow: 1.4, alpha: 0.85 });
+    this.hud.title('RUN.', '', 'run', 1.6);
+    this.audio.playRunPrompt();
+  }
   /** the camera's blend from the cave cinematic's last shot back to the follow camera (watched hand-off) */
   private cineBlend: { pos: THREE.Vector3; quat: THREE.Quaternion; fov: number; t: number; dur: number } | null = null;
 
   /** Rear-view framing (skier in the foreground, the yeti behind), or null when not needed. */
   rearView(out: { pos: THREE.Vector3; look: THREE.Vector3 }): number {
-    if (this.run.phase !== 'chase' || !this.yeti.root.visible) return 0;
+    if (this.run.phase !== 'chase' || !this.yeti.root.visible || this.leapPending) return 0;
     const d = this.yetiAI.distance;
     if (d > 110) return 0;
     const s = this.phys.s;
@@ -463,6 +479,7 @@ export class GameSession implements Stage {
     if (this.run.phase === 'chase') {
       const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded, down: s.crashed || s.recoverTime > 0 };
       this.yetiAI.update(PHYS_DT, target);
+      if (this.leapPending && !this.yetiAI.airborne) this.yetiLanded();
       this.stepSnowballs();
       if (this.yetiAI.phase === 'chase' && !this.yetiAI.airborne) this.chaseMinGap = Math.min(this.chaseMinGap, this.yetiAI.distance);
       if (this.yetiAI.canCatch(target) && this.run.catchPlayer()) this.beginDefeat();
@@ -747,8 +764,10 @@ export class GameSession implements Stage {
     this.chaseMinGap = Infinity;
     if (this.run.encounter) this.events.emit({ type: 'YetiEncountered', encounter: this.run.encounter.index, difficulty: this.world.course.difficulty });
     this.hud.setSkipHint(null);
-    this.hud.title('RUN.', '', 'run', 1.6);
-    this.audio.playRunPrompt();
+    // (round 3, W-076 review F F1) the leap is the chase's first beat: the RUN. title and the rear
+    // view wait for his landing (yetiLanded), which hits like the filmed one did
+    this.leapPending = this.yetiAI.airborne;
+    if (!this.leapPending) this.yetiLanded();
     this.audio.setMusicMode('chase');
     this.follow.snap(this.followTarget());
     this.yeti.setVisible(true);

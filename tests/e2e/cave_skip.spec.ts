@@ -35,6 +35,8 @@ type W = {
   autopilot(style: string | null): void;
   setInputPads(fn: () => unknown[]): void;
   setCourse(mode: string, len: string, o: Record<string, unknown>): string;
+  teleport(z: number, speed?: number): void;
+  world(): { mountain: { profile: { encounters(a: number, b: number): Array<{ triggerZ: number }> } } };
 };
 const api = 'window.__skifree';
 
@@ -50,16 +52,22 @@ async function boot(page: Page, biome: string) {
 }
 const sess = (page: Page) => page.evaluate(() => (window as unknown as { __skifree: W }).__skifree.state().session!);
 
-/** a fresh run up to the cave cinematic (frozen skier) */
-async function toCave(page: Page) {
-  await page.evaluate(async () => {
+/** a fresh run up to the cave cinematic (frozen skier): skied there by the autopilot, or (slow) rolling in at ~3 m/s */
+async function toCave(page: Page, slow = false) {
+  await page.evaluate(async (sl) => {
     const k = (window as unknown as { __skifree: W }).__skifree;
     await k.startRun(true);
     k.hold(true);
+    if (sl) {
+      const tz = k.world().mountain.profile.encounters(0, 1e6)[0]!.triggerZ;
+      k.teleport(tz - 4, 3);
+      for (let i = 0; i < 600 && k.state().session!.phase !== 'caveCinematic'; i++) k.frames(1, 1 / 30);
+      return;
+    }
     k.autopilot('skilled');
     k.advance(200);
     k.autopilot(null);
-  });
+  }, slow);
   const s = await sess(page);
   expect(s.phase).toBe('caveCinematic');
   return s;
@@ -96,8 +104,8 @@ function same(a: S, b: S, tol: number, what: string) {
 
 test.describe.configure({ mode: 'serial' });
 
-for (const biome of ['alpine', 'whiteout']) {
-  test(`${biome}: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase`, async ({ page }) => {
+for (const [biome, slow] of [['alpine', false], ['fjord', false], ['whiteout', false], ['alpine', true]] as const) {
+  test(`${biome}${slow ? ', slow arrival' : ''}: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase`, async ({ page }) => {
     test.setTimeout(60 * 60 * 1000);
     void api;
     const errors: string[] = [];
@@ -105,7 +113,7 @@ for (const biome of ['alpine', 'whiteout']) {
     await boot(page, biome);
 
     // 1) first viewing: Escape pauses (it cannot skip yet); then it is watched to the end
-    await toCave(page);
+    await toCave(page, slow);
     await page.evaluate(() => (window as unknown as { __skifree: W }).__skifree.framesLive(30, 1 / 30));
     await page.keyboard.press('Escape');
     await page.evaluate(() => (window as unknown as { __skifree: W }).__skifree.framesLive(2, 1 / 30));
@@ -129,7 +137,7 @@ for (const biome of ['alpine', 'whiteout']) {
       ['controller Start at 9 s', 9.0, 'pad'],
       ['Escape just before the leap', 14.3, 'key'],
     ] as const) {
-      await toCave(page);
+      await toCave(page, slow);
       await page.evaluate((t) => {
         const k = (window as unknown as { __skifree: W }).__skifree;
         while (k.state().session!.cinematicTime < t - 1 / 60) k.framesLive(1, 1 / 30);
