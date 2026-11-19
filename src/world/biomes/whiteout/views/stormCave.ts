@@ -300,6 +300,7 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
   const nu = 28;
   const nv = 7;
   const pos: number[] = [];
+  const col: number[] = [];
   const idx: number[] = [];
   // each column roots on the rock itself, just above the opening: a ray in from outside finds the
   // face (round-2 check: rooted on the anchor point alone, the lip floated in front of a bulging brow)
@@ -333,10 +334,16 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
     for (let j = 0; j <= nv; j++) {
       const v = j / nv; // 0 = on the rock (back), 1 = the drooping edge
       const th = v * Math.PI * 0.75;
-      const reach = (C.overhang * taper + 0.3) * Math.sin(th) * (1 + wob);
-      const rise = C.thick * taper * (0.55 * Math.cos(th) + 0.35) - 0.45 * v * v * taper;
+      // (round 3, R2 A N3: it read as a smooth slab) a scalloped, wind-sculpted lip: the edge bulges
+      // and dips irregularly, and sags lower between the bulges
+      const sc = Math.abs(Math.sin(a * 1.9 + 0.7)) * 0.6 + 0.4 * Math.abs(Math.sin(a * 4.3 + 2.1));
+      const reach = (C.overhang * taper + 0.3) * Math.sin(th) * (1 + wob) * (1 + 0.28 * (sc - 0.5) * v * v);
+      const rise = C.thick * taper * (0.55 * Math.cos(th) + 0.35) - 0.45 * v * v * taper - 0.22 * (1 - sc) * v * v * v;
       const p = roots[i]!.clone().addScaledVector(out, reach).add(new THREE.Vector3(0, rise + 0.05, 0));
       pos.push(p.x, p.y, p.z);
+      // the underside and the drooping lip in shadow-blue, the crown bright
+      const k = 1 - 0.3 * smoothstep(0.45, 1, v);
+      col.push(0.95 * k, 0.97 * k, 1.0 * (0.94 + 0.06 * k));
     }
   }
   for (let i = 0; i < nu; i++)
@@ -346,10 +353,12 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
     }
   const cg = new THREE.BufferGeometry();
   cg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  cg.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   cg.setIndex(idx);
   cg.computeVertexNormals();
-  const cornice = new THREE.Mesh(cg, snow);
-  cornice.material.side = THREE.DoubleSide;
+  const corniceM = new THREE.MeshStandardMaterial({ color: 0xf2f6fc, roughness: 0.88, metalness: 0, vertexColors: true, side: THREE.DoubleSide });
+  disposables.push(corniceM);
+  const cornice = new THREE.Mesh(cg, corniceM);
   cornice.castShadow = true;
   cornice.name = 'storm-cave-cornice';
   group.add(cornice);
@@ -360,21 +369,35 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
     const k = (i * (nv + 1) + nv) * 3;
     return new THREE.Vector3(pos[k]!, pos[k + 1]!, pos[k + 2]!);
   };
-  // rime feathers: thin blades grown off the underside of the edge into the wind (outward, a little up)
-  const feather = new THREE.ConeGeometry(0.06, 1, 4);
+  // rime feathers: flattened, irregular blades grown off the underside of the edge into the wind,
+  // in clusters (round 3, R2 A N3: 46 evenly spaced four-sided cones read as bunting)
+  const feather = new THREE.ConeGeometry(0.09, 1, 3);
   feather.translate(0, 0.5, 0);
+  feather.scale(1, 1, 0.22);
   disposables.push(feather);
-  const count = 46;
+  const hash = (n: number) => {
+    const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  const clusters = 8;
+  const count = 54;
   const fm = new THREE.InstancedMesh(feather, rime, count);
   const q = new THREE.Quaternion();
+  const q2 = new THREE.Quaternion();
   const m4 = new THREE.Matrix4();
-  const dirV = out.clone().add(new THREE.Vector3(0, -0.15, 0)).normalize();
-  q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dirV);
+  const up = new THREE.Vector3(0, 1, 0);
   for (let n = 0; n < count; n++) {
-    const u = 0.08 + 0.84 * ((n * 0.6180339887) % 1);
-    const p = edge(u).add(new THREE.Vector3(0, -0.12 - 0.25 * ((n * 0.37) % 1), 0));
-    const len = 0.25 + 0.55 * ((n * 0.7548776662) % 1) * Math.sin(Math.PI * u);
-    m4.compose(p, q, new THREE.Vector3(1 + len, len, 1 + len));
+    const c = n % clusters;
+    const cu = 0.1 + 0.8 * hash(c + 3.3);
+    const u = Math.min(0.95, Math.max(0.05, cu + (hash(n * 1.7) - 0.5) * 0.09));
+    const p = edge(u).add(new THREE.Vector3(0, -0.1 - 0.3 * hash(n * 2.9), 0));
+    // each blade points out into the wind, fanned a little up/down and sideways
+    const dirV = out.clone().addScaledVector(along, (hash(n * 5.1) - 0.5) * 0.9).add(new THREE.Vector3(0, -0.35 + 0.5 * hash(n * 3.7), 0)).normalize();
+    q.setFromUnitVectors(up, dirV);
+    q2.setFromAxisAngle(up, hash(n * 7.3) * Math.PI);
+    q.multiply(q2);
+    const len = (0.2 + 0.75 * Math.pow(hash(n * 9.1), 1.6)) * (0.5 + 0.5 * Math.sin(Math.PI * u));
+    m4.compose(p, q, new THREE.Vector3(1 + 2 * len, len, 1 + 2 * len));
     fm.setMatrixAt(n, m4);
   }
   fm.instanceMatrix.needsUpdate = true;
@@ -391,27 +414,64 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
   group.add(bank);
   disposables.push(bank.geometry);
   // the spindrift sheet off the cornice edge: a ribbon of falling snow streaks blown sideways
+  // (round 3, R2 A N3: a regular grid of vertical dashes read as "digital rain") wisps at hashed
+  // places, slanted downwind, soft-ended, of every length and weight; the sheet's own edges fade
+  // (alphaMap, not repeated) so it never shows as a rectangle against the rock
   const sheetTex = (() => {
     const c = document.createElement('canvas');
-    c.width = 64;
+    c.width = 256;
     c.height = 256;
     const g = c.getContext('2d');
     if (g) {
-      g.clearRect(0, 0, 64, 256);
-      for (let k = 0; k < 90; k++) {
-        const x = (k * 37) % 64;
-        const y = (k * 151) % 256;
-        g.fillStyle = `rgba(255,255,255,${0.25 + ((k * 13) % 10) / 20})`;
-        g.fillRect(x, y, 1.5, 10 + ((k * 7) % 22));
+      g.clearRect(0, 0, 256, 256);
+      g.lineCap = 'round';
+      for (let k = 0; k < 140; k++) {
+        const x = hash(k * 1.31) * 256;
+        const y = hash(k * 2.77) * 256;
+        const len = 14 + 60 * Math.pow(hash(k * 4.13), 2);
+        const slant = 0.35 + 0.3 * hash(k * 5.9);
+        const a = 0.12 + 0.4 * Math.pow(hash(k * 6.7), 1.5);
+        const gr = g.createLinearGradient(x, y, x - slant * len, y + len);
+        gr.addColorStop(0, 'rgba(255,255,255,0)');
+        gr.addColorStop(0.35, `rgba(255,255,255,${a})`);
+        gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.strokeStyle = gr;
+        g.lineWidth = 0.8 + 2.2 * hash(k * 8.3);
+        for (const ox of [-256, 0, 256])
+          for (const oy of [-256, 0, 256]) {
+            g.beginPath();
+            g.moveTo(x + ox, y + oy);
+            g.lineTo(x + ox - slant * len, y + oy + len);
+            g.stroke();
+          }
       }
     }
     const t = new THREE.CanvasTexture(c);
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(6, 1);
+    t.repeat.set(2.3, 1.15);
     return t;
   })();
-  const sheetM = new THREE.MeshBasicMaterial({ map: sheetTex, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
-  disposables.push(sheetTex, sheetM);
+  const sheetFade = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    if (g) {
+      const img = g.createImageData(64, 64);
+      for (let y = 0; y < 64; y++)
+        for (let x = 0; x < 64; x++) {
+          const ex = Math.min(x, 63 - x) / 18;
+          const ey = Math.min(y, 63 - y) / 22;
+          const v = Math.round(255 * Math.min(1, ex) * Math.min(1, ey) * (0.75 + 0.25 * hash(x * 0.37 + y * 1.91)));
+          const o = (y * 64 + x) * 4;
+          img.data[o] = img.data[o + 1] = img.data[o + 2] = v;
+          img.data[o + 3] = 255;
+        }
+      g.putImageData(img, 0, 0);
+    }
+    return new THREE.CanvasTexture(c);
+  })();
+  const sheetM = new THREE.MeshBasicMaterial({ map: sheetTex, alphaMap: sheetFade, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
+  disposables.push(sheetTex, sheetFade, sheetM);
   const sheet = new THREE.Mesh(new THREE.PlaneGeometry(C.len * 0.8, 3.2), sheetM);
   const mid = edge(0.5);
   sheet.position.copy(mid).add(new THREE.Vector3(0, -1.7, 0)).addScaledVector(out, 0.25);
@@ -424,8 +484,10 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
     group,
     update(dt: number, wind: number) {
       // the snow pours faster and slants harder the stronger the wind
-      sheetTex.offset.y += dt * (0.35 + 0.08 * wind);
-      sheetTex.offset.x -= dt * 0.04 * wind;
+      // (along the wisps' slant: they fall and drift downwind together)
+      const v = dt * (0.35 + 0.08 * wind);
+      sheetTex.offset.y += v;
+      sheetTex.offset.x += v * 0.45;
       sheetM.opacity = 0.25 + 0.45 * smoothstep(3, 10, wind);
     },
     dispose() {
