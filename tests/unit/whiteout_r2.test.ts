@@ -108,3 +108,26 @@ describe('Whiteout round 2: the lee shoulder', () => {
     expect(whiteoutExposure(m, m.routeX(z) + LEE.lane, z, calm, ws)).toBeCloseTo(whiteoutExposure(m, m.routeX(z) + LEE.lane, z), 9);
   });
 });
+
+describe('round 3 (R2 D N-3): the weather clear zones are cached per band', () => {
+  it('a second request for the same ground does not recompute the lee zones', async () => {
+    const { WHITEOUT_WEATHER } = await import('../../src/world/biomes/whiteout/storm');
+    const { hazardClearZones } = await import('../../src/world/hazards/field');
+    const { buildMountain, makeCourse, worldSeed } = await import('../../src/game/CourseConfig');
+    const c = makeCourse('custom', 'sprint', { biome: 'whiteout', customText: 'R3-CACHE' });
+    const m = buildMountain(c);
+    const orig = WHITEOUT_WEATHER.clearZones!;
+    let calls = 0;
+    (WHITEOUT_WEATHER as { clearZones: typeof orig }).clearZones = (mm, a, b) => (calls++, orig(mm, a, b));
+    try {
+      const a = hazardClearZones(m, worldSeed(c), 900, 1500);
+      const n = calls;
+      const b = hazardClearZones(m, worldSeed(c), 900, 1500);
+      expect(n).toBeGreaterThan(0);
+      expect(calls).toBe(n);
+      expect(b).toEqual(a);
+    } finally {
+      (WHITEOUT_WEATHER as { clearZones: typeof orig }).clearZones = orig;
+    }
+  });
+});

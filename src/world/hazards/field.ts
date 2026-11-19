@@ -202,9 +202,26 @@ export class HazardField {
  * per mountain and band (pure).
  */
 const zoneCache = new WeakMap<Mountain, Map<string, readonly ClearZone[]>>();
+/**
+ * The weather's clear zones (Whiteout's lee shoulders), cached per mountain and band like the hazard
+ * zones (round 3, R2 D N-3: recomputed on every band, ~1,600 heightAt calls each, 3–24 ms slices)
+ */
+const weatherZoneCache = new WeakMap<Mountain, Map<number, readonly ClearZone[]>>();
+function weatherClearZones(m: Mountain, fn: ((m: Mountain, z0: number, z1: number) => readonly ClearZone[]) | undefined, z0: number, z1: number): ClearZone[] {
+  if (!fn) return [];
+  let cache = weatherZoneCache.get(m);
+  if (!cache) weatherZoneCache.set(m, (cache = new Map()));
+  const out: ClearZone[] = [];
+  for (let b = Math.floor(z0 / BAND); b <= Math.floor(z1 / BAND); b++) {
+    let zs = cache.get(b);
+    if (!zs) cache.set(b, (zs = fn(m, b * BAND, (b + 1) * BAND)));
+    for (const c of zs) if (c.z + c.hz > z0 && c.z - c.hz < z1) out.push(c);
+  }
+  return out;
+}
 export function hazardClearZones(m: Mountain, seed: number, z0: number, z1: number): readonly ClearZone[] {
   const caps = capabilitiesOf(m.biome);
-  const weather = caps.weather.clearZones ? caps.weather.clearZones(m, z0, z1) : [];
+  const weather = weatherClearZones(m, caps.weather.clearZones, z0, z1);
   if (caps.hazards.kinds.length === 0 || caps.hazards.density <= 0) return weather;
   const kinds = caps.hazards.kinds.map(getHazardKind);
   if (!kinds.some((k) => k.clearZones)) return weather;

@@ -84,8 +84,17 @@ class Grains {
         gr.age = 0;
       }
       gr.p.addScaledVector(gr.v, dt);
-      if (i < show) this.pos.set([gr.p.x, gr.p.y, gr.p.z], i * 3);
-      else this.pos.set([0, -1e5, 0], i * 3);
+      // (round 3, R2 D N-4) written in place: no array per grain per frame
+      const P = this.pos;
+      if (i < show) {
+        P[i * 3] = gr.p.x;
+        P[i * 3 + 1] = gr.p.y;
+        P[i * 3 + 2] = gr.p.z;
+      } else {
+        P[i * 3] = 0;
+        P[i * 3 + 1] = -1e5;
+        P[i * 3 + 2] = 0;
+      }
     }
     (this.points.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
   }
@@ -212,6 +221,71 @@ export function stormCaveCinematic(c: CaveCinematicContext): CaveCinematicExtras
  * hangs off the cave's own anchors: `lip` (top of the brow), `mouth` (the entrance, at ground level),
  * `out` (the outward normal).
  */
+/**
+ * The rock's triangles (world space) whose bounds touch the band the cornice columns' rays sweep:
+ * within `halfLen` along the brow of `lip`, 0–16 m out from it, ±1.5 m of height `y`.
+ */
+export function browTriangles(rock: THREE.Mesh, lip: THREE.Vector3, along: THREE.Vector3, out: THREE.Vector3, y: number, halfLen: number): Float32Array {
+  const g = rock.geometry;
+  const pos = g.getAttribute('position') as THREE.BufferAttribute;
+  const idx = g.getIndex();
+  const e = rock.matrixWorld.elements;
+  // every vertex once: world position, and its place along the brow / out from it
+  const nv = pos.count;
+  const W = new Float32Array(nv * 3);
+  const A = new Float32Array(nv);
+  const O = new Float32Array(nv);
+  for (let i = 0; i < nv; i++) {
+    const x = pos.getX(i), yy = pos.getY(i), z = pos.getZ(i);
+    const wx = e[0]! * x + e[4]! * yy + e[8]! * z + e[12]!;
+    const wy = e[1]! * x + e[5]! * yy + e[9]! * z + e[13]!;
+    const wz = e[2]! * x + e[6]! * yy + e[10]! * z + e[14]!;
+    W[i * 3] = wx;
+    W[i * 3 + 1] = wy;
+    W[i * 3 + 2] = wz;
+    const dx = wx - lip.x, dy = wy - lip.y, dz = wz - lip.z;
+    A[i] = dx * along.x + dy * along.y + dz * along.z;
+    O[i] = dx * out.x + dy * out.y + dz * out.z;
+  }
+  const n = idx ? idx.count / 3 : nv / 3;
+  const res: number[] = [];
+  for (let t = 0; t < n; t++) {
+    const i0 = idx ? idx.getX(t * 3) : t * 3;
+    const i1 = idx ? idx.getX(t * 3 + 1) : t * 3 + 1;
+    const i2 = idx ? idx.getX(t * 3 + 2) : t * 3 + 2;
+    if (Math.max(A[i0]!, A[i1]!, A[i2]!) < -halfLen || Math.min(A[i0]!, A[i1]!, A[i2]!) > halfLen) continue;
+    if (Math.max(O[i0]!, O[i1]!, O[i2]!) < -10 || Math.min(O[i0]!, O[i1]!, O[i2]!) > 10) continue;
+    const y0 = W[i0 * 3 + 1]!, y1 = W[i1 * 3 + 1]!, y2 = W[i2 * 3 + 1]!;
+    if (Math.max(y0, y1, y2) < y - 1.5 || Math.min(y0, y1, y2) > y + 1.5) continue;
+    for (const k of [i0, i1, i2]) res.push(W[k * 3]!, W[k * 3 + 1]!, W[k * 3 + 2]!);
+  }
+  return new Float32Array(res);
+}
+
+/** nearest hit distance (≤ far) of a ray against a flat triangle list, or null (Möller–Trumbore) */
+export function rayTris(o: THREE.Vector3, dir: THREE.Vector3, tris: Float32Array, far: number): number | null {
+  let best: number | null = null;
+  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), p = new THREE.Vector3(), q = new THREE.Vector3(), s0 = new THREE.Vector3(), a = new THREE.Vector3();
+  for (let i = 0; i < tris.length; i += 9) {
+    a.set(tris[i]!, tris[i + 1]!, tris[i + 2]!);
+    e1.set(tris[i + 3]! - a.x, tris[i + 4]! - a.y, tris[i + 5]! - a.z);
+    e2.set(tris[i + 6]! - a.x, tris[i + 7]! - a.y, tris[i + 8]! - a.z);
+    p.crossVectors(dir, e2);
+    const det = e1.dot(p);
+    if (Math.abs(det) < 1e-9) continue;
+    const inv = 1 / det;
+    s0.subVectors(o, a);
+    const u = s0.dot(p) * inv;
+    if (u < 0 || u > 1) continue;
+    q.crossVectors(s0, e1);
+    const w = dir.dot(q) * inv;
+    if (w < 0 || u + w > 1) continue;
+    const t = e2.dot(q) * inv;
+    if (t > 0 && t <= far && (best === null || t < best)) best = t;
+  }
+  return best;
+}
+
 function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: THREE.Vector3, rock: THREE.Mesh | null) {
   const C = STORM_CAVE.cornice;
   const group = new THREE.Group();
@@ -229,18 +303,20 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
   const idx: number[] = [];
   // each column roots on the rock itself, just above the opening: a ray in from outside finds the
   // face (round-2 check: rooted on the anchor point alone, the lip floated in front of a bulging brow)
-  const ray = new THREE.Raycaster();
+  // (round 3, R2 D N-2: 29 Raycaster calls against the 41.5k-triangle cave rock cost 75–120 ms, a
+  // hitch when a cave is dressed mid-run in Endless) the rock's triangles near the brow are gathered
+  // once, then each column's ray is tested against those few only
   rock?.updateWorldMatrix(true, false);
+  const rayY = mouth.y + 0.58 * (lip.y - mouth.y);
+  const tris = rock ? browTriangles(rock, lip, along, out, rayY, C.len / 2 + 1) : new Float32Array(0);
   const rootAt = (a: number): THREE.Vector3 | null => {
     if (!rock) return lip.clone().addScaledVector(along, a);
     // (just over the opening: ~55% of the way from the floor to the brow anchor — round-2 check,
     // the anchor itself is high on the face)
     const o = lip.clone().addScaledVector(along, a).addScaledVector(out, 8);
-    o.y = mouth.y + 0.58 * (lip.y - mouth.y);
-    ray.set(o, out.clone().negate());
-    ray.far = 16;
-    const hit = ray.intersectObject(rock, false)[0];
-    return hit ? hit.point.clone().addScaledVector(out, -0.15) : null;
+    o.y = rayY;
+    const t = rayTris(o, out.clone().negate(), tris, 16);
+    return t === null ? null : o.addScaledVector(out, -t).addScaledVector(out, -0.15);
   };
   const roots: THREE.Vector3[] = [];
   let lastRoot = lip.clone();
@@ -303,6 +379,8 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
   }
   fm.instanceMatrix.needsUpdate = true;
   fm.name = 'storm-cave-rime';
+  // (round 3, R2 D N-4) its instance buffer is released with the dressing
+  disposables.push(fm);
   group.add(fm);
   // a drift banked against the windward jamb (half-buried: it never floats on a slope)
   const bank = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), snow);

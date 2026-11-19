@@ -13,7 +13,7 @@ import { Mountain, SEED_DEFAULT } from '../../src/world/course';
 import { ALPINE, deriveBiome, getBiome, listBiomes, registerBiome, unregisterBiome, type Biome } from '../../src/world/biome';
 import '../../src/world/biomes';
 import { ALPINE_CAPABILITIES, ALPINE_SURFACE, ALPINE_WEATHER, IDENTITY_SURFACE, capabilitiesOf, combineSurface, makeWeatherSample, parametricWeather, resetSurface, surfaceTable, validateCapabilities, validateSurfaceModifiers, validateWeather, type SurfaceModifiers } from '../../src/world/capabilities';
-import { BiomeEnvironment, type EnvironmentEvent } from '../../src/world/capabilities/environment';
+import { HAZARD_ALERT_RANGE, BiomeEnvironment, type EnvironmentEvent } from '../../src/world/capabilities/environment';
 import { getHazardKind, hasHazardKind, hazardPhase, periodicPhase, registerHazardKind, unregisterHazardKind, validateHazardKind, MIN_TELEGRAPH_S, type HazardInstance, type HazardKind } from '../../src/world/hazards/hazard';
 import { HazardField, generateHazardBand, hazardReserved } from '../../src/world/hazards/field';
 import { EXAMPLE_PULSE_HAZARD, collectPlacements, lifecycleCounter, probe, timeOfPhase } from '../../src/world/hazards/testkit';
@@ -479,6 +479,18 @@ describe('hazards: timing, effects, recovery and gameplay events', () => {
     expect(periodicPhase(4.5, 0, T).phase).toBe('dormant');
     const { h } = setup();
     expect(hazardPhase(kind, h, 7)).toEqual(hazardPhase(kind, h, 7 + 4.4));
+  });
+
+  it('a telegraph that began beyond alert range is announced once the hazard comes into range (R2 B N1)', () => {
+    const { env, h } = setup();
+    const tT = timeOfPhase(kind, h, 'telegraph', 1);
+    // tracked (inside the near window) but beyond HAZARD_ALERT_RANGE: nothing yet
+    const far = probe(env, h.x, h.z - HAZARD_ALERT_RANGE - 20, tT + 0.05);
+    const mine = (ev: EnvironmentEvent[]) => ev.filter((e) => e.type === 'hazard-telegraph' && (e as { hazard?: { id: number } }).hazard?.id === h.id);
+    expect(mine(far.events)).toHaveLength(0);
+    // the same telegraph, now inside the range: reported
+    const near = probe(env, h.x, h.z - HAZARD_ALERT_RANGE + 10, tT + 0.3);
+    expect(mine(near.events)).toHaveLength(1);
   });
 
   it('active contact knocks once per contact and reports it; telegraph is announced first', () => {

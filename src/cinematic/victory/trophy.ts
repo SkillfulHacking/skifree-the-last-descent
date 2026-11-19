@@ -15,11 +15,15 @@ export class TrophyHandoff {
     private st: Stage,
     private trophy: THREE.Object3D,
     private onCaught?: () => void,
+    /** fly only the held part (the first child), leaving the plinth where it stands (round 3, R2 C
+     * N-2: Whiteout's lantern was carried through the air on its stone plinth) */
+    private heldOnly = false,
   ) {}
 
   /** begin the flight (call from a timeline beat) */
   start(): void {
     this.t = 0;
+    if (this.heldOnly && this.trophy.children[0]) this.trophy = this.trophy.children[0];
     this.trophy.getWorldPosition(this.from);
   }
 
@@ -43,7 +47,7 @@ export class TrophyHandoff {
     } else if (trophy.parent !== st.skier.rightHandSocket) {
       st.skier.rightHandSocket.add(trophy);
       // held by the stem: the podium plinth stays behind
-      trophy.children.forEach((c, i) => (c.visible = i === 0));
+      if (!this.heldOnly) trophy.children.forEach((c, i) => (c.visible = i === 0));
       trophy.position.set(0, -0.32, 0);
       trophy.rotation.set(0, 0, 0);
       trophy.scale.setScalar(0.7);

@@ -93,6 +93,7 @@ export class VictoryCinematic implements VictoryDirector {
   onResults: (() => void) | null = null;
   /** 0..1 how much the game should auto-steer the skier to the stop point */
   autopilot = 1;
+  stopOnMark = false;
   cheer = 0;
   welcome = 0;
   readonly stopPoint = new THREE.Vector3();

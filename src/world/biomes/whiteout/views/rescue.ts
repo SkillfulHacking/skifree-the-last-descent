@@ -36,6 +36,27 @@ const C = {
   garageH: 3.4,
 } as const;
 
+/**
+ * Where the station stands, which way its door faces, and the skier's and the Yeti's marks (xz;
+ * pure — the view builds from it, and victory_steer.test.ts checks the stop against it).
+ */
+export function rescueLayout(m: { routeX(z: number): number; centerX(z: number): number }, F: { x: number; z: number }) {
+  const z = F.z + C.ahead;
+  const side = m.routeX(F.z) >= m.centerX(F.z) ? -1 : 1;
+  const x = m.routeX(z) + side * C.side;
+  const faces = new THREE.Vector3(F.x - x, 0, F.z - z).normalize();
+  const yaw = Math.atan2(faces.x, faces.z);
+  const local = (lx: number, lz: number) => new THREE.Vector3(lx, 0, lz).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).add(new THREE.Vector3(x, 0, z));
+  const door = local(DOOR_X, C.hutD / 2 + 0.6);
+  const stop = door.clone().addScaledVector(faces, STOP_OUT);
+  const across = new THREE.Vector3(faces.z, 0, -faces.x);
+  const yeti = door.clone().addScaledVector(faces, 30).addScaledVector(across, -side * 12);
+  return { x, z, side, faces, yaw, door, stop, yeti };
+}
+/** the door's offset along the front of the hall, and the skier's mark this far out from it */
+const DOOR_X = -2.4;
+const STOP_OUT = 8;
+
 function signTexture(): THREE.Texture {
   const c = document.createElement('canvas');
   c.width = 512;
@@ -209,9 +230,8 @@ export class RescueStation implements FinishEnvironment {
     this.group.name = 'rescue-station';
     const m = ctx.mountain;
     // the run-out bends toward the hut: it stands to the side of the line, below the finish
-    const z = F.z + C.ahead;
-    const side = m.routeX(F.z) >= m.centerX(F.z) ? -1 : 1;
-    const x = m.routeX(z) + side * C.side;
+    const L = rescueLayout(m, F);
+    const { x, z, side } = L;
     // level pad on the high corner; the low side stands on the stone base (never buried, never floating)
     let maxY = -Infinity;
     let minY = Infinity;
@@ -331,7 +351,7 @@ export class RescueStation implements FinishEnvironment {
     for (const wx of [-3, 0.6, 3.4]) window(wx, -C.hutD / 2 - 0.01, Math.PI, 1.2, 1.0, warmDim);
     for (const wz of [-1.8, 1.8]) window(-C.hutW / 2 - 0.01, wz, -Math.PI / 2);
     // --- the porch and the door
-    const doorX = -2.4;
+    const doorX = DOOR_X;
     const doorFrame = add(new THREE.BoxGeometry(1.5, 2.3, 0.1), warm, doorX, FL + 1.15, C.hutD / 2 + 0.02, hut, false);
     doorFrame.name = 'door-light';
     add(new THREE.BoxGeometry(1.8, 0.16, 0.16), trim, doorX, FL + 2.38, C.hutD / 2 + 0.06, hut, false);
@@ -584,7 +604,7 @@ export class RescueStation implements FinishEnvironment {
       this.group.add(g.group);
     });
     // stop in front of the door; the Yeti halts up the slope, at the edge of the light
-    this.stop.copy(this.door).addScaledVector(this.faces, 8);
+    this.stop.copy(this.door).addScaledVector(this.faces, STOP_OUT);
     this.stop.y = H(this.stop.x, this.stop.z);
     const across = new THREE.Vector3(this.faces.z, 0, -this.faces.x);
     this.yetiPt.copy(this.door).addScaledVector(this.faces, 30).addScaledVector(across, -side * 12);

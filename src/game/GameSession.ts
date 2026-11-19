@@ -22,6 +22,7 @@ import { DefeatCinematic, VictoryCinematic } from '../cinematic/EndCinematics';
 import { Timeline, ease, pose } from '../cinematic/Timeline';
 import { autopilotInput, type AutopilotStyle } from '../debug/autopilot';
 import { clamp, damp, smoothstep, wrapAngle } from '../core/rng';
+import { victorySteer } from './victorySteer';
 import type { SkierPose, YetiAnimState, YetiMode, AudioFrameState } from '../core/types';
 import type { World } from './World';
 import type { SkierModel } from '../player/SkierModel';
@@ -536,27 +537,13 @@ export class GameSession implements Stage {
     this.prevHeading = s.heading;
     const v = this.victory;
     if (!v) return;
-    // auto-steer to the stop point; drift-brake into a hockey stop near it
-    const sp = v.stopPoint;
-    const d = Math.hypot(sp.x - s.pos.x, sp.z - s.pos.z);
-    const want = Math.atan2(sp.x - s.pos.x, Math.max(2, sp.z - s.pos.z));
-    const err = wrapAngle(want - s.heading);
-    const stopping = d < 22 || s.pos.z > sp.z - 4;
-    // hockey stop: swing the skis ~90° across the direction of travel once, then hold the edge
-    const travel = s.speed > 1 ? Math.atan2(s.vel.x, s.vel.z) : s.heading;
-    const across = Math.abs(wrapAngle(s.heading - travel));
-    if (stopping && !this.hockey) {
-      this.hockey = true;
+    // auto-steer to the stop point; drift-brake into a hockey stop near it (victorySteer.ts)
+    const st = { hockey: this.hockey };
+    const { input: inp, hockeyStarted } = victorySteer(s, v.stopPoint, st, { onMark: v.stopOnMark, driftMin: DRIFT_MIN_SPEED });
+    this.hockey = st.hockey;
+    if (hockeyStarted) {
       this.world.particles.emit({ x: s.pos.x, y: s.pos.y + 0.1, z: s.pos.z, vx: s.vel.x * 0.4, vy: 1.6, vz: s.vel.z * 0.4, spread: 2.2, size: 0.45, life: 1.3, count: 70, gravity: 0.5, drag: 1.8, grow: 1.4, alpha: 0.85 });
     }
-    const inp: SkierInput = {
-      steer: stopping ? (across < 1.45 && s.speed > 2 ? 1 : 0) : clamp(-err * 2.5, -1, 1),
-      tuck: 0,
-      brake: stopping ? 1 : smoothstep(60, 20, d) * 0.6,
-      drift: stopping && s.speed > DRIFT_MIN_SPEED,
-      pop: false,
-      recover: true,
-    };
     this.phys.step(inp, PHYS_DT);
     for (const e of this.phys.drainEvents()) this.onEvent(e);
     if (s.speed < 0.5) s.vel.multiplyScalar(0.9);
@@ -1189,9 +1176,11 @@ export class GameSession implements Stage {
         // (W-048) heard from upwind: the front rolls in from the side it will blow from
         const sp = this.phys.s.pos;
         this.audio.playCue('blizzard-build', new THREE.Vector3(sp.x - f.dir * 60, sp.y + 8, sp.z + 20));
-        // (W-047: short enough to read at 15 characters a second while the front builds; the lee is the
-        // side the wind pushes you toward: storm.ts LEE)
-        this.envCaption(`[a storm front rolls in — the wind pushes you ${side}; the ${side} shoulder is the lee]`, 3.2, 'front', CAPTION_PRIORITY.warning, 6);
+        // (W-047: short enough to read at 15 characters a second while the front builds.) Round 3 (R2
+        // F N2, W-055): the caption no longer sends the player to the lee shoulder — measured, it is not
+        // a net win (it crosses the drift rows) — but to the marked drift gaps, the move that is
+        // (balance/round2: +12/−0 on held-out Normal Sprint seeds)
+        this.envCaption(`[a storm front rolls in — the wind pushes you ${side}; ski the flagged gaps in the drifts]`, 3.2, 'front', CAPTION_PRIORITY.warning, 6);
       } else if (f.phase === 'ease') this.envCaption('[the storm eases — the view opens up]', 2.2, 'front', CAPTION_PRIORITY.report);
       this.lastFront.phase = f.phase;
     }
@@ -1264,7 +1253,11 @@ export class GameSession implements Stage {
     const len = Math.hypot(rx, rz) || 1;
     const pan = (-f.dir * rx) / len;
     void rz;
-    return { storm: this.run.simulating || this.victory ? f.s : 0, exposure: env.lastExposure ?? 1, pan };
+    // (round 3, R2 C N-6) a victory that stages its own weather (Whiteout: the storm holds, then
+    // breaks) is heard as staged: the wind drops with the break, not with the live front
+    const wo = this.victory ? this.world.weatherOverride : null;
+    const storm = wo ? wo.storm : this.run.simulating || this.victory ? f.s : 0;
+    return { storm, exposure: env.lastExposure ?? 1, pan };
   }
 
   /** 0..1 closeness to the sea for the surf/gull beds (coastal locations) */
@@ -1356,7 +1349,13 @@ export class GameSession implements Stage {
   debugFrames(n: number, dt = 1 / 30) {
     this.debugUsed = true;
     const neutral = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recoverPressed: false, recoverHeld: false, lookBack: false, pausePressed: false, skipPressed: false, camX: 0, camY: 0, ...this.debugHeld };
-    for (let i = 0; i < n; i++) this.frame(dt, neutral, 'keyboard');
+    for (let i = 0; i < n; i++) {
+      this.frame(dt, neutral, 'keyboard');
+      // (round 3, R2 C N-3/N-5) the finish animates as in play (App's loop updates it there): the
+      // captures stepped the session alone, so the station's door, lantern and searchlight never moved
+      const r = this.world.resort;
+      if (r && Math.abs(this.camera.position.z - r.finishZ) < 900) r.update(dt, this.time, this.resortState);
+    }
   }
 
   debugState() {

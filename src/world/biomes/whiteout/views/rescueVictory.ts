@@ -26,12 +26,18 @@ import type { FinishEnvironment, VictoryDirector, VictoryScript } from '../../..
 import { TrophyHandoff } from '../../../../cinematic/victory/trophy';
 import type { RescueStation } from './rescue';
 
+/** the Yeti walks in from this far beyond his stop (m) */
+const YETI_IN = 14;
+
 export const RESCUE_BEATS = { arrive: 0, welcome: 3.4, door: 3.8, lantern: 6.6, yetiShow: 8.8, yeti: 9.4, light: 11.0, flinch: 11.4, leave: 13.0, clear: 13.6, clearEnd: 18.6, title: 19.2, results: 23.6 } as const;
 /** the storm the finish holds until the break (as thick as the run's full storm: storm.ts STORM_FOG) */
 export const RESCUE_STORM = { visibility: 20, snowfall: 2.6, storm: 1, windX: 10 } as const;
 
 export class RescueVictory implements VictoryScript {
   private trophy: TrophyHandoff;
+  private frustum = new THREE.Frustum();
+  private pv = new THREE.Matrix4();
+  private tmpV = new THREE.Vector3();
   private t = 0;
   private yetiStop = new THREE.Vector3();
   private yetiState: 'approach' | 'flinch' | 'leave' = 'approach';
@@ -45,7 +51,10 @@ export class RescueVictory implements VictoryScript {
   ) {
     this.station = r as RescueStation;
     this.station.doorOpen = 0;
-    this.trophy = new TrophyHandoff(st, r.trophy, () => st.audio.playCrowdCheer(0.4));
+    // (round 3, R2 C N-2) only the lantern flies; the plinth stays by the door
+    this.trophy = new TrophyHandoff(st, r.trophy, () => st.audio.playCrowdCheer(0.4), true);
+    // (round 3, R2 C N-1) the skier stops on the porch mark, not ~20 m short of it
+    d.stopOnMark = true;
     r.getYetiStopPoint(this.yetiStop);
     const S = this.station;
     const door = S.door.clone();
@@ -57,7 +66,8 @@ export class RescueVictory implements VictoryScript {
     const B = RESCUE_BEATS;
     // the Yeti waits out in the white, hidden until his beat (round 1: visible at 5 s)
     const ya = st.yetiAI;
-    const start = this.yetiStop.clone().addScaledVector(faces, 38);
+    // (round 3, R2 C N-4) he starts 14 m out and walks in at a walk's pace (was 38 m at ~16 m/s)
+    const start = this.yetiStop.clone().addScaledVector(faces, YETI_IN);
     ya.pos.set(start.x, st.world.mountain.heightAt(start.x, start.z), start.z);
     st.yeti.root.visible = false;
     // the storm holds at full strength until the break
@@ -187,9 +197,11 @@ export class RescueVictory implements VictoryScript {
         st.audio.playYetiGrowl(ya.pos, false);
       } else if (dist > 0.4) {
         to.normalize();
-        // reach the stop just before the light hits him
-        const v = Math.min(dist, Math.max(2.5, dist / Math.max(0.3, B.flinch - 0.3 - t)) * dt);
-        st.yetiAnim.speed = 5;
+        // reach the stop just before the light hits him, slowing into it; the gait follows the root
+        // speed (no foot-slide)
+        const sp = Math.min(6.5, Math.max(1.2, dist / Math.max(0.3, B.flinch - 0.3 - t)), dist * 2.2);
+        const v = Math.min(dist, sp * dt);
+        st.yetiAnim.speed = sp;
         ya.pos.addScaledVector(to, v);
         ya.heading = damp(ya.heading, ya.heading + wrapAngle(Math.atan2(to.x, to.z) - ya.heading), 8, dt);
         st.setYetiMode('walk');
@@ -207,12 +219,18 @@ export class RescueVictory implements VictoryScript {
       }
     } else {
       const away = ya.pos.clone().sub(this.station.door).setY(0).normalize();
-      ya.pos.addScaledVector(away, 2.6 * dt);
-      st.yetiAnim.speed = 2.6;
+      // (round 3, R2 C N-7) he lumbers off faster and is hidden only once he is out of the camera's
+      // view (or 10 s on) — never popping out in frame
+      ya.pos.addScaledVector(away, 4 * dt);
+      st.yetiAnim.speed = 4;
       ya.heading = damp(ya.heading, ya.heading + wrapAngle(Math.atan2(away.x, away.z) - ya.heading), 4, dt);
       st.setYetiMode('turnAway');
       // gone into the white (and out of the reveal)
-      if (this.yetiT > 4) st.yeti.root.visible = false;
+      if (st.yeti.root.visible && this.yetiT > 1.5) {
+        this.frustum.setFromProjectionMatrix(this.pv.multiplyMatrices(st.camera.projectionMatrix, st.camera.matrixWorldInverse));
+        const seen = this.frustum.containsPoint(this.tmpV.copy(ya.pos).setY(ya.pos.y + 1.5));
+        if (!seen || this.yetiT > 10) st.yeti.root.visible = false;
+      }
     }
     ya.pos.y = m.heightAt(ya.pos.x, ya.pos.z);
     st.yeti.root.position.copy(ya.pos);

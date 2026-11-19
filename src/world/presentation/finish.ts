@@ -67,6 +67,8 @@ export interface VictoryDirector {
   readonly stopPoint: THREE.Vector3;
   /** 0..1 how much the game auto-steers the skier to the stop point */
   autopilot: number;
+  /** stop on the mark rather than sliding to a halt near it (victorySteer.ts; default false) */
+  stopOnMark?: boolean;
   /** crowd / welcome levels fed back to FinishEnvironment.update */
   cheer: number;
   welcome: number;

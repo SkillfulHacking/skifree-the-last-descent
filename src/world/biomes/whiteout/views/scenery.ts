@@ -73,6 +73,8 @@ interface Chunk {
   wands: THREE.InstancedMesh | null;
 }
 
+/** the lamps' shared clock (their pulse runs along the line: aPhase = z) */
+const LAMP_TIME = { value: 0 };
 let lampTex: THREE.Texture | null = null;
 function lampTexture(): THREE.Texture {
   if (lampTex) return lampTex;
@@ -154,7 +156,9 @@ export class WhiteoutScenery implements SceneryView {
       lp[i * 3] = s.x;
       lp[i * 3 + 1] = s.y + MARKER.pole - 0.05;
       lp[i * 3 + 2] = s.z;
-      const c = s.alt ? [0.35, 0.65, 1.0] : [1.0, 0.62, 0.18];
+      // (round 3, R2 A 8) a deep amber drawn over the fog, not added to it (additive amber on a bright
+      // whiteout saturates to white)
+      const c = s.alt ? [0.3, 0.6, 1.0] : [1.0, 0.48, 0.06];
       lc.set(c, i * 3);
       phase[i] = s.z;
     });
@@ -164,8 +168,20 @@ export class WhiteoutScenery implements SceneryView {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(lp, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(lc, 3));
-    // lamps: not fogged (they are the way through the whiteout), additive glow
-    const lampMat = new THREE.PointsMaterial({ size: MARKER.lamp, map: lampTexture(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, sizeAttenuation: true });
+    geo.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+    // lamps: not fogged (they are the way through the whiteout); each pulses on its own phase, so the
+    // pulse runs down the hill along the line (round 3, R2 A 8: one shared sin made them blink together)
+    const lampMat = new THREE.PointsMaterial({ size: MARKER.lamp, map: lampTexture(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.NormalBlending, fog: false, sizeAttenuation: true });
+    lampMat.onBeforeCompile = (sh) => {
+      sh.uniforms.uLampT = LAMP_TIME;
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uLampT;\nattribute float aPhase;\nvarying float vPulse;')
+        .replace('#include <color_vertex>', '#include <color_vertex>\n  vPulse = pow(0.5 + 0.5 * sin(uLampT * 2.4 - aPhase * 0.045), 3.0);')
+        .replace('gl_PointSize = size;', 'gl_PointSize = size * (0.82 + 0.4 * vPulse);');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying float vPulse;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= 0.7 + 0.5 * vPulse;');
+    };
     const lamps = new THREE.Points(geo, lampMat);
     lamps.frustumCulled = false;
     group.add(poles, lamps);
@@ -206,6 +222,7 @@ export class WhiteoutScenery implements SceneryView {
 
   update(dt: number, time: number, f: SceneryFrame): void {
     this.sky.update(dt, time, f);
+    LAMP_TIME.value = time;
     ROCK_ORIGIN.value.copy(f.origin);
     // (a scan that arrived since the last stream: place the rocks of the live chunks)
     this.rocks.stream(this.win[0], this.win[1]);
@@ -214,7 +231,7 @@ export class WhiteoutScenery implements SceneryView {
     // brighter and larger as the storm closes in (they matter most then)
     const s = f.storm ?? 0;
     for (const ch of this.chunks.values()) {
-      ch.lampMat.size = MARKER.lamp * (1 + 0.9 * s) * (0.92 + 0.08 * Math.sin(time * 2.2));
+      ch.lampMat.size = MARKER.lamp * (1 + 0.9 * s);
       ch.lampMat.opacity = 0.75 + 0.25 * s;
     }
   }

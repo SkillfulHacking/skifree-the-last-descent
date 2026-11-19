@@ -363,11 +363,15 @@ export class BiomeEnvironment implements PhysicsEnvironment {
         this.tracks.set(h.id, tr);
       }
       // telegraph / active transitions ahead of the skier
-      if (k.timing.kind === 'periodic' && tr.phase !== ph.phase && h.z > q.z - h.r && h.z - q.z < HAZARD_ALERT_RANGE) {
+      // (round 3, R2 B N1) the phase is only recorded once the hazard is within alert range: a cell
+      // tracked further out (the near window reaches r + reach + 175 m) whose telegraph began there is
+      // reported as it comes into range, not consumed silently
+      const inAlert = h.z > q.z - h.r && h.z - q.z < HAZARD_ALERT_RANGE;
+      if (k.timing.kind === 'periodic' && tr.phase !== ph.phase && inAlert) {
         if (ph.phase === 'telegraph') this.emit({ type: 'hazard-telegraph', hazard: h, kind: k.id, cue: k.audio?.telegraph ?? null, t: q.t });
         else if (ph.phase === 'active') this.emit({ type: 'hazard-active', hazard: h, kind: k.id, cue: k.audio?.active ?? null, t: q.t });
       }
-      tr.phase = ph.phase;
+      if (inAlert || k.timing.kind !== 'periodic') tr.phase = ph.phase;
       tr.closest = Math.min(tr.closest, dist - h.r);
       const inside = dist < h.r;
       if (inside !== tr.inside) {
