@@ -286,7 +286,10 @@ export class Mountain {
       // 1.4 m down 20 m past the rim, 4.5 m at 40 m — that the edge never read as an edge: dev renders.)
       const ts = (t * t) / (t + 0.02);
       const fall = R.depth * (1 - Math.pow(1 - Math.min(1, ts), 1.8));
-      const lip = R.lip * smoothstep(0, R.rim, e) * (1 - smoothstep(R.rim, R.rim + 30, e));
+      // (W-065) on a rim stretch (profile.rimLeanAt) there is no lip: the bank rolls down ~2.5 m to the
+      // rim, so from the gameplay camera, 14 m away, the edge is a skyline over the drop, not a hump
+      const lk = this.profile.rimLeanAt?.(z) ?? 0;
+      const lip = R.lip * (1 - lk) * smoothstep(0, R.rim, e) * (1 - smoothstep(R.rim, R.rim + 30, e)) - 2.5 * lk * smoothstep(0, R.rim, e);
       // ribs and couloirs down the flank (elongated across the course = down the fall line), strongest mid-flank
       const steep = 4 * t * (1 - t);
       const rib = (ridged(x / 130, z / 62, s + 41, 2) - 0.5) * 36 * steep;

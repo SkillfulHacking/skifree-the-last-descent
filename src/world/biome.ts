@@ -104,6 +104,12 @@ export interface BiomeTerrainLook {
   shadeTint: RGB;
   /** multiplier on indirect (sky) light on snow */
   skylightTint: RGB;
+  /**
+   * Optional (Whiteout, W-065): ground far below the eye and far away is darkened toward `tint` by up
+   * to `amount` (from `below[0]`→`below[1]` m below the camera, `dist[0]`→`dist[1]` m away): the valley
+   * under a ridge reads as depth, not as a snow bank beside the piste. Absent = none (bit-identical).
+   */
+  valleyShade?: { tint: RGB; amount: number; below: [number, number]; dist: [number, number] };
 }
 
 /** Distant skyline palette (look/ranges.ts). */

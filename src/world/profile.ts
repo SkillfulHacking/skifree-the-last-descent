@@ -255,6 +255,8 @@ export interface CourseProfile {
   sightings(z0: number, z1: number): Sighting[];
   checkpoints(z0: number, z1: number): number[];
   segmentAt(z: number): SegmentType;
+  /** 0..1: how far the racing line has moved over to the rim (ProfileKnobs.rimLean); absent = 0 */
+  rimLeanAt?(z: number): number;
   /** alternate lines (shortcuts through bends / tree runs) overlapping [z0, z1] */
   altRoutes(z0: number, z1: number): AltRoute[];
   /** x of an alternate line at z, or null where there is none */
@@ -1009,6 +1011,12 @@ export class GeneratedProfile implements CourseProfile {
     if (a < 1e-3) return 0;
     const p = this.phase;
     return a * (Math.sin(z / 410 + p[0]) * 0.63 + Math.sin(z / 173 + p[1]) * 0.28 + Math.sin(z / 71 + p[2]) * 0.09);
+  }
+  rimLeanAt(z: number): number {
+    if (!this.knobs.rimLean) return 0;
+    this.reach(z);
+    const k = this.lean.at(z);
+    return k * k * (3 - 2 * k);
   }
   routeX(z: number) {
     const ra = this.routeAmp.at(z);

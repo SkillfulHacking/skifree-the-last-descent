@@ -85,6 +85,9 @@ export function makeWhiteoutBiome(): Biome {
       rockB: [0.2, 0.2, 0.205],
       rockC: [0.055, 0.058, 0.066],
       shadeTint: [0.86, 0.92, 1.08],
+      // (round 3, W-065) the valley under the ridge reads as depth: the far flank and floor, well below
+      // the eye, darker and colder than the snow beside the piste
+      valleyShade: { tint: [0.42, 0.5, 0.62], amount: 0.75, below: [40, 260], dist: [220, 800] },
       skylightTint: [0.9, 0.96, 1.15],
     },
     ranges: { skyColor: [0.6, 0.67, 0.78], snow: [0.9, 0.92, 0.96], stoneDark: [0.11, 0.115, 0.13], stoneLight: [0.3, 0.31, 0.33], lowland: [0.2, 0.22, 0.26], horizonHaze: 0.8, soft: 0.8 },
