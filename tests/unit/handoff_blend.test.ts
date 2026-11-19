@@ -59,7 +59,7 @@ function scenario(biome: 'alpine' | 'fjord' | 'whiteout') {
 }
 
 describe('cave hand-off camera', () => {
-  it('the look-back schedule: held until the landing + 0.35 s, released by a smoothstep over 1.5 s, then over', () => {
+  it('the look-back schedule: held until the landing + 0.35 s, released by a smoothstep over HANDOFF_CAM.release s, then over', () => {
     const B: HandoffBlend = { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fov: 46, t: 1.0, landedAt: null };
     expect(lookBackAt(B)).toBe(1);
     B.landedAt = 2.0;
@@ -126,7 +126,9 @@ describe('cave hand-off camera', () => {
         // the touchdown in view: within the horizontal half-angle of view, with a margin (48° at 16:9 / fov 64)
         if (Math.abs(B.t - landing) < 1e-9) {
           const toYeti = yeti.pos.clone().add(new THREE.Vector3(0, 1.5, 0)).sub(A.cam.position).normalize();
-          expect(deg(d.angleTo(toYeti)), 'the Yeti at touchdown').toBeLessThan(40);
+          // and clear of the top HUD band (the Yeti bar, the finish panel): within ±18° vertically of centre
+          expect(deg(d.angleTo(toYeti)), 'the Yeti at touchdown').toBeLessThan(30);
+          expect(Math.abs(deg(Math.asin(toYeti.y) - Math.asin(d.y))), 'the Yeti at touchdown, vertically').toBeLessThan(18);
         }
         if (A.fc.lookBackOverride === null && B.t > landing) {
           A.fc.lookBackAim = null;

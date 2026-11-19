@@ -47,6 +47,7 @@ export class FollowCamera {
   lookBackOverride: number | null = null;
   /** with lookBackOverride: the point to turn the look-back toward (null: straight back) */
   lookBackAim: THREE.Vector3 | null = null;
+  private tmpAim = new THREE.Vector3();
   private lookBackS = 0;
   private avoidS = 0;
   private avoidSide = 1;
@@ -193,6 +194,9 @@ export class FollowCamera {
     // aim slightly down the slope so the upcoming terrain is in view
     const gy = this.mountain.heightAt(look.x, look.z) + 1.2;
     look.y = THREE.MathUtils.lerp(Math.min(look.y, gy), baseY + 1.0, 0.5);
+    // (W-076 review C) looking back at the leap, the aim is pulled 30% of the way onto the Yeti, so he
+    // sits in the middle of the frame (not under the top HUD) with the skier in the foreground
+    if (this.lookBackAim && this.lookBackOverride !== null) look.lerp(this.tmpAim.copy(this.lookBackAim).setY(this.lookBackAim.y + 1.5), 0.3 * this.lookBackS);
 
     if (!this.initialized) {
       this.pos.copy(goal);
