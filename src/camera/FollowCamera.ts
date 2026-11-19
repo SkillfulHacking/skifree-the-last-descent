@@ -43,6 +43,8 @@ export class FollowCamera {
   avoid: THREE.Vector3 | null = null;
   /** 0..1 look back over the shoulder (held input) */
   lookBack = 0;
+  /** a scripted look-back (0..1) that replaces the player's, undamped (the cave hand-off: W-076) */
+  lookBackOverride: number | null = null;
   private lookBackS = 0;
   private avoidS = 0;
   private avoidSide = 1;
@@ -124,7 +126,7 @@ export class FollowCamera {
     this.airY = damp(this.airY, air, t.grounded ? 6 : 1.8, dt);
     const baseY = t.pos.y - air + this.airY * 0.75 + air * 0.25;
 
-    this.lookBackS = damp(this.lookBackS, this.lookBack, 6, dt);
+    this.lookBackS = this.lookBackOverride ?? damp(this.lookBackS, this.lookBack, 6, dt);
     // keep out of the yeti: when it is close behind, lift the boom and swing to the side so it
     // reads over the skier's shoulder instead of filling the screen
     let avoidK = 0;

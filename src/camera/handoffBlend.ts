@@ -1,52 +1,48 @@
 /**
- * The camera's swing from the cave cinematic's last shot back to the follow camera, while the player
- * already has control and the Yeti is in the air (W-076). Pure: GameSession calls it every frame of
- * the swing after the follow camera has placed `camera`; tests/unit/handoff_blend.test.ts.
+ * The watched cave hand-off's camera (W-076): the player has control while the Yeti is in the air.
  *
- * The position and field of view ease from the shot's to the follow camera's over the whole swing;
- * the aim stays on the leaping Yeti for the first half, then turns onto the follow camera's own aim,
- * so the landing is seen and the swing ends exactly on the follow pose (no cut). (Review C, C1: a
- * slerp of the camera's quaternion onto itself kept the shot's direction, then snapped at the end.)
+ * The follow camera's own look-back view carries it: the skier in the foreground, the cave and the
+ * leaping Yeti behind them (review C, C6/C7: a free swing from the shot to the follow aim either never
+ * turned or whip-panned past both of them, and the landing happened out of frame).
+ * - `shotBlend`: the first 0.5 s ease from the cinematic's last shot (behind the skier's position,
+ *   looking up at the cave) into that look-back view — both face uphill, so this is a short move;
+ * - `lookBackAt`: the look-back held until the landing + LAND_HOLD, then released with a smoothstep
+ *   over RELEASE s — at most ~3° of turn per frame at 60 fps (1.5 × 180° / RELEASE peak).
  */
 import * as THREE from 'three';
 import { smoothstep } from '../core/rng';
 
+export const HANDOFF_CAM = { shot: 0.5, landHold: 0.35, release: 1.5 } as const;
+
 export interface HandoffBlend {
-  /** the shot's camera position and fov when control returned */
+  /** the shot's camera when control returned */
   pos: THREE.Vector3;
-  /** the point the shot was aimed at when control returned (on the shot's line of sight) */
-  look: THREE.Vector3;
+  quat: THREE.Quaternion;
   fov: number;
-  /** seconds into the swing, and its length */
+  /** seconds since the hand-off; the landing time (s since the hand-off), once known */
   t: number;
-  dur: number;
+  landedAt: number | null;
 }
 
-const followPos = new THREE.Vector3();
-const followLook = new THREE.Vector3();
-const fwd = new THREE.Vector3();
-const look = new THREE.Vector3();
-const yetiAim = new THREE.Vector3();
+/** the follow camera's scripted look-back at time B.t (null when the hand-off camera is over) */
+export function lookBackAt(B: HandoffBlend): number | null {
+  if (B.landedAt === null) return 1;
+  const u = (B.t - B.landedAt - HANDOFF_CAM.landHold) / HANDOFF_CAM.release;
+  if (u >= 1) return null;
+  return 1 - smoothstep(0, 1, u);
+}
 
-/** `camera` holds the follow pose on entry; `yeti` the Yeti's position (aimed at early in the swing). Returns false once the swing is over. */
-export function applyHandoffBlend(camera: THREE.PerspectiveCamera, B: HandoffBlend, yeti: THREE.Vector3): boolean {
-  const u = Math.min(1, B.t / B.dur);
-  const k = smoothstep(0, 1, u);
-  followPos.copy(camera.position);
-  camera.getWorldDirection(fwd);
-  followLook.copy(followPos).addScaledVector(fwd, 30);
-  const followFov = camera.fov;
-  camera.position.lerpVectors(B.pos, followPos, k);
-  // the aim: from the shot's own aim (no jump on the first frame) onto the leaping Yeti, then, over
-  // the second half, onto the follow camera's aim
-  yetiAim.set(yeti.x, yeti.y + 1.6, yeti.z);
-  look.copy(B.look).lerp(yetiAim, smoothstep(0, 0.3, u)).lerp(followLook, smoothstep(0.5, 1, u));
-  if (u >= 1) {
-    camera.position.copy(followPos);
-    look.copy(followLook);
-  }
-  camera.lookAt(look);
-  camera.fov = B.fov + (followFov - B.fov) * k;
+const q = new THREE.Quaternion();
+const p = new THREE.Vector3();
+
+/** ease `camera` (holding the follow pose) from the shot over the first HANDOFF_CAM.shot s */
+export function shotBlend(camera: THREE.PerspectiveCamera, B: HandoffBlend): void {
+  const k = smoothstep(0, 1, B.t / HANDOFF_CAM.shot);
+  if (k >= 1) return;
+  q.copy(camera.quaternion);
+  p.copy(camera.position);
+  camera.position.lerpVectors(B.pos, p, k);
+  camera.quaternion.copy(B.quat).slerp(q, k);
+  camera.fov = B.fov + (camera.fov - B.fov) * k;
   camera.updateProjectionMatrix();
-  return u < 1;
 }
