@@ -41,7 +41,7 @@ export interface ExtraCollider {
   /** how far it stands above `y` */
   height?: number;
 }
-import { makeEnvQuery, makeEnvSample, type EnvSample, type PhysicsEnvironment } from './environment';
+import { makeEnvQuery, makeEnvSample, SLIP_EDGE, type EnvSample, type PhysicsEnvironment } from './environment';
 
 export const PHYS_DT = 1 / 120;
 export const GRAVITY = 9.81;
@@ -131,8 +131,8 @@ export function poleEffect(speed: number): number {
   return 1 - u * u * (3 - 2 * u);
 }
 
-/** How a grounded side-slip (EnvSample.groundSlip*) takes hold, by what the skier is doing. */
-export const SLIP_EDGE = { base: 1, tuck: 0.6, brake: 0.45, drift: 0.6 } as const;
+/** How a grounded side-slip (EnvSample.groundSlip*) takes hold, by what the skier is doing (./environment). */
+export { SLIP_EDGE };
 
 /**
  * Terrain-contact limits (engine-wide, every location).

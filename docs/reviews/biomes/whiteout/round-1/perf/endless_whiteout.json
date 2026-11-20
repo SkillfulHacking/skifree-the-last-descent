@@ -1,0 +1,725 @@
+{
+ "rows": [
+  {
+   "km": 1,
+   "phase": "chase",
+   "checkpoints": 0,
+   "geometries": 587,
+   "textures": 26,
+   "heapMB": 70.8,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    0,
+    0
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 2,
+   "phase": "chase",
+   "checkpoints": 0,
+   "geometries": 526,
+   "textures": 26,
+   "heapMB": 82.5,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    0,
+    2048
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 3,
+   "phase": "chase",
+   "checkpoints": 0,
+   "geometries": 512,
+   "textures": 26,
+   "heapMB": 74,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    0,
+    2048
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 4,
+   "phase": "chase",
+   "checkpoints": 0,
+   "geometries": 521,
+   "textures": 26,
+   "heapMB": 78.6,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    0,
+    4096
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 5,
+   "phase": "chase",
+   "checkpoints": 0,
+   "geometries": 557,
+   "textures": 28,
+   "heapMB": 84.6,
+   "bands": 11,
+   "vegBands": 11,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    0,
+    4096
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 6,
+   "phase": "chase",
+   "checkpoints": 0,
+   "geometries": 557,
+   "textures": 31,
+   "heapMB": 73.7,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 2,
+   "origin": [
+    0,
+    -2048,
+    6144
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 7,
+   "phase": "chase",
+   "checkpoints": 1,
+   "geometries": 589,
+   "textures": 30,
+   "heapMB": 82.9,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 2,
+   "origin": [
+    0,
+    -2048,
+    6144
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 8,
+   "phase": "chase",
+   "checkpoints": 1,
+   "geometries": 531,
+   "textures": 27,
+   "heapMB": 87.7,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    -2048,
+    8192
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 9,
+   "phase": "chase",
+   "checkpoints": 1,
+   "geometries": 503,
+   "textures": 27,
+   "heapMB": 82.7,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -2048,
+    8192
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 10,
+   "phase": "chase",
+   "checkpoints": 1,
+   "geometries": 478,
+   "textures": 27,
+   "heapMB": 62.5,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -2048,
+    10240
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 11,
+   "phase": "chase",
+   "checkpoints": 1,
+   "geometries": 558,
+   "textures": 28,
+   "heapMB": 77.6,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -2048,
+    10240
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 12,
+   "phase": "chase",
+   "checkpoints": 1,
+   "geometries": 573,
+   "textures": 31,
+   "heapMB": 93.6,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 2,
+   "origin": [
+    0,
+    -2048,
+    12288
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 13,
+   "phase": "chase",
+   "checkpoints": 2,
+   "geometries": 569,
+   "textures": 30,
+   "heapMB": 85.2,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 2,
+   "origin": [
+    0,
+    -4096,
+    12288
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 14,
+   "phase": "chase",
+   "checkpoints": 2,
+   "geometries": 501,
+   "textures": 27,
+   "heapMB": 89.6,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -4096,
+    14336
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 15,
+   "phase": "chase",
+   "checkpoints": 2,
+   "geometries": 509,
+   "textures": 27,
+   "heapMB": 68.1,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -4096,
+    14336
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 16,
+   "phase": "chase",
+   "checkpoints": 2,
+   "geometries": 554,
+   "textures": 27,
+   "heapMB": 73.2,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -4096,
+    16384
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 17,
+   "phase": "chase",
+   "checkpoints": 2,
+   "geometries": 573,
+   "textures": 28,
+   "heapMB": 62.2,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    -4096,
+    16384
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 18,
+   "phase": "chase",
+   "checkpoints": 2,
+   "geometries": 539,
+   "textures": 31,
+   "heapMB": 74.1,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 2,
+   "origin": [
+    0,
+    -4096,
+    18432
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 19,
+   "phase": "chase",
+   "checkpoints": 3,
+   "geometries": 558,
+   "textures": 30,
+   "heapMB": 73.8,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 2,
+   "origin": [
+    0,
+    -4096,
+    18432
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 20,
+   "phase": "chase",
+   "checkpoints": 3,
+   "geometries": 543,
+   "textures": 27,
+   "heapMB": 83.7,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -6144,
+    20480
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 21,
+   "phase": "chase",
+   "checkpoints": 3,
+   "geometries": 498,
+   "textures": 27,
+   "heapMB": 69.4,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -6144,
+    20480
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 22,
+   "phase": "chase",
+   "checkpoints": 3,
+   "geometries": 504,
+   "textures": 27,
+   "heapMB": 76.3,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    -6144,
+    20480
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 23,
+   "phase": "chase",
+   "checkpoints": 3,
+   "geometries": 581,
+   "textures": 28,
+   "heapMB": 70,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    -6144,
+    22528
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 24,
+   "phase": "chase",
+   "checkpoints": 3,
+   "geometries": 573,
+   "textures": 31,
+   "heapMB": 76.9,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 2,
+   "origin": [
+    0,
+    -6144,
+    22528
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 25,
+   "phase": "chase",
+   "checkpoints": 4,
+   "geometries": 553,
+   "textures": 30,
+   "heapMB": 75.6,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 2,
+   "origin": [
+    0,
+    -6144,
+    24576
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 26,
+   "phase": "chase",
+   "checkpoints": 4,
+   "geometries": 531,
+   "textures": 27,
+   "heapMB": 90.8,
+   "bands": 11,
+   "vegBands": 11,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -6144,
+    24576
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 27,
+   "phase": "chase",
+   "checkpoints": 4,
+   "geometries": 545,
+   "textures": 27,
+   "heapMB": 67.8,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -8192,
+    26624
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 28,
+   "phase": "chase",
+   "checkpoints": 4,
+   "geometries": 531,
+   "textures": 27,
+   "heapMB": 82.7,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    -8192,
+    26624
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 29,
+   "phase": "chase",
+   "checkpoints": 4,
+   "geometries": 563,
+   "textures": 28,
+   "heapMB": 80.1,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    -8192,
+    28672
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 30,
+   "phase": "chase",
+   "checkpoints": 4,
+   "geometries": 558,
+   "textures": 31,
+   "heapMB": 94.2,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 2,
+   "origin": [
+    0,
+    -8192,
+    28672
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 31,
+   "phase": "chase",
+   "checkpoints": 5,
+   "geometries": 563,
+   "textures": 30,
+   "heapMB": 71.5,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 2,
+   "origin": [
+    0,
+    -8192,
+    30720
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 32,
+   "phase": "chase",
+   "checkpoints": 5,
+   "geometries": 571,
+   "textures": 27,
+   "heapMB": 84.8,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -8192,
+    30720
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 33,
+   "phase": "chase",
+   "checkpoints": 5,
+   "geometries": 538,
+   "textures": 27,
+   "heapMB": 73.2,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    -8192,
+    32768
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 34,
+   "phase": "chase",
+   "checkpoints": 5,
+   "geometries": 529,
+   "textures": 27,
+   "heapMB": 74.9,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    -10240,
+    32768
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 35,
+   "phase": "chase",
+   "checkpoints": 5,
+   "geometries": 573,
+   "textures": 28,
+   "heapMB": 75,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 1,
+   "origin": [
+    0,
+    -10240,
+    34816
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 36,
+   "phase": "chase",
+   "checkpoints": 5,
+   "geometries": 558,
+   "textures": 31,
+   "heapMB": 87.9,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 264,
+   "caves": 2,
+   "origin": [
+    0,
+    -10240,
+    34816
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 37,
+   "phase": "chase",
+   "checkpoints": 6,
+   "geometries": 563,
+   "textures": 30,
+   "heapMB": 84,
+   "bands": 11,
+   "vegBands": 11,
+   "chunks": 264,
+   "caves": 2,
+   "origin": [
+    0,
+    -10240,
+    36864
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 38,
+   "phase": "chase",
+   "checkpoints": 6,
+   "geometries": 539,
+   "textures": 27,
+   "heapMB": 85.3,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    -10240,
+    36864
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 39,
+   "phase": "chase",
+   "checkpoints": 6,
+   "geometries": 544,
+   "textures": 27,
+   "heapMB": 80.1,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    -10240,
+    38912
+   ],
+   "outcome": "none"
+  },
+  {
+   "km": 40,
+   "phase": "chase",
+   "checkpoints": 6,
+   "geometries": 559,
+   "textures": 27,
+   "heapMB": 81.2,
+   "bands": 12,
+   "vegBands": 12,
+   "chunks": 272,
+   "caves": 1,
+   "origin": [
+    0,
+    -10240,
+    38912
+   ],
+   "outcome": "none"
+  }
+ ],
+ "errors": []
+}

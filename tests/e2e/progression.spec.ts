@@ -4,6 +4,7 @@
  * recolours the skier, and automated ?debug runs never persist achievements.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { shotPath } from './shots';
 
 type Progress = {
   saved: { version: number; achievements: Record<string, { earnedAt: number }>; stats: { counters: Record<string, number> }; cosmetics: { owned: Record<string, unknown>; equipped: Record<string, string> } };
@@ -112,9 +113,9 @@ test('Achievements + Locker: layout, keyboard/mouse/gamepad, v1 save migration, 
   await expect(page.locator('.ach-card.earned .ach-name')).toHaveText('Not Today, Yeti');
   await expect(page.locator('.ach-card[data-id="pizza-party"] .ach-count')).toHaveText('400 / 1,000 m');
   await expect(page.locator('.ach-card.secret .ach-name')).toHaveText('???');
-  // (Fjord Coast build: Scenic Route is earnable — only the three achievements of the locations still to come wait)
-  await expect(page.locator('.ach-card.future')).toHaveCount(3);
-  await expect(page.locator('.ach-card.future[data-id="scenic-route"]')).toHaveCount(0);
+  // (Fjord Coast and Whiteout Ridge ship: only the two achievements of the locations still to come wait — W-050)
+  await expect(page.locator('.ach-card.future')).toHaveCount(2);
+  for (const id of ['scenic-route', 'whiteout-survivor']) await expect(page.locator(`.ach-card.future[data-id="${id}"]`)).toHaveCount(0);
   await expect(page.locator('.menu-subtitle')).toContainText('1 / 12 earned');
   for (const [w, h] of [
     [1366, 768],
@@ -126,7 +127,7 @@ test('Achievements + Locker: layout, keyboard/mouse/gamepad, v1 save migration, 
     const l = await layout(page);
     expect(l, `achievements ${w}x${h}`).toMatchObject({ panelScroll: 0, overflowX: 0, overflowY: 0, rowsOutside: 0 });
     if (w >= 1366) expect(l, `no inner scrolling at ${w}x${h}`).toMatchObject({ gridScroll: 0, cardsOutside: 0 });
-    await page.screenshot({ path: `docs/reviews/pass4/achievements/achievements_${w}x${h}.png` });
+    await page.screenshot({ path: shotPath(`docs/reviews/pass4/achievements/achievements_${w}x${h}.png`) });
   }
   await page.setViewportSize({ width: 1366, height: 768 });
   // Escape goes back; gamepad A re-enters; gamepad B goes back
@@ -153,7 +154,7 @@ test('Achievements + Locker: layout, keyboard/mouse/gamepad, v1 save migration, 
   p = await api(page);
   expect(p.saved.cosmetics.equipped).toEqual({ jacket: 'jacket.glacier-blue' });
   expect(p.jacket).toBe(0x2f6db5);
-  await page.screenshot({ path: 'docs/reviews/pass4/achievements/locker_glacier_blue.png' });
+  await page.screenshot({ path: shotPath('docs/reviews/pass4/achievements/locker_glacier_blue.png') });
   // only owned jackets cycle: right again wraps to Summit Red, then back to Glacier Blue
   await press(page, 'ArrowRight');
   await expect(page.locator('.menu-row.focus .val')).toHaveText('Summit Red');

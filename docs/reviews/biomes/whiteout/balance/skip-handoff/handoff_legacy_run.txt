@@ -1,0 +1,10 @@
+     × alpine, slow arrival (4 m/s): same start and the same pursuit for 10 s 285ms
+     × alpine, fast arrival (22 m/s): same start and the same pursuit for 10 s 226ms
+     × fjord, slow arrival (4 m/s): same start and the same pursuit for 10 s 244ms
+     × fjord, fast arrival (22 m/s): same start and the same pursuit for 10 s 235ms
+     × whiteout, slow arrival (4 m/s): same start and the same pursuit for 10 s 226ms
+     × whiteout, fast arrival (22 m/s): same start and the same pursuit for 10 s 218ms
+     × a retry after a finished encounter starts the same chase again (no state carried over) 29ms
+     × every encounter of an Endless course hands off the same way (encounters 1–3) 400ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  8 failed | 2 passed (10)

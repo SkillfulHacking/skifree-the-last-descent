@@ -294,9 +294,10 @@ if (want('cave') || want('cinematic') || want('pursuit')) {
       await settle(1500);
       await shot('08d_yeti_cinematic_roar', 'Cave cinematic, t≈11.65 s (Fjord: the roar blows spray and sea smoke out of the mouth; the lintel icicles drop and shatter)');
     }
-    await framesUntil(biome === "fjord" ? `(s) => s.cinematicTime >= 15.0` : `(s) => s.cinematicTime >= 14.6`, 400);
+    // (W-076: the Yeti on the ledge 14.2–14.7 s, then the swing round to the run; the leap is the chase's first second)
+    await framesUntil(`(s) => s.cinematicTime >= 14.45`, 400);
     await settle(1500);
-    await shot('08b_yeti_cinematic', biome === 'fjord' ? 'Cave cinematic, t≈15.0 s (Fjord: the leap from the ledge, down onto the skier)' : 'Cave cinematic, t≈14.6 s');
+    await shot('08b_yeti_cinematic', 'Cave cinematic, t≈14.45 s: over the shoulder, the Yeti on the ledge, gathering for the leap');
   }
   // 9) pursuit with the rear view
   if (want('pursuit')) {

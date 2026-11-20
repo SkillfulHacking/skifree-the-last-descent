@@ -74,6 +74,11 @@ export interface BiomeAtmosphere {
   linear: number;
   /** 1 / haze scale height (m) */
   falloff: number;
+  /**
+   * Optional accessibility ceiling on the FogExp2 density the weather may reach (Whiteout: the
+   * fog never closes in below ~80 m, so obstacles stay readable at speed). Absent = no ceiling.
+   */
+  maxFogDensity?: number;
 }
 
 export interface BiomeWeather {
@@ -99,6 +104,12 @@ export interface BiomeTerrainLook {
   shadeTint: RGB;
   /** multiplier on indirect (sky) light on snow */
   skylightTint: RGB;
+  /**
+   * Optional (Whiteout, W-065): ground far below the eye and far away is darkened toward `tint` by up
+   * to `amount` (from `below[0]`→`below[1]` m below the camera, `dist[0]`→`dist[1]` m away): the valley
+   * under a ridge reads as depth, not as a snow bank beside the piste. Absent = none (bit-identical).
+   */
+  valleyShade?: { tint: RGB; amount: number; below: [number, number]; dist: [number, number] };
 }
 
 /** Distant skyline palette (look/ranges.ts). */
@@ -119,6 +130,12 @@ export interface BiomeRangesLook {
    * clear coastal air, islands and the far shore stay readable).
    */
   horizonHaze?: number;
+  /**
+   * Optional (Whiteout, W-004): 0..1 rounds the far ridges' crests (fewer noise octaves, compressed
+   * peaks) — the 5-octave ridged crest aliases into a regular sawtooth on the 480-segment rings.
+   * Absent = the original skyline (bit-identical).
+   */
+  soft?: number;
 }
 
 /** One conifer species (shape + needle colour). See props.ts pineGeometry. */
@@ -166,6 +183,12 @@ export interface BiomeRocks {
   tintDark: RGB;
   /** snow cap colour */
   snow: RGB;
+  /**
+   * Scanned CC0 boulders (art/scanModels ids) for the near-LOD obstacle rocks: when set, the
+   * procedural near rocks are replaced by these once they load (the collision is unchanged —
+   * the scans are normalised to the same unit footprint). Unset: the procedural rocks.
+   */
+  scan?: readonly ('namaqualand_boulder_02' | 'namaqualand_boulder_06' | 'boulder_01')[];
 }
 
 /** Obstacle mix: multipliers on the base placement probabilities (1 = original). */
@@ -199,6 +222,29 @@ export interface BiomeTerrain {
   startSlope?: number;
   /** side of the piste the Yeti caves are cut into (default +1; a coast: −1, the sea side) */
   caveSide?: 1 | -1;
+  /**
+   * Optional (Pass 5, Whiteout): the ground falls away on one side of the piste instead of rising
+   * into a valley wall — the course runs along a ridge's shoulder with open air on that side. The
+   * drop is `depth` m reached over `width` m from the piste edge (keep it skiable: ≤ ~16°). The
+   * cave side must be the other side. Absent = a valley on both sides (bit-identical).
+   */
+  shoulderDrop?: { side: 1 | -1; depth: number; width: number };
+  /**
+   * Optional (Whiteout full production): the course runs along the top of a broad ridge. On
+   * `dropSide` the bank rolls over a corniced rim `rim` m beyond the piste edge (rising `lip` m) and
+   * the flank falls `depth` m over `flank` m into a valley (steepest ≈ 1.5·depth/flank at mid-flank,
+   * rock ribs and couloirs); on the other side a broken rocky crest rises `crest` m (varying along the
+   * course) `crestE` m out and falls `backDrop` m behind it, so there is sky on both sides. Supersedes
+   * `shoulderDrop`; absent = no ridge (bit-identical). Off-piste only: the rim guard
+   * (capabilities/environment.ts) returns a skier who goes over the rim.
+   */
+  /**
+   * Optional (Whiteout, W-005): 0..1 domain-warps the wind drifts and breaks them into patches
+   * (sastrugi fields), instead of one regular anisotropic noise (which reads as diagonal stripes).
+   * Absent = the original drifts (bit-identical).
+   */
+  driftWarp?: number;
+  ridge?: { dropSide: 1 | -1; rim: number; lip: number; depth: number; flank: number; crest: number; crestE: number; backDrop: number };
   /** valley wall height (m) */
   wallHeight: number;
   /** ridged/fbm relief on the valley walls (m) */

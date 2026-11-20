@@ -9,7 +9,8 @@ import type { QualityPreset } from '../core/types';
 import { Rng, fbm, smoothstep } from '../core/rng';
 import { BAND, pickSpecies, type Obstacle, type ObstacleField } from '../physics/obstacles';
 import type { Mountain } from './course';
-import { createFoliageMaterial, createRockMaterial, logGeometry, pineGeometry, rockGeometry, stumpGeometry } from './props';
+import { createFoliageMaterial, createRockMaterial, logGeometry, pineGeometry, rockGeometry, scanRockGeometry, stumpGeometry } from './props';
+import { decimateUnit, loadScan, SCAN_GRID, SCAN_ON } from './art/scanModels';
 
 /** rock geometry variants (see rockGeometry: boulder, blocky, slab, split block, dome, wedge) */
 const ROCK_VARIANTS = 6;
@@ -102,6 +103,29 @@ export class Vegetation {
     this.logGeo = logGeometry();
     this.stumpGeo = stumpGeometry();
     this.geos.push(...this.treeNear, ...this.treeFar, ...this.rockNear, ...this.rockFar, this.logGeo, this.stumpGeo);
+    // (W-003) scanned boulders for the near rocks where the location asks for them
+    // (round 3, R2 D N-1) at a lighter LOD per preset; low keeps the procedural rock
+    const scans = SCAN_ON[quality] ? biome.rocks.scan : undefined;
+    const grid = SCAN_GRID[quality];
+    if (scans?.length)
+      void Promise.all(scans.map((id) => loadScan(id))).then((geos) => {
+        if (this.disposed || geos.some((g) => !g)) return;
+        for (let v = 0; v < ROCK_VARIANTS; v++) {
+          const old = this.rockNear[v]!;
+          const unit = geos[v % geos.length]!;
+          const g = scanRockGeometry(grid > 0 ? decimateUnit(unit, grid) : unit, v, biome.rocks.base);
+          this.rockNear[v] = g;
+          this.geos.push(g);
+          this.group.traverse((o) => {
+            const m = o as THREE.InstancedMesh;
+            if (m.isInstancedMesh && m.geometry === old) {
+              m.geometry = g;
+              m.boundingSphere = null;
+              m.boundingBox = null;
+            }
+          });
+        }
+      });
 
     field.onBand((band, list, added) => {
       if (added) this.queue.push({ band, list });
@@ -403,7 +427,9 @@ export class Vegetation {
       }
   }
 
+  private disposed = false;
   dispose() {
+    this.disposed = true;
     if (this.job) {
       this.job.gen.return(undefined);
       this.job = null;

@@ -1,0 +1,17 @@
+e2e on 1d88f0a (dist built from 1d88f0a, clean tree for src)
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 6 tests using 1 worker
+
+[1/6] tests/e2e/cave_skip.spec.ts:149:3 › alpine, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[2/6] tests/e2e/cave_skip.spec.ts:149:3 › fjord, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[3/6] tests/e2e/cave_skip.spec.ts:149:3 › whiteout, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[4/6] tests/e2e/cave_skip.spec.ts:149:3 › alpine, normal, slow arrival: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[5/6] tests/e2e/cave_skip.spec.ts:149:3 › whiteout, hard: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[6/6] tests/e2e/cave_skip.spec.ts:149:3 › fjord, hard, Reduce Camera Motion: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+  Slow test file: tests/e2e/cave_skip.spec.ts (2.1h)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  6 passed (2.1h)

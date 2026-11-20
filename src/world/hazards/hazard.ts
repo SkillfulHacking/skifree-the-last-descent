@@ -77,6 +77,12 @@ export interface HazardPlacementContext {
   laneDistance(x: number, z: number): number;
   /** true where nothing may be placed (start, finish, refuges, cave mouths and clearings) */
   reserved(x: number, z: number, r: number): boolean;
+  /**
+   * W-056: another kind's instances in this band and the two next to it, as that kind places them
+   * (pure, from the same seeds) — for placement rules between kinds (a kind may only look at kinds
+   * that do not look back; empty when the kind is not on this course)
+   */
+  neighbours(kindId: string): readonly HazardInstance[];
 }
 
 /** The skier relative to one instance, for effect rules. */
@@ -95,8 +101,16 @@ export interface HazardContact {
   t: number;
   /** × effect strength for the game difficulty (HazardSetup.intensity; 1 when not set) */
   intensity?: number;
+  /** the course's weather seed (BiomeEnvironment.seed), for kinds that follow the weather */
+  seed?: number;
   /** how far the skier is tucked, 0..1 (undefined when the caller does not know) */
   tuck?: number;
+  /**
+   * skier height above the terrain directly beneath them (m; 0 when grounded). Unlike `heightAbove`
+   * (relative to the hazard's centre) it does not depend on the slope across a wide hazard: what a
+   * jump over a drift must clear
+   */
+  clearance?: number;
 }
 
 /** What touching a hazard does this step (everything optional; null = nothing). */
@@ -154,6 +168,12 @@ export interface HazardKind<P = unknown> {
   /** solid/dangerous kinds keep the primary lane clear (default: true unless severity is cosmetic/slow) */
   readonly keepLaneClear?: boolean;
   place(ctx: HazardPlacementContext): Array<HazardSpot<P>>;
+  /**
+   * Optional: rectangles (centre, half-extents, world axes) the obstacle field keeps free of rock and
+   * trees because the hazard asks the skier to ski there (Whiteout: a drift row's gap and the line
+   * into it). Pure: a function of the instance only.
+   */
+  clearZones?(h: HazardInstance<P>): ReadonlyArray<{ x: number; z: number; hx: number; hz: number }>;
   effect(h: HazardInstance<P>, phase: HazardPhaseState, c: HazardContact): HazardEffect | null;
   readonly audio?: HazardAudio;
   /** view factory id (presentation/hazardViews.ts); required unless cosmetic-and-invisible */

@@ -247,17 +247,25 @@ export interface WindTargets {
   pan: number;
 }
 
-export function windTargets(speed: number, eerie: number, gust: number): WindTargets {
+/**
+ * The wind bed: the skier's own speed and a slow gust, plus (W-048) the storm where there is one —
+ * a roaring low band and a howling whistle that rise with the front and with exposure (shelter
+ * takes them down), gusting harder, panned toward where the wind comes from. With no storm the
+ * result is exactly the old one.
+ */
+export function windTargets(speed: number, eerie: number, gust: number, weather?: { storm: number; exposure: number; pan: number }): WindTargets {
   const v = clamp(speed / 35);
   const g = clamp(gust);
   const duck = 1 - 0.75 * clamp(eerie);
+  const w = weather ? clamp(weather.storm) * (0.3 + 0.7 * clamp(weather.exposure)) : 0;
+  const gw = g * (1 + 1.2 * w);
   return {
-    lowGain: (0.1 + 0.32 * v + 0.12 * g) * duck,
-    lowFreq: 220 + 900 * v + 260 * g,
-    whistleGain: (0.015 + 0.16 * Math.pow(v, 1.5) + 0.05 * g) * duck,
-    whistleFreq: 850 + 1900 * v + 500 * g,
-    whistleQ: 3 + 5 * v,
-    pan: (g - 0.5) * 0.6,
+    lowGain: (0.1 + 0.32 * v + 0.12 * gw + 0.55 * w) * duck,
+    lowFreq: 220 + 900 * v + 260 * gw + 160 * w,
+    whistleGain: (0.015 + 0.16 * Math.pow(v, 1.5) + 0.05 * gw + 0.12 * w) * duck,
+    whistleFreq: 850 + 1900 * v + 500 * gw + 300 * w,
+    whistleQ: 3 + 5 * v + 4 * w,
+    pan: (g - 0.5) * 0.6 * (1 - w) + (weather ? clamp(weather.pan, -1, 1) : 0) * 0.8 * w,
   };
 }
 

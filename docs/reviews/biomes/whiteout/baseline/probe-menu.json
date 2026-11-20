@@ -1,0 +1,53 @@
+{
+ "res": [
+  {
+   "x": 0.5,
+   "y": 0.5,
+   "hits": [
+    {
+     "d": 14,
+     "chain": "Points<Scene",
+     "mat": "PointsMaterial",
+     "ud": "{}",
+     "key": "onBeforeCompile(){}",
+     "geo": "BufferGeometry:3000",
+     "inst": false,
+     "p": [
+      14,
+      7,
+      -3
+     ]
+    },
+    {
+     "d": 19,
+     "chain": "Points<Scene",
+     "mat": "PointsMaterial",
+     "ud": "{}",
+     "key": "onBeforeCompile(){}",
+     "geo": "BufferGeometry:3000",
+     "inst": false,
+     "p": [
+      13,
+      7,
+      2
+     ]
+    },
+    {
+     "d": 22,
+     "chain": "Points<Scene",
+     "mat": "PointsMaterial",
+     "ud": "{}",
+     "key": "onBeforeCompile(){}",
+     "geo": "BufferGeometry:3000",
+     "inst": false,
+     "p": [
+      13,
+      7,
+      6
+     ]
+    }
+   ]
+  }
+ ],
+ "segs": null
+}

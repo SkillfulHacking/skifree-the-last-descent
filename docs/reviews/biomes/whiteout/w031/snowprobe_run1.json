@@ -1,0 +1,631 @@
+{
+  "seed": "default",
+  "courseId": "SEED-4055206780-SPR@WHITE",
+  "length": "sprint",
+  "biome": "whiteout",
+  "size": "320x180",
+  "frames": [
+    {
+      "t": 15.23333333333329,
+      "phase": "caveCinematic",
+      "probe": {
+        "snow": {
+          "n": 3000,
+          "nan": 0,
+          "size": 0.093135,
+          "opacity": 0.6587500000000001,
+          "visible": true,
+          "flakeBase": 0.075,
+          "sunBase": 0.6566443406991034,
+          "falloffBase": 0.0007142857142857143,
+          "storm": 0.18600000000000003,
+          "snowfall": 0.7750000000000001,
+          "dMin": 1.1754165430363168,
+          "d1": 6.703060627430812,
+          "dMed": 25.939330610080688,
+          "within2m": 1
+        },
+        "veils": [
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "ShaderMaterial:SkyShader",
+            "parent": "Scene",
+            "dist": 0,
+            "size": 38971.143170299736,
+            "opacity": 1,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "ShaderMaterial",
+            "parent": "DistantRanges",
+            "dist": 0,
+            "size": 17010.87887206302,
+            "opacity": 1,
+            "renderOrder": -10
+          },
+          {
+            "name": "env-snow",
+            "type": "Points",
+            "mat": "PointsMaterial",
+            "parent": "Scene",
+            "dist": 0,
+            "size": 44.94640061902637,
+            "opacity": 0.6587500000000001,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "ShaderMaterial",
+            "parent": "whiteout-sky",
+            "dist": 0,
+            "size": 12727.922061357855,
+            "opacity": 1,
+            "renderOrder": -1
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Points",
+            "mat": "PointsMaterial",
+            "parent": "Group",
+            "dist": 0,
+            "size": 117.26774653720331,
+            "opacity": 0.7965,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Points",
+            "mat": "ShaderMaterial",
+            "parent": "Scene",
+            "dist": 0,
+            "size": 49997.846406841745,
+            "opacity": 1,
+            "renderOrder": 5
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Points",
+            "mat": "PointsMaterial",
+            "parent": "whiteout-storm-cave",
+            "dist": 0,
+            "size": 49986.68330281167,
+            "opacity": 0.85,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Points",
+            "mat": "PointsMaterial",
+            "parent": "whiteout-storm-cave",
+            "dist": 0,
+            "size": 49984.76000367482,
+            "opacity": 0.85,
+            "renderOrder": 0
+          },
+          {
+            "name": "storm-dome",
+            "type": "Mesh",
+            "mat": "MeshBasicMaterial",
+            "parent": "Scene",
+            "dist": 0,
+            "size": 1905.255888325765,
+            "opacity": 0.2139,
+            "renderOrder": 5
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Scene",
+            "dist": 19.42826373164735,
+            "size": 138.74495666493877,
+            "opacity": 1,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Points",
+            "mat": "PointsMaterial",
+            "parent": "Group",
+            "dist": 33.02726511928175,
+            "size": 86.13236796010825,
+            "opacity": 0.7965,
+            "renderOrder": 0
+          },
+          {
+            "name": "cave-icicles",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 52.7568225417236,
+            "size": 6.40738911967078,
+            "opacity": 0.72,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Scene",
+            "dist": 173.17132493246615,
+            "size": 163.67605296198403,
+            "opacity": 1,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Points",
+            "mat": "PointsMaterial",
+            "parent": "Group",
+            "dist": 249.28684342117737,
+            "size": 119.45698434764292,
+            "opacity": 0.7965,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Sprite",
+            "mat": "SpriteMaterial",
+            "parent": "Group",
+            "dist": 276.25963295833844,
+            "size": 1.5556349186104046,
+            "opacity": 1,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Sprite",
+            "mat": "SpriteMaterial",
+            "parent": "Group",
+            "dist": 276.7528689140178,
+            "size": 1.5556349186104048,
+            "opacity": 1,
+            "renderOrder": 0
+          },
+          {
+            "name": "whiteout-blowing-snow",
+            "type": "Mesh",
+            "mat": "ShaderMaterial",
+            "parent": "whiteout-scenery",
+            "dist": 287.7854150691917,
+            "size": 1.4142135623730951,
+            "opacity": 1,
+            "renderOrder": 6
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "ShaderMaterial",
+            "parent": "Group",
+            "dist": 289.1996286315648,
+            "size": 0,
+            "opacity": 1,
+            "renderOrder": 1
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "ShaderMaterial",
+            "parent": "Group",
+            "dist": 289.1996286315648,
+            "size": 0,
+            "opacity": 1,
+            "renderOrder": 1
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Points",
+            "mat": "PointsMaterial",
+            "parent": "Group",
+            "dist": 512.2877268573445,
+            "size": 115.77042552687978,
+            "opacity": 0.7965,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Points",
+            "mat": "PointsMaterial",
+            "parent": "Group",
+            "dist": 767.5106517969397,
+            "size": 118.2180878068598,
+            "opacity": 0.7965,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Points",
+            "mat": "PointsMaterial",
+            "parent": "Group",
+            "dist": 1028.1895527166214,
+            "size": 119.01118738028521,
+            "opacity": 0.7965,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "ShaderMaterial",
+            "parent": "Object3D",
+            "dist": 2791.437781195436,
+            "size": 34.708104231356984,
+            "opacity": 1,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Sprite",
+            "mat": "SpriteMaterial",
+            "parent": "Group",
+            "dist": 2840.8020083555816,
+            "size": 0.848528137423893,
+            "opacity": 0.4375,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Points",
+            "mat": "PointsMaterial",
+            "parent": "rescue-station",
+            "dist": 2842.4180687185158,
+            "size": 4.800734601293269,
+            "opacity": 0.35,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2842.8216322682288,
+            "size": 0.37380255144105995,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2843.228807250556,
+            "size": 0.474242884460773,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2843.6769068949943,
+            "size": 0.5176895849472197,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2844.1869159779008,
+            "size": 0.47739683567425384,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2844.924969464663,
+            "size": 0.2503996767737814,
+            "opacity": 0.9,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2845.310477303785,
+            "size": 0.2511475543933102,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2845.806456770087,
+            "size": 0.22587692724253938,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2846.1893832092655,
+            "size": 0.3633249031379167,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2846.598801739453,
+            "size": 0.46201009270087057,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2847.542124490015,
+            "size": 0.48551172065331005,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2847.8261029014416,
+            "size": 0.43482937387124077,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2848.0785811615647,
+            "size": 0.4071855218557611,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2848.387030553451,
+            "size": 0.3203562956743911,
+            "opacity": 0.88,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Sprite",
+            "mat": "SpriteMaterial",
+            "parent": "rescue-station",
+            "dist": 2848.615535866051,
+            "size": 2.262741699796968,
+            "opacity": 0.5125,
+            "renderOrder": 0
+          },
+          {
+            "name": "(unnamed)",
+            "type": "Mesh",
+            "mat": "MeshStandardMaterial",
+            "parent": "Group",
+            "dist": 2848.655135234851,
+            "size": 0.2734839451702256,
+            "opacity": 0.88,
+            "renderOrder": 0
+          }
+        ],
+        "camAbs": [
+          -16.980099306089024,
+          -44.26799282078954,
+          285.2866036809455
+        ],
+        "camMatrixPos": [
+          -16.980099306089024,
+          -44.26799282078954,
+          285.2866036809455
+        ],
+        "matrixAgrees": true,
+        "camRender": [
+          -16.980099306089024,
+          -44.26799282078954,
+          285.2866036809455
+        ],
+        "origin": [
+          0,
+          0,
+          0
+        ],
+        "dir": [
+          -0.855495481598507,
+          0.28255384706584696,
+          -0.4339248834450824
+        ],
+        "near": 0.15,
+        "far": 12000,
+        "fov": 45.42997787188364,
+        "parent": null,
+        "fogDensity": 0.00171275,
+        "uFogExp": 0.00171275,
+        "uFogLin": 0.00003846153846153846,
+        "uFogFalloff": 0.0005814285714285714,
+        "uFogColor": [
+          0.749486,
+          0.796324,
+          0.861581
+        ],
+        "uCloudK": 0.32,
+        "uDriftK": 0.020798700751507884,
+        "objs": {
+          "terrain-chunk": [
+            [
+              -448,
+              415.0321464538574,
+              -832,
+              1
+            ],
+            [
+              -320,
+              444.2279930114746,
+              -832,
+              1
+            ],
+            [
+              -192,
+              391.8985404968262,
+              -832,
+              1
+            ],
+            [
+              -64,
+              343.55895614624023,
+              -832,
+              1
+            ],
+            [
+              64,
+              330.2052345275879,
+              -832,
+              1
+            ],
+            [
+              192,
+              250.93942260742188,
+              -832,
+              1
+            ],
+            [
+              320,
+              131.97930526733398,
+              -832,
+              1
+            ],
+            [
+              448,
+              18.263736724853516,
+              -832,
+              1
+            ]
+          ],
+          "cave-rock": [
+            [
+              -81.25795555114746,
+              -24.10525894165039,
+              266.18798065185547,
+              1
+            ]
+          ],
+          "cave-icicles": [
+            [
+              -68.22282791137695,
+              -27.688502311706543,
+              260.7976837158203,
+              1
+            ]
+          ],
+          "whiteout-storm-cave": [
+            [
+              -34.80378723144531,
+              -50013.508558273315,
+              152.1341094970703,
+              1
+            ]
+          ]
+        }
+      },
+      "shots": [
+        "/tmp/w031l/t15.2_m0.png"
+      ],
+      "perf": {
+        "fps": 10,
+        "p50": 100,
+        "p95": 100,
+        "calls": 266,
+        "triangles": 7927532,
+        "geometries": 795,
+        "textures": 31,
+        "particles": 7,
+        "terrainPending": 0
+      },
+      "terrain": {
+        "n": 367,
+        "visible": 367,
+        "nearest": [
+          [
+            49.055200005897454,
+            0,
+            -52,
+            256,
+            1,
+            0,
+            107.5720002885554,
+            -38.75714111328125
+          ],
+          [
+            79.06647345910788,
+            -128,
+            -48,
+            256,
+            1,
+            0,
+            103.70409423152554,
+            17.092247009277344
+          ],
+          [
+            134.5205679066984,
+            0,
+            -29,
+            128,
+            1,
+            0,
+            102.64556380819033,
+            -32.840983390808105
+          ],
+          [
+            139.58883230866482,
+            0,
+            -88,
+            384,
+            1,
+            0,
+            98.230680734728,
+            -24.21846580505371
+          ],
+          [
+            148.12453465777324,
+            -128,
+            -25,
+            128,
+            1,
+            0,
+            96.26094337020491,
+            12.010719299316406
+          ],
+          [
+            152.74205931222008,
+            -128,
+            -91,
+            384,
+            1,
+            0,
+            96.38686708176733,
+            13.45494556427002
+          ]
+        ]
+      }
+    }
+  ],
+  "errors": []
+}

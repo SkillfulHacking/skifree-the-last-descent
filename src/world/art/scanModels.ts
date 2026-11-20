@@ -40,6 +40,64 @@ export function decodeSkm(buf: ArrayBuffer): THREE.BufferGeometry {
   return g;
 }
 
+/**
+ * A lighter copy of a unit scan by vertex clustering (round 3, R2 D N-1: the 5,000-triangle scans put
+ * ~5× Alpine's triangle load on the GPU): vertices snap to an n³ grid over the unit box, each cell's
+ * vertices merge to their mean, and collapsed triangles are dropped. Pure, O(vertices).
+ */
+export function decimateUnit(g: THREE.BufferGeometry, n: number): THREE.BufferGeometry {
+  const pos = g.getAttribute('position') as THREE.BufferAttribute;
+  const idx = g.getIndex();
+  const cellOf = new Int32Array(pos.count);
+  const map = new Map<number, number>();
+  const sum: number[] = [];
+  const cnt: number[] = [];
+  for (let i = 0; i < pos.count; i++) {
+    const x = Math.min(n - 1, Math.floor((pos.getX(i) + 0.5) * n));
+    const y = Math.min(n - 1, Math.floor(pos.getY(i) * n));
+    const z = Math.min(n - 1, Math.floor((pos.getZ(i) + 0.5) * n));
+    const key = (x * n + y) * n + z;
+    let c = map.get(key);
+    if (c === undefined) {
+      c = cnt.length;
+      map.set(key, c);
+      cnt.push(0);
+      sum.push(0, 0, 0);
+    }
+    cellOf[i] = c;
+    cnt[c]!++;
+    sum[c * 3] += pos.getX(i);
+    sum[c * 3 + 1] += pos.getY(i);
+    sum[c * 3 + 2] += pos.getZ(i);
+  }
+  const out = new Float32Array(cnt.length * 3);
+  for (let c = 0; c < cnt.length; c++) for (let a = 0; a < 3; a++) out[c * 3 + a] = sum[c * 3 + a]! / cnt[c]!;
+  const tris: number[] = [];
+  const seen = new Set<string>();
+  const nTri = idx ? idx.count / 3 : pos.count / 3;
+  for (let t = 0; t < nTri; t++) {
+    const a = cellOf[idx ? idx.getX(t * 3) : t * 3]!;
+    const b = cellOf[idx ? idx.getX(t * 3 + 1) : t * 3 + 1]!;
+    const c = cellOf[idx ? idx.getX(t * 3 + 2) : t * 3 + 2]!;
+    if (a === b || b === c || a === c) continue;
+    const k = [a, b, c].sort((p, q) => p - q).join(',');
+    if (seen.has(k)) continue;
+    seen.add(k);
+    tris.push(a, b, c);
+  }
+  const d = new THREE.BufferGeometry();
+  d.setAttribute('position', new THREE.BufferAttribute(out, 3));
+  d.setIndex(tris);
+  d.computeVertexNormals();
+  d.computeBoundingSphere();
+  return d;
+}
+
+/** grid resolution of the scan LOD per quality preset (0 = the full scan; ~850 / ~1,200 / 5,000 triangles) */
+export const SCAN_GRID = { low: 0, medium: 10, high: 12, ultra: 0 } as const;
+/** quality presets that use the scans at all (low keeps the procedural rock) */
+export const SCAN_ON = { low: false, medium: true, high: true, ultra: true } as const;
+
 const cache = new Map<ScanId, Promise<THREE.BufferGeometry | null>>();
 
 /** the unit geometry of a scan (null without a DOM or when it fails to load) */

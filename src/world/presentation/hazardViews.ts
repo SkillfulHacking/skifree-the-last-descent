@@ -25,6 +25,11 @@ export interface HazardViewContext {
   mountain: Mountain;
   quality: QualityPreset;
   biome: Biome;
+  /**
+   * The terrain's own material (optional): a view that drapes snow on the terrain can use it so the
+   * snow matches exactly (meshes need an `aSurf` attribute: ice, powder, groomed weights).
+   */
+  terrainMaterial?: THREE.Material;
 }
 
 export type HazardViewFactory = (h: HazardInstance, ctx: HazardViewContext) => HazardView;

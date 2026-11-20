@@ -83,8 +83,8 @@ export class SnowballView {
   private beamGeo = new THREE.CylinderGeometry(SNOWBALL.hitRadius * 0.55, SNOWBALL.hitRadius * 0.85, 9, 24, 1, true).translate(0, 4.5, 0);
   private beamTex = beamTexture();
   private beamMat = new THREE.MeshBasicMaterial({ color: 0xff4a24, transparent: true, opacity: 0.55, alphaMap: this.beamTex, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false });
-  private ringMat = new THREE.MeshBasicMaterial({ color: 0xff3b1f, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide });
-  private fillMat = new THREE.MeshBasicMaterial({ color: 0xff5a2a, transparent: true, opacity: 0.32, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide });
+  private ringMat = new THREE.MeshBasicMaterial({ color: 0xff3b1f, transparent: true, opacity: 0.9, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide, fog: false });
+  private fillMat = new THREE.MeshBasicMaterial({ color: 0xff5a2a, transparent: true, opacity: 0.32, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: THREE.DoubleSide, fog: false });
   private p: Vec3 = { x: 0, y: 0, z: 0 };
   private glintTex = glintTexture();
   // the threat colour of the landing marker (orange-red), alpha-blended so it also reads against

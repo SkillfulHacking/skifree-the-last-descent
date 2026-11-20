@@ -12,7 +12,9 @@
  */
 import { Rng } from '../../core/rng';
 import type { Mountain } from '../course';
-import { BAND, LANE_HALF } from '../../physics/obstacles';
+import { BAND, LANE_HALF, setObstacleClearings, type ClearZone } from '../../physics/obstacles';
+import { capabilitiesOf } from '../capabilities/index';
+import { getHazardKind } from './hazard';
 import { keepsLaneClear, type HazardInstance, type HazardKind, type HazardPlacementContext } from './hazard';
 
 export type HazardBandListener = (band: number, hazards: readonly HazardInstance[], added: boolean) => void;
@@ -42,7 +44,7 @@ export function hazardReserved(m: Mountain, x: number, z: number, r: number): bo
   return false;
 }
 
-export function generateHazardBand(m: Mountain, seed: number, kinds: readonly HazardKind[], density: number, band: number): HazardInstance[] {
+export function generateHazardBand(m: Mountain, seed: number, kinds: readonly HazardKind[], density: number, band: number, only?: string): HazardInstance[] {
   const list: HazardInstance[] = [];
   const z0 = band * BAND;
   const z1 = z0 + BAND;
@@ -62,7 +64,16 @@ export function generateHazardBand(m: Mountain, seed: number, kinds: readonly Ha
       density,
       laneDistance: (x, z) => Math.abs(x - m.routeX(z)),
       reserved: (x, z, r) => hazardReserved(m, x, z, r),
+      neighbours: (id) => {
+        if (only !== undefined || !kinds.some((kk) => kk.id === id)) return [];
+        const out: HazardInstance[] = [];
+        for (let b = band - 1; b <= band + 1; b++) out.push(...generateHazardBand(m, seed, kinds, density, b, id));
+        return out;
+      },
     };
+    // `only`: just this kind's spots (its rng seed depends on its index in `kinds`, so the list is kept
+    // whole); their ids are not the run's ids — neighbours are read for positions and params only
+    if (only !== undefined && k.id !== only) return;
     const lane = keepsLaneClear(k);
     for (const s of k.place(ctx)) {
       if (!(s.z >= z0 && s.z < z1) || !Number.isFinite(s.x) || !(s.r > 0) || s.r > MAX_HAZARD_R) continue;
@@ -192,3 +203,53 @@ export class HazardField {
     for (const l of this.listeners) l(b, list, true);
   }
 }
+
+/**
+ * The ground a location's hazards keep clear of obstacles between z0 and z1 (HazardKind.clearZones):
+ * the same bands, seed and kinds the run's HazardField generates (BiomeEnvironment uses the course
+ * seed for both), so the rock the skier meets and the gap the drift row shows always agree. Cached
+ * per mountain and band (pure).
+ */
+const zoneCache = new WeakMap<Mountain, Map<string, readonly ClearZone[]>>();
+/**
+ * The weather's clear zones (Whiteout's lee shoulders), cached per mountain and band like the hazard
+ * zones (round 3, R2 D N-3: recomputed on every band, ~1,600 heightAt calls each, 3–24 ms slices)
+ */
+const weatherZoneCache = new WeakMap<Mountain, Map<number, readonly ClearZone[]>>();
+function weatherClearZones(m: Mountain, fn: ((m: Mountain, z0: number, z1: number) => readonly ClearZone[]) | undefined, z0: number, z1: number): ClearZone[] {
+  if (!fn) return [];
+  let cache = weatherZoneCache.get(m);
+  if (!cache) weatherZoneCache.set(m, (cache = new Map()));
+  const out: ClearZone[] = [];
+  for (let b = Math.floor(z0 / BAND); b <= Math.floor(z1 / BAND); b++) {
+    let zs = cache.get(b);
+    if (!zs) cache.set(b, (zs = fn(m, b * BAND, (b + 1) * BAND)));
+    for (const c of zs) if (c.z + c.hz > z0 && c.z - c.hz < z1) out.push(c);
+  }
+  return out;
+}
+export function hazardClearZones(m: Mountain, seed: number, z0: number, z1: number): readonly ClearZone[] {
+  const caps = capabilitiesOf(m.biome);
+  const weather = weatherClearZones(m, caps.weather.clearZones, z0, z1);
+  if (caps.hazards.kinds.length === 0 || caps.hazards.density <= 0) return weather;
+  const kinds = caps.hazards.kinds.map(getHazardKind);
+  if (!kinds.some((k) => k.clearZones)) return weather;
+  let cache = zoneCache.get(m);
+  if (!cache) zoneCache.set(m, (cache = new Map()));
+  const out: ClearZone[] = [...weather];
+  for (let b = Math.floor(z0 / BAND); b <= Math.floor(z1 / BAND); b++) {
+    const key = `${seed}:${b}`;
+    let zs = cache.get(key);
+    if (!zs) {
+      const list: ClearZone[] = [];
+      for (const h of generateHazardBand(m, seed, kinds, caps.hazards.density, b)) {
+        const k = kinds.find((kk) => kk.id === h.kind);
+        if (k?.clearZones) for (const c of k.clearZones(h)) list.push(c);
+      }
+      cache.set(key, (zs = list));
+    }
+    for (const c of zs) if (c.z + c.hz > z0 && c.z - c.hz < z1) out.push(c);
+  }
+  return out;
+}
+setObstacleClearings(hazardClearZones);

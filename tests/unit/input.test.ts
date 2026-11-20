@@ -108,6 +108,34 @@ describe('input', () => {
     expect(inp.activeDevice).toBe('keyboard');
   });
 
+  it('one Start press that closes the pause menu is not read again by the gameplay in the same frame (W-076, review E F1)', () => {
+    const w = new FakeWindow();
+    const inp = new Input(settings(), w as unknown as Window);
+    const start = pad({ buttons: Object.assign([], { [PAD.START]: { value: 1, pressed: true } }) });
+    inp.padSource = () => [pad()];
+    inp.poll();
+    inp.padSource = () => [start];
+    inp.poll();
+    // the pause menu reads the press (back = resume)…
+    expect(inp.menu(1 / 60).back).toBe(true);
+    // …and the gameplay frame that follows in the same loop iteration sees no new pause or skip
+    const g = inp.gameplay(1 / 60);
+    expect(g.pausePressed).toBe(false);
+    expect(g.skipPressed).toBe(false);
+    // the keyboard behaves the same way (Escape consumed by the menu)
+    w.fire('keydown', { code: 'Escape' });
+    expect(inp.menu(1 / 60).back).toBe(true);
+    expect(inp.gameplay(1 / 60).pausePressed).toBe(false);
+    // in play, one Start press is still both the pause and the skip of that frame
+    inp.padSource = () => [pad()];
+    inp.poll();
+    inp.padSource = () => [start];
+    inp.poll();
+    const h = inp.gameplay(1 / 60);
+    expect(h.pausePressed).toBe(true);
+    expect(h.skipPressed).toBe(true);
+  });
+
   it('gamepad disconnects and broken sources do not crash', () => {
     const w = new FakeWindow();
     const inp = new Input(settings(), w as unknown as Window);

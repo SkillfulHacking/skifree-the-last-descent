@@ -24,6 +24,8 @@ export interface SceneryContext {
   terrain: TerrainUniforms;
   /** direction towards the sun (world space, normalised) */
   sunDir: THREE.Vector3;
+  /** the terrain's snow material, for authored snow forms that must read as the same snow */
+  terrainMaterial?: THREE.Material;
 }
 
 export interface SceneryFrame {
@@ -32,6 +34,21 @@ export interface SceneryFrame {
   camPos: THREE.Vector3;
   /** render-space origin (World.origin) */
   origin: THREE.Vector3;
+  /** the weather's storm intensity at the focus right now (0..1; 0 where it never storms) */
+  storm?: number;
+  /** the weather's physics clock (s) and seed: the same timeline the skier's weather follows */
+  clock?: number;
+  weatherSeed?: number;
+  /** wind at the focus (m/s) */
+  windX?: number;
+  windZ?: number;
+  /** true while a finish cinematic overrides the weather (World.weatherOverride) */
+  override?: boolean;
+  /**
+   * true while a cinematic's weather is being handed back to the model (World.releaseWeather): `storm`
+   * is the blended value the fog and snow use, so the sky follows it too (W-043)
+   */
+  blend?: boolean;
 }
 
 export interface SceneryView {

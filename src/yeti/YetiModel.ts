@@ -429,6 +429,11 @@ export class YetiModel {
     this.eyeGlow.value = THREE.MathUtils.clamp(v, 0, 1);
   }
 
+  /** the current light factor (as set: the uniform holds its square) and eye glow — tests, diagnostics */
+  get look(): { shade: number; eyeGlow: number } {
+    return { shade: Math.sqrt(this.shade.value), eyeGlow: this.eyeGlow.value };
+  }
+
   setVisible(v: boolean): void {
     if (v && !this.root.visible) this.needSnap = true;
     this.root.visible = v;

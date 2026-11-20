@@ -398,7 +398,15 @@ ${coastal ? coastRockGlsl(T, quality === 'low') : ''}
   col *= 1.0 - uCloudShadow * 0.22 * smoothstep(0.52, 0.7, cloud);
   // cold, slightly blue-shifted albedo on faces turned away from the sun (reads as crisp winter light)
   float away = 1.0 - clamp(dot(gn, uSunDir), 0.0, 1.0);
-  col *= mix(vec3(1.0), ${v3(T.shadeTint)}, 0.25 * away * (1.0 - sf_rock));
+  col *= mix(vec3(1.0), ${v3(T.shadeTint)}, 0.25 * away * (1.0 - sf_rock));${
+    T.valleyShade
+      ? `
+  // (W-065) the valley under the ridge: far below the eye and far away, darker and colder
+  float vBelow = cameraPosition.y - vWPos.y;
+  float vFar = length(vWPos.xz - cameraPosition.xz);
+  col *= mix(vec3(1.0), ${v3(T.valleyShade.tint)}, ${T.valleyShade.amount.toFixed(3)} * smoothstep(${T.valleyShade.below[0].toFixed(1)}, ${T.valleyShade.below[1].toFixed(1)}, vBelow) * smoothstep(${T.valleyShade.dist[0].toFixed(1)}, ${T.valleyShade.dist[1].toFixed(1)}, vFar));`
+      : ''
+  }
   diffuseColor.rgb = col;${coastal ? shoreGlsl(quality === 'low') : ''}
 
   // relief: one height field (macro + mid + band-limited micro), applied as a screen-derivative bump
@@ -426,7 +434,7 @@ ${coastal ? coastRockGlsl(T, quality === 'low') : ''}
 // skylight is blue: shadowed snow reads cold while the sunlit side stays warm
 reflectedLight.indirectDiffuse *= mix(${v3(T.skylightTint)}, vec3(1.0), sf_rock * 0.5);`,
       )
-      .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vWPos);')
+      .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(sf_spindrift(gl_FragColor.rgb, vWPos, 1.0 - sf_rock), vWPos);')
       .replace(
         '#include <roughnessmap_fragment>',
         `#include <roughnessmap_fragment>

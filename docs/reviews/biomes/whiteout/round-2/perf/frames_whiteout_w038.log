@@ -1,0 +1,1 @@
+{"biome":"whiteout","km":12,"frames":37270,"median":0.8,"p95":8.2,"p99":9.4,"max":35.6,"over8":2454,"over16":24,"over33":1,"restarts":0,"softwareRenderMs":{"n":155,"median":11808},"heapMB":93.4,"renderer":{"fps":10,"p50":100,"p95":100,"calls":200,"triangles":7804452,"geometries":694,"textures":31,"particles":191,"terrainPending":1},"errors":[],"seconds":2093}

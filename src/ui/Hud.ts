@@ -15,6 +15,8 @@ export interface HudFrame {
   score: number;
   multiplier: number;
   yetiDistance: number | null;
+  /** the player is losing ground to the Yeti (yeti/presence.ts) */
+  yetiClosing?: boolean;
   chase: boolean;
   crashed: boolean;
   canRecover: boolean;
@@ -101,6 +103,7 @@ export class Hud {
     const bar = el('div', 'hud-yeti-bar', this.yetiWrap);
     this.yetiBar = el('div', 'fill', bar);
 
+    this.weatherPill = el('div', 'hud-weather hidden', this.root);
     this.air = el('div', 'hud-air', this.root);
     this.trick = el('div', 'hud-trick', this.root);
     this.prompt = el('div', 'hud-prompt', this.root);
@@ -109,6 +112,8 @@ export class Hud {
     this.skipHint = el('div', 'hud-skip hidden', this.root);
     this.fps = el('div', 'hud-fps hidden', this.root);
     this.cap = el('div', 'hud-caption', this.root);
+    this.capHard = el('div', 'cap-line cap-hard', this.cap);
+    this.capSoft = el('div', 'cap-line cap-soft', this.cap);
   }
 
   show(v: boolean) {
@@ -123,6 +128,27 @@ export class Hud {
   letterbox(on: boolean) {
     this.letterTop.classList.toggle('on', on);
     this.letterBot.classList.toggle('on', on);
+  }
+
+  private weatherPill: HTMLElement;
+  private weatherText = '';
+  /**
+   * The storm-front forecast (Whiteout): a pill under the score with the wind's direction (an arrow
+   * pointing the way it blows) — e.g. "STORM IN 6 s ←", "STORM ←", "CLEARING". null hides it.
+   */
+  setWeather(text: string | null, level: 'warn' | 'storm' | 'calm' = 'calm') {
+    const t = text ?? '';
+    if (t === this.weatherText) return;
+    this.weatherText = t;
+    this.weatherPill.classList.toggle('hidden', !text);
+    this.weatherPill.classList.toggle('warn', level === 'warn');
+    this.weatherPill.classList.toggle('storm', level === 'storm');
+    this.weatherPill.textContent = t;
+  }
+
+  /** the weather pill's text (tests) */
+  get weatherPillText(): string | null {
+    return this.weatherText || null;
   }
 
   setSkipHint(text: string | null) {
@@ -174,25 +200,77 @@ export class Hud {
   }
 
   captionsOn = true;
-  private capTimer = 0;
-  /** priority of the caption on screen: Infinity for a hard (Yeti) caption, else its soft priority */
-  private capPriority = 0;
   /**
-   * Closed caption for important non-speech sounds. `soft`: a location sound — never hides a hard
-   * caption (the Yeti's cues) and only replaces a soft one on screen when its `priority` is higher
-   * (e.g. a squall warning, which asks for a decision, replaces a rock-scrape note, which reports
-   * one: round 2, E3). Returns whether it was shown.
+   * Captions (W-046/W-047, round 2): two lines in one box, so a location warning is never lost
+   * behind the Yeti's cues and the Yeti's cues are never hidden by one —
+   *  - the hard line: the Yeti and the run's own moments (footsteps, howls, roars). A caption with
+   *    the same text already on screen is only extended (the footsteps, re-sent each frame);
+   *  - the soft line: location sounds (squalls, blizzards, fronts, drifts, rock). A higher priority
+   *    replaces a lower one on screen; one that cannot show yet waits in a queue (highest priority
+   *    first, then oldest) until the line is free, unless it goes stale (`ttl`, s) first — a
+   *    blizzard warning for a cell already behind the skier is no use.
+   * Duration follows reading time: at least 1 s + 15 characters a second (capped at 8 s).
    */
-  caption(text: string, seconds = 2.2, opts: { soft?: boolean; priority?: number } = {}): boolean {
+  private capHard: HTMLDivElement;
+  private capSoft: HTMLDivElement;
+  private hardTimer = 0;
+  private softTimer = 0;
+  private softPriority = 0;
+  private softQueue: Array<{ text: string; seconds: number; priority: number; ttl: number; n: number }> = [];
+  private softN = 0;
+  /** shown seconds for a caption of this text: never shorter than it takes to read */
+  static readSeconds(text: string, seconds: number): number {
+    return Math.min(8, Math.max(seconds, 1 + text.length / 15));
+  }
+  /**
+   * Closed caption for important non-speech sounds. `soft`: a location sound (the soft line);
+   * `queue` (default true for soft captions with priority ≥ 2, the warnings): wait for the line
+   * instead of being dropped, for up to `ttl` s. Returns whether it was shown or queued.
+   */
+  caption(text: string, seconds = 2.2, opts: { soft?: boolean; priority?: number; queue?: boolean; ttl?: number } = {}): boolean {
     if (!this.captionsOn) return false;
-    const pr = opts.soft ? (opts.priority ?? 0) : Infinity;
-    if (opts.soft && this.capTimer > 0 && pr <= this.capPriority) return false;
-    this.cap.classList.remove('hint');
-    this.cap.textContent = text;
-    this.cap.classList.add('on');
-    this.capTimer = seconds;
-    this.capPriority = pr;
+    const secs = Hud.readSeconds(text, seconds);
+    if (!opts.soft) {
+      if (this.hardTimer > 0 && this.capHard.textContent === text) {
+        this.hardTimer = Math.max(this.hardTimer, secs);
+        return true;
+      }
+      this.capHard.textContent = text;
+      this.capHard.classList.add('on');
+      this.hardTimer = secs;
+      this.refreshCaption();
+      return true;
+    }
+    const pr = opts.priority ?? 0;
+    if (this.softTimer > 0 && pr <= this.softPriority) {
+      if (opts.queue ?? pr >= 2) {
+        this.softQueue.push({ text, seconds: secs, priority: pr, ttl: opts.ttl ?? 4, n: this.softN++ });
+        return true;
+      }
+      return false;
+    }
+    this.showSoft(text, secs, pr);
     return true;
+  }
+
+  private showSoft(text: string, secs: number, pr: number) {
+    this.capSoft.textContent = text;
+    this.capSoft.classList.add('on');
+    this.cap.classList.remove('hint');
+    this.softTimer = secs;
+    this.softPriority = pr;
+    this.refreshCaption();
+  }
+
+  private refreshCaption() {
+    const on = this.hardTimer > 0 || this.softTimer > 0;
+    this.cap.classList.toggle('on', on);
+    if (!on) this.cap.classList.remove('hint');
+  }
+
+  /** captions waiting for the soft line (tests) */
+  get captionQueue(): readonly string[] {
+    return [...this.softQueue].sort((a, b) => b.priority - a.priority || a.n - b.n).map((q) => q.text);
   }
 
   /**
@@ -200,23 +278,71 @@ export class Hud {
    * off). Never replaces a caption on screen; returns whether it was shown.
    */
   hint(text: string, seconds = 5): boolean {
-    if (this.capTimer > 0) return false;
-    this.cap.textContent = text;
+    if (this.hardTimer > 0 || this.softTimer > 0) return false;
+    this.capSoft.textContent = text;
+    this.capSoft.classList.add('on');
     this.cap.classList.add('on', 'hint');
-    this.capTimer = seconds;
-    this.capPriority = 1;
+    this.softTimer = seconds;
+    this.softPriority = 1;
     return true;
   }
 
-  /** the caption on screen (tests) */
+  /** the caption(s) on screen (tests): the hard line, then the soft line */
   get captionText(): string | null {
-    return this.capTimer > 0 ? this.cap.textContent : null;
+    const parts: string[] = [];
+    if (this.hardTimer > 0) parts.push(this.capHard.textContent ?? '');
+    if (this.softTimer > 0) parts.push(this.capSoft.textContent ?? '');
+    return parts.length ? parts.join('\n') : null;
+  }
+
+  /**
+   * Take back a soft caption that no longer holds (round 3, R2 A N8: "a storm front rolls in" stayed
+   * up into the clearing): drops it from the queue, and ends it if it is on screen.
+   */
+  withdrawCaption(match: (text: string) => boolean) {
+    for (let i = this.softQueue.length - 1; i >= 0; i--) if (match(this.softQueue[i]!.text)) this.softQueue.splice(i, 1);
+    if (this.softTimer > 0 && match(this.capSoft.textContent ?? '')) {
+      this.softTimer = 0;
+      this.softPriority = 0;
+      this.capSoft.classList.remove('on');
+      this.refreshCaption();
+    }
   }
 
   clearCaption() {
-    this.capTimer = 0;
-    this.capPriority = 0;
-    this.cap.classList.remove('on');
+    this.hardTimer = 0;
+    this.softTimer = 0;
+    this.softPriority = 0;
+    this.softQueue.length = 0;
+    this.capHard.classList.remove('on');
+    this.capSoft.classList.remove('on');
+    this.cap.classList.remove('on', 'hint');
+  }
+
+  /** advance the caption timers and the queue (from update; separate for tests) */
+  tickCaptions(dt: number) {
+    if (this.hardTimer > 0) {
+      this.hardTimer -= dt;
+      if (this.hardTimer <= 0) this.capHard.classList.remove('on');
+    }
+    for (const q of this.softQueue) q.ttl -= dt;
+    if (this.softTimer > 0) {
+      this.softTimer -= dt;
+      if (this.softTimer <= 0) {
+        this.capSoft.classList.remove('on');
+        this.cap.classList.remove('hint');
+        this.softPriority = 0;
+      }
+    }
+    if (this.softTimer <= 0) {
+      this.softQueue = this.softQueue.filter((q) => q.ttl > 0);
+      if (this.softQueue.length && this.captionsOn) {
+        this.softQueue.sort((a, b) => b.priority - a.priority || a.n - b.n);
+        const q = this.softQueue.shift()!;
+        this.showSoft(q.text, q.seconds, q.priority);
+      }
+    }
+    this.refreshCaption();
   }
 
   showFps(on: boolean) {
@@ -252,15 +378,20 @@ export class Hud {
       this.air.classList.add('on');
     } else this.air.classList.remove('on');
 
-    const chase = f.chase && f.yetiDistance !== null;
+    // (no widget until the chase has a distance: no stale text from the last run on its first frame)
+    const chase = f.chase && f.yetiDistance !== null && Number.isFinite(f.yetiDistance);
     this.yetiWrap.classList.toggle('hidden', !chase);
     this.progressYeti.classList.toggle('hidden', !chase);
-    if (chase && f.yetiDistance !== null) {
+    // (a chase's first frame, before the Yeti's first update, has no distance yet: W-076 review)
+    if (chase && f.yetiDistance !== null && Number.isFinite(f.yetiDistance)) {
       const d = f.yetiDistance;
       const threat = Math.max(0, Math.min(1, 1 - (d - 3) / 120));
       this.yetiBar.style.width = `${(threat * 100).toFixed(1)}%`;
-      this.yetiLabel.textContent = d < 25 ? `YETI  ${Math.round(d)} m  — MOVE!` : `YETI  ${Math.round(d)} m`;
+      const closing = !!f.yetiClosing;
+      this.yetiLabel.textContent = d < 25 ? `YETI  ${Math.round(d)} m  — MOVE!` : closing ? `YETI  ${Math.round(d)} m  ▲ CLOSING` : `YETI  ${Math.round(d)} m`;
+      // (W-076 review F, F7) red only when he is close; losing ground further back is amber
       this.yetiWrap.classList.toggle('near', d < 40);
+      this.yetiWrap.classList.toggle('closing', closing && d >= 40);
       const pulse = this.reduceFlashes ? 0.55 : 0.5 + 0.5 * Math.sin(performance.now() / (d < 25 ? 90 : 160));
       this.danger.style.opacity = String(Math.max(0, threat - 0.55) * 2.0 * (0.6 + 0.4 * pulse));
       const total = f.progress > 0 ? (f.distance ?? 0) / f.progress : 3000;
@@ -272,10 +403,7 @@ export class Hud {
       this.trickTimer -= dt;
       if (this.trickTimer <= 0) this.trick.classList.remove('pop');
     }
-    if (this.capTimer > 0) {
-      this.capTimer -= dt;
-      if (this.capTimer <= 0) this.cap.classList.remove('on', 'hint');
-    }
+    this.tickCaptions(dt);
     if (this.centerTimer > 0) {
       this.centerTimer -= dt;
       if (this.centerTimer <= 0) this.clearTitle();
@@ -283,6 +411,7 @@ export class Hud {
   }
 
   reset() {
+    this.clearCaption();
     this.clearTitle();
     this.setPrompt(null);
     this.letterbox(false);

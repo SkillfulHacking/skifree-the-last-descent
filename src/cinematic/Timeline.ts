@@ -1,6 +1,7 @@
 /** Cinematic building blocks: eased camera moves, shots and fire-once timed events. */
 import * as THREE from 'three';
 import { clamp } from '../core/rng';
+import { orbitPose } from './orbit';
 
 export const ease = {
   linear: (t: number) => t,
@@ -27,6 +28,8 @@ export interface Shot {
   easing?: (t: number) => number;
   /** Handheld-like drift amplitude (metres). */
   handheld?: number;
+  /** Swing around this point instead of a straight move (cinematic/orbit.ts); `via` is ignored. */
+  orbit?: () => THREE.Vector3;
 }
 
 export interface TimedEvent {
@@ -89,7 +92,11 @@ export class Timeline {
     let active: Shot | null = null;
     for (const s of this.shots) if (this.time >= s.start && this.time < s.end) active = s;
     if (!active) {
-      const last = this.shots[this.shots.length - 1];
+      // past every shot: hold the one that ends last (on a tie, the later-pushed one, as above) — not
+      // the last pushed (Gitar, round 3: a location's earlier shots, pushed after the base ones,
+      // snapped the camera back to the roar close-up on the cinematic's final frame)
+      let last: Shot | null = null;
+      for (const s of this.shots) if (!last || s.end >= last.end) last = s;
       if (!last || this.time < last.end) return false;
       active = last;
     }
@@ -99,7 +106,11 @@ export class Timeline {
     const b = active.to();
     const pos = new THREE.Vector3();
     const look = new THREE.Vector3();
-    if (active.via) {
+    if (active.orbit) {
+      const o = orbitPose(a, b, active.orbit(), t);
+      pos.copy(o.pos);
+      look.copy(o.look);
+    } else if (active.via) {
       const v = active.via();
       const u = 1 - t;
       pos.copy(a.pos).multiplyScalar(u * u).addScaledVector(v.pos, 2 * u * t).addScaledVector(b.pos, t * t);

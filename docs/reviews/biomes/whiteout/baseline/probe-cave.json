@@ -1,0 +1,53 @@
+{
+ "res": [
+  {
+   "x": 0.5,
+   "y": 0.5,
+   "hits": [
+    {
+     "d": 42,
+     "chain": "cave-rock<Group<Scene",
+     "mat": "MeshStandardMaterial",
+     "ud": "{}",
+     "key": "skifree-cave-rock-v4",
+     "geo": "BufferGeometry:23753",
+     "inst": false,
+     "p": [
+      -37,
+      -36,
+      266
+     ]
+    },
+    {
+     "d": 43,
+     "chain": "cave-rock<Group<Scene",
+     "mat": "MeshStandardMaterial",
+     "ud": "{}",
+     "key": "skifree-cave-rock-v4",
+     "geo": "BufferGeometry:23753",
+     "inst": false,
+     "p": [
+      -37,
+      -36,
+      266
+     ]
+    },
+    {
+     "d": 44,
+     "chain": "Mesh<Group<Scene",
+     "mat": "MeshStandardMaterial",
+     "ud": "{}",
+     "key": "skifree-snow-v6:whiteout",
+     "geo": "BufferGeometry:17153",
+     "inst": false,
+     "p": [
+      -38,
+      -36,
+      267
+     ]
+    }
+   ]
+  }
+ ],
+ "segs": null
+}

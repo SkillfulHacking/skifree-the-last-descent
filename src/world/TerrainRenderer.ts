@@ -314,6 +314,7 @@ export class TerrainRenderer {
       c.mesh.geometry = geo;
     } else {
       c.mesh = new THREE.Mesh(geo, this.material);
+      c.mesh.name = 'terrain-chunk';
       c.mesh.receiveShadow = true;
       c.mesh.position.set(c.ix * CHUNK, (geo.userData['y0'] as number) ?? 0, c.iz * CHUNK);
       this.group.add(c.mesh);
@@ -332,6 +333,7 @@ export class TerrainRenderer {
       return;
     }
     t.mesh = new THREE.Mesh(geo, this.material);
+    t.mesh.name = 'terrain-far';
     t.mesh.position.set(t.ix * FAR_TILE, (geo.userData['y0'] as number) ?? 0, t.iz * FAR_TILE);
     t.mesh.updateMatrix();
     t.mesh.matrixAutoUpdate = false;

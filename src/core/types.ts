@@ -111,6 +111,13 @@ export interface AudioFrameState {
   crowdLevel: number;
   /** 0..1 closeness to the sea (coastal locations: surf/gull beds); absent/0 inland */
   coast?: number;
+  /**
+   * The storm at the skier (W-048): `storm` 0..1 (the front's strength: rises through the build,
+   * falls through the clearing), `exposure` 0..1 (shelter — trees, gullies, the lee shoulder —
+   * takes the wind down), `pan` −1..1 where the wind comes from (+ = the listener's right).
+   * Absent where it never storms.
+   */
+  weather?: { storm: number; exposure: number; pan: number };
   /** 0..1 how deep the player is inside the "eerie" zone before the cave (ducks wind/music). */
   eerie: number;
 }

@@ -10,6 +10,7 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { focusRow, press } from './keyboard-menu';
+import { shotPath } from './shots';
 
 const KEY_S = 'skifree-tld.settings.v1';
 const KEY_R1 = 'skifree-tld.records.v1';
@@ -150,7 +151,7 @@ test('a Pass 3 save (settings + per-course records, no progress key) loads uncha
   await page.keyboard.up('KeyW');
   // software rendering runs far below real time: the skier is moving and scoring (distance shows 0.1 km steps)
   await expect(page.locator('.hud-score')).not.toHaveText('0');
-  await page.screenshot({ path: 'docs/reviews/pass4/release-verification/migration_pass3_playing.png' });
+  await page.screenshot({ path: shotPath('docs/reviews/pass4/release-verification/migration_pass3_playing.png') });
   await press(page, 'Escape');
   await expect(page.locator('.menu-root:not(.hidden) .menu-title')).toBeVisible();
   await focusRow(page, 'Exit to Menu');
@@ -166,7 +167,8 @@ test('a Pass 3 save (settings + per-course records, no progress key) loads uncha
   // the pole hint may or may not have been shown during the run)
   const savedS = JSON.parse(after[KEY_S]!);
   expect(typeof savedS.seenPoleHint).toBe('boolean');
-  expect(savedS).toEqual({ ...PASS3_SETTINGS, course: 'classic', controlHints: true, seenPoleHint: savedS.seenPoleHint });
+  // (Whiteout round 2: Reduce Weather Effects is a new setting too — written at its default by the save)
+  expect(savedS).toEqual({ ...PASS3_SETTINGS, course: 'classic', controlHints: true, seenPoleHint: savedS.seenPoleHint, reduceWeather: false });
   if (after[KEY_P] !== undefined) {
     const p = JSON.parse(after[KEY_P]!);
     expect(p.version).toBe(2);
@@ -179,7 +181,7 @@ test('a Pass 3 save (settings + per-course records, no progress key) loads uncha
   await expect(page.locator('.course-card .code')).toHaveText('CLASSIC-SPR-H');
   await expect(page.locator('.course-card .rec')).toContainText('Best 9,120 pts');
   expect(JSON.parse((await dump(page))[KEY_RB]!)).toEqual(PASS3_BOOK);
-  await page.screenshot({ path: 'docs/reviews/pass4/release-verification/migration_pass3_menu_after.png' });
+  await page.screenshot({ path: shotPath('docs/reviews/pass4/release-verification/migration_pass3_menu_after.png') });
   expect(errors).toEqual([]);
 });
 

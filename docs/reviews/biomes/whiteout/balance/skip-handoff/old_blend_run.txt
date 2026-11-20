@@ -1,0 +1,4 @@
+     × ends exactly on the follow pose (no snap when the swing is dropped) 4ms
+     × mid-swing the camera is pointed between the shot and the follow aim (the old blend stayed on the shot) 1ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  2 failed | 2 passed (4)

@@ -21,6 +21,11 @@ export interface WeatherSample {
   snowfall: number;
   /** 0..1 gustiness right now (drives balance coupling and audio) */
   gust: number;
+  /**
+   * 0..1 storm intensity (Whiteout: dims the daylight, greys the fog, drives the storm audio and HUD).
+   * Absent or 0 = fair weather; models that never storm leave it out.
+   */
+  storm?: number;
 }
 
 export interface WeatherCoupling {
@@ -35,6 +40,19 @@ export interface WeatherCoupling {
    * Keep ≤ ~0.003.
    */
   headwind?: Readonly<Record<'relaxed' | 'normal' | 'hard', number>>;
+  /**
+   * Optional (Whiteout, W-014): grounded crosswind side-slip (m/s per m/s of exposure-scaled
+   * crosswind): the wind blows a skier on open, wind-scoured snow sideways — more on low-grip hard
+   * pack (× (2 − grip)), resisted by the edges like any side-slip (SLIP_EDGE: a tuck gives it more,
+   * pizza and edging less). Absent/0 = none. Keep the result ≤ ~2 m/s.
+   */
+  groundSlip?: number;
+  /**
+   * Optional (Whiteout, W-014): extra drag per m/s of that crosswind slip — holding a line against a
+   * crosswind on hard pack means skidding the edges, which costs speed. With `groundSlip`: exposed
+   * hard pack is fast in fair weather and slow in a storm (the sheltered line's case). 0 = none.
+   */
+  skidDrag?: number;
 }
 
 export interface WeatherModel {
@@ -43,6 +61,42 @@ export interface WeatherModel {
   readonly static?: boolean;
   readonly coupling: WeatherCoupling;
   sample(x: number, z: number, t: number, seed: number, out: WeatherSample): WeatherSample;
+  /**
+   * Optional 0..1 exposure of the ground at (x, z) to the wind (1 = fully exposed, the default):
+   * BiomeEnvironment scales the airborne, balance and headwind couplings by it, so sheltered lines
+   * (trees, gullies) ski calmer than exposed ones. Pure; given the course.
+   */
+  exposure?(m: ExposureQuery, x: number, z: number, t?: number, seed?: number): number;
+  /**
+   * Optional storm-front forecast at time t (Whiteout): what the HUD and the captions telegraph —
+   * the phase, seconds until it changes, which side the wind blows from (+1 = from the skier's
+   * right, toward +X) and the intensity. Null/absent: no fronts.
+   */
+  front?(t: number, seed: number): WeatherFront | null;
+  /**
+   * Optional: ground the obstacle field keeps free of rock and trees between z0 and z1 because the
+   * weather asks the skier to ski there (Whiteout: the lee shoulders either side of the racing line).
+   * Pure in (m, z0, z1).
+   */
+  clearZones?(m: ExposureQuery, z0: number, z1: number): ReadonlyArray<{ x: number; z: number; hx: number; hz: number }>;
+}
+
+export interface WeatherFront {
+  phase: 'clear' | 'build' | 'storm' | 'ease';
+  left: number;
+  dir: number;
+  s: number;
+}
+
+/** what an exposure model may read from the course (a Mountain satisfies it) */
+export interface ExposureQuery {
+  routeX(z: number): number;
+  /** terrain height (a Mountain has it; optional so light test doubles need not) */
+  heightAt?(x: number, z: number): number;
+  centerX?(z: number): number;
+  halfWidth(z: number): number;
+  altLane(x: number, z: number): number;
+  readonly profile: { segmentAt(z: number): string; finishZ: number };
 }
 
 export function makeWeatherSample(): WeatherSample {
@@ -126,9 +180,10 @@ export function validateWeather(m: WeatherModel, seed = 1): string[] {
     for (let z = 0; z < 6000; z += 1300) {
       m.sample(0, z, t, seed, s);
       if (![s.windX, s.windZ, s.visibility, s.snowfall, s.gust].every(Number.isFinite)) out.push(`non-finite sample at z=${z} t=${t}`);
-      else if (s.visibility <= 0 || s.visibility > 12) out.push(`visibility=${s.visibility} outside (0, 12] at z=${z} t=${t}`);
+      else if (s.visibility <= 0 || s.visibility > 24) out.push(`visibility=${s.visibility} outside (0, 24] at z=${z} t=${t}`);
       else if (s.snowfall < 0 || s.snowfall > 4) out.push(`snowfall=${s.snowfall} outside [0, 4]`);
       else if (Math.hypot(s.windX, s.windZ) > 40) out.push(`wind ${Math.hypot(s.windX, s.windZ).toFixed(1)} m/s > 40`);
+      else if (s.storm !== undefined && !(s.storm >= 0 && s.storm <= 1)) out.push(`storm=${s.storm} outside [0, 1]`);
       if (out.length > 4) return out;
     }
   return out;

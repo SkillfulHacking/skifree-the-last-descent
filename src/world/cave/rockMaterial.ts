@@ -60,7 +60,15 @@ export function createCaveRockMaterial(o: CaveMaterialOptions): THREE.MeshStanda
     uBounce: { value: 0.14 },
     /** faint self-lit cold bounce inside (survives the cinematic's ambient dimming: depth cues, not a void) */
     uGlow: { value: 0.035 },
+    /**
+     * Rime and ice (Whiteout's storm cave; 0 = none, the original look): feathery rime on the
+     * windward faces, a glaze of clear ice and frozen drips on the steep faces around the mouth, the
+     * rock graded darker (granite). `uRimeDir`: the side the storms blow from (unit, world).
+     */
+    uRime: { value: 0 },
+    uRimeDir: { value: new THREE.Vector3(1, 0, 0) },
   };
+  mat.userData.caveUniforms = uniforms;
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     addAtmosphereUniforms(shader.uniforms);
@@ -91,6 +99,8 @@ uniform float uDetail;
 uniform float uPowder;
 uniform float uBounce;
 uniform float uGlow;
+uniform float uRime;
+uniform vec3 uRimeDir;
 varying vec4 vCave;
 varying vec3 vCWPos;
 varying vec3 vAPos;
@@ -257,6 +267,32 @@ float cv_fracture(vec3 p, float tw){
   #endif
   cv_rough = mix(0.86, mix(0.82, 0.93, uPowder), cv_snow);
   cv_rough = max(cv_rough, 0.95 * cv_claw);
+  if (uRime > 0.0) {
+    float outside = smoothstep(0.2, 0.45, cv_vis);
+    // dark frost-shattered granite
+    col = mix(col, col * vec3(0.8, 0.83, 0.88), uRime * (1.0 - cv_snow) * (1.0 - kind));
+    // rime: a fine frosting grown out into the wind, streaked along it (feathers ~10–30 cm), thicker
+    // on the edges facing the wind — a texture over the rock, never broad white blotches (art: the
+    // first renders read as camouflage)
+    vec3 wq = ap * 2.6;
+    float along = dot(wq, uRimeDir);
+    // smooth fbm stretched along the wind (single-octave value noise at a hard threshold read as
+    // pixelated "digital camo" in dev8)
+    float feather = cv_f3(wq - uRimeDir * along * 0.72 + 4.0);
+    // (band-limited: far away the frosting is its average, no shimmer)
+    feather = mix(feather, 0.5, smoothstep(0.35, 1.1, length(fwidth(wq))));
+    float windward = smoothstep(-0.05, 0.6, dot(wn, uRimeDir));
+    float rime = uRime * windward * outside * smoothstep(0.3, 0.8, feather) * (1.0 - kind) * (1.0 - cv_claw);
+    col = mix(col, vec3(0.8, 0.85, 0.91), 0.38 * rime * (1.0 - cv_snow));
+    // clear ice glaze and frozen drips on steep faces near the sky (vertical streaks)
+    float steep = 1.0 - smoothstep(0.2, 0.55, abs(wn.y));
+    float drip = smoothstep(0.55, 0.8, cv_n3(vec3(ap.x * 2.6, ap.y * 0.22, ap.z * 2.6)));
+    float glaze = uRime * steep * outside * drip * (1.0 - kind) * (1.0 - cv_snow);
+    col = mix(col, vec3(0.5, 0.6, 0.72), 0.4 * glaze);
+    cv_rough = mix(cv_rough, 0.7, rime);
+    // (not mirror-glossy: at 0.18 the drip streaks threw thin specular arcs that read as scratches)
+    cv_rough = mix(cv_rough, 0.42, glaze);
+  }
   // baked AO darkens the albedo of the rock a little too (crevices read even in direct light)
   col *= mix(1.0, ao, 0.25 * (1.0 - cv_rim));
   diffuseColor.rgb = col;

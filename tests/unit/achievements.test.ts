@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import '../../src/world/biomes';
+import { hasBiome } from '../../src/world/biome';
 import { EventBus, type GameEvent, type RunContext } from '../../src/game/events';
 import {
   ACHIEVEMENTS,
@@ -67,15 +69,14 @@ describe('achievement definitions', () => {
     expect(ids).toEqual(expect.arrayContaining(['first-descent', 'not-today-yeti', 'pizza-party', 'airborne', 'long-haul', 'daily-ritual', 'scenic-route', 'whiteout-survivor', 'ice-dancer', 'steam-runner']));
   });
 
-  it('location achievements are marked as needing their biome (Fjord Coast ships: Scenic Route no longer does)', () => {
-    for (const id of ['whiteout-survivor', 'ice-dancer', 'steam-runner']) {
-      const a = ACHIEVEMENTS.find((x) => x.id === id)!;
-      expect(a.requires).toBeTruthy();
-      expect(a.biome).toBeTruthy();
+  it('an achievement says it needs its location exactly when that location is not in the game (W-050)', () => {
+    for (const a of ACHIEVEMENTS.filter((x) => x.biome)) {
+      if (hasBiome(a.biome)) expect(a.requires, a.id).toBeUndefined();
+      else expect(a.requires, a.id).toBeTruthy();
     }
-    const scenic = ACHIEVEMENTS.find((x) => x.id === 'scenic-route')!;
-    expect(scenic.biome).toBe('fjord');
-    expect(scenic.requires).toBeUndefined();
+    // shipped: Fjord Coast and Whiteout Ridge; still to come: Frozen Frontier and Volcanic Expanse
+    for (const id of ['scenic-route', 'whiteout-survivor']) expect(ACHIEVEMENTS.find((x) => x.id === id)!.requires, id).toBeUndefined();
+    for (const id of ['ice-dancer', 'steam-runner']) expect(ACHIEVEMENTS.find((x) => x.id === id)!.requires, id).toBeTruthy();
   });
 });
 
