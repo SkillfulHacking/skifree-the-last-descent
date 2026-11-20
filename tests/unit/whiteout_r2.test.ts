@@ -90,8 +90,7 @@ describe('Whiteout round 2: the lee shoulder', () => {
     let checked = 0;
     for (let z = 300; z < 2800 && checked < 12; z += 37) {
       // (where an open crest line crosses the shoulder, the crest's full exposure wins)
-      // (and where an alternate line crosses the windward lane: its full exposure there is the line's, not the weather's)
-      if (!leeLaneAt(m, z, f.dir) || m.altLane(m.routeX(z), z) > 0 || m.altLane(m.routeX(z) + f.dir * LEE.lane, z) > 0 || m.altLane(m.routeX(z) - f.dir * LEE.lane, z) > 0) continue;
+      if (!leeLaneAt(m, z, f.dir) || m.altLane(m.routeX(z), z) > 0 || m.altLane(m.routeX(z) + f.dir * LEE.lane, z) > 0) continue;
       const rx = m.routeX(z);
       const line = whiteoutExposure(m, rx, z, t, ws);
       const lee = whiteoutExposure(m, rx + f.dir * LEE.lane, z, t, ws);

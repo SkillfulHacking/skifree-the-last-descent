@@ -313,10 +313,12 @@ describe('Whiteout Ridge: playability', () => {
   it('Normal rewards reading the weather; Hard is winnable by a skier who reads it', () => {
     // (round 2, W-035: the full weather reader — storm line, drift gaps, blizzard stance, the lee —
     // balance/w035-final) WD8 / WD2 Normal: the informed skier escapes, the weather-blind one is caught
-    for (const s of ['WD2', 'WD8']) {
-      expect(play(s, 'normal', INFORMED2), s).toBe('victory');
-      expect(play(s, 'normal', BLIND), s).toBe('caught');
-    }
+    // (round 3, W-056: every chase now opens on a fair stretch, and blind play wins more Sprints — 18/24
+    // on W3H and W2H, the reader 24/24, balance/w056) WD10: the reader escapes, the weather-blind one
+    // is caught; WD1: both escape, the blind one by 4.8 m (the reader by 49)
+    expect(play('WD10', 'normal', INFORMED2)).toBe('victory');
+    expect(play('WD10', 'normal', BLIND)).toBe('caught');
+    for (const s of ['WD2', 'WD8']) expect(play(s, 'normal', INFORMED2), s).toBe('victory');
     for (const s of ['WD3', 'WD5']) expect(play(s, 'normal', INFORMED2), s).toBe('victory');
     // Hard: a skier who reads the weather can win (WD3); not automatic for the blind one (WD1, WD2)
     expect(play('WD3', 'hard', INFORMED2)).toBe('victory');

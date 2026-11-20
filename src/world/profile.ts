@@ -255,8 +255,6 @@ export interface CourseProfile {
   sightings(z0: number, z1: number): Sighting[];
   checkpoints(z0: number, z1: number): number[];
   segmentAt(z: number): SegmentType;
-  /** 0..1: how far the racing line has moved over to the rim (ProfileKnobs.rimLean); absent = 0 */
-  rimLeanAt?(z: number): number;
   /** alternate lines (shortcuts through bends / tree runs) overlapping [z0, z1] */
   altRoutes(z0: number, z1: number): AltRoute[];
   /** x of an alternate line at z, or null where there is none */
@@ -526,15 +524,6 @@ export interface ProfileKnobs {
    * to jump from a take-off kicker halfway along. Omit for none (original courses).
    */
   spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
-  /**
-   * Rim stretches (Whiteout, W-065): on regular segments of these types (long enough), the piste
-   * narrows to a ridge-top run (half-width ≤ `width`), the bank on `side` is set at the piste edge, and
-   * the racing line leaves its usual swing to run `edge` m inside that edge — so a ridge rim on that
-   * side (terrain.ridge, `rim` m past the edge) comes within `edge` + rim m of the line and the drop is
-   * in the gameplay camera's view. The line eases over in `ease` m each way (a gentle bend: a wide
-   * piste crossed in 90 m cost a skier 10 m/s). Omit for none (bit-identical).
-   */
-  rimLean?: { side: 1 | -1; types: readonly SegmentType[]; edge: number; width: number; ease: number };
   /** slope (degrees) of the run-in at the start gate (default 6): steeper = no stall on a bump */
   startSlope?: number;
   /**
@@ -630,8 +619,6 @@ export class GeneratedProfile implements CourseProfile {
   private width = new KeyTrack();
   private amp = new KeyTrack(); // centreline amplitude
   private routeAmp = new KeyTrack();
-  /** 0..1: how far the racing line has moved over to the rim (ProfileKnobs.rimLean) */
-  private lean = new KeyTrack();
   private tMogul = new KeyTrack();
   private tRoller = new KeyTrack();
   private tIce = new KeyTrack();
@@ -827,24 +814,8 @@ export class GeneratedProfile implements CourseProfile {
       steepN: steepSide > 0 ? st * 0.8 : st,
     };
     const edge = Math.min(70, len / 4);
-    // (W-065) a rim stretch: the line along the drop-side edge, that side's bank at the piste edge
-    const RL = K.rimLean;
-    const leanSeg = !!RL && RL.types.includes(type) && len - 2 * edge - 2 * RL.ease >= 100;
-    if (leanSeg) {
-      common.width = Math.min(common.width, RL!.width);
-      if (RL!.side > 0) common.setback = 1;
-      else common.setbackN = 1;
-    }
     this.keys(z0 + edge, { slope: sA, ...common });
     this.keys(z1 - edge, { slope: sB, ...common });
-    if (RL) {
-      this.lean.push(z0 + edge, 0);
-      if (leanSeg) {
-        this.lean.push(z0 + edge + RL.ease, 1);
-        this.lean.push(z1 - edge - RL.ease, 1);
-      }
-      this.lean.push(z1 - edge, 0);
-    }
     this.segs.push({ i: idx, type, z0, z1 });
     this.lastType = type;
     this.zDone = z1;
@@ -1012,23 +983,9 @@ export class GeneratedProfile implements CourseProfile {
     const p = this.phase;
     return a * (Math.sin(z / 410 + p[0]) * 0.63 + Math.sin(z / 173 + p[1]) * 0.28 + Math.sin(z / 71 + p[2]) * 0.09);
   }
-  rimLeanAt(z: number): number {
-    if (!this.knobs.rimLean) return 0;
-    this.reach(z);
-    const k = this.lean.at(z);
-    return k * k * (3 - 2 * k);
-  }
   routeX(z: number) {
     const ra = this.routeAmp.at(z);
-    const cx = this.centerX(z);
-    const hw = this.halfWidth(z);
-    const x = cx + ra * hw * 0.3 * Math.sin(z / 133 + this.phase[3]);
-    const RL = this.knobs.rimLean;
-    if (!RL) return x;
-    const k = this.lean.at(z);
-    if (k <= 0) return x;
-    const s = k * k * (3 - 2 * k);
-    return x + (cx + RL.side * Math.max(0, hw - RL.edge) - x) * s;
+    return this.centerX(z) + ra * this.halfWidth(z) * 0.3 * Math.sin(z / 133 + this.phase[3]);
   }
   mogulZone(z: number) {
     return this.tMogul.at(z);

@@ -216,8 +216,6 @@ export interface BiomeTerrain {
   altTypes?: readonly SegmentType[];
   /** floor (degrees) on regular segments' slope; omit for none (see profile.ts ProfileKnobs) */
   minSlope?: number;
-  /** rim stretches: the racing line runs along the drop-side edge; omit for none (see profile.ts ProfileKnobs) */
-  rimLean?: { side: 1 | -1; types: readonly SegmentType[]; edge: number; width: number; ease: number };
   /** ridgeline spines with gap jumps; omit for none (see profile.ts ProfileKnobs) */
   spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
   /** run-in slope at the start gate (degrees, default 6) */

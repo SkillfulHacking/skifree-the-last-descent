@@ -28,35 +28,13 @@ describe('Whiteout ridge terrain', () => {
         const cx = m.profile.centerX(z);
         const w = m.profile.halfWidth(z);
         const rim = m.ridgeRimX(z);
-        // the rim stands outside the piste edge, and clear of the line: on rim stretches (W-065,
-        // terrain.rimLean) the line runs `edge` m inside the piste edge, so `edge` + rim m from the rim
-        const L = m.biome.terrain.rimLean!;
+        // the rim stands outside the piste edge, and well clear of the line (which swings ≤ 0.3·w)
         expect((rim - cx) * R.dropSide).toBeGreaterThanOrEqual(w + R.rim - 1e-6);
-        expect((rim - m.routeX(z)) * R.dropSide).toBeGreaterThanOrEqual(L.edge + R.rim - 1e-6);
+        expect((rim - m.routeX(z)) * R.dropSide).toBeGreaterThan(0.69 * w + R.rim);
         const h0 = m.heightAt(cx, z);
         // 400 m beyond the rim the ground is far below the piste (the valley)
         expect(m.heightAt(rim + R.dropSide * 400, z)).toBeLessThan(h0 - 150);
       }
-    }
-  });
-
-  it('W-065: rim stretches — the line comes within 16 m of the rim on the Classic courses, eased over gently', () => {
-    for (const len of ['sprint', 'standard'] as const) {
-      const m = buildMountain(makeCourse('classic', len, { biome: 'whiteout', difficulty: 'normal' }));
-      const R = m.biome.terrain.ridge!;
-      let near = 0;
-      let prev = m.routeX(100);
-      let maxBend = 0;
-      for (let z = 105; z < m.finishZ - 150; z += 5) {
-        const x = m.routeX(z);
-        if ((m.ridgeRimX(z) - x) * R.dropSide <= 16) near += 5;
-        maxBend = Math.max(maxBend, Math.abs(Math.atan2(x - prev, 5)));
-        prev = x;
-      }
-      expect(near, `${len}: metres of line within 16 m of the rim`).toBeGreaterThanOrEqual(150);
-      // the line's heading off the fall line stays within what the courses already ask (the finish
-      // approach's swing reaches ~44°): the ease over to the rim adds no sharper bend
-      expect((maxBend * 180) / Math.PI, len).toBeLessThan(45);
     }
   });
 
@@ -189,9 +167,7 @@ describe('Hazard pass reports (W-023, engine-wide)', () => {
       env.listen((e) => {
         if (e.type === 'hazard-passed') seen.set(e.hazard.id, (seen.get(e.hazard.id) ?? 0) + 1);
       });
-      // (the Yeti held back — 0.5 × his speed — so the run covers the course: this counts hazard reports;
-      // with rim stretches the plain autopilot, which does not read the weather, is caught early on HP1)
-      sim(m, new ObstacleField(m, ws), (s, t) => ap(m, s, 'skilled', t), { streaming: true, environment: env, yetiSpeed: 0.5, maxTime: 400 });
+      sim(m, new ObstacleField(m, ws), (s, t) => ap(m, s, 'skilled', t), { streaming: true, environment: env, yetiSpeed: DIFFICULTY.normal.yetiSpeed, maxTime: 400 });
       expect(seen.size, biome).toBeGreaterThan(3);
       for (const [id, n] of seen) expect(n, `${biome} hazard ${id}`).toBe(1);
     }
