@@ -761,6 +761,8 @@ export class GameSession implements Stage {
   // --- phases ---------------------------------------------------------------------
   private beginCave() {
     this.hud.setPrompt(null);
+    // (W-076 review C, C4) a camera nudge before the trigger does not outlive the cinematic
+    this.follow.resetOrbit();
     const e = this.run.encounter!;
     this.world.focusEncounter = e;
     this.world.caveFor(e);

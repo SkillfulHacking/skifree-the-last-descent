@@ -1,0 +1,9 @@
+case 'whiteout, normal:' on e06d6b9 (dist built from e06d6b9)
+
+Running 1 test using 1 worker
+
+[1/1] tests/e2e/cave_skip.spec.ts:149:3 › whiteout, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+  Slow test file: tests/e2e/cave_skip.spec.ts (14.8m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 passed (14.9m)
+exit 0

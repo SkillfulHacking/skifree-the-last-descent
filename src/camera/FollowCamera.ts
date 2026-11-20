@@ -78,6 +78,12 @@ export class FollowCamera {
     this.orbitIdle = 0;
   }
 
+  /** Forget the player's camera orbit (a cinematic begins: W-076 review C, C4) */
+  resetOrbit() {
+    this.orbitYaw = 0;
+    this.orbitPitch = 0;
+  }
+
   /** Snap to the ideal pose immediately (after cuts / teleports). */
   snap(t: FollowTarget) {
     this.initialized = false;

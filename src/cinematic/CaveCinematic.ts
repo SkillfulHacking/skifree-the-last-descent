@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { Timeline, ease, pose, type CamPose } from './Timeline';
 import type { Stage } from '../game/Stage';
-import { CAVE_GATHER_AT, CAVE_LEAP_AT, CAVE_TURN_AT, startCanonicalChase } from './caveHandoff';
+import { CAVE_GATHER_AT, CAVE_LEAP_AT, CAVE_TURN_AT, LEAP_SETUP, leapSetupLook, startCanonicalChase } from './caveHandoff';
 import { yetiSpawnAfterCinematic } from '../yeti/spawn';
 import type { CaveCinematicExtras } from '../world/presentation/cave';
 
@@ -124,7 +124,7 @@ export class CaveCinematic {
     tl.shot({ start: 13.7, end: 14.2, from: () => reactionCam, to: () => pose(reactionCam.pos.clone().add(new THREE.Vector3(0, 0.1, 0.4)), reactionCam.look, 44) });
     // Beat 10b: he leaps from the ledge toward the piste — seen past the skier's shoulder
     // over the skier's shoulder: camera behind the skier on the line to the cave, framing both
-    const leapCam = P.clone().addScaledVector(toCave, -3.6).addScaledVector(downhill, 1.3).add(new THREE.Vector3(0, 1.35, 0));
+    const leapCam = P.clone().addScaledVector(toCave, -LEAP_SETUP.back).addScaledVector(downhill, 1.3).add(new THREE.Vector3(0, 1.35 + LEAP_SETUP.lift, 0));
     const skierHead = P.clone().add(new THREE.Vector3(0, 1.5, 0));
     {
       // keep the ledge in sight: where the ground between the camera and the ledge rises above the
@@ -142,16 +142,16 @@ export class CaveCinematic {
       };
       for (let k = 0; k < 24 && blocked(leapCam); k++) leapCam.y += 0.5;
     }
-    const yetiLook = () => st.yeti.root.position.clone().add(new THREE.Vector3(0, 1.6, 0)).lerp(skierHead, 0.34);
+    const yetiLook = () => leapSetupLook(leapCam, st.yeti.root.position.clone().add(new THREE.Vector3(0, 1.6, 0)), skierHead);
     // Beat 10b: from behind the skier's position toward the cave, the Yeti gathering on the ledge
-    tl.shot({ start: CAVE_GATHER_AT, end: CAVE_TURN_AT, from: () => pose(leapCam, yetiLook(), 44), to: () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.1, 0)), yetiLook(), 45) });
+    tl.shot({ start: CAVE_GATHER_AT, end: CAVE_TURN_AT, from: () => pose(leapCam, yetiLook(), LEAP_SETUP.fov), to: () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.1, 0)), yetiLook(), LEAP_SETUP.fov) });
     // Beat 11 (W-076, owner's decision 1): the camera swings around the skier from the Yeti to the run
     // and lands on the follow camera's own forward pose, so control returns looking downhill — the
     // same gameplay camera a skip gives. The leap is the chase's first second (caveHandoff.ts).
     // Reduce Camera Motion: no swing — a hold on the Yeti, then a cut to the forward view.
     let fwd: CamPose | null = null;
     const forward = () => (fwd ??= st.gameplayPose());
-    const turnFrom = () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.1, 0)), yetiLook(), 45);
+    const turnFrom = () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.1, 0)), yetiLook(), LEAP_SETUP.fov);
     const pivot = P.clone().add(new THREE.Vector3(0, 1.2, 0));
     if (st.settings.reduceCameraMotion) {
       const cutAt = (CAVE_TURN_AT + CAVE_LEAP_AT) / 2;

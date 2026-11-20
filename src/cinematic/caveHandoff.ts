@@ -26,6 +26,20 @@ import type { YetiAI } from '../yeti/YetiAI';
  */
 export const CAVE_GATHER_AT = 14.2;
 export const CAVE_TURN_AT = 14.7;
+/**
+ * (W-076 review C, C1) the leap set-up shot (14.2–14.7 s), over the skier's shoulder: the camera `back` m
+ * behind the skier on the line from the cave and `lift` m above the reaction shot's height, aimed along
+ * the angular blend (`toSkier` of the way) between the directions to the Yeti (1.6 m up) and to the
+ * skier's head, at `fov`° — both inside the letterbox (a positional blend aimed almost at the Yeti and
+ * left the skier under the bar)
+ */
+export const LEAP_SETUP = { back: 6, lift: 0.3, toSkier: 0.5, fov: 40 } as const;
+/** where the set-up shot looks from `cam` (the angular blend; see LEAP_SETUP) */
+export function leapSetupLook(cam: THREE.Vector3, yeti: THREE.Vector3, skierHead: THREE.Vector3): THREE.Vector3 {
+  const a = yeti.clone().sub(cam).normalize();
+  const b = skierHead.clone().sub(cam).normalize();
+  return cam.clone().add(a.multiplyScalar(1 - LEAP_SETUP.toSkier).addScaledVector(b, LEAP_SETUP.toSkier).normalize().multiplyScalar(20));
+}
 /** the leap beat: the cinematic ends here and the chase begins */
 export const CAVE_LEAP_AT = 15.8;
 

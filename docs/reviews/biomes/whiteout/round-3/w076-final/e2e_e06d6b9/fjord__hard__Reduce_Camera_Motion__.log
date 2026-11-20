@@ -1,0 +1,5 @@
+case 'fjord, hard, Reduce Camera Motion:' on e06d6b9 (dist built from e06d6b9)
+
+Running 1 test using 1 worker
+
+[1/1] tests/e2e/cave_skip.spec.ts:149:3 › fjord, hard, Reduce Camera Motion: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera

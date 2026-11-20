@@ -17,7 +17,7 @@ import { buildMountain, makeCourse, worldSeed } from '../../src/game/CourseConfi
 import { ObstacleField } from '../../src/physics/obstacles';
 import { FollowCamera } from '../../src/camera/FollowCamera';
 import { yetiSpawnAfterCinematic } from '../../src/yeti/spawn';
-import { CAVE_GATHER_AT, CAVE_LEAP_AT, CAVE_TURN_AT } from '../../src/cinematic/caveHandoff';
+import { CAVE_GATHER_AT, CAVE_LEAP_AT, CAVE_TURN_AT, LEAP_SETUP, leapSetupLook } from '../../src/cinematic/caveHandoff';
 import { orbitPose } from '../../src/cinematic/orbit';
 import { Timeline, ease, pose, type CamPose } from '../../src/cinematic/Timeline';
 
@@ -39,18 +39,38 @@ function scenario(biome: 'alpine' | 'fjord' | 'whiteout', speed: number, difficu
   const P = tg.pos;
   const toCave = new THREE.Vector3(sp.pos.x - P.x, 0, sp.pos.z - P.z).normalize();
   const skierHead = P.clone().add(new THREE.Vector3(0, 1.5, 0));
-  const leapCam = P.clone().addScaledVector(toCave, -3.6).add(new THREE.Vector3(0, 1.35, 1.3));
-  const yetiLook = sp.pos.clone().add(new THREE.Vector3(0, 1.6, 0)).lerp(skierHead, 0.34);
-  const turnFrom = pose(leapCam.clone().add(new THREE.Vector3(0, 0.1, 0)), yetiLook, 45);
+  const leapCam = P.clone().addScaledVector(toCave, -LEAP_SETUP.back).add(new THREE.Vector3(0, 1.35 + LEAP_SETUP.lift, 1.3));
+  const yetiLook = leapSetupLook(leapCam, sp.pos.clone().add(new THREE.Vector3(0, 1.6, 0)), skierHead);
+  const turnFrom = pose(leapCam.clone().add(new THREE.Vector3(0, 0.1, 0)), yetiLook, LEAP_SETUP.fov);
   // the gameplay camera (GameSession.gameplayPose = the snap finishCave does)
   const cam = new THREE.PerspectiveCamera(64, 16 / 9, 0.1, 5000);
   const fc = new FollowCamera(cam, m, f);
   fc.snap(tg);
   const forward = pose(cam.position, fc.lookTarget, cam.fov);
-  return { m, f, e, tg, sp, turnFrom, forward, pivot: P.clone().add(new THREE.Vector3(0, 1.2, 0)), fc, cam };
+  return { m, f, e, tg, sp, skierHead, turnFrom, forward, pivot: P.clone().add(new THREE.Vector3(0, 1.2, 0)), fc, cam };
+}
+
+function ndcOf(p: CamPose, pt: THREE.Vector3) {
+  const c = new THREE.PerspectiveCamera(p.fov, 16 / 9, 0.1, 5000);
+  c.position.copy(p.pos);
+  c.lookAt(p.look);
+  c.updateMatrixWorld();
+  return pt.clone().project(c);
 }
 
 describe('W-076 decision 1: the hand-off camera faces the run', () => {
+  for (const biome of ['alpine', 'fjord', 'whiteout'] as const)
+    it(`${biome}: the leap set-up shot shows the skier's head and the Yeti on the ledge inside the letterbox (review C, C1)`, () => {
+      const { sp, skierHead, turnFrom } = scenario(biome, 10, 'normal');
+      const head = ndcOf(turnFrom, skierHead);
+      const yeti = ndcOf(turnFrom, sp.pos.clone().add(new THREE.Vector3(0, 1.6, 0)));
+      for (const [what, v] of [['skier', head], ['Yeti', yeti]] as const) {
+        expect(Math.abs(v.y), `${what} y`).toBeLessThan(0.75);
+        expect(Math.abs(v.x), `${what} x`).toBeLessThan(0.9);
+        expect(v.z, `${what} in front`).toBeLessThan(1);
+      }
+    });
+
   it('orbitPose: ends exactly on both poses, takes the shorter way round, keeps its distance', () => {
     const c = new THREE.Vector3(0, 1, 0);
     const a = pose(new THREE.Vector3(5, 3, 0), new THREE.Vector3(-10, 1, 0), 45);
@@ -105,9 +125,11 @@ describe('W-076 decision 1: the hand-off camera faces the run', () => {
         maxTurn = Math.max(maxTurn, step);
         total += step;
         prev = d;
-        // the skier in frame all along
-        const toSkier = tg.pos.clone().add(new THREE.Vector3(0, 1, 0)).sub(p.pos).normalize();
-        expect(deg(d.angleTo(toSkier)), `skier off frame at ${i}/${n}`).toBeLessThan(32);
+        // the skier (body, 1 m up) inside the letterboxed frame all along (review C, C1: a cone test
+        // passed a skier hidden under the bar) — the bars cover 11 vh top and bottom: |ndc y| < 0.78
+        const ndc = ndcOf(p, tg.pos.clone().add(new THREE.Vector3(0, 1, 0)));
+        expect(Math.abs(ndc.y), `skier under the letterbox at ${i}/${n}`).toBeLessThan(0.78);
+        expect(Math.abs(ndc.x), `skier off the side at ${i}/${n}`).toBeLessThan(1);
         // above the snow, and clear of the skier
         expect(p.pos.y - m.heightAt(p.pos.x, p.pos.z), 'camera under the snow').toBeGreaterThan(0.5);
         expect(p.pos.distanceTo(pivot), 'camera through the skier').toBeGreaterThan(2.5);
@@ -138,6 +160,17 @@ describe('W-076 decision 1: the hand-off camera faces the run', () => {
     fc.lookBack = 0;
     fc.snap(tg);
     expect(cam.getWorldDirection(new THREE.Vector3()).z, 'forward on the first controllable frame').toBeGreaterThan(0.3);
+  });
+
+  it('(review C, C4) a camera orbit from before the cave is forgotten (resetOrbit at the cave start)', () => {
+    const { tg, fc, cam } = scenario('alpine', 10, 'normal');
+    const ref = cam.position.clone();
+    fc.orbit(1.2, 0.3);
+    fc.snap(tg);
+    expect(cam.position.distanceTo(ref)).toBeGreaterThan(1);
+    fc.resetOrbit();
+    fc.snap(tg);
+    expect(cam.position.distanceTo(ref)).toBeLessThan(1e-6);
   });
 
   it('after the hand-off the follow camera does not look back by itself; held look-back still works and is released', () => {
