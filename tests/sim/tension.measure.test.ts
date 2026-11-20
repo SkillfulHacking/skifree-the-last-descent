@@ -2,7 +2,8 @@
  * Pursuit tension across locations (W-076, owner's decision 3): with the canonical chase start, how
  * present and threatening the Yeti is for six kinds of player, on Alpine, Fjord and Whiteout.
  *
- * Players (all from the canonical hand-off; the headless game, simulate.ts):
+ * Players (all from the canonical hand-off; the headless game, simulate.ts). On Whiteout every player
+ * is built on the weather reader (informed2NoLee) instead of the plain autopilot (WX=0: the autopilot):
  *   skilled      the autopilot's racing line, tucked (a clean expert run)
  *   competent    the autopilot's 'intermediate' style, scrubbing speed for 1 s every 12 s (a sloppy turn:
  *                no tuck, half brake) — competent but imperfect (the 'intermediate' style alone skis the
@@ -32,21 +33,29 @@ import { clamp, wrapAngle } from '../../src/core/rng';
 import type { Mountain } from '../../src/world/course';
 import type { BiomeId } from '../../src/world/biome';
 import { ChasePresence } from '../../src/yeti/presence';
+import { whiteoutDriver } from './whiteoutDriver';
+import { POLICIES } from './balance';
 
 const P = (globalThis as unknown as { process: { env: Record<string, string | undefined>; stdout: { write(s: string): void } } }).process;
 
 export const BEHAVIOURS = ['skilled', 'competent', 'cautious', 'crash', 'lateCrash', 'poorRoute', 'slowArrival'] as const;
 export type Behaviour = (typeof BEHAVIOURS)[number];
 
-function driver(m: Mountain, b: Behaviour): (s: SkierState, t: number) => SkierInput {
+type Drive = (s: SkierState, t: number) => SkierInput;
+/**
+ * `base`: how a good player skis this location — the skilled autopilot, or on Whiteout the weather
+ * reader (whiteoutDriver, informed2NoLee: storm line, drift gaps, blizzard stance; review F, F6: the plain
+ * autopilot ploughs every drift row there)
+ */
+function driver(m: Mountain, b: Behaviour, base: Drive): Drive {
   if (b === 'competent')
     return (s, t) => {
-      const i = autopilotInput(m, s, 'intermediate', t);
+      const i = base(s, t);
       return t % 12 < 1 ? { ...i, tuck: 0, brake: 0.5 } : i;
     };
   if (b === 'cautious')
     return (s, t) => {
-      const i = autopilotInput(m, s, 'skilled', t);
+      const i = base(s, t);
       return s.speed > 13 ? { ...i, tuck: 0, brake: 1 } : { ...i, tuck: Math.min(i.tuck, 0.3) };
     };
   if (b === 'poorRoute')
@@ -57,7 +66,7 @@ function driver(m: Mountain, b: Behaviour): (s: SkierState, t: number) => SkierI
       const err = wrapAngle(Math.atan2(tx - s.pos.x, look) - s.heading);
       return { ...NO_INPUT, steer: clamp(-err * 2.6, -1, 1), tuck: s.speed < 18 ? 0.8 : 0.2, recover: s.crashTime > 1.4 };
     };
-  return (s, t) => autopilotInput(m, s, 'skilled', t);
+  return base;
 }
 
 export interface TensionRow {
@@ -102,7 +111,8 @@ export function runTension(biome: BiomeId, len: LengthMode, diff: Difficulty, b:
   const pres = new ChasePresence(1);
   let calls = 0;
   let closingS = 0;
-  const r = simulateCourse(m, f, driver(m, b), {
+  const base: Drive = biome === 'whiteout' && P.env.WX !== '0' ? whiteoutDriver(m, env, ws, POLICIES.informed2NoLee!, undefined, 0.25, f) : (s, t) => autopilotInput(m, s, 'skilled', t);
+  const r = simulateCourse(m, f, driver(m, b, base), {
     streaming: true,
     environment: env,
     yetiSpeed: DIFFICULTY[diff].yetiSpeed,

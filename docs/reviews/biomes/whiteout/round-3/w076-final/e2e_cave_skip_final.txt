@@ -1,0 +1,10 @@
+e2e cave_skip on e10dfcc (dist built from e10dfcc; src clean: 0 changes)
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 6 tests using 1 worker
+
+[1/6] tests/e2e/cave_skip.spec.ts:149:3 › alpine, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[2/6] tests/e2e/cave_skip.spec.ts:149:3 › fjord, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera

@@ -389,7 +389,9 @@ export class Hud {
       this.yetiBar.style.width = `${(threat * 100).toFixed(1)}%`;
       const closing = !!f.yetiClosing;
       this.yetiLabel.textContent = d < 25 ? `YETI  ${Math.round(d)} m  — MOVE!` : closing ? `YETI  ${Math.round(d)} m  ▲ CLOSING` : `YETI  ${Math.round(d)} m`;
-      this.yetiWrap.classList.toggle('near', d < 40 || closing);
+      // (W-076 review F, F7) red only when he is close; losing ground further back is amber
+      this.yetiWrap.classList.toggle('near', d < 40);
+      this.yetiWrap.classList.toggle('closing', closing && d >= 40);
       const pulse = this.reduceFlashes ? 0.55 : 0.5 + 0.5 * Math.sin(performance.now() / (d < 25 ? 90 : 160));
       this.danger.style.opacity = String(Math.max(0, threat - 0.55) * 2.0 * (0.6 + 0.4 * pulse));
       const total = f.progress > 0 ? (f.distance ?? 0) / f.progress : 3000;

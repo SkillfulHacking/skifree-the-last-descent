@@ -360,6 +360,7 @@ export class GameSession implements Stage {
       this.follow.avoid = this.run.phase === 'chase' && this.yeti.root.visible ? this.yeti.root.position : null;
       this.follow.update(dt, this.followTarget(true));
     }
+    if (this.sinceLanding >= 0) this.sinceLanding += dt;
     this.updatePresence(dt);
     this.updateTutorial(dt);
     this.updateHud(dt);
@@ -372,14 +373,30 @@ export class GameSession implements Stage {
   private leapPending = false;
   private yetiLanded() {
     this.leapPending = false;
+    this.sinceLanding = 0;
     const p = this.yetiAI.pos;
     this.shake(0.5);
     this.audio.playYetiFootstep(p, 1);
+    // (W-076 review F, F3) the landing is felt wherever he lands: a close, unattenuated impact layer,
+    // the pad's rumble and a caption (the shake alone is gone with Reduce Camera Motion)
+    this.audio.playImpact('rock-light', 1);
+    this.rumble?.(0.8, 0.5, 260);
+    this.hud.caption('[a heavy landing behind you]', 1.6);
     this.world.particles.emit({ x: p.x, y: p.y + 0.2, z: p.z, vx: 0, vy: 2, vz: 0, spread: 2.5, size: 0.7, life: 1.4, count: 60, gravity: 0.5, drag: 1.6, grow: 1.4, alpha: 0.85 });
   }
   private showRunTitle() {
     this.hud.title('RUN.', '', 'run', 1.6);
     this.audio.playRunPrompt();
+  }
+
+  /** seconds since the Yeti's landing in this chase (−1 while he is still in the air / no chase) */
+  private sinceLanding = -1;
+  /** 0..1: how tight the rear-view inset frames the leap and the landing (W-076 review F, F2) */
+  rearViewZoom(): number {
+    if (this.run.phase !== 'chase') return 0;
+    if (this.leapPending) return 1;
+    if (this.sinceLanding < 0) return 0;
+    return 1 - smoothstep(1.0, 1.8, this.sinceLanding);
   }
 
   /** Rear-view framing (skier in the foreground, the yeti behind), or null when not needed. */
@@ -772,6 +789,7 @@ export class GameSession implements Stage {
     // (W-076, decision 1) the danger is announced at once — RUN. on the first controllable frame —
     // and the leap is the chase's first beat: his landing (yetiLanded) hits with a thud and a shake
     this.showRunTitle();
+    this.sinceLanding = -1;
     this.leapPending = this.yetiAI.airborne;
     if (!this.leapPending) this.yetiLanded();
     this.audio.setMusicMode('chase');

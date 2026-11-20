@@ -871,6 +871,10 @@ export class App {
     this.rearFrame.style.cssText = `left:${x}px;top:${top}px;width:${w}px;height:${h}px;opacity:${k}`;
     this.rearCam.position.copy(this.rearPose.pos);
     this.rearCam.lookAt(this.rearPose.look);
+    // (W-076 review F, F2) the leap and landing framed tight in the inset: 22° while he is in the air
+    // and for a second after the landing, then the usual 48° (eased)
+    const zoom = this.session?.rearViewZoom() ?? 0;
+    this.rearCam.fov = 48 + (22 - 48) * zoom;
     this.rearCam.aspect = w / h;
     this.rearCam.updateProjectionMatrix();
     this.rearCam.updateMatrixWorld();

@@ -34,18 +34,25 @@ warning is shown.
   caught; the clean skier never sees him inside 45 m.
 - **Fjord: graded.** Normal: the skilled skier sees him inside 45 m for ~3 s, the sloppy one comes to 15 m,
   a crash to 18 m; braking and wandering are caught. Hard: the skilled skier comes to 16.5 m.
-- **Whiteout: the autopilot is caught on Classic Sprint whatever it does** (it does not read the weather —
-  see `balance/w056/` for the weather reader); Standard is graded like Fjord.
+- **Whiteout (review F, F6: measured on the weather reader, `whiteout_reader.jsonl`; the plain
+  autopilot ploughs every drift row there, so the `at_f915a77` Whiteout rows understate a good player):**
+  Sprint Normal grades sharply — the clean reader escapes (44.5 m, inside 45 m for 0.9 s), every mistake
+  (sloppy, braking, a crash at 5 s or 20 s, a wandering line) is caught. **Standard Normal does not:** a
+  sloppy, late-crashing or wandering reader never comes inside the starting gap, as on Alpine (review F,
+  F5 — the README's earlier "graded like Fjord" was wrong). Hard Standard grades the mistakes.
 - **Presentation (this change):** a clean skier on Alpine or Fjord now hears him 2–5 times while he is out
   of sight; the CLOSING warning is shown for 5–28 s in the chases where the gap shrinks (crash, wander,
   sloppy runs).
 
 ## Reading against the owner's decision 3
-A clean expert escape on Alpine is a deserved escape. But "poor decisions and recoverable mistakes should
-create pressure" is **not met on Alpine Normal**: the presentation makes him present, it cannot make a
-mistake cost anything. That needs a gameplay change on Alpine (course or pursuit), which the owner asked to
-be evidence-led, scoped and independently reviewed — it is recorded as W-077 with this evidence, not made
-in this pass. Fjord and Whiteout grade the mistakes already.
+A clean expert escape is a deserved escape. But "poor decisions and recoverable mistakes should create
+pressure" is **not met on Alpine Normal (Sprint and Standard) nor on Whiteout Standard Normal**: there a
+competent skier outruns the Yeti's pace (20–28 m/s against 16.5) and the existing far-behind catch-up holds
+him at 115–170 m, beyond the inset and the chase music (review F's probe). Presentation makes him present;
+it cannot make a mistake cost anything. That needs an evidence-led, scoped gameplay change (review F:
+prefer a fixed per-location pace or course design over anything distance-based; do not strengthen the
+catch-up term) with fresh cross-location balance and independent review — W-077, open. Fjord grades the
+mistakes already; so do Whiteout Sprint and every Hard course measured.
 
 ## Tables (`f915a77`)
 ### Sprint, Normal
