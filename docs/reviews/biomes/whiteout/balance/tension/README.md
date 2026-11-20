@@ -1,7 +1,7 @@
 # Pursuit tension across locations (W-076, owner's decision 3)
 
-**Build:** `pass5-whiteout` at `612470b` (`at_612470b.jsonl`; the canonical chase start, the presence cues,
-W-056's placement rules and W-065's rim stretches). Earlier: `baseline_872ac4d.jsonl` (before the presence cues
+**Build:** `pass5-whiteout` at `f915a77` (`at_f915a77.jsonl`; the canonical chase start, the presence cues and
+W-056's placement rules). Earlier: `baseline_872ac4d.jsonl` (before the presence cues
 and before W-056/W-065), `after_presence.jsonl` (`1d88f0a`).
 **Runner:** `tests/sim/tension.measure.test.ts` (headless game, `simulate.ts`; Classic course of each location;
 first chase). Model drivers, not human playtesters; none of them reads Whiteout's weather (the weather reader
@@ -47,7 +47,7 @@ mistake cost anything. That needs a gameplay change on Alpine (course or pursuit
 be evidence-led, scoped and independently reviewed — it is recorded as W-077 with this evidence, not made
 in this pass. Fjord and Whiteout grade the mistakes already.
 
-## Tables (`612470b`)
+## Tables (`f915a77`)
 ### Sprint, Normal
 | Location | Length | Diff | Player | start gap @ skier speed | min gap | s < 110 m | s < 45 m | s < 25 m | s < 13 m | lunges | outcome (chase s) | calls | CLOSING s |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -129,17 +129,17 @@ in this pass. Fjord and Whiteout grade the mistakes already.
 | fjord | standard | hard | lateCrash | 42.5 m @ 15.28 m/s | 2.8 | 31.4 | 9.3 | 4.1 | 1.9 | 1 | caught at 31.4 s | 0 | 10.3 |
 | fjord | standard | hard | poorRoute | 36.2 m @ 13.33 m/s | 2.8 | 34.4 | 26.7 | 4.6 | 1.1 | 1 | caught at 34.4 s | 0 | 12.9 |
 | fjord | standard | hard | slowArrival | 22.4 m @ 3 m/s | 5.9 | 90 | 50.7 | 19 | 11.5 | 4 | escaped (90 s) | 0 | 26.4 |
-| whiteout | standard | normal | skilled | 50.4 m @ 16.44 m/s | 50.4 | 80.9 | 0 | 0 | 0 | 0 | escaped (85.9 s) | 0 | 6.4 |
-| whiteout | standard | normal | competent | 47.2 m @ 14.47 m/s | 47.2 | 90.3 | 0 | 0 | 0 | 0 | escaped (90.3 s) | 0 | 11.8 |
+| whiteout | standard | normal | skilled | 50.4 m @ 16.44 m/s | 50.4 | 57.7 | 0 | 0 | 0 | 0 | escaped (80.3 s) | 1 | 3.3 |
+| whiteout | standard | normal | competent | 47.2 m @ 14.47 m/s | 47.2 | 64.8 | 0 | 0 | 0 | 0 | escaped (84.2 s) | 1 | 9.4 |
 | whiteout | standard | normal | cautious | 42.3 m @ 12.05 m/s | 2.8 | 16.1 | 10.5 | 4.8 | 1.8 | 1 | caught at 16.1 s | 0 | 10.4 |
-| whiteout | standard | normal | crash | 50.4 m @ 16.44 m/s | 25.4 | 90.3 | 12 | 0 | 0 | 0 | escaped (90.2 s) | 0 | 16.6 |
-| whiteout | standard | normal | lateCrash | 50.4 m @ 16.44 m/s | 41.1 | 90.3 | 4.9 | 0 | 0 | 0 | escaped (90.3 s) | 0 | 18.1 |
-| whiteout | standard | normal | poorRoute | 43.3 m @ 14.87 m/s | 2.8 | 66 | 19.7 | 14.9 | 9.6 | 4 | caught at 66 s | 0 | 28.5 |
-| whiteout | standard | normal | slowArrival | 32.9 m @ 3 m/s | 31.6 | 87.5 | 12.5 | 0 | 0 | 0 | escaped (90.4 s) | 0 | 10.9 |
-| whiteout | standard | hard | skilled | 50.4 m @ 16.44 m/s | 2.8 | 53.6 | 10.4 | 4.4 | 2.3 | 1 | caught at 53.6 s | 0 | 24.4 |
-| whiteout | standard | hard | competent | 47.2 m @ 14.47 m/s | 2.8 | 60.4 | 16.7 | 7.1 | 3.6 | 2 | caught at 60.4 s | 0 | 32.3 |
-| whiteout | standard | hard | cautious | 42.3 m @ 12.05 m/s | 3 | 13.5 | 8.2 | 3.6 | 1.4 | 1 | caught at 13.5 s | 0 | 7.9 |
-| whiteout | standard | hard | crash | 50.4 m @ 16.44 m/s | 2.8 | 48 | 39.9 | 25.8 | 1.5 | 1 | caught at 48 s | 0 | 20.9 |
-| whiteout | standard | hard | lateCrash | 50.4 m @ 16.44 m/s | 2.8 | 50.7 | 23.7 | 10.3 | 2 | 1 | caught at 50.7 s | 0 | 18.4 |
-| whiteout | standard | hard | poorRoute | 43.3 m @ 14.87 m/s | 2.8 | 47.1 | 15.4 | 10.2 | 5.3 | 2 | caught at 47.1 s | 0 | 18 |
-| whiteout | standard | hard | slowArrival | 32.9 m @ 3 m/s | 28.1 | 91.8 | 57.4 | 0 | 0 | 0 | escaped (91.8 s) | 0 | 17.8 |
+| whiteout | standard | normal | crash | 50.4 m @ 16.44 m/s | 25.2 | 69.9 | 11.2 | 0 | 0 | 0 | escaped (84 s) | 1 | 11.1 |
+| whiteout | standard | normal | lateCrash | 50.4 m @ 16.44 m/s | 50.4 | 76.9 | 0 | 0 | 0 | 0 | escaped (84.8 s) | 0 | 10.2 |
+| whiteout | standard | normal | poorRoute | 43.3 m @ 14.87 m/s | 43.3 | 91.7 | 0.7 | 0 | 0 | 0 | escaped (91.7 s) | 0 | 4.2 |
+| whiteout | standard | normal | slowArrival | 32.9 m @ 3 m/s | 31.6 | 65.9 | 12.5 | 0 | 0 | 0 | escaped (84.1 s) | 1 | 6.4 |
+| whiteout | standard | hard | skilled | 50.4 m @ 16.44 m/s | 50.4 | 67.2 | 0 | 0 | 0 | 0 | escaped (81.6 s) | 1 | 9 |
+| whiteout | standard | hard | competent | 47.2 m @ 14.47 m/s | 16 | 81.5 | 26.7 | 15.3 | 0 | 0 | escaped (86.6 s) | 0 | 31.5 |
+| whiteout | standard | hard | cautious | 42.3 m @ 12.05 m/s | 2.9 | 13.6 | 8.2 | 3.6 | 1.4 | 1 | caught at 13.6 s | 0 | 7.9 |
+| whiteout | standard | hard | crash | 50.4 m @ 16.44 m/s | 15.2 | 85.9 | 15.2 | 8.3 | 0 | 0 | escaped (85.9 s) | 0 | 19.2 |
+| whiteout | standard | hard | lateCrash | 50.4 m @ 16.44 m/s | 38.6 | 87.1 | 29.2 | 0 | 0 | 0 | escaped (87.1 s) | 0 | 16.4 |
+| whiteout | standard | hard | poorRoute | 43.3 m @ 14.87 m/s | 2.8 | 75.1 | 27 | 11.3 | 4.6 | 2 | caught at 75.1 s | 0 | 23.5 |
+| whiteout | standard | hard | slowArrival | 32.9 m @ 3 m/s | 31.6 | 78.9 | 15.6 | 0 | 0 | 0 | escaped (86.8 s) | 0 | 15.7 |
