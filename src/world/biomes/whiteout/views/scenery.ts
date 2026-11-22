@@ -14,6 +14,7 @@ import type { Mountain } from '../../../course';
 import { LANE_HALF } from '../../../../physics/obstacles';
 import { StormSky } from './sky';
 import { BlowingSnow } from './blowingSnow';
+import { ValleyCloudSea } from './cloudSea';
 import { RidgeRocks } from './ridgeRocks';
 import { ROCK_ORIGIN } from '../../../art/rockMaterial';
 import { buildCorniceGeometry, corniceMaterial, corniceSamples, wandGeometry, wandSpots } from './cornice';
@@ -103,6 +104,8 @@ export class WhiteoutScenery implements SceneryView {
   private sky = new StormSky();
   private snow: BlowingSnow;
   private rocks: RidgeRocks;
+  /** (W-065) the cloud deck in the valley below the ridge */
+  private cloudSea: ValleyCloudSea;
   private win: [number, number] = [0, -1];
   private camR = new THREE.Vector3();
 
@@ -113,7 +116,8 @@ export class WhiteoutScenery implements SceneryView {
     this.group.name = 'whiteout-scenery';
     this.snow = new BlowingSnow(ctx.quality);
     this.rocks = new RidgeRocks(ctx.mountain, ctx.quality);
-    this.group.add(this.sky.group, this.snow.mesh, this.rocks.group);
+    this.cloudSea = new ValleyCloudSea(ctx.mountain, ctx.biome.atmosphere.fogColor as [number, number, number]);
+    this.group.add(this.sky.group, this.snow.mesh, this.rocks.group, this.cloudSea.mesh);
     // a slim pole with reflective orange/black bands (vertex colours)
     const g = new THREE.CylinderGeometry(0.045, 0.06, MARKER.pole, 6, 8);
     g.translate(0, MARKER.pole / 2, 0);
@@ -222,6 +226,7 @@ export class WhiteoutScenery implements SceneryView {
 
   update(dt: number, time: number, f: SceneryFrame): void {
     this.sky.update(dt, time, f);
+    this.cloudSea.update(time, f);
     LAMP_TIME.value = time;
     ROCK_ORIGIN.value.copy(f.origin);
     // (a scan that arrived since the last stream: place the rocks of the live chunks)
@@ -244,6 +249,7 @@ export class WhiteoutScenery implements SceneryView {
 
   dispose(): void {
     for (const [k, ch] of this.chunks) this.drop(k, ch);
+    this.cloudSea.dispose();
     this.poleGeo.dispose();
     this.poleMat.dispose();
     this.wandMat.dispose();
