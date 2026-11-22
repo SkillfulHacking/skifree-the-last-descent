@@ -54,10 +54,10 @@ void main() {
   vec2 p = vW.xz / 900.0 + vec2(uTime * 0.004, uTime * 0.0015);
   float c = fbm(p) * 0.7 + fbm(p * 3.1 + 7.0) * 0.3;
   // billow tops lit, the hollows between them in shadow: cooler and darker than the snow on the ridge
-  vec3 col = mix(vec3(0.50, 0.57, 0.68), vec3(0.86, 0.89, 0.94), smoothstep(0.35, 0.75, c));
+  vec3 col = mix(vec3(0.34, 0.41, 0.53), vec3(0.74, 0.79, 0.87), smoothstep(0.4, 0.8, c));
   float d = length(vW.xz - uCam.xz);
   // into the haze with distance (gentler than the terrain's fog: the deck is what the eye reads as depth)
-  col = mix(col, uHaze, 1.0 - exp(-d * 0.00022));
+  col = mix(col, uHaze, 0.85 * (1.0 - exp(-d * 0.00012)));
   // a soft edge where it meets the flank, and a ragged one
   float e = (vW.x - uRimX) * uSide;
   float a = uOpacity * smoothstep(${CLOUD_SEA.from.toFixed(1)}, ${(CLOUD_SEA.from + 500).toFixed(1)}, e + (c - 0.5) * 300.0);

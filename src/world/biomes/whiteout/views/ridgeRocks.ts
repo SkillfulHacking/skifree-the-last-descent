@@ -200,6 +200,7 @@ export class RidgeRocks {
   readonly group = new THREE.Group();
   private geos = new Map<ScanId, THREE.BufferGeometry>();
   private mat: THREE.MeshStandardMaterial;
+  private spireMat: THREE.MeshStandardMaterial;
   private chunks = new Map<number, THREE.InstancedMesh[]>();
   private disposed = false;
   private stale = false;
@@ -219,6 +220,18 @@ export class RidgeRocks {
       grade: { lum: 0.055, desat: 0.92, tint: [0.93, 0.97, 1.06] },
       macroSet: { kind: 'cliff_side', tile: 90, strength: 0.35 },
       streaks: 0.35,
+    });
+    // (W-065) the rim spires: wind-scoured faces, dark against the haze (the snow rule would whiten them)
+    this.spireMat = createRockMaterial({
+      kind: 'rock_face_03',
+      tile: 9,
+      snow: 0.18,
+      snowFrom: 0.9,
+      strata: 0.35,
+      hq: quality !== 'low',
+      grade: { lum: 0.035, desat: 0.9, tint: [0.9, 0.95, 1.05] },
+      macroSet: { kind: 'cliff_side', tile: 90, strength: 0.45 },
+      streaks: 0.25,
     });
     for (const id of RIDGE_ROCK_IDS)
       void loadScan(id).then((g) => {
@@ -252,9 +265,10 @@ export class RidgeRocks {
     const sc = new THREE.Vector3();
     for (const id of RIDGE_ROCK_IDS) {
       const g = this.geos.get(id);
-      const mine = pls.filter((pl) => pl.id === id);
+      for (const spire of [false, true]) {
+      const mine = pls.filter((pl) => pl.id === id && (pl.family === 'spire') === spire);
       if (!g || !mine.length) continue;
-      const im = new THREE.InstancedMesh(g, this.mat, mine.length);
+      const im = new THREE.InstancedMesh(g, spire ? this.spireMat : this.mat, mine.length);
       mine.forEach((pl, i) => {
         q.set(...pl.q);
         M.compose(p.set(pl.x, pl.y, pl.z), q, sc.set(pl.sx, pl.sy, pl.sz));
@@ -269,6 +283,7 @@ export class RidgeRocks {
       im.frustumCulled = true;
       this.group.add(im);
       list.push(im);
+      }
     }
     this.chunks.set(k, list);
   }
@@ -284,5 +299,6 @@ export class RidgeRocks {
     for (const list of this.chunks.values()) for (const im of list) im.dispose();
     this.chunks.clear();
     disposeRockMaterial(this.mat);
+    disposeRockMaterial(this.spireMat);
   }
 }
