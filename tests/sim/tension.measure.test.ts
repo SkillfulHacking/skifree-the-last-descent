@@ -204,7 +204,7 @@ export function runTension(biome: BiomeId, len: LengthMode, diff: Difficulty, b:
 
 it('pursuit tension', async () => {
   const fs = (await import('node:fs' as string)) as { writeFileSync: (p: string, d: string) => void; appendFileSync: (p: string, d: string) => void; existsSync: (p: string) => boolean; readFileSync: (p: string, e: string) => string };
-  const out = P.env.OUT ?? '/tmp/tension.jsonl';
+  const out = P.env.OUT ?? '.measure/tension.jsonl';
   // resumable: rows already in OUT are kept
   const done = new Set<string>();
   const keyOf = (r: { seed: string; enc: number; pace: number; biome: string; len: string; diff: string; behaviour: string }) => `${r.seed}|${r.enc}|${r.pace}|${r.biome}|${r.len}|${r.diff}|${r.behaviour}`;

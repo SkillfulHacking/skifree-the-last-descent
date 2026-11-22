@@ -4,7 +4,9 @@
 //   node tools/storm_horizon_probe.mjs <outDir> [seed=WO-R2] [variants=current]
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-const [outDir = '/tmp/probe', seed = 'WO-R2'] = process.argv.slice(2);
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const [outDir = join(tmpdir(), 'probe'), seed = 'WO-R2'] = process.argv.slice(2);
 const base = process.env.BASE ?? 'http://127.0.0.1:4471';
 mkdirSync(outDir, { recursive: true });
 const W = 960, H = 540;

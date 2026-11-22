@@ -8,7 +8,9 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-const [outDir = '/tmp/handoff', size = '960x540', list = 'alpine,fjord,whiteout'] = process.argv.slice(2);
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const [outDir = join(tmpdir(), 'handoff'), size = '960x540', list = 'alpine,fjord,whiteout'] = process.argv.slice(2);
 const base = process.env.BASE ?? 'http://127.0.0.1:4471';
 const [W, H] = size.split('x').map(Number);
 mkdirSync(outDir, { recursive: true });

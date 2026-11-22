@@ -6,10 +6,12 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import sharp from 'sharp';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 /** luminance spread / mean of a capture (white-out frames: stdev 5–15, mean ≈ 188) */
 const lum = async (f) => { const s = (await sharp(f).greyscale().stats()).channels[0]; return { stdev: +s.stdev.toFixed(1), mean: +s.mean.toFixed(1) }; };
 
-const [outDir = '/tmp/w031', size = '640x360', seed = 'WO-DEV2', length = 'sprint', biome = 'whiteout'] = process.argv.slice(2);
+const [outDir = join(tmpdir(), 'w031'), size = '640x360', seed = 'WO-DEV2', length = 'sprint', biome = 'whiteout'] = process.argv.slice(2);
 const TIMES = (process.env.TIMES ?? '13.7,14.5,14.6,15.0,15.8,16.9').split(',').map(Number);
 const MODES_ALL = (process.env.MODES ?? '0,1,2,3,6').split(',').map(Number);
 const MODES_KEY = [4, 5, 7];

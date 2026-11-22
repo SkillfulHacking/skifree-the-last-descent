@@ -9,3 +9,4 @@ tools/*.tmp.mjs
 
 # build-time asset cache (Poly Haven originals; tools/assets/pipeline.mjs)
 .asset-cache/
+.measure/

@@ -35,7 +35,7 @@ const env = (globalThis as unknown as { process: { env: Record<string, string | 
 
 it('fjord round-2 balance', async () => {
   const { appendFileSync } = (await import(/* @vite-ignore */ 'node:fs' as string)) as { appendFileSync(p: string, d: string): void };
-  const out = env.OUT ?? '/tmp/fjord_r2_balance.jsonl';
+  const out = env.OUT ?? '.measure/fjord_r2_balance.jsonl';
   const part = env.PART ?? 'all';
   const jobs: Array<Parameters<typeof one>> = [];
   for (const len of ['sprint', 'standard'] as LengthMode[]) {

@@ -10,8 +10,10 @@
 // Web Audio graph's own output, not a speaker measurement.
 import { chromium } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-const [out = '/tmp/audio_probe.json', secs = '150', seed = 'WO-R1'] = process.argv.slice(2);
+const [out = join(tmpdir(), 'audio_probe.json'), secs = '150', seed = 'WO-R1'] = process.argv.slice(2);
 const base = process.env.BASE ?? 'http://127.0.0.1:4471';
 const b = await chromium.launch({ executablePath: process.env.PW_CHROME ?? '/usr/bin/google-chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'] });
 const p = await b.newPage({ viewport: { width: 640, height: 360 } });

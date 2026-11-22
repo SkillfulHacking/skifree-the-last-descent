@@ -84,8 +84,8 @@ it('drift micro', async () => {
       out.push(res);
     }
   }
-  fs.writeFileSync(proc.env.OUT ?? '/tmp/drift_micro.json', JSON.stringify(out));
-  fs.writeFileSync((proc.env.OUT ?? '/tmp/drift_micro.json') + '.crashes.txt', crashLog.join('\n'));
+  fs.writeFileSync(proc.env.OUT ?? '.measure/drift_micro.json', JSON.stringify(out));
+  fs.writeFileSync((proc.env.OUT ?? '.measure/drift_micro.json') + '.crashes.txt', crashLog.join('\n'));
   const med = (k: string, f: string) => { const v = out.map((r) => r[k][f]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
   console.log('rows', out.length);
   console.log(crashLog.join('\n'));

@@ -7,7 +7,9 @@
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-const [outDir = '/tmp/rim', size = '960x540', list = 'classic:sprint,classic:standard'] = process.argv.slice(2);
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const [outDir = join(tmpdir(), 'rim'), size = '960x540', list = 'classic:sprint,classic:standard'] = process.argv.slice(2);
 const base = process.env.BASE ?? 'http://127.0.0.1:4471';
 const [W, H] = size.split('x').map(Number);
 mkdirSync(outDir, { recursive: true });
@@ -67,11 +69,14 @@ for (const item of list.split(',')) {
         const k = window.__skifree;
         const m = k.world().mountain;
         const go = () => {
-          k.setTime(tt - 3);
+          // (the clock after the teleport: a teleport restarts the run's weather from its own clock)
           k.teleport(z - 50, 18, m.routeX(z - 50), Math.atan2(m.routeX(z - 49) - m.routeX(z - 50), 1));
+          k.setTime(tt - 3);
           k.settleWeather();
           k.autopilot('skilled');
+          if (k.placeYeti) k.placeYeti(260);
           k.frames(90, 1 / 30);
+          if (k.placeYeti) k.placeYeti(260);
         };
         go();
         // a cave trigger on the way: let its cinematic play (the first viewing cannot be skipped), then

@@ -81,6 +81,6 @@ it('skip vs watch', async () => {
             P.stdout.write(`\n${biome} ${diff} ${len} ${style} | ${k.name.padEnd(32)} | yeti ${JSON.stringify(rec.yeti)} sep ${rec.separation} | gaps ${JSON.stringify(gapAt)} | ${res.outcome}`);
           }
         }
-  fs.writeFileSync(P.env.OUT ?? '/tmp/skip_handoff.json', JSON.stringify(rows, null, 1));
+  fs.writeFileSync(P.env.OUT ?? '.measure/skip_handoff.json', JSON.stringify(rows, null, 1));
   P.stdout.write('\n');
 }, 3_600_000);

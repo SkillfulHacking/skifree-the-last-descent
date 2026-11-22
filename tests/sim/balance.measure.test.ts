@@ -25,7 +25,7 @@ it('measure', async () => {
           }
   const shards = Number(E.SHARDS ?? 1);
   const shard = Number(E.SHARD ?? 0);
-  const out = E.OUT ?? '/tmp/w034.jsonl';
+  const out = E.OUT ?? '.measure/w034.jsonl';
   // (round 3) resume: runs already in OUT are skipped (the cloud machine restarts long jobs)
   const fsx = (await import('node:fs' as string)) as { existsSync: (p: string) => boolean; readFileSync: (p: string, e: string) => string };
   const done = new Set<string>();
