@@ -93,7 +93,7 @@ export class Mountain {
     this.kDriftWarp = t.driftWarp ?? 0;
     if (typeof seedOrProfile === 'number') {
       this.seed = seedOrProfile;
-      this.profile = new ClassicProfile(seedOrProfile);
+      this.profile = new ClassicProfile(seedOrProfile, t.encounterPace ?? 1);
     } else {
       this.profile = seedOrProfile;
       this.seed = seed ?? SEED_DEFAULT;
@@ -286,7 +286,8 @@ export class Mountain {
       // 1.4 m down 20 m past the rim, 4.5 m at 40 m — that the edge never read as an edge: dev renders.)
       const ts = (t * t) / (t + 0.02);
       const fall = R.depth * (1 - Math.pow(1 - Math.min(1, ts), 1.8));
-      const lip = R.lip * smoothstep(0, R.rim, e) * (1 - smoothstep(R.rim, R.rim + 30, e));
+      // (W-065) with rollDown the bank falls to the rim instead of rising over a lip
+      const lip = R.rollDown !== undefined ? -R.rollDown * smoothstep(0, R.rim, e) : R.lip * smoothstep(0, R.rim, e) * (1 - smoothstep(R.rim, R.rim + 30, e));
       // ribs and couloirs down the flank (elongated across the course = down the fall line), strongest mid-flank
       const steep = 4 * t * (1 - t);
       const rib = (ridged(x / 130, z / 62, s + 41, 2) - 0.5) * 36 * steep;
@@ -336,7 +337,11 @@ export class Mountain {
     // valley cross-section (a coast: the sea side is flatter, so the rim and the sea beyond it sit
     // low in the gameplay view instead of behind a rising bank — art request R1 — except around a
     // sea-side cave, which is cut into an ordinary valley side: R4)
-    const cross = 0.0016 * d * d * (ad < w ? 1 : w / ad);
+    let cross = 0.0016 * d * d * (ad < w ? 1 : w / ad);
+    // (W-065) the drop side of a ridge: past the piste edge the cross-section holds its edge value
+    // (terrain.ridge.rollDown; the bank then rolls down to the rim in ridgeSide)
+    const RR = this.kRidge;
+    if (RR?.rollDown !== undefined && ad > w && Math.sign(d) === RR.dropSide) cross = 0.0016 * w * w;
     const seaCave = this.coast && d < 0 ? this.seaCaveK(z) : 0;
     h += this.coast && d < 0 ? cross * (SEA_CROSS + (1 - SEA_CROSS) * seaCave) : cross;
     // each side of the valley has its own character: banks set back further or closer, steeper or gentler

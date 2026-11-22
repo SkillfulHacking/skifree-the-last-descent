@@ -111,6 +111,8 @@ export function makeWhiteoutBiome(): Biome {
     rocks: { base: [0.21, 0.215, 0.225], tintCool: [0.92, 0.97, 1.05], tintWarm: [1.04, 1.0, 0.95], tintDark: [0.5, 0.52, 0.56], snow: [0.92, 0.94, 0.98], scan: ['boulder_01', 'namaqualand_boulder_02', 'namaqualand_boulder_06'] },
     obstacles: { rocks: 1.5, logs: 0.1, stumps: 0.25 },
     terrain: {
+      // (W-077) Alpine's fixed Yeti pace is Alpine's own (deriveBiome would inherit it): unchanged here
+      encounterPace: 1,
       // a high bare ridge: broad open bowls and ridgelines, with sheltered gullies and the last
       // trees lower down; steeper and more varied than Fjord's even runs
       slopeScale: 1.0,
@@ -135,7 +137,9 @@ export function makeWhiteoutBiome(): Biome {
       // the crest side.
       // (round 2, W-041) the rim 10 m off the piste (was 26) behind a low 1.5 m lip (was 3.5): where the line
       // runs on the drop side the fall-away is in the gameplay camera's view, not hidden by a bank
-      ridge: { dropSide: 1, rim: 10, lip: 1.5, depth: 520, flank: 680, crest: 75, crestE: 150, backDrop: 380 },
+      // (round 3, W-065: from the line the rim stood 5–8 m above the eye, so nothing past it showed)
+      // the drop-side bank no longer climbs to the rim: it rolls down 2 m to it
+      ridge: { dropSide: 1, rim: 10, lip: 1.5, depth: 520, flank: 680, crest: 75, crestE: 150, backDrop: 380, rollDown: 2 },
       caveSide: -1,
       wallHeight: 130,
       wallRelief: 95,

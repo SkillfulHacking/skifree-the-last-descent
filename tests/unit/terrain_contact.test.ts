@@ -454,7 +454,8 @@ describe('normal Alpine runs are bit-identical to before the fix', () => {
           h = mix(mix(mix(mix(h, s.pos.x), s.pos.y), s.pos.z), s.vel.y);
           return autopilotInput(m, s, style, t);
         },
-        { streaming: seed !== 'classic', yetiSpeed: DIFFICULTY.normal.yetiSpeed, maxTime: 900 },
+        { streaming: seed !== 'classic', // (W-077: Alpine's fixed Yeti pace is divided out — these runs pin the terrain contact, recorded before it)
+          yetiSpeed: DIFFICULTY.normal.yetiSpeed / (m.biome.terrain.encounterPace ?? 1), maxTime: 900 },
       );
       expect(+res.time.toFixed(3)).toBe(time);
       expect(h.toString(16)).toBe(hash);
@@ -479,7 +480,8 @@ describe('normal Alpine runs are bit-identical to before the fix', () => {
           h = mix(mix(mix(mix(h, s.pos.x), s.pos.y), s.pos.z), s.vel.y);
           return autopilotInput(m, s, 'average', t);
         },
-        { streaming: true, yetiSpeed: DIFFICULTY.normal.yetiSpeed, maxTime: 900 },
+        { streaming: true, // (W-077: Alpine's fixed Yeti pace is divided out — these runs pin the terrain contact, recorded before it)
+          yetiSpeed: DIFFICULTY.normal.yetiSpeed / (m.biome.terrain.encounterPace ?? 1), maxTime: 900 },
       );
       expect(+res.time.toFixed(3)).toBe(64.817);
       expect(h.toString(16)).toBe('cb29719a');

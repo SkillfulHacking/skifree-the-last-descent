@@ -27,7 +27,7 @@ for (const item of list.split(',')) {
   await page.goto(`${base}/?debug`);
   await page.waitForFunction(() => window.__ready === true, null, { timeout: 900_000, polling: 1000 });
   await page.evaluate(async () => { const k = window.__skifree; await k.startRun(true); k.hold(true); });
-  const stretches = await page.evaluate(() => {
+  const stretches = process.env.ZAT ? process.env.ZAT.split(',').map((z) => [Number(z) - 40, Number(z) + 40]) : await page.evaluate(() => {
     const m = window.__skifree.world().mountain;
     const out = [];
     let cur = null;
@@ -36,11 +36,22 @@ for (const item of list.split(',')) {
       if (d <= 16) { if (!cur) cur = [z, z]; cur[1] = z; } else if (cur) { out.push(cur); cur = null; }
     }
     if (cur) out.push(cur);
-    return out;
+    if (out.length) return out;
+    // (W-065 diagnosis, no rim stretches) the places where the rim comes nearest the line: local
+    // minima of the distance, at least 300 m apart, nearest first
+    const mins = [];
+    for (let z = 300; z < Math.min(m.finishZ - 200, 10000); z += 10) {
+      const d = (q) => m.ridgeRimX(q) - m.routeX(q);
+      if (d(z) <= d(z - 10) && d(z) <= d(z + 10)) mins.push([d(z), z]);
+    }
+    mins.sort((a, b) => a[0] - b[0]);
+    const pick = [];
+    for (const [, z] of mins) if (pick.every((q) => Math.abs(q - z) > 300)) pick.push(z);
+    return pick.slice(0, 4).map((z) => [z - 40, z + 40]);
   });
   manifest.frames.push({ course: item, stretches });
   for (const [i, [z0, z1]] of stretches.slice(0, Number(process.env.MAX ?? 2)).entries()) {
-    for (const wx of ['clear', 'storm']) {
+    for (const wx of (process.env.WX ?? 'clear,storm').split(',')) {
       const zc = (z0 + z1) / 2;
       // a clear window or a storm at the time we arrive (the weather runs on the physics clock)
       const t = await page.evaluate((w) => {
@@ -78,7 +89,11 @@ for (const item of list.split(',')) {
         const k = window.__skifree;
         const s = k.state().session;
         const m = k.world().mountain;
-        return { z: s.z, x: s.x, speed: s.speed, rimFromSkier: m.ridgeRimX(s.z) - s.x, rimFromLine: m.ridgeRimX(s.z) - m.routeX(s.z), cam: k.cameraPose(), front: k.front(s.time ?? 0) };
+        // where the rim 60 m ahead lands on screen (NDC; |x|,|y| < 1 = in view)
+        const za = s.z + 60;
+        const P = { x: m.ridgeRimX(za), y: m.heightAt(m.ridgeRimX(za), za), z: za };
+        const c = k.cameraPose();
+        return { z: s.z, x: s.x, speed: s.speed, rimFromSkier: m.ridgeRimX(s.z) - s.x, rimFromLine: m.ridgeRimX(s.z) - m.routeX(s.z), rimAheadNdc: k.projectToScreen ? k.projectToScreen(P) : null, cam: c, front: k.front(k.state().session.time ?? 0) };
       });
       manifest.frames.push({ name, stretch: [z0, z1], weather: wx, ...st });
       writeFileSync(`${outDir}/manifest.json`, JSON.stringify(manifest, null, 2));

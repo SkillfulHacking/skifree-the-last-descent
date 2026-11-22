@@ -62,7 +62,7 @@ describe('Whiteout ridge rock', () => {
     for (const seed of ['K1', 'K2']) {
       const m = buildMountain(course('standard', seed));
       const pls = ridgeRockPlacements(m, 0, 6000);
-      const fam = { tor: 0, rim: 0, flank: 0 };
+      const fam = { tor: 0, rim: 0, flank: 0, spire: 0 };
       for (const p of pls) {
         fam[p.family]++;
         // bedded: the base is below the terrain at the centre by ≥ 25 % of the block's height
@@ -77,9 +77,16 @@ describe('Whiteout ridge rock', () => {
         expect(Math.abs(p.x - m.profile.centerX(p.z))).toBeGreaterThan(m.profile.halfWidth(p.z) + 0.3 * Math.max(p.sx, p.sz));
         // rim blocks stand past the rim (the rim guard's ground), never inside it
         if (p.family === 'rim') expect(m.beyondRidgeRim(p.x, p.z)).toBeGreaterThan(0);
+        // (W-065) spires stand on the flank past the rim, and their tops rise above the rim's snow
+        if (p.family === 'spire') {
+          expect(m.beyondRidgeRim(p.x, p.z)).toBeGreaterThan(10);
+          const rim = m.ridgeRimX(p.z);
+          expect(p.y + up.y * p.sy, `spire top at ${p.z.toFixed(0)}`).toBeGreaterThan(m.heightAt(rim - m.biome.terrain.ridge!.dropSide * 2, p.z) + 3);
+        }
       }
       expect(fam.tor).toBeGreaterThan(20);
       expect(fam.flank).toBeGreaterThan(5);
+      expect(fam.spire, 'rim spires').toBeGreaterThan(10);
     }
   });
 });

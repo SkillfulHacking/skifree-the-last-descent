@@ -8,7 +8,9 @@
  *    (past the rim: never inside the skiable area, so they need no collider — a skier there has
  *    already gone over and is returned by the rim guard);
  *  - flank buttresses: big slabs half-buried in the upper flank below the rim, seen when the course
- *    swings toward the edge or in the clear windows.
+ *    swings toward the edge or in the clear windows;
+ *  - rim spires (W-065): towers rooted on the flank just past the rim, standing above it — the drop's
+ *    sign from the racing line.
  *
  * Every block is bedded on the slope it stands on: its base is tilted to the ground plane fitted under
  * its footprint (most of the way: a little lean of its own is kept), sunk 25–40 % of its height below
@@ -37,7 +39,7 @@ export interface RockPlacement {
   sz: number;
   yaw: number;
   tilt: number;
-  family: 'tor' | 'rim' | 'flank';
+  family: 'tor' | 'rim' | 'flank' | 'spire';
   /** orientation (x, y, z, w): yaw, the block's own lean, then tilted onto the ground plane */
   q: [number, number, number, number];
 }
@@ -145,6 +147,49 @@ export function ridgeRockPlacements(m: Mountain, z0: number, z1: number): RockPl
     const out1 = 70 + 220 * hash2(k, 31, s);
     const big = 16 + 22 * hash2(k, 32, s);
     add({ id: pick(k + 999), x: rim + R.dropSide * out1, z: z + (hash2(k, 33, s) - 0.5) * 80, sx: big * 1.4, sy: big * 0.8, sz: big, yaw: hash2(k, 34, s) * Math.PI * 2, tilt: R.dropSide * 0.45, family: 'flank' }, 0.4);
+  }
+  // (W-065) rim spires: rock towers rooted on the flank just past the rim, rising above it — from the
+  // racing line (40+ m away, the camera 2–3 m above the snow) the flank itself can never be seen, so
+  // the drop reads through what stands up out of it: dark rock standing beyond the snow edge with its
+  // foot falling out of sight. Past the rim (the rim guard's ground), so no collider is needed.
+  const SP = 100;
+  for (let z = Math.ceil(z0 / SP) * SP; z < z1 && z < end; z += SP) {
+    if (z < 160) continue;
+    const k = Math.round(z / SP);
+    if (hash2(k, 41, s) < 0.15) continue;
+    const zz = z + (hash2(k, 42, s) - 0.5) * 50;
+    const rim = m.ridgeRimX(zz);
+    const rimY = m.heightAt(rim - R.dropSide * 2, zz);
+    const x = rim + R.dropSide * (14 + 22 * hash2(k, 43, s));
+    const footY = m.heightAt(x, zz);
+    const top = rimY + 6 + 12 * hash2(k, 44, s);
+    const tall = top - footY;
+    if (tall < 14) continue;
+    // sized until its top clears the rim by the wanted rise: it is sunk 27 % and lowered again where its
+    // footprint sits across the steep flank, so its height is grown and the block re-seated (a few
+    // rounds). Stretched at most 2.2×: the instance matrix also bends the normals, and a block stretched
+    // further turns its faces skyward — the snow rule (flatter than ~40°) then paints the whole tower
+    // white against white haze.
+    const sz0 = 0.8 + 0.3 * hash2(k, 46, s);
+    const yaw = hash2(k, 47, s) * Math.PI * 2;
+    let sy = tall * 1.4 + 10;
+    let wide = Math.max(6 + 4 * hash2(k, 45, s), sy / 2.2);
+    for (let it = 0; it < 5; it++) {
+      const st = seat(m, x, zz, wide, sy, wide * sz0, yaw, R.dropSide * 0.08, 0.27);
+      _v.set(0, 1, 0).applyQuaternion(_q.set(...st.q));
+      const short = top - (st.y + _v.y * sy);
+      if (short <= 0) break;
+      sy += short / Math.max(0.5, _v.y) + 2;
+      wide = Math.max(wide, sy / 2.2);
+    }
+    const n0 = out.length;
+    add({ id: pick(k + 4242), x, z: zz, sx: wide, sy, sz: wide * sz0, yaw, tilt: R.dropSide * 0.08, family: 'spire' }, 0.27);
+    // a spire that ends up no higher than the rim tells nothing: leave it out
+    const sp = out[n0];
+    if (sp) {
+      _v.set(0, 1, 0).applyQuaternion(_q.set(...sp.q));
+      if (sp.y + _v.y * sp.sy < rimY + 3) out.length = n0;
+    }
   }
   return out;
 }

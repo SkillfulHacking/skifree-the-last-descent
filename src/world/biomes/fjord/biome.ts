@@ -184,6 +184,8 @@ export function makeFjordBiome(): Biome {
     rocks: { base: [0.19, 0.198, 0.21], tintCool: [0.9, 0.97, 1.06], tintWarm: [1.1, 1.02, 0.92], tintDark: [0.5, 0.52, 0.58], snow: [0.88, 0.91, 0.965] },
     obstacles: { rocks: 1.7, logs: 0.25, stumps: 0.35 },
     terrain: {
+      // (W-077) Alpine's fixed Yeti pace is Alpine's own (deriveBiome would inherit it): unchanged here
+      encounterPace: 1,
       // round 3 (B N1, F2): the round-2 terrain (minSlope 14, highspeed-heavy, swing 0.8) made the
       // Fjord the faster mountain on unseen seeds. The terrain alone now skis like Alpine's for a
       // skilled skier (measured route gradient on 8 unseen seeds: Sprint 14.8° / Standard 15.8° /

@@ -216,6 +216,8 @@ export interface BiomeTerrain {
   altTypes?: readonly SegmentType[];
   /** floor (degrees) on regular segments' slope; omit for none (see profile.ts ProfileKnobs) */
   minSlope?: number;
+  /** (W-077) the location's fixed Yeti pace on every encounter; omit for 1 (see profile.ts ProfileKnobs) */
+  encounterPace?: number;
   /** ridgeline spines with gap jumps; omit for none (see profile.ts ProfileKnobs) */
   spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
   /** run-in slope at the start gate (degrees, default 6) */
@@ -244,7 +246,23 @@ export interface BiomeTerrain {
    * Absent = the original drifts (bit-identical).
    */
   driftWarp?: number;
-  ridge?: { dropSide: 1 | -1; rim: number; lip: number; depth: number; flank: number; crest: number; crestE: number; backDrop: number };
+  ridge?: {
+    dropSide: 1 | -1;
+    rim: number;
+    lip: number;
+    depth: number;
+    flank: number;
+    crest: number;
+    crestE: number;
+    backDrop: number;
+    /**
+     * Optional (round 3, W-065): past the piste edge on the drop side the valley cross-section stops
+     * rising (it holds its value at the edge) and the bank rolls down `rollDown` m to the rim instead of
+     * rising over a lip — so the rim sits below the gameplay camera's eye, not 5–8 m above it. The
+     * piste itself (and the racing line on it) is untouched. Absent = the original bank (bit-identical).
+     */
+    rollDown?: number;
+  };
   /** valley wall height (m) */
   wallHeight: number;
   /** ridged/fbm relief on the valley walls (m) */
@@ -368,7 +386,9 @@ export const ALPINE: Biome = {
   rocks: { base: [0.27, 0.26, 0.25], tintCool: [0.95, 0.97, 1.02], tintWarm: [1.18, 1.06, 0.92], tintDark: [0.62, 0.62, 0.66], snow: [0.88, 0.9, 0.94] },
   obstacles: { rocks: 1, logs: 1, stumps: 1 },
   // profile.ts GeneratedProfile (scales) + course.ts Mountain.heightAt (amplitudes)
-  terrain: { slopeScale: 1, widthScale: 1, swingScale: 1, wallHeight: 330, wallRelief: 64, rangeHeight: 900, undulation: 7, detail: 1.4, moguls: 0.42, drifts: 0.9, driftsPowder: 0.6, rollers: 0.6 },
+  // (round 3, W-077) a fixed Yeti pace for Alpine's encounters: on its steep runs a competent skier
+  // outran the shipped pace and a crash or a sloppy run cost nothing (balance/w077/README.md)
+  terrain: { encounterPace: 1.1, slopeScale: 1, widthScale: 1, swingScale: 1, wallHeight: 330, wallRelief: 64, rangeHeight: 900, undulation: 7, detail: 1.4, moguls: 0.42, drifts: 0.9, driftsPowder: 0.6, rollers: 0.6 },
   audio: { ambience: 'wind', windGain: 1, windPitch: 1 },
 };
 

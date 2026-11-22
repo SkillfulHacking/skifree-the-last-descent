@@ -1243,6 +1243,11 @@ export class App {
       renderer: this.renderer,
       camera: this.camera,
       cameraPose: () => ({ pos: this.camera.position.toArray(), fov: this.camera.fov, dir: this.camera.getWorldDirection(new THREE.Vector3()).toArray() }),
+      /** (evidence) a world point's place on screen through the game camera (NDC: in view when |x|,|y| < 1) */
+      projectToScreen: (p: { x: number; y: number; z: number }) => {
+        const v = new THREE.Vector3(p.x, p.y, p.z).project(this.camera);
+        return { x: v.x, y: v.y, z: v.z };
+      },
     };
     (window as unknown as { __skifree: typeof api }).__skifree = api;
     (window as unknown as { __THREE: unknown }).__THREE = { Raycaster: THREE.Raycaster };

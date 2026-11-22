@@ -33,6 +33,7 @@ import { clamp, wrapAngle } from '../../src/core/rng';
 import type { Mountain } from '../../src/world/course';
 import type { BiomeId } from '../../src/world/biome';
 import { ChasePresence } from '../../src/yeti/presence';
+import { getBiome } from '../../src/world/biome';
 import { whiteoutDriver } from './whiteoutDriver';
 import { POLICIES } from './balance';
 
@@ -70,6 +71,13 @@ function driver(m: Mountain, b: Behaviour, base: Drive): Drive {
 }
 
 export interface TensionRow {
+  /** 'CLASSIC', a Custom seed text, or 'DAILY:<date>'; `enc`: which encounter (0 = the first chase) */
+  seed: string;
+  enc: number;
+  /** the experiment's per-location pace multiplier (1 = shipped) */
+  pace: number;
+  /** the gap every 2 s of the chase (m) */
+  traj: number[];
   biome: string;
   len: string;
   diff: string;
@@ -91,13 +99,20 @@ export interface TensionRow {
   closingS: number;
 }
 
-export function runTension(biome: BiomeId, len: LengthMode, diff: Difficulty, b: Behaviour): TensionRow {
-  const course = makeCourse('classic', len, { biome, difficulty: diff });
+export function runTension(biome: BiomeId, len: LengthMode, diff: Difficulty, b: Behaviour, seed = 'CLASSIC', encIdx = 0, pace = 1): TensionRow {
+  const course =
+    seed === 'CLASSIC'
+      ? makeCourse('classic', len, { biome, difficulty: diff })
+      : seed.startsWith('DAILY:')
+        ? makeCourse('daily', len, { biome, date: seed.slice(6), difficulty: diff })
+        : makeCourse('custom', len, { biome, customText: seed, difficulty: diff });
   const ws = worldSeed(course);
   const m = buildMountain(course);
   const f = new ObstacleField(m, ws);
   const env = new BiomeEnvironment(m, ws, { difficulty: diff });
-  const enc = m.profile.encounters(0, Number.isFinite(m.finishZ) ? m.finishZ : 30000)[0]!;
+  const enc = m.profile.encounters(0, Number.isFinite(m.finishZ) ? m.finishZ : 30000)[encIdx]!;
+  const traj: number[] = [];
+  let nextT = 0;
   const crashAt = b === 'crash' ? 5 : b === 'lateCrash' ? 20 : null;
   let v0 = NaN;
   let startGap = NaN;
@@ -115,11 +130,13 @@ export function runTension(biome: BiomeId, len: LengthMode, diff: Difficulty, b:
   const r = simulateCourse(m, f, driver(m, b, base), {
     streaming: true,
     environment: env,
-    yetiSpeed: DIFFICULTY[diff].yetiSpeed,
+    // (W-077 experiment B) a fixed pace multiplier for every encounter, like an encounter's speedMul
+    yetiSpeed: DIFFICULTY[diff].yetiSpeed * pace,
     snowballs: diff === 'hard',
     dodge: diff === 'hard',
     maxZ: Math.min(enc.triggerZ + 1500, Number.isFinite(m.finishZ) ? m.finishZ + 50 : Infinity),
-    crashAtChase: crashAt !== null ? [crashAt] : [],
+    // (crashes are scheduled per chase in order: the first `encIdx` chases get none)
+    crashAtChase: crashAt !== null ? [...Array.from({ length: encIdx }, () => 1e9), crashAt] : [],
     maxTime: 900,
     trace: (e, ct, s, y, start) => {
       if (e.index !== enc.index) return;
@@ -134,6 +151,10 @@ export function runTension(biome: BiomeId, len: LengthMode, diff: Difficulty, b:
       }
       lastCt = ct;
       const d = y.distance;
+      if (ct >= nextT) {
+        traj.push(Math.round(d));
+        nextT += 2;
+      }
       if (!y.airborne || ct > 1.5) {
         const cue = pres.update(PHYS_DT, d);
         if (cue.call) calls++;
@@ -155,6 +176,10 @@ export function runTension(biome: BiomeId, len: LengthMode, diff: Difficulty, b:
   });
   const f1 = (x: number) => +x.toFixed(1);
   return {
+    seed,
+    enc: encIdx,
+    pace,
+    traj,
     biome,
     len,
     diff,
@@ -182,19 +207,33 @@ it('pursuit tension', async () => {
   const out = P.env.OUT ?? '/tmp/tension.jsonl';
   // resumable: rows already in OUT are kept
   const done = new Set<string>();
-  if (fs.existsSync(out)) for (const l of fs.readFileSync(out, 'utf8').split('\n').filter(Boolean)) {
-    const r = JSON.parse(l) as TensionRow;
-    done.add(`${r.biome}|${r.len}|${r.diff}|${r.behaviour}`);
+  const keyOf = (r: { seed: string; enc: number; pace: number; biome: string; len: string; diff: string; behaviour: string }) => `${r.seed}|${r.enc}|${r.pace}|${r.biome}|${r.len}|${r.diff}|${r.behaviour}`;
+  if (fs.existsSync(out))
+    for (const l of fs.readFileSync(out, 'utf8').split('\n').filter(Boolean)) {
+      const r = JSON.parse(l) as TensionRow;
+      done.add(keyOf({ ...r, seed: r.seed ?? 'CLASSIC', enc: r.enc ?? 0, pace: r.pace ?? 1 }));
+    }
+  // PACE='alpine:1.1,whiteout:1.05' (experiment B); SEEDS='CLASSIC,T4H-01'; ENCS='0,1,2' (Endless)
+  // (W-077 experiment A) SLOPE='alpine:0.9': scale a location's generated-course slopes (its terrain
+  // knob, mutated for this run only; Alpine's hand-made Classic Sprint is not generated)
+  for (const kv of (P.env.SLOPE ?? '').split(',').filter(Boolean)) {
+    const [bid, v] = kv.split(':');
+    const B = getBiome(bid as BiomeId) as unknown as { terrain: { slopeScale: number } };
+    B.terrain.slopeScale *= Number(v);
   }
+  const paceOf = (b: string) => Number((P.env.PACE ?? '').split(',').find((x) => x.startsWith(b + ':'))?.split(':')[1] ?? 1);
   const biomes = (P.env.BIOMES ?? 'alpine,fjord,whiteout').split(',') as BiomeId[];
-  for (const biome of biomes)
-    for (const len of (P.env.LENS ?? 'sprint').split(',') as LengthMode[])
-      for (const diff of (P.env.DIFFS ?? 'normal,hard').split(',') as Difficulty[])
-        for (const b of (P.env.BEHAVIOURS?.split(',') as Behaviour[] | undefined) ?? BEHAVIOURS) {
-          const key = `${biome}|${len}|${diff}|${b}`;
-          if (done.has(key)) continue;
-          const row = runTension(biome, len, diff, b);
-          fs.appendFileSync(out, JSON.stringify(row) + '\n');
-          P.stdout.write(`${key}: ${row.outcome} start ${row.startGap} m @ ${row.v0} m/s, min ${row.minGap} m, <45 m ${row.t45} s, <25 m ${row.t25} s, lunges ${row.lunges}\n`);
-        }
+  for (const seed of (P.env.SEEDS ?? 'CLASSIC').split(','))
+    for (const biome of biomes)
+      for (const len of (P.env.LENS ?? 'sprint').split(',') as LengthMode[])
+        for (const enc of (P.env.ENCS ?? '0').split(',').map(Number))
+          for (const diff of (P.env.DIFFS ?? 'normal,hard').split(',') as Difficulty[])
+            for (const b of (P.env.BEHAVIOURS?.split(',') as Behaviour[] | undefined) ?? BEHAVIOURS) {
+              const pace = paceOf(biome);
+              const key = keyOf({ seed, enc, pace, biome, len, diff, behaviour: b });
+              if (done.has(key)) continue;
+              const row = runTension(biome, len, diff, b, seed, enc, pace);
+              fs.appendFileSync(out, JSON.stringify(row) + '\n');
+              P.stdout.write(`${key}: ${row.outcome} start ${row.startGap} m, min ${row.minGap} m, <45 m ${row.t45} s\n`);
+            }
 });
