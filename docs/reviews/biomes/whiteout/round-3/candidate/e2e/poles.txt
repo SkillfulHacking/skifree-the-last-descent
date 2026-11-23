@@ -1,0 +1,10 @@
+e2e poles on 46ed200 (dist built from 46ed200)
+
+Running 2 tests using 1 worker
+
+[1/2] tests/e2e/poles.spec.ts:55:1 › keyboard: slow → POLE PUSH prompt and hint; hold R strokes; crash → R recovers first; release, press → push; cinematic: no push
+[2/2] tests/e2e/poles.spec.ts:135:1 › controller Y pushes and shows Y in the prompt; a remapped key replaces R
+  Slow test file: tests/e2e/poles.spec.ts (17.7m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  2 passed (17.7m)
+exit 0

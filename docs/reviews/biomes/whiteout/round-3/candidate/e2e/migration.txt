@@ -1,0 +1,10 @@
+e2e migration on 46ed200 (dist built from 46ed200)
+
+Running 2 tests using 1 worker
+
+[1/2] tests/e2e/migration.spec.ts:103:1 › a Pass 3 save (settings + per-course records, no progress key) loads unchanged in the pass-4 build and stays playable
+[2/2] tests/e2e/migration.spec.ts:188:1 › a v1 progress save migrates to v2 without ?debug: reward granted, unknown data kept, written back as v2
+  Slow test file: tests/e2e/migration.spec.ts (12.0m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  2 passed (12.0m)
+exit 0

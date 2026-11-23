@@ -1,0 +1,16 @@
+unit tests on 88b3721
+
+ RUN  v5.1.0 /home/claude/sf-wo
+
+
+cornice roots: gather 106.4 ms (rays 10.36 ms) vs Raycaster 141.5 ms, 1107 triangles kept
+
+ Test Files  51 passed (51)
+      Tests  489 passed (489)
+   Start at  13:48:11
+   Duration  1418.35s (tests 99%, import 1%)
+
+    Isolate  51 workers spawned · ~329ms startup each (spawn + environment, per file)
+             at least ~16.46s faster with isolate: false — reuses workers across files instead of one per file
+
+exit 0

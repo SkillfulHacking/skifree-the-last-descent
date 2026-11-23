@@ -1,0 +1,32 @@
+
+> skifree-the-last-descent@0.1.0 build
+> tsc --noEmit && vite build
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+vite v8.3.6 building client environment for production...
+transforming...
+✓ 166 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                      0.87 kB │ gzip:   0.53 kB
+dist/assets/boulder_01-BSGnkYPa.skm                 45.04 kB
+dist/assets/namaqualand_boulder_06-Ckukc6nO.skm     45.04 kB
+dist/assets/namaqualand_boulder_02--N4Thug-.skm     45.23 kB
+dist/assets/basalt_albedo-DNpBcFUX.webp            210.51 kB
+dist/assets/cliff_side_albedo-6ISZgc3O.webp        482.52 kB
+dist/assets/basalt_nhr-BVJhnxjT.webp               489.11 kB
+dist/assets/cliff_side_nhr-DS0Eyr07.webp           493.66 kB
+dist/assets/rock_face_03_albedo-DwQjmbXy.webp      569.05 kB
+dist/assets/rock_face_03_nhr-Cw4B6rO1.webp         898.88 kB
+dist/assets/main-B9IvlgTG.css                       20.88 kB │ gzip:   5.60 kB
+dist/assets/main-D9xyikF8.js                     1,543.94 kB │ gzip: 485.88 kB
+
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 1500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.46s
+build ok (88b3721)

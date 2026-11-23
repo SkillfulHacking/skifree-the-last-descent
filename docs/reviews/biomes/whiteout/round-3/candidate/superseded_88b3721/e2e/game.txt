@@ -1,0 +1,37 @@
+e2e game on 88b3721 (dist built from 88b3721)
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 3 tests using 1 worker
+
+[1/3] tests/e2e/game.spec.ts:58:1 › main menu loads with a rendered 3D background and no fatal errors
+[2/3] tests/e2e/game.spec.ts:72:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory
+  1) tests/e2e/game.spec.ts:72:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory 
+
+    TimeoutError: page.screenshot: Timeout 120000ms exceeded.
+    Call log:
+      - taking page screenshot
+      - waiting for fonts to load...
+      - fonts loaded
+
+
+      109 |   expect(s.session?.phase).toBe('caveCinematic');
+      110 |   expect(s.session!.z).toBeCloseTo(zFrozen, 3);
+    > 111 |   await page.screenshot({ path: shotPath('docs/screenshots/e2e_cave_cinematic.png') });
+          |              ^
+      112 |   // first viewing cannot be skipped: Esc pauses instead, and the cinematic resumes afterwards
+      113 |   await page.keyboard.press('Escape');
+      114 |   await page.evaluate(() => window.__skifree.frames(2));
+        at /home/claude/sf-wo/tests/e2e/game.spec.ts:111:14
+
+    Error Context: test-results/game-full-loop-start-→-lea-2f59d--→-caught-→-retry-→-victory/error-context.md
+
+
+[3/3] tests/e2e/game.spec.ts:191:1 › pause/resume and gamepad hot-plug do not break the game
+  1 failed
+    tests/e2e/game.spec.ts:72:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory 
+  1 did not run
+  1 passed (19.3m)
+exit 1

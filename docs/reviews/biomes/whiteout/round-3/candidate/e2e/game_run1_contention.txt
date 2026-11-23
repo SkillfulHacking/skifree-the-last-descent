@@ -1,0 +1,31 @@
+e2e game on 46ed200 (dist built from 46ed200)
+
+Running 3 tests using 1 worker
+
+[1/3] tests/e2e/game.spec.ts:58:1 › main menu loads with a rendered 3D background and no fatal errors
+[2/3] tests/e2e/game.spec.ts:72:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory
+  1) tests/e2e/game.spec.ts:72:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      83 |   await page.evaluate(() => window.__skifree.frames(3));
+      84 |   s = await st(page);
+    > 85 |   expect(s.session?.intro).toBe(false);
+         |                            ^
+      86 |   expect(s.session?.phase).toBe('learn');
+      87 |
+      88 |   // keyboard steering changes heading
+        at /home/claude/sf-wo/tests/e2e/game.spec.ts:85:28
+
+    Error Context: test-results/game-full-loop-start-→-lea-2f59d--→-caught-→-retry-→-victory/error-context.md
+
+
+[3/3] tests/e2e/game.spec.ts:191:1 › pause/resume and gamepad hot-plug do not break the game
+  1 failed
+    tests/e2e/game.spec.ts:72:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory 
+  1 did not run
+  1 passed (6.6m)
+exit 1
