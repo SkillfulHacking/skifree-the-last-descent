@@ -155,3 +155,77 @@
 - **Reduce Camera Motion in pixels;** the hand-off at 1366×768, 1920×1080 and ultrawide; R3-C4's overlap (computed only).
 - **Every victory beat on this build** (no renders). The W-063 fixes are code-read only.
 - **Whether the e2e ran on a quiet machine:** it passed (6/6) but took 47 min, and I did not re-run it.
+
+---
+
+## Addendum: victory and cave frames
+
+**Source.** These are the completed Whiteout captures in `candidate/evidence/whiteout/`:
+- 1366×768, SwiftShader;
+- seed `SEED-3403625622-SPR@WHITE` (plus the `-H` course for 18);
+- manifest sha `8bc6fbf`, a docs-only commit after `46ed200`;
+- `run.log`: 0 page errors.
+
+**How I examined them.** I viewed 12–17 and 19–26 in full, and 2× to 6× crops of 14 (brow), 17 (crest), 21 (door), 22 (lantern) and 26 (station).
+
+**What the stills cannot show.** The capture hides the HUD in the cinematic frames, so the letterbox and the title are not visible. Stills also show no motion: gait, foot-slide and the walk-in pace (N-4) cannot be judged from them.
+
+### Victory: round-2 findings checked in image
+
+| R2 | Code (`46ed200`) | In the frames | Status |
+|---|---|---|---|
+| **N-1** Skier stops ~20 m short | `stopOnMark` (`rescueVictory.ts:57`, `victorySteer.ts`) | The skier's z settles at 3022.4–3023.0 from 5.2 s (round 2: 3004.6). In **20** he glides in beside the porch with the rescuers behind him. In **22** he raises the lantern at the porch steps, under the porch light. | **Fixed (verified)** |
+| **N-2** Lantern flies with its plinth | `heldOnly` (`trophy.ts:20-26,50`) | **21** (5.2 s, before the beat): the lantern stands on the white plinth on the porch. **22**: the lantern is in the skier's hand, and no stone block hangs in the air. | **Fixed (verified)** |
+| **N-3** Door never visibly opens, no warm spill | Hinge unchanged (`rescue.ts:639`) | **21**: the dark door leaf stands swung inward at the left of the frame, so the door *is* open. Why this differs from round 2 is undetermined; I correct my R3-C7 note that it was "unchanged". The doorway behind it reads as a **flat beige panel**, not a lit orange interior, and nothing warm spills onto the porch or snow. Also, **21** has no skier in it, although the manifest note says "skier arriving". | **Partly fixed**: the door opens, but there is no warmth |
+| **N-4** 16 m/s walk-in | 14 m at gait = root speed | **23**: the Yeti is a hunched walking figure at mid-distance in the storm, between marker poles. That reads well. I cannot judge the pace from stills. | Code fix; **pace unverified** |
+| **N-5** Light-vs-Yeti beat not legible | Beam and framing unchanged (`rescue.ts:480,654-655`) | **23** has no skier or lantern in the foreground; it is the Yeti alone in the white. **24** (11.9 s, "in the searchlight beam") shows **no beam, no light pool and no rim** on him: he stands lit flat, arms hanging, mouth open in a grimace. That reads as a snarl, not a recoil from light. **24b** reads clearly as him turning back into the storm. | **Still open (Major)** |
+| **N-6** Wind from the live front | Override-driven (`GameSession.ts:1355-1356`) | Audio; not visible. | Code fix; **unverified** |
+| **N-7** Pops out of frame | Hide only outside the frustum (`rescueVictory.ts:231`) | **25** and **26** have no Yeti. No stills fall in the hiding window. | Code fix; **unverified** |
+| **N-8** Crane opens on a dead frame | Unchanged | **25** (16.0 s) is the hut roof and chimney in a corner, with empty snow and poles beyond. There is no subject. | **Open (Minor)** |
+| C-2 residual: reveal shows the hut's back | Unchanged | **26**: the station sits small in the lower middle with the porch side facing away. There is no visible skier or rescuers; at 4× I find none. Blue sky breaks only at the top edge. Two lozenge-shaped snow "pucks" lie against the walls (the W-068 art minor, still open). | **Open (Minor)** |
+| C-10 residual: pole in the lantern hand | — | **22**: the ski pole still hangs from the hand that raises the lantern. | **Open (Minor)** |
+
+**Net effect.** The middle act now shows what it says: arrival, porch, rescuers waving, and the lantern raised at the door. The round-2 headline defect (N-1) is gone, and N-2 is gone with it. The climax's cause and effect (N-5) still does not read. Without a visible beam and a recoil, the story is still "he walks up, grimaces, leaves". The ending's bookends (N-8 and the reveal) remain weak.
+
+### Cave frames (12–15)
+- **12 (3.0 s):** a dark rimed mouth with a dim crawling shape deep inside. The beat reads.
+- **13–14:** the emergence and the roar are strong close shots, with face and eyes legible and diagonal driven-snow streaks across the mouth. That is better than round 2's vertical "rain".
+- **Rime blades:** in 13–14 the blades under the cornice read as crumpled white paper or origami. The cornice is a flat untextured slab with a hard cut edge (crop of 14). This is A's area, but I note that W-066 does not hold in close-up.
+- **Roar burst:** "snow blasted off the brow" (14) is not visible beyond the streaks.
+- **15 "The leap" (15.23 s):** this frame is mid-swing. It shows the skier on the slope and no Yeti, which is consistent with the final staging (the leap plays after control returns). The manifest note mislabels it. This frame is **additional evidence for R3-C1**: no capture anywhere on this build shows the leap in flight in the main view (by design), or the landing.
+
+### Storm chase (16–17)
+- **16:** the HUD reads **YETI 117 m**. There is no rear-view inset, since the inset shows only within 110 m. The note claims "18–34 m behind, rear view", and `run.log` records `gap false`, so the harness failed to set the close gap.
+- **17:** at a 6× crop there is a ~10 px pale shape on the crest between the ski tracks, hazed almost to the sky's value, with no visible eye glow. Assuming it is the Yeti at about 117 m, the storm "silhouette with glowing eyes" (W-009) is still **unevidenced at a close gap**.
+- This is the same gap as round-2 C-9. It bears on cinematics because the pursuit's look in a storm is the Whiteout chase's signature image.
+
+### New or updated findings
+- **R3-C7 (updated), Major:**
+  - N-1 and N-2 are verified fixed.
+  - N-3 is partly fixed: the door opens, but the doorway is beige with no spill. Fix: give the doorway an emissive warm interior (with the bloom/tone-mapped value above the porch lamp), add a warm light card on the porch floor and snow, and keep the skier in the welcome shot.
+  - **N-5 is open and is the remaining Major in the victory.** Fix as in round 2: put the lantern and the skier's silhouette in the foreground of 23; make a visible beam cone and pool at his feet; over-expose or rim him while lit; use an eyes-shielding recoil pose.
+- **R3-C9, Minor (new): the ending's bookends.**
+  - The crane opens on a roof corner (25).
+  - The reveal frames the station's back, with no characters (26).
+  - Fix: start the crane on the porch two-shot, and swing the reveal so the lit porch faces the camera.
+- **R3-C10, Evidence (new):** several manifest notes again do not match their images:
+  - 15 "The leap" shows no leap;
+  - 16 says "18–34 m, rear view", but the HUD shows 117 m and there is no inset;
+  - 17 says "Yeti silhouette", but there is only a ~10 px haze shape;
+  - 21 says "skier arriving", but there is no skier;
+  - 24 says "in the searchlight beam", but no beam is visible.
+  
+  Also, `run.log` shows `gap false` for the chase setup, and the manifest still omits the Yeti's position and visibility. Fix: make the harness fail on `gap false`, record `yetiDistance`/`yetiVisible`, and write notes from the image.
+
+### Scores after the frames
+- **Cinematics: 7 → 7.5 (changed).** The frames verify that the victory's middle act now stages correctly (N-1 and N-2). That was the largest round-2 defect and was code-only in my first pass. It does not reach 9, because the light-vs-Yeti climax (N-5) is still not legible, the leap is legible only briefly (R3-C1), and the opening and closing frames of the finish are weak (R3-C9). **The category gate is still not met.**
+- **All other categories: unchanged** (lc). The cave close-ups support neither raising nor lowering Art (7): the driven snow is better and the rime blades are worse in close-up, so I leave that to Reviewer A. Overall stays at 7: a better finish is offset by the still-unevidenced storm pursuit.
+- **W-076 verdict: unchanged, PASS.** Frame 15 adds nothing against the hand-off and confirms R3-C1.
+
+### Could not verify (addendum)
+- The letterbox and title in the victory (the HUD is hidden in the capture).
+- The Yeti's walk-in pace and gait.
+- The wind drop at the break.
+- The frustum hide.
+- The storm pursuit at 18–34 m.
+- Whether the shape in 17 is the Yeti (there is no Yeti position in the manifest).
