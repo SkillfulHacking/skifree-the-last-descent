@@ -1,0 +1,37 @@
+[188s] course verified SEED-3403625622-SPR@WHITE normal
+[197s] course {"L":3000,"cave":{"index":0,"caveZ":260,"triggerZ":282,"foreshadowZ":180,"anchor":{"z":260,"centerX":6.185433809964871,"side":-1,"d":46},"chaseEndZ":3000,"checkpointZ":null,"speedMul":1},"rimSide":1}
+[402s] shot 01_clear_window clear s=0.00
+[580s] shot 02_wall_far clear s=0.00
+[732s] shot 03_wall_near clear s=0.00
+[884s] shot 04_build build s=0.81
+[1051s] shot 05_storm storm s=0.82
+[1232s] shot 06_easing ease s=0.07
+[1415s] shot 07_clearing clear s=0.00
+[1642s] shot 08_cornice_edge clear s=0.00
+[1730s] shot 09_valley_view clear s=0.00
+[1813s] shot 10_crest clear s=0.00
+[1962s] shot 11_ridge_overview clear s=0.00
+[2009s] course verified SEED-3403625622-SPR@WHITE normal
+[2038s] cinematic true
+[2180s] shot 12_cave_mouth clear s=0.00
+[2334s] shot 13_cave_emerge clear s=0.00
+[2525s] shot 14_cave_roar clear s=0.00
+[2637s] shot 15_cave_leap clear s=0.00
+[2687s] gap false
+[2826s] shot 16_storm_chase storm s=0.83
+[2950s] shot 17_yeti_silhouette storm s=0.83
+[3058s] course verified SEED-3403625622-SPR-H@WHITE hard
+[3090s] throw true
+[3251s] shot 18_hard_snowball_fog storm s=0.84
+[3365s] course verified SEED-3403625622-SPR@WHITE normal
+[3493s] shot 19_station_approach storm s=0.82
+[3501s] finish true
+[3591s] shot 20_v_arrive storm s=0.89
+[3678s] shot 21_v_welcome storm s=0.79
+[3776s] shot 22_v_lantern storm s=0.84
+[3898s] shot 23_v_yeti_white storm s=0.89
+[4074s] shot 24_v_yeti_flinch storm s=0.93
+[4254s] shot 24b_v_yeti_leaves storm s=0.94
+[4349s] shot 25_v_break storm s=0.87
+[4434s] shot 26_v_reveal storm s=0.83
+[4434s] done; page errors: 0
