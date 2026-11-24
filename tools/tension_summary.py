@@ -1,15 +1,31 @@
 #!/usr/bin/env python3
 """W-077: summarise tension rows (tests/sim/tension.measure.test.ts) by location/length/difficulty/player.
-usage: python3 -I tools/tension_summary.py <file.jsonl> [<compare.jsonl>]"""
+usage: python3 -I tools/tension_summary.py <file.jsonl> [<compare.jsonl>]
+Files must live under .measure/ or docs/reviews/biomes/whiteout/balance/ (path or unique file name)."""
 import json, sys, statistics, collections
 import os
+# W-087: the tool opens only files it enumerates itself under these fixed measurement directories.
+# A command-line argument is a lookup key matched against that list; it is never opened as a path.
 ROOT = os.path.realpath(os.getcwd())
-def load(p):
-    # only measurement files inside the working tree (no path from the command line escapes it)
-    q = os.path.realpath(p)
-    if os.path.commonpath([q, ROOT]) != ROOT or not q.endswith('.jsonl'):
-        sys.exit(f'refusing {p}: give a .jsonl inside {ROOT}')
-    with open(q, encoding='utf-8') as fh:
+MEASURE_DIRS = ('.measure', os.path.join('docs', 'reviews', 'biomes', 'whiteout', 'balance'))
+def catalogue():
+    found = {}
+    for d in MEASURE_DIRS:
+        base = os.path.join(ROOT, d)
+        for dirpath, _dirs, files in os.walk(base, followlinks=False):
+            for f in files:
+                full = os.path.join(dirpath, f)
+                if f.endswith('.jsonl') and not os.path.islink(full):
+                    found[os.path.relpath(full, ROOT)] = full
+    return found
+def load(key):
+    files = catalogue()
+    want = os.path.normpath(key)
+    hits = [full for rel, full in files.items() if rel == want] or \
+           [full for rel, full in files.items() if os.path.basename(rel) == want]
+    if len(hits) != 1:
+        sys.exit(f'refusing {key}: give a .jsonl under {" or ".join(MEASURE_DIRS)} (by path or unique name)')
+    with open(hits[0], encoding='utf-8') as fh:
         return [json.loads(l) for l in fh if l.strip()]
 def summ(rows):
     g = collections.defaultdict(list)
