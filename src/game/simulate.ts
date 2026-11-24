@@ -117,6 +117,9 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
   };
   while (t < maxTime) {
     const s = phys.s;
+    // (W-089) hazards stream ahead as in the game (World.stream → environment.stream: z − 80 … z + 400),
+    // so a weather-reading driver and the alert logic see what a player would
+    env?.stream(s.pos.z);
     if (opts.streaming) {
       f.ensure(s.pos.z - 300, s.pos.z + 700);
       f.release(s.pos.z - 400, s.pos.z + 800);
