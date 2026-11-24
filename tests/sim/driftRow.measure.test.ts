@@ -15,6 +15,7 @@ import { ObstacleField } from '../../src/physics/obstacles';
 import { SkierPhysics, PHYS_DT } from '../../src/physics/SkierPhysics';
 import { clamp, wrapAngle } from '../../src/core/rng';
 import { DRIFT } from '../../src/world/biomes/whiteout/hazards';
+import { outPath } from './outPath';
 const proc = (globalThis as any).process;
 it('drift micro', async () => {
   const fs = await import('node:fs' as string);
@@ -84,8 +85,9 @@ it('drift micro', async () => {
       out.push(res);
     }
   }
-  fs.writeFileSync(proc.env.OUT ?? '.measure/drift_micro.json', JSON.stringify(out));
-  fs.writeFileSync((proc.env.OUT ?? '.measure/drift_micro.json') + '.crashes.txt', crashLog.join('\n'));
+  const outFile = await outPath(proc.env.OUT, '.measure/drift_micro.json');
+  fs.writeFileSync(outFile, JSON.stringify(out));
+  fs.writeFileSync(outFile + '.crashes.txt', crashLog.join('\n'));
   const med = (k: string, f: string) => { const v = out.map((r) => r[k][f]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
   console.log('rows', out.length);
   console.log(crashLog.join('\n'));

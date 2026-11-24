@@ -25,6 +25,7 @@ import { getBiome, type BiomeId } from '../../src/world/biome';
 import { measure, POLICIES, type RunSpec } from './balance';
 import { applyTune } from './tune';
 import { EXPERT_TUCK } from './whiteoutDriver';
+import { outPath } from './outPath';
 
 const P = (globalThis as unknown as { process: { env: Record<string, string | undefined>; stdout: { write(s: string): void } } }).process;
 const E = P.env;
@@ -42,7 +43,7 @@ it('ladder', async () => {
   if (E.TUNE) applyTune(JSON.parse(E.TUNE));
   if (E.XTUCK) Object.assign(EXPERT_TUCK, { on: true, band: Number(E.XTUCK) });
   const tag = E.TAG ?? 'base';
-  const out = E.OUT ?? '.measure/ladder.jsonl';
+  const out = await outPath(E.OUT, '.measure/ladder.jsonl');
   const key = (r: { biome: string; len: string; diff: string; seed: string; policy: string; pace: number; tag: string }) => `${r.biome}|${r.len}|${r.diff}|${r.seed}|${r.policy}|${r.pace}|${r.tag}`;
   const done = new Set<string>();
   if (fs.existsSync(out)) for (const l of fs.readFileSync(out, 'utf8').split('\n')) if (l.trim()) done.add(key(JSON.parse(l)));
