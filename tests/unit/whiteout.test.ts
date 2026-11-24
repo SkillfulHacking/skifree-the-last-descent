@@ -20,7 +20,7 @@ import { WEATHER_FX_FOG_KEEP } from '../../src/world/look/weatherFx';
 const INFORMED2: WhiteoutPolicy = { lines: 'weather', drifts: 'gap', blizzard: 'brake', lee: true };
 import { collectPlacements } from '../../src/world/hazards/testkit';
 import { getHazardKind, hazardPhase } from '../../src/world/hazards/hazard';
-import { FRONT, frontAt, frontType, FRONT_TYPES, STORM_FOG, whiteoutExposure, WHITEOUT_WEATHER } from '../../src/world/biomes/whiteout/storm';
+import { CREST_LEE, FRONT, frontAt, frontType, FRONT_TYPES, STORM_FOG, whiteoutExposure, WHITEOUT_WEATHER } from '../../src/world/biomes/whiteout/storm';
 import { HARDPACK, WHITEOUT_SURFACE } from '../../src/world/biomes/whiteout/biome';
 import { BLIZZARD_TIMING } from '../../src/world/biomes/whiteout/hazards';
 
@@ -138,7 +138,10 @@ describe('Whiteout Ridge: exposure and snow', () => {
       // (inside a segment, away from the 80 m blend at its ends)
       if (P.segmentAt(z - 40) !== seg || P.segmentAt(z + 40) !== seg) continue;
       if (seg === 'forest' || seg === 'chute') expect(e).toBeLessThan(0.62), shelter++;
-      if (seg === 'ridgeline' || seg === 'basin') expect(e).toBeGreaterThan(0.75), open++;
+      // (W-080) where a crest line runs beside it, the main line keeps below the crest in its lee:
+      // CREST_LEE.main of the segment's openness (the crest itself takes it all: below)
+      const lee = P.altRouteX(z) !== null ? CREST_LEE.main : 1;
+      if (seg === 'ridgeline' || seg === 'basin') expect(e).toBeGreaterThan(0.75 * lee), open++;
       const ax = P.altRouteX(z);
       if (ax !== null && m.altLane(ax, z) > 0.9) {
         alts++;
@@ -192,7 +195,8 @@ describe('Whiteout Ridge: exposure and snow', () => {
     };
     let pairs = 0;
     for (let z = 400; z < m.finishZ - 400; z += 60) {
-      const ex = whiteoutExposure(m, m.routeX(z), z);
+      // (with the time: the wind's grip, as physics asks — the crest lee, W-080)
+      const ex = whiteoutExposure(m, m.routeX(z), z, t, worldSeed(c));
       const air = sample(z, false);
       if (e.hazards.empty || air === 0) continue;
       // airborne crosswind ∝ exposure (± the hazards' own push, which this check skips where present)
@@ -311,17 +315,17 @@ describe('Whiteout Ridge: playability', () => {
     expect(sim('sprint', 'WP1', 'normal', 'careless').outcome).toBe('caught');
   }, 900_000);
   it('Normal rewards reading the weather; Hard is winnable by a skier who reads it', () => {
-    // (round 2, W-035: the full weather reader — storm line, drift gaps, blizzard stance, the lee —
-    // balance/w035-final) WD8 / WD2 Normal: the informed skier escapes, the weather-blind one is caught
-    // (round 3, W-056: every chase now opens on a fair stretch, and blind play wins more Sprints — 18/24
-    // on W3H and W2H, the reader 24/24, balance/w056) WD10: the reader escapes, the weather-blind one
-    // is caught; WD1: both escape, the blind one by 4.8 m (the reader by 49)
-    expect(play('WD10', 'normal', INFORMED2)).toBe('victory');
-    expect(play('WD10', 'normal', BLIND)).toBe('caught');
-    for (const s of ['WD2', 'WD8']) expect(play(s, 'normal', INFORMED2), s).toBe('victory');
-    for (const s of ['WD3', 'WD5']) expect(play(s, 'normal', INFORMED2), s).toBe('victory');
-    // Hard: a skier who reads the weather can win (WD3); not automatic for the blind one (WD1, WD2)
+    // (round 4, owner's decision A: a perfect Hard run must be winnable — W-080, balance/w080) The
+    // reader escapes Normal on every seed here; on Hard reading the weather decides outcomes: over the
+    // fixed set WD1–WD12 the reader wins at least 3 more than the weather-blind skier, and wins WD3.
+    // (Round 3 pinned single seeds — WD10 Normal blind caught, WD1/WD2 Hard blind caught; on Normal
+    // Sprint the reading advantage is now in the margins, not the outcome: balance/w080/README.md.)
+    for (const s of ['WD2', 'WD3', 'WD5', 'WD8', 'WD10']) expect(play(s, 'normal', INFORMED2), s).toBe('victory');
     expect(play('WD3', 'hard', INFORMED2)).toBe('victory');
-    for (const s of ['WD1', 'WD2']) expect(play(s, 'hard', BLIND), s).toBe('caught');
+    const seeds = Array.from({ length: 12 }, (_, i) => `WD${i + 1}`);
+    const reader = seeds.filter((s) => play(s, 'hard', INFORMED2) === 'victory').length;
+    const blind = seeds.filter((s) => play(s, 'hard', BLIND) === 'victory').length;
+    expect(reader, `reader ${reader}/12, blind ${blind}/12`).toBeGreaterThanOrEqual(blind + 3);
+    expect(blind, 'not automatic for the weather-blind skier').toBeLessThan(12);
   }, 900_000);
 });

@@ -11,7 +11,7 @@
 import { smoothstep } from '../../core/rng';
 import type { SurfaceType } from '../../core/types';
 import type { Mountain } from '../course';
-import { SLIP_EDGE, type EnvQuery, type EnvSample, type PhysicsEnvironment } from '../../physics/environment';
+import { HEADWIND_STANCE, SLIP_EDGE, type EnvQuery, type EnvSample, type PhysicsEnvironment } from '../../physics/environment';
 import { capabilitiesOf, type BiomeCapabilities, type GameDifficulty } from './index';
 import { combineSurface, resetSurface, type SurfaceQuery, type SurfaceWeights } from './surface';
 import { makeWeatherSample, type WeatherSample } from './weather';
@@ -238,8 +238,9 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       gust *= ex;
       gustK *= ex;
     }
-    // the breeze costs a grounded, upright skier speed whatever their heading (extra drag × its strength)
-    if (this.headwind && q.grounded && !q.crashed) S.dragAdd += this.headwind * gustK;
+    // the breeze costs a grounded skier speed whatever their heading (extra drag × its strength); like the
+    // skier's own air drag it bites less on the tuck's smaller frontal area (W-080: HEADWIND_STANCE)
+    if (this.headwind && q.grounded && !q.crashed) S.dragAdd += this.headwind * gustK * (1 - (1 - HEADWIND_STANCE.tuck) * (q.tuck ?? 0));
     // the weather's own wind at the skier (before any hazard's), for the ground crosswind slip
     const wwx = wx;
     const wwz = wz;

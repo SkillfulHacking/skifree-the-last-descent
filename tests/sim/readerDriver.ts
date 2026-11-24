@@ -8,12 +8,13 @@
  * It only uses information the game shows (hazard positions and the windsock's phase); the 'read'
  * policy also knows the squall cycle (a player who has learnt it), 'cue' only sees the windsock now.
  */
-import { clamp, wrapAngle } from '../../src/core/rng';
+import { clamp, smoothstep, wrapAngle } from '../../src/core/rng';
 import type { Mountain } from '../../src/world/course';
 import type { SkierInput, SkierState } from '../../src/physics/SkierPhysics';
 import type { BiomeEnvironment } from '../../src/world/capabilities/environment';
 import { getHazardKind, hazardPhase, type HazardInstance, type HazardKind } from '../../src/world/hazards/hazard';
 import { GATE, type GustParams } from '../../src/world/biomes/fjord/hazards';
+import { EXPERT_TUCK } from './whiteoutDriver';
 
 /**
  * How the driver treats the wind:
@@ -164,6 +165,7 @@ export function readerDriver(m: Mountain, env: BiomeEnvironment | null, o: Reade
     const desired = Math.atan2(tx - s.pos.x, tz - s.pos.z);
     const err = wrapAngle(desired - s.heading);
     const steer = clamp(-err * 3.2, -1, 1);
-    return { steer, tuck: !standUp && Math.abs(err) < 0.16 ? 1 : 0, brake: 0, drift: false, pop: false, recover: s.crashTime > 1.4 };
+    const tuck = standUp ? 0 : EXPERT_TUCK.on ? 1 - smoothstep(0.16, 0.16 + EXPERT_TUCK.band, Math.abs(err)) : Math.abs(err) < 0.16 ? 1 : 0;
+    return { steer, tuck, brake: 0, drift: false, pop: false, recover: s.crashTime > 1.4 };
   };
 }

@@ -96,7 +96,7 @@ export interface ExposureQuery {
   centerX?(z: number): number;
   halfWidth(z: number): number;
   altLane(x: number, z: number): number;
-  readonly profile: { segmentAt(z: number): string; finishZ: number };
+  readonly profile: { segmentAt(z: number): string; finishZ: number; /** (W-080) an alternate line here (null: none) */ altRouteX?(z: number): number | null };
 }
 
 export function makeWeatherSample(): WeatherSample {

@@ -123,7 +123,9 @@ export function makeWhiteoutBiome(): Biome {
       // skier at ~12–14 m/s on 11° ground, below the Yeti's 16.5 m/s, so a long gentle traverse in a
       // front (Classic: 580 m at 11°) was a catch no line or stance could avoid. At 14° the weather
       // reader keeps ahead in the storm; ploughing the drift rows still loses ground (the skill).
-      minSlope: 14,
+      // (W-080, round 4) 15°: on Hard (Yeti 17.7 m/s) a tucked expert in a full storm on 14° ground held
+      // ~16–17 m/s, so a storm over the floor was a catch for a perfect run (balance/w080/README.md)
+      minSlope: 15,
       startSlope: 8,
       // fast alternate lines over the exposed crests (the risky choice in a storm)
       altTypes: ['alpine', 'highspeed', 'basin', 'ridgeline', 'chute', 'forest'],

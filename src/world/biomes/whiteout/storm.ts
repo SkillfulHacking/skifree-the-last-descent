@@ -240,6 +240,14 @@ export function leeLaneAt(m: ExposureQuery, z: number, side: number): boolean {
  * lines. With the time and the course seed, the lee of the piste in a front (LEE) as well; without
  * them (the snow surface, the hazard placement), the ground's openness only.
  */
+/**
+ * (W-080) the main line's share of the wind where an alternate crest line runs beside it (round 3: 1).
+ * 0.75: the sheltered line pays in a storm and the exposed crest no longer wins it outright — Classic
+ * Hard Sprint, the reader on the main line caught while the weather-blind crest line won
+ * (balance/w080/README.md). An object so measurement runs can compare.
+ */
+export const CREST_LEE = { main: 0.75 };
+
 export function whiteoutExposure(m: ExposureQuery, x: number, z: number, t?: number, seed?: number): number {
   const seg = (zz: number) => SEGMENT_EXPOSURE[m.profile.segmentAt(zz)] ?? 0.75;
   let base = 0.25 * seg(z - 40) + 0.5 * seg(z) + 0.25 * seg(z + 40);
@@ -247,8 +255,14 @@ export function whiteoutExposure(m: ExposureQuery, x: number, z: number, t?: num
     const f = frontAt(t, seed, leeFront);
     if (f.s > 0) base *= 1 - LEE.shelter * f.s * smoothstep(LEE.from, LEE.to, (x - m.routeX(z)) * f.dir);
   }
-  // the fast alternate lines run over the open crest: fully exposed
+  // the fast alternate lines run over the open crest: fully exposed. (W-080) Where one runs, the main
+  // line keeps below the crest, in its lee: it takes CREST_LEE.main of the segment's exposure — the
+  // sheltered line the storm caption and the reader choose in a front (round 3: equally exposed on
+  // crest segments, so the storm-line decision hardly mattered and the crest won even in a storm)
   const al = m.altLane(x, z);
+  // (the wind's grip only — with a time, as physics and the weather ask; where the hazards and the lee
+  // shoulders are placed, without one, the ground's openness is unchanged)
+  if (t !== undefined && CREST_LEE.main < 1 && (m.profile.altRouteX?.(z) ?? null) !== null) base *= CREST_LEE.main;
   return al > 0 ? base + (1 - base) * al : base;
 }
 

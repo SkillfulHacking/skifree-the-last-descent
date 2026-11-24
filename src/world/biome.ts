@@ -395,7 +395,10 @@ export const ALPINE: Biome = {
   // profile.ts GeneratedProfile (scales) + course.ts Mountain.heightAt (amplitudes)
   // (round 3, W-077) a fixed Yeti pace for Alpine's encounters: on its steep runs a competent skier
   // outran the shipped pace and a crash or a sloppy run cost nothing (balance/w077/README.md)
-  terrain: { encounterPace: 1.1, slopeScale: 1, widthScale: 1, swingScale: 1, wallHeight: 330, wallRelief: 64, rangeHeight: 900, undulation: 7, detail: 1.4, moguls: 0.42, drifts: 0.9, driftsPowder: 0.6, rollers: 0.6 },
+  // (round 4, W-079) 1.05, not 1.10: the same graded Normal pressure on a crash (Standard crash 2/7, min 11 m)
+  // without making Hard disproportionately punishing (1.10: Sprint, every crash a capture; Hard clean
+  // skilled caught 4/7) — balance/w080/README.md
+  terrain: { encounterPace: 1.05, slopeScale: 1, widthScale: 1, swingScale: 1, wallHeight: 330, wallRelief: 64, rangeHeight: 900, undulation: 7, detail: 1.4, moguls: 0.42, drifts: 0.9, driftsPowder: 0.6, rollers: 0.6 },
   audio: { ambience: 'wind', windGain: 1, windPitch: 1 },
 };
 

@@ -127,8 +127,10 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
       peakBands = Math.max(peakBands, f.bandCount);
     }
     const inp = driver(s, t);
-    if (balls && opts.dodge && !s.crashed) {
+    if (balls && opts.dodge && !s.crashed && s.grounded) {
       // read the marks: if the current line runs through a landing zone, steer out of it
+      // (round 4: only on the snow — round 3's dodge also yanked the skis round in the air, and the
+      // landing that followed was sideways: the expert's Alpine Classic Hard Standard crash at 215.6 s)
       for (const b of balls.balls) {
         if (b.landed) continue;
         // the whole danger window (the end of the fall + the splash), not just the impact instant

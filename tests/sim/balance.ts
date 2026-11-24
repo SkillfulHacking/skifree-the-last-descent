@@ -27,6 +27,8 @@ import { getHazardKind, hazardPhase, type HazardInstance } from '../../src/world
 import { BLIZZARD, blizzardStrength } from '../../src/world/biomes/whiteout/hazards';
 import type { EnvQuery, EnvSample } from '../../src/physics/environment';
 import { whiteoutDriver, type WhiteoutPolicy } from './whiteoutDriver';
+import { readerDriver } from './readerDriver';
+import { POLE, type SkierInput, type SkierState } from '../../src/physics/SkierPhysics';
 import type { BiomeId } from '../../src/world/biome';
 
 export const POLICIES: Record<string, WhiteoutPolicy> = {
@@ -60,6 +62,15 @@ export interface RunSpec {
   seed: string;
   policy: keyof typeof POLICIES;
   react?: number;
+  /**
+   * (round 4, owner's decision A) the expert driver: 'fjordRead' drives Fjord with the squall reader
+   * (readerDriver: wind gates, rock, alternate lines) instead of the Whiteout driver; `pole` adds pole
+   * pushes on slow ground (below POLE.zero, grounded, upright, roughly on line), as a skilled player does
+   */
+  fjordRead?: boolean;
+  pole?: boolean;
+  /** a competent, unoptimised skier: a sloppy turn (1 s, no tuck, half brake) every 12 s */
+  sloppy?: boolean;
 }
 
 export interface RunResult extends RunSpec {
@@ -98,6 +109,15 @@ export interface RunResult extends RunSpec {
 const r1 = (v: number) => Math.round(v * 10) / 10;
 const r2 = (v: number) => Math.round(v * 100) / 100;
 
+/** pole pushes where they help: grounded, upright, below the speed where a push stops adding (POLE.zero), heading within ~10° of the line's direction */
+export function withPoles(base: (s: SkierState, t: number) => SkierInput): (s: SkierState, t: number) => SkierInput {
+  return (s, t) => {
+    const i = base(s, t);
+    const pole = s.grounded && !s.crashed && i.brake === 0 && s.speed < POLE.zero - 0.5 && Math.abs(i.steer) < 0.35;
+    return pole ? { ...i, pole: true } : i;
+  };
+}
+
 export function measure(spec: RunSpec): RunResult {
   // (round 3) seed 'CLASSIC': the location's Classic course (the default course); 'DAILY:<date>': that day's Daily
   const c =
@@ -111,7 +131,9 @@ export function measure(spec: RunSpec): RunResult {
   const env = new BiomeEnvironment(m, ws, { difficulty: spec.diff });
   const field = new ObstacleField(m, ws);
   const stats = { alt: 0, main: 0, gapSteers: 0, brakes: 0 };
-  const driver = whiteoutDriver(m, env, ws, POLICIES[spec.policy]!, stats, spec.react ?? 0.25, field);
+  const base = spec.fjordRead && spec.biome === 'fjord' ? readerDriver(m, env, { rocks: true, squalls: true, alts: true }) : whiteoutDriver(m, env, ws, POLICIES[spec.policy]!, stats, spec.react ?? 0.25, field);
+  const poled = spec.pole ? withPoles(base) : base;
+  const driver: typeof poled = spec.sloppy ? (st, t) => { const i = poled(st, t); return t % 12 < 1 ? { ...i, tuck: 0, brake: 0.5 } : i; } : poled;
 
   // ---- environment instrumentation (reads the engine's own outputs) ----
   let lastT = -1;

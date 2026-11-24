@@ -115,8 +115,13 @@ export const FJORD_SURFACE: SurfaceModel = {
  * (headwind drag × gusts), so the coast is consistently the slower, harder mountain than sheltered
  * Alpine (F-039). Relaxed has no headwind: an upright skier must still outrun its Yeti.
  */
-/** Fjord's grounded headwind drag (WeatherCoupling.headwind) */
-export const FJORD_HEADWIND = 0.0007;
+/**
+ * Fjord's grounded headwind drag (WeatherCoupling.headwind), for an upright skier. (W-080, round 4) The
+ * headwind now bites a tucked skier by the tuck's own drag ratio (HEADWIND_STANCE: ~47 %), so 0.0010
+ * (round 3: 0.0007 whatever the stance) keeps the coast the slower mountain (F-039) while a tucked
+ * expert can win Fjord Hard (balance/w080/README.md).
+ */
+export const FJORD_HEADWIND = 0.001;
 
 export const FJORD_WEATHER = parametricWeather({
   id: 'fjord',

@@ -23,7 +23,7 @@ import type { SkierInput, SkierState } from '../../src/physics/SkierPhysics';
 import type { BiomeEnvironment } from '../../src/world/capabilities/environment';
 import { getHazardKind, hazardPhase, type HazardInstance } from '../../src/world/hazards/hazard';
 import { frontAt } from '../../src/world/biomes/whiteout/storm';
-import { BLIZZARD, blizzardStrength, type DriftParams } from '../../src/world/biomes/whiteout/hazards';
+import { BLIZZARD, BLIZZARD_KNOCK_R, blizzardStrength, type DriftParams } from '../../src/world/biomes/whiteout/hazards';
 import { LEE, leeLaneAt, whiteoutExposure } from '../../src/world/biomes/whiteout/storm';
 import type { ObstacleField } from '../../src/physics/obstacles';
 
@@ -57,6 +57,9 @@ export const FOG_READ = 60;
  * input in between, with a softer correction (the same for every policy). 0 = the instant, perfect
  * path follower of the 'skilled' autopilot.
  */
+/** (round 4 ladder) the expert's tuck: progressive through turns (measurement only; off = round 3's driver) */
+export const EXPERT_TUCK = { on: false, band: 0.25, lead: 0.45 };
+
 export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number, p: WhiteoutPolicy, stats?: { alt: number; main: number; gapSteers: number; brakes: number; lee?: number; maxAimJump?: number }, react = 0.25, field?: ObstacleField) {
   const ids: number[] = [];
   /** on an alternate line (from its fork until the lines rejoin); the last planned aim (checks) */
@@ -199,6 +202,21 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
         if (h.z < s.pos.z - h.r || h.z > s.pos.z + 70) continue;
         const ph = hazardPhase(getHazardKind(h.kind), h, t);
         const w = blizzardStrength(ph.phase, ph.u);
+        // (round 4 expert) rise only for the gust that can knock: inside the knock radius, at knock
+        // strength and above the knock speed, looking EXPERT_TUCK.lead s ahead (the tuck takes ~0.3 s to
+        // come out); otherwise stay tucked. Round 3's reader stood up for the whole cell.
+        if (EXPERT_TUCK.on) {
+          const L = EXPERT_TUCK.lead;
+          const ph2 = hazardPhase(getHazardKind(h.kind), h, t + L);
+          const w2 = Math.max(w, blizzardStrength(ph2.phase, ph2.u));
+          const d2 = Math.hypot(h.x - (s.pos.x + s.vel.x * L), h.z - (s.pos.z + s.vel.z * L));
+          const dNow = Math.hypot(h.x - s.pos.x, h.z - s.pos.z);
+          if (w2 > BLIZZARD.knockAt - 0.03 && Math.min(d2, dNow) < BLIZZARD_KNOCK_R + 2 && speed > BLIZZARD.knockSpeed - 1.5) {
+            tuckOk = false;
+            if (stats) stats.brakes++;
+          }
+          continue;
+        }
         // rise out of the tuck while the cell is really blowing at you (what the caption teaches)
         if (w > BLIZZARD.knockAt - 0.05 && Math.hypot(h.x - s.pos.x, h.z - s.pos.z) < h.r + 2) {
           tuckOk = false;
@@ -212,6 +230,9 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     const steer = clamp(-err * (react > 0 ? 2.2 : 3.2), -1, 1);
     // (every policy) a skier who has bogged down poles out, as the game's hint teaches
     const pole = s.grounded && !s.crashed && speed < 4;
-    return { steer, tuck: tuckOk && !edgeUp && Math.abs(err) < tuckTol ? 1 : 0, brake, drift: false, pop, recover: s.crashTime > 1.4, pole, polePressed: pole && Math.floor(t * 2) % 2 === 0 };
+    // (round 4) the expert: holds a partial tuck through moderate turns (the tuck halves turn rate, so it
+    // eases out progressively instead of all-or-nothing at tuckTol)
+    const tuck = !tuckOk || edgeUp ? 0 : EXPERT_TUCK.on ? 1 - smoothstep(tuckTol, tuckTol + EXPERT_TUCK.band, Math.abs(err)) : Math.abs(err) < tuckTol ? 1 : 0;
+    return { steer, tuck, brake, drift: false, pop, recover: s.crashTime > 1.4, pole, polePressed: pole && Math.floor(t * 2) % 2 === 0 };
   }
 }

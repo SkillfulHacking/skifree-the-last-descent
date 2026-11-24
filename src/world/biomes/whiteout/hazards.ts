@@ -43,6 +43,14 @@ export const DRIFT = {
   // ploughing (driftRow.measure, 50 rows: mistimed +0.64 s, timed-but-clipped +0.12 s vs plough; the
   // marked gap −0.35 s). A jump that clears the snow is not knocked: jumping is not banned
   clipKeep: 0.6,
+  /**
+   * how far the gap of an off-line row lies from the racing line (m, drawn uniformly; at least 12).
+   * (W-080, round 4) 14–18 (was 16–22): in a storm the gap shows only ~60 m ahead (W-075), ~3.5 s at
+   * the Hard Yeti's pace — a 20 m move in that time was beyond even a perfect reader, so the rows under
+   * the default course's first storm cost every Hard run (balance/w080/README.md). Still well clear
+   * of the line: a skier who ignores the flags ploughs the row.
+   */
+  gapOffset: [14, 18] as [number, number],
   /** rows per 256 m band on exposed ground (× density) */
   rowChance: 1,
   /** share of rows that drift over the racing line (the gap is off to one side) */
@@ -153,7 +161,7 @@ export const WIND_DRIFT: HazardKind<DriftParams> = {
     let gapX = rx;
     if (onLine) {
       const side = rx - cx > 0 ? -1 : 1;
-      gapX = clamp(rx + side * ctx.rng.range(16, 22), cx - hw + 8, cx + hw - 8);
+      gapX = clamp(rx + side * ctx.rng.range(DRIFT.gapOffset[0], DRIFT.gapOffset[1]), cx - hw + 8, cx + hw - 8);
       if (Math.abs(gapX - rx) < 12) gapX = rx + side * 12;
       // (round 2) the way over to the gap and through it must be smooth snow (no terrain step on the
       // line into it — B F8): checked across at the row and on the approach, and along the gap
