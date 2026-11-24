@@ -223,17 +223,43 @@ export const WIND_DRIFT: HazardKind<DriftParams> = {
 };
 
 /**
- * Which way a blizzard cell pushes (+1 toward +X, the skier's left) at time t (round 3, R2 E N1: each
- * cell's own direction was a coin flip, so in a front about half of them pushed against the HUD's
- * wind arrow and the wind audio). Inside a front (s > 0.3) a cell is a squall of that front: it blows
- * the front's way; in a clear window it keeps its own direction. The caption uses the same rule.
+ * Which way a blizzard cell pushes (+1 toward +X, the skier's left) during the gust that contains t
+ * (or, in the lull, the next gust: the one a warning is about).
+ * - (round 3, R2 E N1) A gust that blows inside a front is a squall of that front: it blows the front's
+ *   way, as the HUD arrow and the wind audio do; a gust in a clear window keeps the cell's own direction.
+ * - (W-081) The direction is decided once per gust, from the front over the gust's whole telegraph +
+ *   active window, so the warning, the side-slip, the air push and the wind all name the same side for
+ *   the whole gust. Round 3 re-decided it every step, and a front crossing 30 % mid-gust flipped the push
+ *   against the warning (11 of 120 warnings named the wrong side).
+ * Deterministic in (seed, instance seed, t); memoised per gust.
  */
-export function blizzardPushDir(h: { params: BlizzardParams }, t: number, seed: number | undefined): number {
+export function blizzardPushDir(h: { params: BlizzardParams; seed?: number }, t: number, seed: number | undefined): number {
   if (seed === undefined) return h.params.dir;
-  const f = frontAt(t, seed, pushFront);
-  return f.s > 0.3 ? f.dir : h.params.dir;
+  const T = BLIZZARD_TIMING;
+  const period = T.dormant + T.telegraph + T.active + T.recovery;
+  const off = ((h.seed ?? 0) % 10007) / 10007;
+  let x = (t / period + off) % 1;
+  if (x < 0) x += 1;
+  const s = x * period;
+  // the telegraph start of this gust (in the lull: of the coming one)
+  const g0 = s < T.dormant ? t + (T.dormant - s) : t - (s - T.dormant);
+  const key = `${seed}:${h.seed ?? 0}:${h.params.dir}:${Math.round(g0 * 1000)}`;
+  const hit = gustDir.get(key);
+  if (hit !== undefined) return hit;
+  let best = 0;
+  let dir = h.params.dir;
+  const span = T.telegraph + T.active;
+  for (let k = 0; k <= span * 2; k++) {
+    const f = frontAt(g0 + k * 0.5, seed, pushFront);
+    if (f.s > best) { best = f.s; dir = f.dir; }
+  }
+  const d = best > 0.3 ? dir : h.params.dir;
+  if (gustDir.size > 512) gustDir.delete(gustDir.keys().next().value!);
+  gustDir.set(key, d);
+  return d;
 }
 const pushFront: FrontState = { s: 0, dir: 1, phase: 'clear', left: 0, k: 0 };
+const gustDir = new Map<string, number>();
 
 /**
  * (W-056) Every chase opens on a fair stretch: from the cave trigger to CHASE_OPENING m past it — about

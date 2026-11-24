@@ -134,19 +134,10 @@ describe('round 3 (R2 D N-3): the weather clear zones are cached per band', () =
 
 describe('round 3 (R2 E N1): a blizzard cell pushes the way the front blows', () => {
   it('inside a front the push follows the front (the HUD arrow and the wind audio); in the clear, the cell', async () => {
-    const { blizzardPushDir, BLIZZARD_CELL } = await import('../../src/world/biomes/whiteout/hazards');
+    const { BLIZZARD_CELL } = await import('../../src/world/biomes/whiteout/hazards');
     const { frontAt } = await import('../../src/world/biomes/whiteout/storm');
+    // (W-081) decided per gust over its telegraph + active window: tests/unit/w081_blizzard_dir.test.ts
     const seed = 913;
-    let storm = 0, clear = 0;
-    for (let t = 0; t < 900; t += 1.7) {
-      const f = frontAt(t, seed);
-      for (const own of [-1, 1]) {
-        const d = blizzardPushDir({ params: { dir: own } }, t, seed);
-        if (f.s > 0.3) { expect(d).toBe(f.dir); storm++; } else { expect(d).toBe(own); clear++; }
-      }
-    }
-    expect(storm).toBeGreaterThan(50);
-    expect(clear).toBeGreaterThan(50);
     // and the effect itself uses it: a grounded skier in the cell slips toward the front's side
     const t = (() => { for (let tt = 30; tt < 900; tt += 0.5) if (frontAt(tt, seed).s > 0.8) return tt; return -1; })();
     const f = frontAt(t, seed);
