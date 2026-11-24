@@ -84,8 +84,11 @@ test('full loop: start → learn → cave cinematic → chase → caught → ret
   // neutral debug frames, and failed once under CPU load)
   await page.evaluate(() => window.__skifree.frames(3));
   await page.evaluate(() => window.__skifree.hold(true));
-  await page.keyboard.press('Space');
+  // (round 4: Space is the pop key, read as held — press() releases it before the stepped frames run;
+  // a player's tap lasts several frames, so hold it down across them)
+  await page.keyboard.down('Space');
   await page.evaluate(() => window.__skifree.framesLive(3));
+  await page.keyboard.up('Space');
   await page.evaluate(() => window.__skifree.hold(false));
   s = await st(page);
   expect(s.session?.intro).toBe(false);
