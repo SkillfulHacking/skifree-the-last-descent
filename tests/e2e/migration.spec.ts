@@ -168,7 +168,8 @@ test('a Pass 3 save (settings + per-course records, no progress key) loads uncha
   const savedS = JSON.parse(after[KEY_S]!);
   expect(typeof savedS.seenPoleHint).toBe('boolean');
   // (Whiteout round 2: Reduce Weather Effects is a new setting too — written at its default by the save)
-  expect(savedS).toEqual({ ...PASS3_SETTINGS, course: 'classic', controlHints: true, seenPoleHint: savedS.seenPoleHint, reduceWeather: false });
+  // (Whiteout round 4, W-088: the vibration toggle likewise, at its default — on)
+  expect(savedS).toEqual({ ...PASS3_SETTINGS, course: 'classic', controlHints: true, seenPoleHint: savedS.seenPoleHint, reduceWeather: false, vibration: true });
   if (after[KEY_P] !== undefined) {
     const p = JSON.parse(after[KEY_P]!);
     expect(p.version).toBe(2);
