@@ -38,7 +38,8 @@ for (const biome of list.split(',')) {
     const s = await page.evaluate(() => window.__skifree.state().session);
     const name = `${biome}_${String(i).padStart(2, '0')}`;
     await page.screenshot({ path: `${outDir}/${name}.png`, timeout: 1_200_000 });
-    manifest.frames.push({ name, biome, phase: s.phase, cinematicTime: s.cinematicTime, chaseTime: s.chaseTime, yetiPos: s.yetiPos, yetiRoot: s.yetiRoot, yetiAirborne: s.yetiAirborne, yetiVisible: s.yetiVisible, yetiMode: s.yetiMode, z: s.z, cam: await page.evaluate(() => window.__skifree.cameraPose()) });
+    const course = await page.evaluate(() => window.__skifree.state().course?.id ?? null);
+    manifest.frames.push({ name, biome, course, phase: s.phase, cinematicTime: s.cinematicTime, chaseTime: s.chaseTime, yetiPos: s.yetiPos, yetiRoot: s.yetiRoot, yetiAirborne: s.yetiAirborne, yetiVisible: s.yetiVisible, yetiMode: s.yetiMode, z: s.z, cam: await page.evaluate(() => window.__skifree.cameraPose()) });
     writeFileSync(`${outDir}/manifest.json`, JSON.stringify(manifest, null, 2));
     console.log(name, s.phase, s.cinematicTime.toFixed(2), s.chaseTime?.toFixed?.(2));
     if (SKIP_AT !== null && s.phase === 'caveCinematic' && s.cinematicTime >= SKIP_AT - 0.25) {

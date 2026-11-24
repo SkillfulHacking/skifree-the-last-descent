@@ -17,7 +17,9 @@ export const PRESENCE = {
   callEvery: [9, 14] as const,
   closingRate: 1.5,
   closingWindow: 2,
-  closingWithin: 90,
+  // (round 4, W-085 / review F8: CLOSING showed 21.5 s on a clean run) within 60 m, where the gap is the
+  // player's to lose: beyond it the Yeti's catch-up pressure (YETI.catchUpGap) closes in by design
+  closingWithin: 60,
   closingHold: 1,
 } as const;
 

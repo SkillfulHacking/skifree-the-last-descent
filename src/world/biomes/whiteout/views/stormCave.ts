@@ -107,6 +107,15 @@ class Grains {
 }
 
 export function dressStormCave(ctx: CaveDressingContext): CaveDressing {
+  const g = dressStormCaveSteps(ctx);
+  for (;;) {
+    const r = g.next();
+    if (r.done) return r.value;
+  }
+}
+
+/** the dressing in slices (CavePresentation.dressSteps): World yields a frame at each pause */
+export function* dressStormCaveSteps(ctx: CaveDressingContext): Generator<void, CaveDressing, void> {
   rs = 0x2f6e2b1 ^ Math.round(ctx.anchor.z);
   const cave = ctx.cave;
   const group = new THREE.Group();
@@ -137,7 +146,8 @@ export function dressStormCave(ctx: CaveDressingContext): CaveDressing {
     gr.life = 2 + rnd() * 1.5;
   });
   group.add(curtain.points, skate.points);
-  const built = buildStormArchitecture(cave.lipTop, cave.mouth, O, rock ?? null);
+  yield;
+  const built = yield* buildStormArchitectureSteps(cave.lipTop, cave.mouth, O, rock ?? null);
   group.add(built.group);
   let burst = 0;
   const dressing: CaveDressing & { setWind(w: number): void; roar(): void } = {
@@ -333,7 +343,9 @@ export function rayTris(o: THREE.Vector3, dir: THREE.Vector3, tris: Float32Array
   return best;
 }
 
-function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: THREE.Vector3, rock: THREE.Mesh | null) {
+/** (round 4, W-086 / review D3-1) the architecture built in slices: a pause after the brow's triangles are
+ * gathered, after the roots, the cornice, the feathers and the bank (round 3: one ~22 ms frame) */
+function* buildStormArchitectureSteps(lip: THREE.Vector3, mouth: THREE.Vector3, out: THREE.Vector3, rock: THREE.Mesh | null) {
   const C = STORM_CAVE.cornice;
   const group = new THREE.Group();
   group.name = 'storm-cave-architecture';
@@ -357,6 +369,7 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
   rock?.updateWorldMatrix(true, false);
   const rayY = mouth.y + 0.58 * (lip.y - mouth.y);
   const tris = rock ? browTriangles(rock, lip, along, out, rayY, C.len / 2 + 1) : new Float32Array(0);
+  yield;
   const rootAt = (a: number): THREE.Vector3 | null => {
     if (!rock) return lip.clone().addScaledVector(along, a);
     // (just over the opening: ~55% of the way from the floor to the brow anchor — round-2 check,
@@ -369,6 +382,7 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
   // (Gitar, round 3) a column whose ray misses keeps its own place along the brow and borrows only
   // the depth (along `out`) of the nearest hit — never another column's point (degenerate strips)
   const roots = corniceRoots(nu, C.len, lip, along, rootAt);
+  yield;
   for (let i = 0; i <= nu; i++) {
     const u = i / nu;
     const a = (u - 0.5) * C.len;
@@ -405,6 +419,7 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
   cornice.castShadow = true;
   cornice.name = 'storm-cave-cornice';
   group.add(cornice);
+  yield;
   disposables.push(cg);
   // the cornice's drooping edge (the last row), where the feathers grow and the spindrift pours off
   const edge = (u: number) => {
@@ -448,6 +463,7 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
   // (round 3, R2 D N-4) its instance buffer is released with the dressing
   disposables.push(fm);
   group.add(fm);
+  yield;
   // a drift banked against the windward jamb (half-buried: it never floats on a slope)
   const bank = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), snow);
   bank.scale.set(4.2, 1.6, 2.6);
@@ -455,66 +471,18 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
   bank.lookAt(bank.position.clone().add(along));
   bank.name = 'storm-cave-drift-bank';
   group.add(bank);
+  yield;
   disposables.push(bank.geometry);
   // the spindrift sheet off the cornice edge: a ribbon of falling snow streaks blown sideways
   // (round 3, R2 A N3: a regular grid of vertical dashes read as "digital rain") wisps at hashed
   // places, slanted downwind, soft-ended, of every length and weight; the sheet's own edges fade
   // (alphaMap, not repeated) so it never shows as a rectangle against the rock
-  const sheetTex = (() => {
-    const c = document.createElement('canvas');
-    c.width = 256;
-    c.height = 256;
-    const g = c.getContext('2d');
-    if (g) {
-      g.clearRect(0, 0, 256, 256);
-      g.lineCap = 'round';
-      for (let k = 0; k < 140; k++) {
-        const x = hash(k * 1.31) * 256;
-        const y = hash(k * 2.77) * 256;
-        const len = 14 + 60 * Math.pow(hash(k * 4.13), 2);
-        const slant = 0.35 + 0.3 * hash(k * 5.9);
-        const a = 0.12 + 0.4 * Math.pow(hash(k * 6.7), 1.5);
-        const gr = g.createLinearGradient(x, y, x - slant * len, y + len);
-        gr.addColorStop(0, 'rgba(255,255,255,0)');
-        gr.addColorStop(0.35, `rgba(255,255,255,${a})`);
-        gr.addColorStop(1, 'rgba(255,255,255,0)');
-        g.strokeStyle = gr;
-        g.lineWidth = 0.8 + 2.2 * hash(k * 8.3);
-        for (const ox of [-256, 0, 256])
-          for (const oy of [-256, 0, 256]) {
-            g.beginPath();
-            g.moveTo(x + ox, y + oy);
-            g.lineTo(x + ox - slant * len, y + oy + len);
-            g.stroke();
-          }
-      }
-    }
-    const t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping;
-    t.repeat.set(2.3, 1.15);
-    return t;
-  })();
-  const sheetFade = (() => {
-    const c = document.createElement('canvas');
-    c.width = c.height = 64;
-    const g = c.getContext('2d');
-    if (g) {
-      const img = g.createImageData(64, 64);
-      for (let y = 0; y < 64; y++)
-        for (let x = 0; x < 64; x++) {
-          const ex = Math.min(x, 63 - x) / 18;
-          const ey = Math.min(y, 63 - y) / 22;
-          const v = Math.round(255 * Math.min(1, ex) * Math.min(1, ey) * (0.75 + 0.25 * hash(x * 0.37 + y * 1.91)));
-          const o = (y * 64 + x) * 4;
-          img.data[o] = img.data[o + 1] = img.data[o + 2] = v;
-          img.data[o + 3] = 255;
-        }
-      g.putImageData(img, 0, 0);
-    }
-    return new THREE.CanvasTexture(c);
-  })();
+  // (round 4, W-086 / review D3-1) both textures are module singletons: they are the same for every cave,
+  // and drawing the wisps (1,260 gradient strokes) took 3–7 ms of the dressing frame each time
+  const sheetTex = spindriftSheetTexture();
+  const sheetFade = spindriftSheetFade();
   const sheetM = new THREE.MeshBasicMaterial({ map: sheetTex, alphaMap: sheetFade, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
-  disposables.push(sheetTex, sheetFade, sheetM);
+  disposables.push(sheetM);
   const sheet = new THREE.Mesh(new THREE.PlaneGeometry(C.len * 0.8, 3.2), sheetM);
   const mid = edge(0.5);
   sheet.position.copy(mid).add(new THREE.Vector3(0, -1.7, 0)).addScaledVector(out, 0.25);
@@ -537,4 +505,73 @@ function buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: T
       for (const d of disposables) d.dispose();
     },
   };
+}
+
+/** the spindrift sheet's wisps (shared by every storm cave; never disposed) */
+const sheetHash = (n: number) => {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+let sheetTexS: THREE.CanvasTexture | null = null;
+function spindriftSheetTexture(): THREE.CanvasTexture {
+  if (sheetTexS) return sheetTexS;
+  sheetTexS = (() => {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 256;
+    const g = c.getContext('2d');
+    if (g) {
+      g.clearRect(0, 0, 256, 256);
+      g.lineCap = 'round';
+      for (let k = 0; k < 140; k++) {
+        const x = sheetHash(k * 1.31) * 256;
+        const y = sheetHash(k * 2.77) * 256;
+        const len = 14 + 60 * Math.pow(sheetHash(k * 4.13), 2);
+        const slant = 0.35 + 0.3 * sheetHash(k * 5.9);
+        const a = 0.12 + 0.4 * Math.pow(sheetHash(k * 6.7), 1.5);
+        const gr = g.createLinearGradient(x, y, x - slant * len, y + len);
+        gr.addColorStop(0, 'rgba(255,255,255,0)');
+        gr.addColorStop(0.35, `rgba(255,255,255,${a})`);
+        gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.strokeStyle = gr;
+        g.lineWidth = 0.8 + 2.2 * sheetHash(k * 8.3);
+        for (const ox of [-256, 0, 256])
+          for (const oy of [-256, 0, 256]) {
+            g.beginPath();
+            g.moveTo(x + ox, y + oy);
+            g.lineTo(x + ox - slant * len, y + oy + len);
+            g.stroke();
+          }
+      }
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(2.3, 1.15);
+    return t;
+  })();
+  return sheetTexS;
+}
+let sheetFadeS: THREE.CanvasTexture | null = null;
+function spindriftSheetFade(): THREE.CanvasTexture {
+  if (sheetFadeS) return sheetFadeS;
+  sheetFadeS = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    if (g) {
+      const img = g.createImageData(64, 64);
+      for (let y = 0; y < 64; y++)
+        for (let x = 0; x < 64; x++) {
+          const ex = Math.min(x, 63 - x) / 18;
+          const ey = Math.min(y, 63 - y) / 22;
+          const v = Math.round(255 * Math.min(1, ex) * Math.min(1, ey) * (0.75 + 0.25 * sheetHash(x * 0.37 + y * 1.91)));
+          const o = (y * 64 + x) * 4;
+          img.data[o] = img.data[o + 1] = img.data[o + 2] = v;
+          img.data[o + 3] = 255;
+        }
+      g.putImageData(img, 0, 0);
+    }
+    return new THREE.CanvasTexture(c);
+  })();
+  return sheetFadeS;
 }

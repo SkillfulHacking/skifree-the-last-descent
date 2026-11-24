@@ -39,7 +39,7 @@ describe('chase presence cues', () => {
     expect(run(() => 200, 60, 7).calls).toEqual(run(() => 200, 60, 7).calls);
   });
 
-  it('closing: shown while the gap shrinks faster than 1.5 m/s within 90 m, held ≥ 1 s', () => {
+  it('closing: shown while the gap shrinks faster than 1.5 m/s within 60 m, held ≥ 1 s', () => {
     // steady at 50 m, then losing 3 m/s for 5 s, then steady again
     const gap = (t: number) => (t < 5 ? 50 : t < 10 ? 50 - 3 * (t - 5) : 35);
     const { closing } = run(gap, 15);
@@ -55,5 +55,7 @@ describe('chase presence cues', () => {
     expect(run((t) => 40 + t, 10).closing).toEqual([]);
     expect(run((t) => 60 - 1.0 * t, 10).closing).toEqual([]);
     expect(run((t) => 200 - 5 * t, 10).closing).toEqual([]);
+    // (round 4, W-085) the catch-up pressure closing in from beyond 60 m is not the player losing ground
+    expect(run((t) => 90 - 2.5 * t, 10).closing).toEqual([]);
   });
 });

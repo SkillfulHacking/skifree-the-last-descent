@@ -18,6 +18,7 @@
  *  - two rescuers in red jackets and helmets on the porch who wave the skier in and cheer;
  *  - the trophy: a brass storm lantern on a stone plinth beside the door.
  */
+import { A11Y } from '../../../../core/a11y';
 import * as THREE from 'three';
 import type { CircleCollider, FinishBuildContext, FinishEnvironment, FinishState } from '../../../presentation/finish';
 import { Guest, type GuestLook } from '../../../resort/Guest';
@@ -631,10 +632,12 @@ export class RescueStation implements FinishEnvironment {
 
   update(dt: number, time: number, st: FinishState): void {
     // the beacon flashes (1 Hz), the light bar turns, the windsock swings, the chimney smokes
-    const f = 0.5 + 0.5 * Math.sin(time * Math.PI * 2);
+    // (round 4, W-088) with Reduce flashes & pulsing they burn steadily instead of flashing
+    const calm = A11Y.reduceFlashes;
+    const f = calm ? 0.6 : 0.5 + 0.5 * Math.sin(time * Math.PI * 2);
     this.beacon.material.opacity = 0.35 + 0.65 * f * f;
     this.beacon.scale.setScalar(2.4 + 1.6 * f);
-    const lb = 0.5 + 0.5 * Math.sin(time * 9);
+    const lb = calm ? 0.6 : 0.5 + 0.5 * Math.sin(time * 9);
     this.lightBar.material.opacity = 0.25 + 0.75 * lb * lb;
     this.windsock.rotation.y = 0.5 * Math.sin(time * 0.7) + 0.2 * Math.sin(time * 2.9);
     this.windsock.rotation.z = -0.15 + 0.08 * Math.sin(time * 3.7);

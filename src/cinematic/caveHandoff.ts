@@ -33,12 +33,34 @@ export const CAVE_TURN_AT = 14.7;
  * skier's head, at `fov`° — both inside the letterbox (a positional blend aimed almost at the Yeti and
  * left the skier under the bar)
  */
-export const LEAP_SETUP = { back: 6, lift: 0.3, toSkier: 0.5, fov: 40 } as const;
+// (round 4, W-091 / review C R3-C2) toSkier 0.6 and a 34° lens (were 0.5 and 40°): the skier's head and
+// shoulders clear the bottom bar (round 3: a red sliver on it) and the Yeti on his ledge is ~1.2× larger
+export const LEAP_SETUP = { back: 6, lift: 0.3, toSkier: 0.6, fov: 34, side: 1.3, eye: 1.35, head: 1.5 } as const;
 /** where the set-up shot looks from `cam` (the angular blend; see LEAP_SETUP) */
 export function leapSetupLook(cam: THREE.Vector3, yeti: THREE.Vector3, skierHead: THREE.Vector3): THREE.Vector3 {
   const a = yeti.clone().sub(cam).normalize();
   const b = skierHead.clone().sub(cam).normalize();
   return cam.clone().add(a.multiplyScalar(1 - LEAP_SETUP.toSkier).addScaledVector(b, LEAP_SETUP.toSkier).normalize().multiplyScalar(20));
+}
+/**
+ * The set-up shot's camera: behind the skier on the line to the cave (LEAP_SETUP), lifted where the
+ * ground would cut a sight line the shot uses — to the Yeti on his ledge and to the skier's head (round 4,
+ * review C R3-C6: round 3 tested a point a third of the way from the ledge to the skier, not what the
+ * shot looks at). An unobstructed shot (every Alpine and Fjord cave) is left as it was.
+ */
+export function leapSetupCamera(P: THREE.Vector3, toCave: THREE.Vector3, downhill: THREE.Vector3, yeti: THREE.Vector3, heightAt: (x: number, z: number) => number): THREE.Vector3 {
+  const cam = P.clone().addScaledVector(toCave, -LEAP_SETUP.back).addScaledVector(downhill, LEAP_SETUP.side).add(new THREE.Vector3(0, LEAP_SETUP.eye + LEAP_SETUP.lift, 0));
+  const head = P.clone().add(new THREE.Vector3(0, LEAP_SETUP.head, 0));
+  const blocked = (c: THREE.Vector3, t: THREE.Vector3) => {
+    for (let i = 2; i < 24; i++) {
+      const u = i / 24;
+      const x = c.x + (t.x - c.x) * u, z = c.z + (t.z - c.z) * u;
+      if (c.y + (t.y - c.y) * u < heightAt(x, z) + 0.6) return true;
+    }
+    return false;
+  };
+  for (let k = 0; k < 24 && (blocked(cam, yeti) || blocked(cam, head)); k++) cam.y += 0.5;
+  return cam;
 }
 /** the leap beat: the cinematic ends here and the chase begins */
 export const CAVE_LEAP_AT = 15.8;

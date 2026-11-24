@@ -94,7 +94,9 @@ export function decimateUnit(g: THREE.BufferGeometry, n: number): THREE.BufferGe
 }
 
 /** grid resolution of the scan LOD per quality preset (0 = the full scan; ~850 / ~1,200 / 5,000 triangles) */
-export const SCAN_GRID = { low: 0, medium: 10, high: 12, ultra: 0 } as const;
+// (round 4, W-086 / review D3-2) ultra uses high's decimation: full 5,000-triangle scans in Ultra's wider
+// near ring with longer shadows were round 2's load again, for no visible gain at play distance
+export const SCAN_GRID = { low: 0, medium: 10, high: 12, ultra: 12 } as const;
 /** quality presets that use the scans at all (low keeps the procedural rock) */
 export const SCAN_ON = { low: false, medium: true, high: true, ultra: true } as const;
 

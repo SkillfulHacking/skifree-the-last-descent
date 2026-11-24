@@ -112,6 +112,9 @@ export class Hud {
     this.skipHint = el('div', 'hud-skip hidden', this.root);
     this.fps = el('div', 'hud-fps hidden', this.root);
     this.cap = el('div', 'hud-caption', this.root);
+    // (round 4, W-088 / review E F2) captions are announced by screen readers as they appear
+    this.cap.setAttribute('role', 'status');
+    this.cap.setAttribute('aria-live', 'polite');
     this.capHard = el('div', 'cap-line cap-hard', this.cap);
     this.capSoft = el('div', 'cap-line cap-soft', this.cap);
   }

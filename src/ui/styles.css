@@ -173,7 +173,9 @@ kbd {
 .hud-caption .cap-line.on { display: block; }
 .hud-caption .cap-hard.on + .cap-soft.on { margin-top: 3px; padding-top: 3px; border-top: 1px solid rgba(255,255,255,0.18); }
 .hud-caption.on { opacity: 1; }
-.hud-center.run { top: 36%; font-size: clamp(44px, 7vw, 96px) !important; }
+/* (round 4, W-085 / review C R3-C4) RUN. sits below the rear-view inset at every UI scale: the inset's bottom is
+   78px·scale + min(420px·scale, 30vw) / 2.4 (App.prepareRearView); round 3 overlapped it by 12–18 px at UI 1.5 */
+.hud-center.run { top: max(36%, calc(78px * var(--ui-scale, 1) + min(175px * var(--ui-scale, 1), 12.5vw) + 10px)); font-size: clamp(44px, 7vw, 96px) !important; }
 
 /* ---------- main menu (pass 2): hero title outside the panel; fits without scrolling ---------- */
 .menu-root.main { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0;

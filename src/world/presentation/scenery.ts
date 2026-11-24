@@ -67,6 +67,12 @@ export interface SceneryView {
   update(dt: number, time: number, f: SceneryFrame): void;
   /** optional main-menu camera (the location's establishing view around the start); null = default */
   menuCamera?(time: number, out: { pos: THREE.Vector3; look: THREE.Vector3; fov: number }): boolean;
+  /**
+   * (round 4, W-086 / review D3-3) make every layer that can show during a run visible for the load-time
+   * shader warm-up (renderer.compile skips hidden objects: the storm dome, wall, cloud sea and blowing
+   * snow compiled mid-run at their first sight); the next update restores them
+   */
+  warmup?(): void;
   /** live object/instance counts (streaming tests, debug) */
   stats?(): Record<string, number>;
   dispose(): void;

@@ -10,9 +10,9 @@ const load = async (id: string) => {
 };
 
 describe('scan LOD', () => {
-  it('quality presets: low has no scans, ultra the full scan', () => {
+  it('quality presets: low has no scans, ultra the high decimation (round 4, W-086: the full scan cost round 2\'s load)', () => {
     expect(SCAN_ON.low).toBe(false);
-    expect(SCAN_GRID.ultra).toBe(0);
+    expect(SCAN_GRID.ultra).toBe(SCAN_GRID.high);
   });
   for (const id of ['boulder_01', 'namaqualand_boulder_02', 'namaqualand_boulder_06']) {
     it(`${id}: high ≤ 1,600 and medium ≤ 1,100 triangles (from 5,000), same footprint and height`, async () => {

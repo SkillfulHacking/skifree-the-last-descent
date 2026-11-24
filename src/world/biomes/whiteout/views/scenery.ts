@@ -244,6 +244,12 @@ export class WhiteoutScenery implements SceneryView {
     this.wandMat.emissiveIntensity = 0.35 + 1.1 * s;
   }
 
+  warmup(): void {
+    // the storm dome and wall, the cloud sea and the blowing snow: shown for the load-time compile,
+    // restored by the next update (W-086)
+    this.group.traverse((o) => (o.visible = true));
+  }
+
   stats(): Record<string, number> {
     let n = 0;
     for (const c of this.chunks.values()) n += c.poles.count;

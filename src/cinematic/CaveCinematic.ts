@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { Timeline, ease, pose, type CamPose } from './Timeline';
 import type { Stage } from '../game/Stage';
-import { CAVE_GATHER_AT, CAVE_LEAP_AT, CAVE_TURN_AT, LEAP_SETUP, leapSetupLook, startCanonicalChase } from './caveHandoff';
+import { CAVE_GATHER_AT, CAVE_LEAP_AT, CAVE_TURN_AT, LEAP_SETUP, leapSetupCamera, leapSetupLook, startCanonicalChase } from './caveHandoff';
 import { yetiSpawnAfterCinematic } from '../yeti/spawn';
 import type { CaveCinematicExtras } from '../world/presentation/cave';
 
@@ -124,24 +124,9 @@ export class CaveCinematic {
     tl.shot({ start: 13.7, end: 14.2, from: () => reactionCam, to: () => pose(reactionCam.pos.clone().add(new THREE.Vector3(0, 0.1, 0.4)), reactionCam.look, 44) });
     // Beat 10b: he leaps from the ledge toward the piste — seen past the skier's shoulder
     // over the skier's shoulder: camera behind the skier on the line to the cave, framing both
-    const leapCam = P.clone().addScaledVector(toCave, -LEAP_SETUP.back).addScaledVector(downhill, 1.3).add(new THREE.Vector3(0, 1.35 + LEAP_SETUP.lift, 0));
-    const skierHead = P.clone().add(new THREE.Vector3(0, 1.5, 0));
-    {
-      // keep the ledge in sight: where the ground between the camera and the ledge rises above the
-      // line of sight (a cave cut into a bank above the piste — Whiteout's crest side), lift the camera
-      // until it clears; an unobstructed shot (every Alpine and Fjord cave) is left exactly as it was
-      const m = st.world.mountain;
-      const target = st.world.cave.ledge.clone().add(new THREE.Vector3(0, 1.6, 0)).lerp(skierHead, 0.34);
-      const blocked = (c: THREE.Vector3) => {
-        for (let i = 2; i < 24; i++) {
-          const u = i / 24;
-          const x = c.x + (target.x - c.x) * u, z = c.z + (target.z - c.z) * u;
-          if (c.y + (target.y - c.y) * u < m.heightAt(x, z) + 0.6) return true;
-        }
-        return false;
-      };
-      for (let k = 0; k < 24 && blocked(leapCam); k++) leapCam.y += 0.5;
-    }
+    const leapSpawn = yetiSpawnAfterCinematic(st.world.mountain, st.world.focusEncounter?.anchor, st.world.cave.ledge);
+    const leapCam = leapSetupCamera(P, toCave, downhill, leapSpawn.pos.clone().add(new THREE.Vector3(0, 1.6, 0)), (x, z) => st.world.mountain.heightAt(x, z));
+    const skierHead = P.clone().add(new THREE.Vector3(0, LEAP_SETUP.head, 0));
     const yetiLook = () => leapSetupLook(leapCam, st.yeti.root.position.clone().add(new THREE.Vector3(0, 1.6, 0)), skierHead);
     // Beat 10b: from behind the skier's position toward the cave, the Yeti gathering on the ledge
     tl.shot({ start: CAVE_GATHER_AT, end: CAVE_TURN_AT, from: () => pose(leapCam, yetiLook(), LEAP_SETUP.fov), to: () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.1, 0)), yetiLook(), LEAP_SETUP.fov) });
@@ -153,11 +138,13 @@ export class CaveCinematic {
     const forward = () => (fwd ??= st.gameplayPose());
     const turnFrom = () => pose(leapCam.clone().add(new THREE.Vector3(0, 0.1, 0)), yetiLook(), LEAP_SETUP.fov);
     const pivot = P.clone().add(new THREE.Vector3(0, 1.2, 0));
-    if (st.settings.reduceCameraMotion) {
-      const cutAt = (CAVE_TURN_AT + CAVE_LEAP_AT) / 2;
-      tl.shot({ start: CAVE_TURN_AT, end: cutAt, from: turnFrom, to: turnFrom });
-      tl.shot({ start: cutAt, end: CAVE_LEAP_AT, from: forward, to: forward });
-    } else tl.shot({ start: CAVE_TURN_AT, end: CAVE_LEAP_AT, from: turnFrom, to: forward, orbit: () => pivot, easing: ease.inOut });
+    // (round 4, W-088 / review E F3) the setting is read as the shot plays, not when the cinematic is
+    // built: Reduce Camera Motion switched on from the pause menu during the first viewing takes effect
+    const rcm = () => st.settings.reduceCameraMotion;
+    const cutAt = (CAVE_TURN_AT + CAVE_LEAP_AT) / 2;
+    tl.shot({ start: CAVE_TURN_AT, end: CAVE_LEAP_AT, from: turnFrom, to: forward, orbit: () => pivot, easing: ease.inOut, when: () => !rcm() });
+    tl.shot({ start: CAVE_TURN_AT, end: cutAt, from: turnFrom, to: turnFrom, when: rcm });
+    tl.shot({ start: cutAt, end: CAVE_LEAP_AT, from: forward, to: forward, when: rcm });
 
     // --- actors & sound
     tl.at(0, () => {

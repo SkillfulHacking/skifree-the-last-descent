@@ -125,6 +125,10 @@ export class YetiAI {
     this.syncClock = 0;
     this.delay = YETI.startDelay;
     this.extraDelay = 0;
+    // (round 4, W-092 / review B3-9) every chase starts with the lunge ready and none under way: round 3
+    // carried the last chase's cooldown (and a lunge in progress) into the next one
+    this.lungeTimer = 0;
+    this.lungeCooldown = 0;
     if (leapVelocity) {
       this.airborne = true;
       this.vel.copy(leapVelocity);

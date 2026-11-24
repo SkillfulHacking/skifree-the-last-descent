@@ -11,6 +11,10 @@
 // those render calls are timed separately and reported as software-renderer numbers only.
 import { chromium } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+// (round 4, W-084) the build and the settings a result belongs to are part of the result
+const sha = (() => { try { return execSync('git rev-parse --short HEAD').toString().trim() + (execSync('git status --porcelain --untracked-files=no -- src').toString().trim() ? '+dirty' : ''); } catch { return 'unknown'; } })();
+const QUALITY = process.env.Q ?? 'high';
 
 const [base = 'http://127.0.0.1:4471', biome = 'fjord', out = `/tmp/prod_frames_${biome}.json`, kmArg = '12', reArg = '240'] = process.argv.slice(2);
 const KM = Number(kmArg);
@@ -20,12 +24,12 @@ const p = await b.newPage({ viewport: { width: 640, height: 360 } });
 const errors = [];
 p.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
 p.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 300)));
-await p.addInitScript((biome) => {
+await p.addInitScript((a) => {
   if (!sessionStorage.getItem('pf')) {
     sessionStorage.setItem('pf', '1');
-    localStorage.setItem('skifree-tld.settings.v1', JSON.stringify({ quality: 'high', biome, course: 'classic', courseLength: 'endless', difficulty: 'relaxed', showTutorial: false }));
+    localStorage.setItem('skifree-tld.settings.v1', JSON.stringify({ quality: a.q, biome: a.biome, course: 'classic', courseLength: 'endless', difficulty: 'relaxed', showTutorial: false }));
   }
-}, biome);
+}, { biome, q: QUALITY });
 await p.goto(base + '/?debug');
 await p.waitForFunction(() => window.__ready === true, null, { timeout: 900_000, polling: 1000 });
 await p.evaluate(() => window.__skifree.startRun(true));
@@ -89,6 +93,7 @@ const summary = {
   errors,
   seconds: Math.round((Date.now() - t0) / 1000),
 };
-writeFileSync(out, JSON.stringify({ summary, step: res.step.map((x) => +x.toFixed(2)) }));
+const course = await p.evaluate(() => window.__skifree.state().course?.id ?? null).catch(() => null);
+writeFileSync(out, JSON.stringify({ sha, quality: QUALITY, biome, course, summary, step: res.step.map((x) => +x.toFixed(2)) }));
 console.log(JSON.stringify(summary));
 await b.close();

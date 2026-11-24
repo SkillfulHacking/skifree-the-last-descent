@@ -1,6 +1,7 @@
 /**
  * Application shell: renderer, loading, menus, settings, run lifecycle, perf overlay, debug harness.
  */
+import { A11Y } from '../core/a11y';
 import * as THREE from 'three';
 import { weatherFx, WEATHER_FX_REDUCED } from '../world/look/weatherFx';
 import { atmosphere } from '../world/look/atmosphere';
@@ -73,6 +74,9 @@ export class App {
     this.book = loadRecordBook();
     this.renderer = new THREE.WebGLRenderer({ antialias: this.settings.quality !== 'low', powerPreference: 'high-performance', stencil: false });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // (round 4, W-086 / review D3-3) no synchronous shader status query per program in production
+    // (getProgramInfoLog after each link: 80 ms stalls in a profile); dev and tests keep the checks
+    if (import.meta.env.PROD) this.renderer.debug.checkShaderErrors = false;
     this.renderer.toneMapping = THREE.AgXToneMapping;
     this.renderer.toneMappingExposure = 0.78;
     this.renderer.shadowMap.enabled = true;
@@ -98,6 +102,7 @@ export class App {
     this.hud = new Hud(this.ui, this.settings.bindings);
     this.applyUiScale();
     this.hud.reduceFlashes = this.settings.reduceFlashes;
+    A11Y.reduceFlashes = this.settings.reduceFlashes;
     weatherFx.scale = this.settings.reduceWeather ? WEATHER_FX_REDUCED : 1;
     this.hud.showFps(this.settings.showFps);
     this.menu = new MenuSystem(this.ui);
@@ -157,6 +162,7 @@ export class App {
     this.input.settings = this.inputSettings();
     this.hud.bindings = this.settings.bindings;
     this.hud.reduceFlashes = this.settings.reduceFlashes;
+    A11Y.reduceFlashes = this.settings.reduceFlashes;
     weatherFx.scale = this.settings.reduceWeather ? WEATHER_FX_REDUCED : 1;
     this.hud.showFps(this.settings.showFps);
     this.hud.captionsOn = this.settings.captions;
@@ -530,7 +536,10 @@ export class App {
     // the controls are taught once: after a run that showed the tutorial (or once every lesson is
     // done) it is switched off; Settings → Tutorial prompts turns it back on for another pass
     this.session.onTutorialDone = () => this.retireTutorial();
-    this.session.rumble = (a, b, ms) => this.input.rumble(a, b, ms);
+    // (W-088) the player can turn vibration off (Settings → Controller vibration)
+    this.session.rumble = (a, b, ms) => {
+      if (this.settings.vibration) this.input.rumble(a, b, ms);
+    };
     // the one-time pole push hint is remembered (no tutorial reset; Settings → Control hints)
     this.session.onPoleHint = () => saveSettings(this.settings);
     this.mode = 'playing';
@@ -658,6 +667,7 @@ export class App {
       { kind: 'slider', label: 'Camera shake', min: 0, max: 1, step: 0.1, get: () => s.cameraShake, set: (v) => ((s.cameraShake = v), changed()), fmt: pct },
       { kind: 'toggle', label: 'Reduce camera motion', get: () => s.reduceCameraMotion, set: (v) => ((s.reduceCameraMotion = v), changed()) },
       { kind: 'toggle', label: 'Reduce flashes & pulsing', get: () => s.reduceFlashes, set: (v) => ((s.reduceFlashes = v), changed()) },
+      { kind: 'toggle', label: 'Controller vibration', get: () => s.vibration, set: (v) => ((s.vibration = v), changed()) },
       // (W-049) presentation only: hazards, physics and every warning are unchanged
       { kind: 'toggle', label: 'Reduce weather effects', get: () => s.reduceWeather, set: (v) => ((s.reduceWeather = v), changed()) },
       { kind: 'slider', label: 'Interface text size', min: 0.85, max: 1.5, step: 0.05, get: () => s.uiScale, set: (v) => ((s.uiScale = v), changed()), fmt: pct },

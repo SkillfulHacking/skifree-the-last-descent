@@ -476,6 +476,8 @@ export class World {
     this.vegetation.group.traverse((o) => (o.visible = true));
     // one view of every hazard kind (disposed again on the next update)
     this.hazardViews.warmup();
+    // the location's weather layers that are hidden in fair weather (W-086)
+    this.scenery?.warmup?.();
   }
 
   /** frames each streaming consumer has waited with work pending (starvation guard) */

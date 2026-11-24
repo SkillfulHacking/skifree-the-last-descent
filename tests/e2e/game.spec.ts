@@ -21,6 +21,8 @@ declare global {
       teleport(z: number, speed?: number): void;
       advance(sec: number): void;
       frames(n: number, dt?: number): void;
+      framesLive(n: number, dt?: number): void;
+      hold(v: boolean): void;
       autopilot(style: string | null): void;
       placeYeti(gap: number): void;
       pressMenu(label: string): boolean;
@@ -77,10 +79,14 @@ test('full loop: start → learn → cave cinematic → chase → caught → ret
   await page.waitForFunction(() => window.__skifree.state().mode === 'playing');
   let s = await st(page);
   expect(s.session?.phase).toBe('intro');
-  // skip the intro with a key
+  // skip the intro with a key. (Round 4, W-090: the press is read through the real input pipeline on
+  // frames stepped here — round 3 relied on the live loop running a frame between the press and the
+  // neutral debug frames, and failed once under CPU load)
   await page.evaluate(() => window.__skifree.frames(3));
+  await page.evaluate(() => window.__skifree.hold(true));
   await page.keyboard.press('Space');
-  await page.evaluate(() => window.__skifree.frames(3));
+  await page.evaluate(() => window.__skifree.framesLive(3));
+  await page.evaluate(() => window.__skifree.hold(false));
   s = await st(page);
   expect(s.session?.intro).toBe(false);
   expect(s.session?.phase).toBe('learn');

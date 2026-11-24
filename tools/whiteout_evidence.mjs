@@ -51,7 +51,21 @@ async function shot(name, note) {
   await page.screenshot({ path: `${outDir}/${name}.png`, timeout: 1_200_000 });
   const st = await ev(() => ({ cam: window.__skifree.cameraPose(), s: window.__skifree.state().session }));
   const f = st.s ? await ev((t) => window.__skifree.front(t), st.s.time ?? 0) : null;
-  manifest.shots.push({ name, note, camera: st.cam, phase: st.s?.phase ?? 'menu', z: st.s?.z ?? null, time: st.s?.time ?? null, front: f, cinematicTime: st.s?.cinematicTime ?? null });
+  // (round 4, W-084) where the Yeti is in this frame, measured, not assumed: his distance, whether he is
+  // drawn, and his on-screen box (projected feet and head) — so a note can be checked against the image
+  const yeti = st.s
+    ? await ev(([H]) => {
+        const k = window.__skifree;
+        const s = k.state().session;
+        const r = s.yetiRoot;
+        const a = k.projectToScreen({ x: r[0], y: r[1], z: r[2] });
+        const b = k.projectToScreen({ x: r[0], y: r[1] + 2.6, z: r[2] });
+        const inFrame = s.yetiVisible && a.z < 1 && b.z < 1 && Math.abs(a.x) < 1 && Math.abs(b.y) < 1 && Math.abs(a.y) < 1.2;
+        return { distance: +s.yetiDistance.toFixed(1), phase: s.yetiPhase, drawn: s.yetiVisible, inMainView: inFrame, heightPx: inFrame ? Math.round(((b.y - a.y) / 2) * H) : 0 };
+      }, [Number(size.split('x')[1])])
+    : null;
+  const course = await ev(() => window.__skifree.state().course?.id ?? null);
+  manifest.shots.push({ name, note, course, yeti, camera: st.cam, phase: st.s?.phase ?? 'menu', z: st.s?.z ?? null, time: st.s?.time ?? null, front: f, cinematicTime: st.s?.cinematicTime ?? null });
   writeFileSync(`${outDir}/manifest.json`, JSON.stringify(manifest, null, 2));
   log('shot', name, f ? `${f.phase} s=${f.s.toFixed(2)}` : '');
 }
@@ -239,8 +253,16 @@ if (want('chase')) {
   if (ts !== null) await ev((tt) => window.__skifree.setTime(tt), ts);
   // (round 1 captured these mid-blend: the cave's weather hand-back still showing a clear sky) — end it
   await ev(() => window.__skifree.settleWeather());
-  const r = await framesUntil('(s) => s.yetiDistance < 34 && s.yetiDistance > 18', 900);
+  // (round 4, W-084) round 3 logged `gap false` and shot anyway (the Yeti at 117 m with no inset under a
+  // note saying 18–34 m): the gap is now set (debug placeYeti) and checked, and the harness stops if it
+  // is not what the note says
+  let r = await framesUntil('(s) => s.yetiDistance < 34 && s.yetiDistance > 18', 300);
+  if (!r.ok) {
+    await ev(() => window.__skifree.placeYeti(26));
+    r = await framesUntil('(s) => s.yetiDistance < 34 && s.yetiDistance > 18', 30);
+  }
   log('gap', r.ok);
+  if (!r.ok) throw new Error('chase gap could not be set to 18–34 m: refusing to shoot 16/17 under that note');
   await shot('16_storm_chase', 'Chase in a storm (third-person): the Yeti 18–34 m behind, rear view, distance bar, captions');
   await ev(() => window.__skifree.hud(false));
   await ev(() => {

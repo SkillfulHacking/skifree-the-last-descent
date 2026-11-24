@@ -180,10 +180,14 @@ for (const c of CASES) {
       // Reduce Camera Motion: no swing — a hold, one cut to the forward view, a hold
       expect(steps.filter((a) => a > 1.5).length, `the cut (frame turns ${steps.map((a) => a.toFixed(1)).join(' ')})`).toBeLessThanOrEqual(1);
     } else expect(big, `the swing turns too fast (frame turns ${steps.map((a) => a.toFixed(1)).join(' ')})`).toEqual([]);
-    expect(watched.cam.dir[2]!, 'the first controllable frame looks downhill').toBeGreaterThan(0.3);
+    // (round 4, W-090) downhill means downhill: round 3 accepted dir.z > 0.3 (72° off the run); measured
+    // 0.978–0.989 (review E), so ≥ 0.9 (< 26°); the values are logged
+    console.log(`[cave_skip] ${label(c)} first frame dir.z ${watched.cam.dir[2]!.toFixed(3)}`);
+    expect(watched.cam.dir[2]!, 'the first controllable frame looks downhill').toBeGreaterThan(0.9);
     expect(Math.max(...steps.slice(-3)), 'no jump at the hand-off').toBeLessThan(c.reduce ? 1.5 : 7.2);
     const { s: watched2, minDirZ } = await after2s(page);
-    expect(minDirZ, 'the view never turns back on its own').toBeGreaterThan(0.3);
+    console.log(`[cave_skip] ${label(c)} lowest dir.z over 2 s ${minDirZ.toFixed(3)}`);
+    expect(minDirZ, 'the view never turns back on its own').toBeGreaterThan(0.85);
 
     // 2) skips at several moments: before he shows (1 s), mid-reveal (9 s), during the swing (15.2 s),
     // just before the leap (15.7 s)
@@ -220,7 +224,8 @@ for (const c of CASES) {
       same(watched, skipped, 1e-3, `${what}, hand-off frame`);
       const { s: skipped2, minDirZ: mz } = await after2s(page);
       same(watched2, skipped2, 1e-3, `${what}, 2 s into the chase`);
-      expect(mz, `${what}: the view never turns back on its own`).toBeGreaterThan(0.3);
+      console.log(`[cave_skip] ${label(c)} ${what}: lowest dir.z ${mz.toFixed(3)}`);
+      expect(mz, `${what}: the view never turns back on its own`).toBeGreaterThan(0.85);
     }
 
     // 3) the player's own look-back (C) still turns the view round, and lets it go
@@ -238,7 +243,8 @@ for (const c of CASES) {
         return k.cameraPose().dir[2]!;
       });
       expect(back, 'held look-back faces uphill').toBeLessThan(-0.3);
-      expect(fwd, 'released, the view faces the run again').toBeGreaterThan(0.3);
+      console.log(`[cave_skip] ${label(c)} released look-back dir.z ${fwd.toFixed(3)}`);
+      expect(fwd, 'released, the view faces the run again').toBeGreaterThan(0.85);
     }
     expect(errors).toEqual([]);
   });

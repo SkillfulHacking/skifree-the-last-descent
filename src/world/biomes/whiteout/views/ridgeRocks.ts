@@ -263,26 +263,34 @@ export class RidgeRocks {
     const q = new THREE.Quaternion();
     const p = new THREE.Vector3();
     const sc = new THREE.Vector3();
+    // (round 4, W-086 / review D3-2) three draw groups per scan: the tors by the piste cast shadows; the
+    // rim and flank rocks below the lip and the tall rim spires do not (Whiteout's shadow pass was 2×
+    // Alpine's, most of it these full scans throwing shadows nobody on the line can see)
+    const groups = [
+      { fam: (f: string) => f === 'tor', spire: false, shadow: true },
+      { fam: (f: string) => f === 'rim' || f === 'flank', spire: false, shadow: false },
+      { fam: (f: string) => f === 'spire', spire: true, shadow: false },
+    ];
     for (const id of RIDGE_ROCK_IDS) {
       const g = this.geos.get(id);
-      for (const spire of [false, true]) {
-      const mine = pls.filter((pl) => pl.id === id && (pl.family === 'spire') === spire);
-      if (!g || !mine.length) continue;
-      const im = new THREE.InstancedMesh(g, spire ? this.spireMat : this.mat, mine.length);
-      mine.forEach((pl, i) => {
-        q.set(...pl.q);
-        M.compose(p.set(pl.x, pl.y, pl.z), q, sc.set(pl.sx, pl.sy, pl.sz));
-        im.setMatrixAt(i, M);
-      });
-      im.instanceMatrix.needsUpdate = true;
-      im.castShadow = true;
-      im.receiveShadow = true;
-      // (round 2, W-052) culled per chunk against the view and the shadow camera: round 1 drew all
-      // ~140 scans (≈ 700k triangles) in both passes whether in view or not
-      im.computeBoundingSphere();
-      im.frustumCulled = true;
-      this.group.add(im);
-      list.push(im);
+      for (const grp of groups) {
+        const mine = pls.filter((pl) => pl.id === id && grp.fam(pl.family));
+        if (!g || !mine.length) continue;
+        const im = new THREE.InstancedMesh(g, grp.spire ? this.spireMat : this.mat, mine.length);
+        mine.forEach((pl, i) => {
+          q.set(...pl.q);
+          M.compose(p.set(pl.x, pl.y, pl.z), q, sc.set(pl.sx, pl.sy, pl.sz));
+          im.setMatrixAt(i, M);
+        });
+        im.instanceMatrix.needsUpdate = true;
+        im.castShadow = grp.shadow;
+        im.receiveShadow = true;
+        // (round 2, W-052) culled per chunk against the view and the shadow camera: round 1 drew all
+        // ~140 scans (≈ 700k triangles) in both passes whether in view or not
+        im.computeBoundingSphere();
+        im.frustumCulled = true;
+        this.group.add(im);
+        list.push(im);
       }
     }
     this.chunks.set(k, list);

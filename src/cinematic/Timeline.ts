@@ -30,6 +30,11 @@ export interface Shot {
   handheld?: number;
   /** Swing around this point instead of a straight move (cinematic/orbit.ts); `via` is ignored. */
   orbit?: () => THREE.Vector3;
+  /**
+   * Optional: the shot plays only while this holds, read every frame (round 4, W-088: a setting changed
+   * in the pause menu mid-cinematic takes effect at once). A skipped shot leaves the time to the others.
+   */
+  when?: () => boolean;
 }
 
 export interface TimedEvent {
@@ -90,13 +95,13 @@ export class Timeline {
   /** Evaluate the active shot into the camera. Returns false if no shot covers the current time. */
   apply(camera: THREE.PerspectiveCamera, shakeOffset?: THREE.Vector3): boolean {
     let active: Shot | null = null;
-    for (const s of this.shots) if (this.time >= s.start && this.time < s.end) active = s;
+    for (const s of this.shots) if (this.time >= s.start && this.time < s.end && (!s.when || s.when())) active = s;
     if (!active) {
       // past every shot: hold the one that ends last (on a tie, the later-pushed one, as above) — not
       // the last pushed (Gitar, round 3: a location's earlier shots, pushed after the base ones,
       // snapped the camera back to the roar close-up on the cinematic's final frame)
       let last: Shot | null = null;
-      for (const s of this.shots) if (!last || s.end >= last.end) last = s;
+      for (const s of this.shots) if ((!s.when || s.when()) && (!last || s.end >= last.end)) last = s;
       if (!last || this.time < last.end) return false;
       active = last;
     }

@@ -17,7 +17,7 @@ import { buildMountain, makeCourse, worldSeed } from '../../src/game/CourseConfi
 import { ObstacleField } from '../../src/physics/obstacles';
 import { FollowCamera } from '../../src/camera/FollowCamera';
 import { yetiSpawnAfterCinematic } from '../../src/yeti/spawn';
-import { CAVE_GATHER_AT, CAVE_LEAP_AT, CAVE_TURN_AT, LEAP_SETUP, leapSetupLook } from '../../src/cinematic/caveHandoff';
+import { CAVE_GATHER_AT, CAVE_LEAP_AT, CAVE_TURN_AT, LEAP_SETUP, leapSetupCamera, leapSetupLook } from '../../src/cinematic/caveHandoff';
 import { orbitPose } from '../../src/cinematic/orbit';
 import { Timeline, ease, pose, type CamPose } from '../../src/cinematic/Timeline';
 
@@ -38,8 +38,11 @@ function scenario(biome: 'alpine' | 'fjord' | 'whiteout', speed: number, difficu
   // CaveCinematic's leap shot: behind the skier on the line to the cave, aimed at the Yeti on the ledge
   const P = tg.pos;
   const toCave = new THREE.Vector3(sp.pos.x - P.x, 0, sp.pos.z - P.z).normalize();
-  const skierHead = P.clone().add(new THREE.Vector3(0, 1.5, 0));
-  const leapCam = P.clone().addScaledVector(toCave, -LEAP_SETUP.back).add(new THREE.Vector3(0, 1.35 + LEAP_SETUP.lift, 1.3));
+  // (round 4) the game's own set-up camera (caveHandoff.leapSetupCamera: offsets and terrain lift); the
+  // skier's head at LEAP_SETUP.head (the look-back pose's skull: 1.42 m bone + ~0.1 m, measured on SkierModel)
+  const skierHead = P.clone().add(new THREE.Vector3(0, LEAP_SETUP.head, 0));
+  const downhill = new THREE.Vector3(Math.sin(hd), 0, Math.cos(hd));
+  const leapCam = leapSetupCamera(P, toCave, downhill, sp.pos.clone().add(new THREE.Vector3(0, 1.6, 0)), (xx, zz) => m.heightAt(xx, zz));
   const yetiLook = leapSetupLook(leapCam, sp.pos.clone().add(new THREE.Vector3(0, 1.6, 0)), skierHead);
   const turnFrom = pose(leapCam.clone().add(new THREE.Vector3(0, 0.1, 0)), yetiLook, LEAP_SETUP.fov);
   // the gameplay camera (GameSession.gameplayPose = the snap finishCave does)
@@ -69,6 +72,11 @@ describe('W-076 decision 1: the hand-off camera faces the run', () => {
         expect(Math.abs(v.x), `${what} x`).toBeLessThan(0.9);
         expect(v.z, `${what} in front`).toBeLessThan(1);
       }
+      // (round 4, review C R3-C2) the skier's shoulders clear the bottom bar (bars: |y| > 0.78 at 540p),
+      // not only the top of the head; the Yeti stands clear of the top bar
+      const shoulders = ndcOf(turnFrom, skierHead.clone().add(new THREE.Vector3(0, -0.3, 0)));
+      expect(shoulders.y, 'shoulders above the bottom bar').toBeGreaterThan(-0.74);
+      expect(yeti.y, 'the Yeti below the top bar').toBeLessThan(0.74);
     });
 
   it('orbitPose: ends exactly on both poses, takes the shorter way round, keeps its distance', () => {

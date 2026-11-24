@@ -12,6 +12,8 @@ export interface Settings {
   sfxVolume: number;
   cameraShake: number; // 0..1
   reduceFlashes: boolean;
+  /** (round 4, W-088) controller vibration (rumble) on impacts and the Yeti's landing */
+  vibration: boolean;
   /** thinner snow, lighter storm fog, less blowing motion (presentation only: W-049) */
   reduceWeather: boolean;
   reduceCameraMotion: boolean;
@@ -62,6 +64,7 @@ export const DEFAULT_SETTINGS: Settings = {
   sfxVolume: 0.9,
   cameraShake: 1,
   reduceFlashes: false,
+  vibration: true,
   reduceWeather: false,
   reduceCameraMotion: false,
   invertCameraY: false,
@@ -153,6 +156,7 @@ export function sanitize(s: Settings): Settings {
   s.deadzone = num(s.deadzone, d.deadzone, 0.02, 0.4);
   s.uiScale = num(s.uiScale, d.uiScale, 0.85, 1.5);
   s.reduceFlashes = bool(s.reduceFlashes, d.reduceFlashes);
+  s.vibration = bool(s.vibration, d.vibration);
   s.reduceWeather = bool(s.reduceWeather, d.reduceWeather);
   s.reduceCameraMotion = bool(s.reduceCameraMotion, d.reduceCameraMotion);
   s.invertCameraX = bool(s.invertCameraX, d.invertCameraX);
