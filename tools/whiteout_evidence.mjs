@@ -23,7 +23,7 @@ const sha = (() => {
     return 'unknown';
   }
 })();
-const manifest = { biome: 'whiteout', seed, length, viewport: size, sha, renderer: 'SwiftShader (software)', date: new Date().toISOString(), shots: [], errors: [] };
+const manifest = { biome: 'whiteout', seed, length, viewport: size, sha, settingsOverride: process.env.SETTINGS ? JSON.parse(process.env.SETTINGS) : null, renderer: 'SwiftShader (software)', date: new Date().toISOString(), shots: [], errors: [] };
 const t0 = Date.now();
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s]`, ...a);
 
@@ -31,7 +31,10 @@ const browser = await chromium.launch({ executablePath: process.env.PW_CHROME ??
 const page = await browser.newPage({ viewport: { width: W, height: H } });
 page.on('pageerror', (e) => manifest.errors.push(String(e).slice(0, 400)));
 page.on('console', (m) => m.type() === 'error' && manifest.errors.push(m.text().slice(0, 400)));
-const settings = (difficulty) => ({ quality: 'high', biome: 'whiteout', course: 'custom', courseLength: length, difficulty, rearView: true, showTutorial: false, seenPoleHint: true });
+// (round 4, W-084/W-088 accessibility captures) SETTINGS='{"reduceWeather":true}' etc. overrides the
+// capture's settings; recorded in the manifest
+const extra = process.env.SETTINGS ? JSON.parse(process.env.SETTINGS) : {};
+const settings = (difficulty) => ({ quality: 'high', biome: 'whiteout', course: 'custom', courseLength: length, difficulty, rearView: true, showTutorial: false, seenPoleHint: true, ...extra });
 await page.addInitScript((s) => {
   if (!sessionStorage.getItem('evidence')) {
     sessionStorage.setItem('evidence', '1');
