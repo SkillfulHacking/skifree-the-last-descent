@@ -141,7 +141,9 @@ export function makeWhiteoutBiome(): Biome {
       // runs on the drop side the fall-away is in the gameplay camera's view, not hidden by a bank
       // (round 3, W-065: from the line the rim stood 5–8 m above the eye, so nothing past it showed)
       // the drop-side bank no longer climbs to the rim: it rolls down 2 m to it
-      ridge: { dropSide: 1, rim: 10, lip: 1.5, depth: 520, flank: 680, crest: 75, crestE: 150, backDrop: 380, rollDown: 2 },
+      // (round 4, W-065 / W-093) farRanges 0.3: the ranges beyond the drop rise out of the valley cloud
+      // sea below eye height — the drop reads as depth, not as a plateau above a plain (blind review A)
+      ridge: { dropSide: 1, rim: 10, lip: 1.5, depth: 520, flank: 680, crest: 75, crestE: 150, backDrop: 380, rollDown: 2, farRanges: 0.3 },
       caveSide: -1,
       wallHeight: 130,
       wallRelief: 95,

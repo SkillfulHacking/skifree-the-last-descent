@@ -121,14 +121,17 @@ export class RescueVictory implements VictoryScript {
       to: () => pose(sk().addScaledVector(toHut(), 1.4).addScaledVector(side(), -0.8).add(new THREE.Vector3(0, 1.95, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.0, 0)), 28),
       handheld: 0.015,
     });
-    // 5) the searchlight swings onto him; close on his face (from the station side) as it hits
+    // 5) the searchlight swings onto him. (Round 4, W-083: framed from the station side the beam came
+    //    from behind the camera and never showed — frame 24.) From his side, a little ahead of him and low,
+    //    so the beam crosses the frame from the station and lands on him: the light, then his flinch
     tl.at(B.light - 0.6, () => (S.searchTarget = this.yetiStop.clone().add(new THREE.Vector3(0, 1.8, 0))));
     const toDoor = () => door.clone().sub(st.yetiAI.pos).setY(0).normalize();
+    const flank = () => new THREE.Vector3(toDoor().z, 0, -toDoor().x);
     tl.shot({
       start: B.light,
       end: B.clear,
-      from: () => pose(this.yetiStop.clone().addScaledVector(toDoor(), 7).add(new THREE.Vector3(0, 1.8, 0)), this.yetiStop.clone().add(new THREE.Vector3(0, 2.4, 0)), 36),
-      to: () => pose(this.yetiStop.clone().addScaledVector(toDoor(), 5.8).add(new THREE.Vector3(0, 1.7, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.3, 0)), 32),
+      from: () => pose(this.yetiStop.clone().addScaledVector(flank(), 8.5).addScaledVector(toDoor(), 2.5).add(new THREE.Vector3(0, 1.4, 0)), this.yetiStop.clone().addScaledVector(toDoor(), 2.0).add(new THREE.Vector3(0, 2.2, 0)), 44),
+      to: () => pose(this.yetiStop.clone().addScaledVector(flank(), 7.0).addScaledVector(toDoor(), 2.0).add(new THREE.Vector3(0, 1.4, 0)), st.yetiAI.pos.clone().addScaledVector(toDoor(), 1.5).add(new THREE.Vector3(0, 2.2, 0)), 40),
       handheld: 0.02,
     });
     // 6) the storm breaks (fanfare): rise and pull back over the station…
@@ -136,13 +139,16 @@ export class RescueVictory implements VictoryScript {
       st.audio.playVictoryFanfare();
       st.audio.playCrowdCheer(0.8);
     });
-    // …and settle: the station in the lower third, the ridge the skier came down behind it in sun
-    const endPos = () => S.hut.clone().addScaledVector(faces, -48).addScaledVector(across, 22).add(new THREE.Vector3(0, 16, 0));
-    const endLook = () => S.hut.clone().addScaledVector(faces, 150).add(new THREE.Vector3(0, 6, 0));
+    // …and settle. (Round 4, W-083: round 3 opened the rise on a bare roof corner and ended behind the
+    // station, with nobody in it.) The rise starts on the skier and the raised lantern at the porch and
+    // pulls up and out to the side: the porch with the skier and the rescuers in the lower third, side on,
+    // the slope the skier came down rising beyond it in the sun
+    const endPos = () => S.hut.clone().addScaledVector(across, 38).addScaledVector(faces, 16).add(new THREE.Vector3(0, 13, 0));
+    const endLook = () => S.hut.clone().addScaledVector(faces, 14).add(new THREE.Vector3(0, 6, 0));
     tl.shot({
       start: B.clear,
       end: B.clearEnd,
-      from: () => pose(S.hut.clone().addScaledVector(faces, 16).addScaledVector(across, 7).add(new THREE.Vector3(0, 3.5, 0)), S.hut.clone().add(new THREE.Vector3(0, 2.5, 0)), 50),
+      from: () => pose(sk().addScaledVector(toHut(), -4.5).addScaledVector(side(), 2.2).add(new THREE.Vector3(0, 1.8, 0)), sk().add(new THREE.Vector3(0, 1.8, 0)), 46),
       to: () => pose(endPos(), endLook(), 54),
       easing: ease.inOut,
     });
@@ -150,7 +156,7 @@ export class RescueVictory implements VictoryScript {
       start: B.clearEnd,
       end: B.results + 0.2,
       from: () => pose(endPos(), endLook(), 54),
-      to: () => pose(endPos().addScaledVector(across, 3).add(new THREE.Vector3(0, 1.2, 0)), endLook(), 53),
+      to: () => pose(endPos().addScaledVector(faces, 3).add(new THREE.Vector3(0, 1.2, 0)), endLook(), 53),
     });
     tl.at(B.title, () => st.hud.title('RESCUED', 'Whiteout Ridge — through the storm to the rescue station', 'victory scrim', B.results - B.title + 0.4));
     tl.at(B.results, () => {

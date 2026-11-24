@@ -294,7 +294,7 @@ export class Mountain {
       // ribs and couloirs down the flank (elongated across the course = down the fall line), strongest mid-flank
       const steep = 4 * t * (1 - t);
       const rib = (ridged(x / 130, z / 62, s + 41, 2) - 0.5) * 36 * steep;
-      const ranges = this.kRanges * smoothstep(R.rim + R.flank + 500, R.rim + R.flank + 3200, e) * (0.35 + (this.kRangeSoft > 0 ? this.softRange(x, z, s) : ridged(x / 900, z / 900, s + 11, 5)));
+      const ranges = (R.farRanges ?? 1) * this.kRanges * smoothstep(R.rim + R.flank + 500, R.rim + R.flank + 3200, e) * (0.35 + (this.kRangeSoft > 0 ? this.softRange(x, z, s) : ridged(x / 900, z / 900, s + 11, 5)));
       return lip - fall + rib + 0.35 * rough * smoothstep(R.rim, R.rim + 60, e) + ranges;
     }
     // the crest varies along the course (higher buttresses, low saddles where the storms pour over)

@@ -87,6 +87,29 @@ for (const item of list.split(',')) {
         }
         k.autopilot(null);
       }, [zc, t]);
+      if (process.env.PROBE) {
+        // (debugging a capture) what transparent point/sprite layers lie near the skier, optionally hidden
+        const found = await page.evaluate((hide) => {
+          const k = window.__skifree;
+          const sc = k.world().scene;
+          const s = k.state().session;
+          const out = [];
+          sc.traverse((o) => {
+            if (!(o.isPoints || o.isSprite)) return;
+            const pos = o.geometry?.getAttribute?.('position');
+            let near = 0;
+            if (pos) for (let j = 0; j < pos.count; j++) { const dx = pos.getX(j) + o.position.x, dz = pos.getZ(j) + o.position.z; if (Math.hypot(dx - s.x, dz - s.z) < 25) near++; }
+            const tag = (o.name || o.parent?.name || o.type) + '|' + (o.material?.type ?? '') + '|' + (o.material?.size ?? '') ;
+            const extra = [];
+            const sz = o.geometry?.getAttribute?.('aSize'), al = o.geometry?.getAttribute?.('aAlpha'), cl = o.geometry?.getAttribute?.('aCol');
+            if (pos && sz && al) for (let j = 0; j < pos.count; j++) { const dx = pos.getX(j) + o.position.x, dz = pos.getZ(j) + o.position.z, dy = pos.getY(j) + o.position.y; if (al.getX(j) > 0.01 && Math.hypot(dx - s.x, dz - s.z) < 25) extra.push([+(dx - s.x).toFixed(1), +(dy - s.y).toFixed(1), +(dz - s.z).toFixed(1), +sz.getX(j).toFixed(2), +al.getX(j).toFixed(2), cl ? +cl.getX(j).toFixed(2) : null]); }
+            out.push({ tag, near, n: pos?.count ?? 0, parts: extra.slice(0, 50) });
+            if (hide && (hide === 'all' || tag.includes(hide))) o.visible = false;
+          });
+          return out.filter((f) => f.near > 0);
+        }, process.env.PROBE === '1' ? '' : process.env.PROBE);
+        process.stdout.write(`probe ${JSON.stringify(found)}\n`);
+      }
       const name = `${item.replace(/:/g, '_')}_${i}_${wx}`;
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
       await page.screenshot({ path: `${outDir}/${name}.png`, timeout: 1_200_000 });

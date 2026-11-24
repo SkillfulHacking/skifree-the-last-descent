@@ -239,6 +239,9 @@ export class WhiteoutScenery implements SceneryView {
       ch.lampMat.size = MARKER.lamp * (1 + 0.9 * s);
       ch.lampMat.opacity = 0.75 + 0.25 * s;
     }
+    // (round 4, W-065) the rim wands' flags carry through the storm: in a whiteout they are what marks
+    // the edge (the drop itself is hidden), so they glow brighter as it closes in, like the lamps
+    this.wandMat.emissiveIntensity = 0.35 + 1.1 * s;
   }
 
   stats(): Record<string, number> {

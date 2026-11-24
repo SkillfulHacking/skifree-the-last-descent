@@ -164,6 +164,7 @@ kbd {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 .rear-view { position: fixed; border: 2px solid rgba(255,255,255,0.7); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(0,0,0,0.3); pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+.rear-view.snap { transition: none; }
 .rear-view::after { content: 'BEHIND YOU'; position: absolute; left: 8px; top: 4px; font: 800 10px var(--font); letter-spacing: 0.25em; color: #ffd0d0; text-shadow: 0 1px 4px #000; }
 .hud-caption { position: absolute; left: 50%; bottom: calc(11vh + 64px); transform: translateX(-50%); padding: 6px 14px; border-radius: 8px; background: rgba(0,0,0,0.62); font-size: 15px; line-height: 1.35; letter-spacing: 0.04em; opacity: 0; transition: opacity 0.25s !important;
   /* (W-047) wraps: never wider than the screen at any UI scale */

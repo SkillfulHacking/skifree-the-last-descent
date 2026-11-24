@@ -13,6 +13,7 @@
  * hidden: the wands stand out in fog and the lip's dark underside shows where the snow ends.
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { clamp, fbm, hash2, smoothstep } from '../../../../core/rng';
 import type { Mountain } from '../../../course';
 
@@ -26,7 +27,8 @@ export const CORNICE = {
   /** rim wands: spacing (m) and how far in from the rim they stand (m) */
   wandStep: 36,
   wandIn: 6,
-  wandH: 1.9,
+  // (round 4, W-065: 1.9 m poles were 1–2 px at 40–50 m from the line) 2.4 m, with a flag panel
+  wandH: 2.4,
 } as const;
 
 export interface CorniceSample {
@@ -164,20 +166,32 @@ export function corniceMaterial(): THREE.MeshStandardMaterial {
 }
 
 let wandGeo: THREE.BufferGeometry | null = null;
-/** a bamboo-style rim wand: yellow with black bands, a small red flag */
+/**
+ * A rim wand: a yellow pole with black bands and, at its top, a fluorescent orange flag panel set
+ * across the course (round 4, W-065: the flag is what reads at 40–50 m — ~8 px wide at 1366×768 —
+ * where the pole alone was 1–2 px; how a ski area marks a closed edge).
+ */
 export function wandGeometry(): THREE.BufferGeometry {
   if (wandGeo) return wandGeo;
   // (W-054: round 1's 3–4 cm wands were ~1 px at 30 m) a 6–7 cm pole, as real piste-edge markers
-  const g = new THREE.CylinderGeometry(0.06, 0.07, CORNICE.wandH, 6, 6);
-  g.translate(0, CORNICE.wandH / 2, 0);
-  const pos = g.getAttribute('position') as THREE.BufferAttribute;
+  const pole = new THREE.CylinderGeometry(0.06, 0.07, CORNICE.wandH, 6, 6);
+  pole.translate(0, CORNICE.wandH / 2, 0);
+  const pos = pole.getAttribute('position') as THREE.BufferAttribute;
   const col: number[] = [];
   for (let i = 0; i < pos.count; i++) {
     const band = Math.floor((pos.getY(i) / CORNICE.wandH) * 6) % 2 === 0;
     if (band) col.push(0.98, 0.78, 0.05);
     else col.push(0.05, 0.05, 0.05);
   }
-  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  pole.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const flag = new THREE.BoxGeometry(0.62, 0.42, 0.03);
+  flag.translate(0.31, CORNICE.wandH - 0.3, 0);
+  const fc: number[] = [];
+  for (let i = 0; i < flag.getAttribute('position').count; i++) fc.push(1.0, 0.36, 0.04);
+  flag.setAttribute('color', new THREE.Float32BufferAttribute(fc, 3));
+  const g = mergeGeometries([pole, flag], false)!;
+  pole.dispose();
+  flag.dispose();
   wandGeo = g;
   return g;
 }

@@ -275,9 +275,11 @@ export class RescueStation implements FinishEnvironment {
     const roofM = mk(new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.55, metalness: 0.35 }));
     const snowM = mk(new THREE.MeshStandardMaterial({ color: 0xf4f7fc, roughness: 0.9 }));
     const stone = mk(new THREE.MeshStandardMaterial({ color: 0x5c6068, roughness: 0.95 }));
-    // unlit: the lit door and windows must glow through the storm whatever the exposure
-    const warm = mk(new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.66, 0.28) }));
-    const warmDim = mk(new THREE.MeshBasicMaterial({ color: new THREE.Color(0.78, 0.45, 0.18) }));
+    // unlit: the lit door and windows must glow through the storm whatever the exposure. (Round 4,
+    // W-083: the storm fog turned the open doorway a flat beige; the light itself is not fogged, so the
+    // doorway and the panes read as warm light in the white, as a lit window does)
+    const warm = mk(new THREE.MeshBasicMaterial({ color: new THREE.Color(1.0, 0.62, 0.24), fog: false }));
+    const warmDim = mk(new THREE.MeshBasicMaterial({ color: new THREE.Color(0.86, 0.47, 0.16), fog: false }));
     const dark = mk(new THREE.MeshStandardMaterial({ color: 0x1d1f24, roughness: 0.8 }));
     const steel = mk(new THREE.MeshStandardMaterial({ color: 0x8b9099, roughness: 0.4, metalness: 0.7 }));
     const yellow = mk(new THREE.MeshStandardMaterial({ color: 0xe8b416, roughness: 0.55 }));
@@ -653,7 +655,9 @@ export class RescueStation implements FinishEnvironment {
     P.lookAt(this.aimCur);
     const uK = (this.beam.material as THREE.ShaderMaterial).uniforms.uK!;
     uK.value += ((this.searchTarget ? 0.42 : 0.12) - uK.value) * (1 - Math.exp(-3 * Math.max(0, dt)));
-    this.search.intensity = this.searchTarget ? 420 : 220;
+    // (round 4, W-083) on its target the light is a hard, bright pool: it must read on the Yeti's pale fur
+    this.search.intensity = this.searchTarget ? 1400 : 220;
+    this.search.angle = this.searchTarget ? 0.2 : 0.16;
     // the lantern swells as it is raised
     if (this.flame) this.flame.intensity = 4 + 14 * this.lanternUp;
     if (this.flame) this.flame.distance = 7 + 9 * this.lanternUp;

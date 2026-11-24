@@ -412,8 +412,12 @@ export class GameSession implements Stage {
     const fz = Math.cos(yaw);
     const p = this.renderPos;
     // just ahead and off to the side of the skier, framed on the beast (the skier is a small
-    // foreground silhouette at the frame edge)
-    out.pos.set(p.x + fx * 1.5 + fz * 2.4, p.y + 1.5, p.z + fz * 1.5 - fx * 2.4);
+    // foreground silhouette at the frame edge). (Round 4, W-082) through the leap and the landing the
+    // camera drops lower and further out to the side: the arc is seen across, against the sky, not end-on
+    // against the pale rock and snow it rose from (round 3: a 8–12 px smudge after the cave mouth)
+    const z = this.rearViewZoom();
+    const side = 2.4 + 4.2 * z;
+    out.pos.set(p.x + fx * 1.5 + fz * side, p.y + 1.5 - 0.8 * z, p.z + fz * 1.5 - fx * side);
     const y = this.yeti.root.position;
     out.look.set(y.x, y.y + 1.6, y.z);
     return smoothstep(110, 90, d);
@@ -620,7 +624,11 @@ export class GameSession implements Stage {
       case 'land': {
         this.audio.playLanding(e.impact, e.hard);
         const n = Math.round(10 + e.impact * 50);
-        fx.emit({ x: s.pos.x, y: s.pos.y + 0.05, z: s.pos.z, vx: s.vel.x * 0.3, vy: 1.5 + e.impact * 2, vz: s.vel.z * 0.3, spread: 1.5 + e.impact * 2, size: 0.4 + e.impact * 0.4, life: 1.1, count: n, gravity: 0.5, drag: 2, grow: 1.4, alpha: 0.8 });
+        // (round 4, W-065 review A) a small landing's snow stays low round the skis: round 3 threw every
+        // landing's burst ~2 m up, between the follow camera and the skier, and a hop over a roller hid
+        // him in a white cloud for a second (every Whiteout rim capture); a hard landing still erupts
+        const k = Math.min(1, e.impact);
+        fx.emit({ x: s.pos.x, y: s.pos.y + 0.05, z: s.pos.z, vx: s.vel.x * 0.3, vy: 0.5 + k * 1.6, vz: s.vel.z * 0.3, spread: 1.2 + k * 2.3, size: 0.3 + k * 0.4, life: 0.7 + k * 0.4, count: n, gravity: 0.6, drag: 2.4, grow: 1.0 + k * 0.4, alpha: 0.4 + k * 0.3 });
         if (e.hard) {
           this.shake(0.45);
           this.audio.playExertion('grunt');
@@ -1089,7 +1097,9 @@ export class GameSession implements Stage {
       this.lastRight.copy(r);
       if (s.grounded && s.speed > 2) {
         const intensity = clamp(s.edgeLoad * 0.8 + s.brake * 0.8 + s.driftAmount + (s.surface === 'powder' ? 0.5 : 0), 0, 2) * clamp(s.speed / 20, 0.2, 1.4);
-        this.sprayAcc += dt * (8 + intensity * 70);
+        // (round 4, W-065 review A: a dense white puff hid the skier in every Whiteout rim capture) the
+        // spray thins out at full edge load instead of piling into one glowing cloud round the skier
+        this.sprayAcc += dt * (8 + Math.min(intensity, 1.2) * 45);
         while (this.sprayAcc > 1) {
           this.sprayAcc -= 1;
           const src = Math.random() < 0.5 ? l : r;
@@ -1109,7 +1119,7 @@ export class GameSession implements Stage {
             gravity: 0.65,
             drag: 2.2,
             grow: 1.6,
-            alpha: 0.55 + 0.3 * Math.min(1, intensity),
+            alpha: 0.45 + 0.25 * Math.min(1, intensity),
           });
         }
       }

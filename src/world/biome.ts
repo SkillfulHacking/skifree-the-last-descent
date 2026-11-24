@@ -269,6 +269,13 @@ export interface BiomeTerrain {
      * piste itself (and the racing line on it) is untouched. Absent = the original bank (bit-identical).
      */
     rollDown?: number;
+    /**
+     * Optional (round 4, W-065 / W-093): the far ranges beyond the drop are this share of rangeHeight
+     * (default 1): below 1 they sit below the skier's eye, so the drop side is a deep, hazy distance —
+     * peaks rising out of the valley's cloud sea, seen from above — instead of a white wall at eye height
+     * that read as a plateau. Art only: kilometres past the rim, nothing reaches it.
+     */
+    farRanges?: number;
   };
   /** valley wall height (m) */
   wallHeight: number;

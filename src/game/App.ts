@@ -856,13 +856,18 @@ export class App {
   /** A small "glance back" window during the chase so the threat is visible, not just a HUD bar. */
   private prepareRearView(): { x: number; y: number; w: number; h: number } | null {
     const s = this.session;
-    const k = s && this.mode === 'playing' && this.settings.rearView && this.world?.quality !== 'low' && !s.isCinematic() ? s.rearView(this.rearPose) : 0;
+    // (round 4, W-082) on Low the inset still shows the leap and the landing (2–3 s, a small viewport):
+    // the chase's first beat had no image at all there; the player's own setting still turns it off
+    const leap = s ? s.rearViewZoom() : 0;
+    const k = s && this.mode === 'playing' && this.settings.rearView && (this.world?.quality !== 'low' || leap > 0) && !s.isCinematic() ? s.rearView(this.rearPose) : 0;
     if (!this.rearFrame) {
       this.rearFrame = document.createElement('div');
       this.rearFrame.className = 'rear-view';
       document.body.appendChild(this.rearFrame);
     }
     this.rearFrame.style.opacity = String(k);
+    // (W-082) the leap's inset is there at once (no 0.3 s fade-in over the first beat)
+    this.rearFrame.classList.toggle('snap', leap > 0);
     if (k <= 0.02 || !this.world) return null;
     const W = innerWidth;
     const H = innerHeight;

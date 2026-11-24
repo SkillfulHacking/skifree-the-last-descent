@@ -51,10 +51,12 @@ float n(vec2 p) {
 }
 float fbm(vec2 p) { float a = 0.5, s = 0.0; for (int k = 0; k < 4; k++) { s += a * n(p); p *= 2.03; a *= 0.5; } return s; }
 void main() {
-  vec2 p = vW.xz / 900.0 + vec2(uTime * 0.004, uTime * 0.0015);
+  vec2 p = vW.xz / 1300.0 + vec2(uTime * 0.004, uTime * 0.0015);
   float c = fbm(p) * 0.7 + fbm(p * 3.1 + 7.0) * 0.3;
-  // billow tops lit, the hollows between them in shadow: cooler and darker than the snow on the ridge
-  vec3 col = mix(vec3(0.34, 0.41, 0.53), vec3(0.74, 0.79, 0.87), smoothstep(0.4, 0.8, c));
+  // (round 4, W-065 blind review A: the round-3 deck was the shaded piste's own colour and read as a
+  // frozen plain) sunlit billow tops brighter and warmer than the snow, deep blue-grey hollows between
+  // them: a sea of cloud seen from above, with the far peaks rising out of it (ridge.farRanges)
+  vec3 col = mix(vec3(0.30, 0.36, 0.49), vec3(0.97, 0.95, 0.91), smoothstep(0.36, 0.62, c));
   float d = length(vW.xz - uCam.xz);
   // into the haze with distance (gentler than the terrain's fog: the deck is what the eye reads as depth)
   col = mix(col, uHaze, 0.85 * (1.0 - exp(-d * 0.00012)));
