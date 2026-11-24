@@ -263,7 +263,8 @@ export function* generateBandSteps(m: Mountain, seed: number, band: number): Gen
   const kLogs = B.obstacles.logs;
   const kStumps = B.obstacles.stumps;
   const speciesW = B.trees.speciesWeights;
-  const rng = new Rng((seed ^ 0x0b57ac1e ^ Math.imul(band + 7919, 0x85ebca6b)) >>> 0);
+  let rng = new Rng((seed ^ 0x0b57ac1e ^ Math.imul(band + 7919, 0x85ebca6b)) >>> 0);
+  const cellStream = B.obstacles.cellStream === true;
   const list: Obstacle[] = [];
   const zA = band * BAND;
   const zB = zA + BAND;
@@ -301,6 +302,7 @@ export function* generateBandSteps(m: Mountain, seed: number, band: number): Gen
     if (gz > Math.max(zA, -260)) yield;
     // per-row seed so a band's layout does not depend on generation order
     for (let gx = X_MIN; gx < X_MAX; gx += CELL) {
+      if (cellStream) rng = new Rng((seed ^ 0x3c6ef372 ^ Math.imul(Math.round(gx) + 104729, 0x85ebca6b) ^ Math.imul(Math.round(gz) + 7919, 0xc2b2ae35)) >>> 0);
       const x = gx + rng.range(0.1, 0.9) * CELL;
       const z = gz + rng.range(0.1, 0.9) * CELL;
       const roll = rng.float();

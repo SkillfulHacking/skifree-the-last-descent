@@ -196,6 +196,13 @@ export interface BiomeObstacles {
   rocks: number;
   logs: number;
   stumps: number;
+  /**
+   * (W-078 / Review B3-2) each placement cell draws from its own random stream, so a change to the
+   * terrain or the hazards in one place never re-rolls obstacles elsewhere (the shared per-band stream
+   * let off-piste terrain re-roll on-piste obstacles). Off for locations already released: switching
+   * would re-roll their Classic layouts.
+   */
+  cellStream?: boolean;
 }
 
 /**

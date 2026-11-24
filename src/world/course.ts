@@ -13,6 +13,9 @@ import { getBiome, type Biome } from './biome';
 import { Coast, FJORD_HEAD_Z } from './coast';
 import { CliffModel } from './art/cliffModel';
 
+/** (W-078) metres over which a rolled-down ridge bank eases from the piste's edge slope to level */
+const EDGE_EASE = 8;
+
 export type { Kicker, CliffBand, CourseProfile, Encounter, Sighting, SegmentType, AltRoute } from './profile';
 import type { AltRoute } from './profile';
 export { CAVE_D, CAVE_FLOOR_RAISE } from './caveTerrain';
@@ -338,10 +341,13 @@ export class Mountain {
     // low in the gameplay view instead of behind a rising bank — art request R1 — except around a
     // sea-side cave, which is cut into an ordinary valley side: R4)
     let cross = 0.0016 * d * d * (ad < w ? 1 : w / ad);
-    // (W-065) the drop side of a ridge: past the piste edge the cross-section holds its edge value
-    // (terrain.ridge.rollDown; the bank then rolls down to the rim in ridgeSide)
+    // (W-065) the drop side of a ridge: past the piste edge the bank stops rising and rolls down to the
+    // rim (terrain.ridge.rollDown; the roll-down itself is in ridgeSide).
+    // (W-078) It leaves the edge on the piste's own slope (0.0032·w) and eases over within ~EDGE_EASE m,
+    // so there is no slope break at the edge: round 3 held the cross-section flat from the edge, a
+    // convex crease that launched a skier coming back onto the piste (Review B3-1).
     const RR = this.kRidge;
-    if (RR?.rollDown !== undefined && ad > w && Math.sign(d) === RR.dropSide) cross = 0.0016 * w * w;
+    if (RR?.rollDown !== undefined && ad > w && Math.sign(d) === RR.dropSide) cross = 0.0016 * w * w + 0.0032 * w * EDGE_EASE * (1 - Math.exp(-(ad - w) / EDGE_EASE));
     const seaCave = this.coast && d < 0 ? this.seaCaveK(z) : 0;
     h += this.coast && d < 0 ? cross * (SEA_CROSS + (1 - SEA_CROSS) * seaCave) : cross;
     // each side of the valley has its own character: banks set back further or closer, steeper or gentler

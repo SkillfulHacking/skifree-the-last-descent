@@ -109,7 +109,7 @@ export function makeWhiteoutBiome(): Biome {
       decorDensity: 0.7,
     },
     rocks: { base: [0.21, 0.215, 0.225], tintCool: [0.92, 0.97, 1.05], tintWarm: [1.04, 1.0, 0.95], tintDark: [0.5, 0.52, 0.56], snow: [0.92, 0.94, 0.98], scan: ['boulder_01', 'namaqualand_boulder_02', 'namaqualand_boulder_06'] },
-    obstacles: { rocks: 1.5, logs: 0.1, stumps: 0.25 },
+    obstacles: { rocks: 1.5, logs: 0.1, stumps: 0.25, cellStream: true },
     terrain: {
       // (W-077) Alpine's fixed Yeti pace is Alpine's own (deriveBiome would inherit it): unchanged here
       encounterPace: 1,
