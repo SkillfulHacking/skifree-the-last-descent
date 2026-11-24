@@ -15,11 +15,11 @@ import { Input, ACTION_LABELS, keyName, type Action, DEFAULT_BINDINGS, type Game
 const NEUTRAL_INPUT: GameplayInput = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recoverPressed: false, recoverHeld: false, lookBack: false, pausePressed: false, skipPressed: false, camX: 0, camY: 0 };
 import { Hud } from '../ui/Hud';
 import { MenuSystem, type Screen, type MenuItem } from '../ui/Menu';
-import { applyRun, loadRecordBook, loadSettings, recordsFor, saveRecordBook, saveSettings, type RecordBook, type RunStats, type Settings, type Records } from '../core/settings';
+import { applyRun, caveSeen, loadRecordBook, loadSettings, markCaveSeen, recordsFor, saveRecordBook, saveSettings, type RecordBook, type RunStats, type Settings, type Records } from '../core/settings';
 import type { QualityPreset } from '../core/types';
 import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, exampleCodes, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
 import { fmtDistance } from '../ui/Hud';
-import { getBiome, hasBiome, listBiomes } from '../world/biome';
+import { DEFAULT_BIOME, getBiome, hasBiome, listBiomes, type BiomeId } from '../world/biome';
 import { capabilitiesOf } from '../world/capabilities';
 import { getHazardKind, hazardPhase } from '../world/hazards/hazard';
 import { locationNoteHtml, locationOptionLabel } from '../ui/location';
@@ -518,9 +518,13 @@ export class App {
     this.trackSession(this.session);
     // compile what the session brings (Hard: the snowball glint sprite) now, not at the first throw
     for (const o of this.session.warmupObjects) this.renderer.compile(o, this.camera, this.world.scene);
-    this.session.recordsSeenCave = this.book.seenCaveCinematic;
+    // (round 4, owner's decision B) each location keeps its own cave-cinematic history: the first
+    // complete viewing in this location can only be paused, never skipped, whatever was seen elsewhere
+    const biome = this.world.course.biome;
+    this.session.recordsSeenCave = caveSeen(this.book, biome);
     this.session.onCaveSeen = () => {
-      this.book.seenCaveCinematic = true;
+      if (caveSeen(this.book, biome)) return;
+      markCaveSeen(this.book, biome);
       saveRecordBook(this.book);
     };
     // the controls are taught once: after a run that showed the tutorial (or once every lesson is
@@ -1006,10 +1010,15 @@ export class App {
         if (this.session) this.session.autopilot = style;
       },
       placeYeti: (gap: number) => this.session?.debugPlaceYeti(gap),
-      seenCave: (v: boolean) => {
-        this.book.seenCaveCinematic = v;
-        if (this.session) this.session.recordsSeenCave = v;
+      /** set a location's cave-cinematic history in memory (default: the current course's location) */
+      seenCave: (v: boolean, biome?: BiomeId) => {
+        const b = biome ?? this.world?.course.biome ?? DEFAULT_BIOME;
+        if (v) markCaveSeen(this.book, b);
+        else delete this.book.seenCave[b];
+        if (this.session && (!biome || biome === this.world?.course.biome)) this.session.recordsSeenCave = v;
       },
+      /** (round 4) the per-location cave-cinematic history, in memory and as stored */
+      caveHistory: () => ({ book: { ...this.book.seenCave }, legacy: this.book.seenCaveCinematic, stored: localStorage.getItem('skifree-tld.records.v2') }),
       pause: () => this.pause(),
       menuId: () => this.menu.current?.id ?? null,
       progress: () => ({ saved: structuredClone(this.progress.saved), persisting: this.progress.persisting, attached: this.progress.attached, toast: this.toast.text, jacket: this.skier?.jacketColor ?? null, events: this.session ? this.session.events.history.map((e) => e.type) : [] }),

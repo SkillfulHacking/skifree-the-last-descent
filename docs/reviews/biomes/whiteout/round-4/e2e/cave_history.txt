@@ -1,0 +1,11 @@
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+Running 1 test using 1 worker
+
+  ✓  1 tests/e2e/cave_history.spec.ts:64:1 › old save: Alpine history kept; Whiteout first viewing pauses, completes, persists and is skippable after; Fjord abandoned part-way is not counted (12.9m)
+
+  Slow test file: tests/e2e/cave_history.spec.ts (12.9m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 passed (12.9m)
