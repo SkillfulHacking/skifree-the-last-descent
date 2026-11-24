@@ -56,10 +56,19 @@ void main() {
   // (round 4, W-065 blind review A: the round-3 deck was the shaded piste's own colour and read as a
   // frozen plain) sunlit billow tops brighter and warmer than the snow, deep blue-grey hollows between
   // them: a sea of cloud seen from above, with the far peaks rising out of it (ridge.farRanges)
-  vec3 col = mix(vec3(0.30, 0.36, 0.49), vec3(0.97, 0.95, 0.91), smoothstep(0.36, 0.62, c));
+  // (round 4, second blind check: bright cloud tops still matched the snow — "haze of almost the same
+  // brightness") the deep valley seen through broken cloud: dark forested floor and rock (blue-green,
+  // well below the snow's value) with ragged pale cloud banks lying on it — the dark is what reads as
+  // depth from the rim
+  vec3 floorC = mix(vec3(0.15, 0.20, 0.24), vec3(0.27, 0.32, 0.37), smoothstep(0.3, 0.7, fbm(p * 6.0 + 3.0)));
+  // snow-streaked spurs and gullies (ridged noise) so the floor reads as land far below, not water
+  float rdg = 1.0 - abs(fbm(p * 3.5 + 5.0) * 2.0 - 1.0);
+  floorC = mix(floorC, vec3(0.55, 0.60, 0.67), smoothstep(0.7, 0.95, rdg) * 0.55);
+  vec3 col = mix(floorC, vec3(0.86, 0.88, 0.92), smoothstep(0.55, 0.75, c));
   float d = length(vW.xz - uCam.xz);
   // into the haze with distance (gentler than the terrain's fog: the deck is what the eye reads as depth)
-  col = mix(col, uHaze, 0.85 * (1.0 - exp(-d * 0.00012)));
+  // aerial perspective: the floor pales into the haze toward its horizon (no hard sea-line)
+  col = mix(col, uHaze, 0.92 * (1.0 - exp(-d * 0.00042)));
   // a soft edge where it meets the flank, and a ragged one
   float e = (vW.x - uRimX) * uSide;
   float a = uOpacity * smoothstep(${CLOUD_SEA.from.toFixed(1)}, ${(CLOUD_SEA.from + 500).toFixed(1)}, e + (c - 0.5) * 300.0);

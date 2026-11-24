@@ -86,6 +86,13 @@ for (const item of list.split(',')) {
           go();
         }
         k.autopilot(null);
+        // (round 4: the "white puff over the skier" in every rim capture was this tool's, not the game's —
+        // 90 scripted frames pile the run's spray into one cloud that the live game never shows; clear it
+        // and let a second of ordinary spray form before the frame)
+        k.world().particles?.clear?.();
+        k.autopilot('skilled');
+        k.frames(20, 1 / 30);
+        k.autopilot(null);
       }, [zc, t]);
       if (process.env.PROBE) {
         // (debugging a capture) what transparent point/sprite layers lie near the skier, optionally hidden

@@ -130,13 +130,16 @@ export function ridgeRockPlacements(m: Mountain, z0: number, z1: number): RockPl
   }
   // rim bands where the cornice breaks
   const S = corniceSamples(m, z0, z1);
-  for (let i = 0; i < S.length; i += 4) {
+  // (round 4, W-065 blind review: "the snow just stops against haze — no lip") a near-continuous band of
+  // low, wide, dark wind-scoured rock along the rim itself: from the line it is the dark edge where the
+  // snow ends, seen against the bright distance beyond
+  for (let i = 0; i < S.length; i += 2) {
     const c = S[i]!;
     if (c.k > 0.1) continue;
     const k = Math.round(c.z);
-    if (hash2(k, 21, s) < 0.35) continue;
-    const big = 3.5 + 5 * hash2(k, 22, s);
-    add({ id: pick(k), x: c.x + R.dropSide * (1.5 + 2.5 * hash2(k, 23, s)), z: c.z, sx: big * 1.3, sy: big * (0.6 + 0.4 * hash2(k, 24, s)), sz: big, yaw: hash2(k, 25, s) * Math.PI * 2, tilt: R.dropSide * 0.25, family: 'rim' }, 0.35);
+    if (hash2(k, 21, s) < 0.12) continue;
+    const big = 3 + 3.5 * hash2(k, 22, s);
+    add({ id: pick(k), x: c.x + R.dropSide * (0.6 + 1.6 * hash2(k, 23, s)), z: c.z, sx: big * 1.7, sy: big * (0.45 + 0.25 * hash2(k, 24, s)), sz: big * 1.2, yaw: hash2(k, 25, s) * Math.PI * 2, tilt: R.dropSide * 0.25, family: 'rim' }, 0.35);
   }
   // flank buttresses
   const FL = 150;
@@ -268,8 +271,9 @@ export class RidgeRocks {
     // Alpine's, most of it these full scans throwing shadows nobody on the line can see)
     const groups = [
       { fam: (f: string) => f === 'tor', spire: false, shadow: true },
-      { fam: (f: string) => f === 'rim' || f === 'flank', spire: false, shadow: false },
-      { fam: (f: string) => f === 'spire', spire: true, shadow: false },
+      { fam: (f: string) => f === 'flank', spire: false, shadow: false },
+      // the rim band and the spires: wind-scoured, dark (their own material, little snow on top)
+      { fam: (f: string) => f === 'rim' || f === 'spire', spire: true, shadow: false },
     ];
     for (const id of RIDGE_ROCK_IDS) {
       const g = this.geos.get(id);
