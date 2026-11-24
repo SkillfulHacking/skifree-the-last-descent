@@ -28,7 +28,7 @@ Stability is good:
 - no page errors in any of my runs;
 - deterministic frame counts (my rerun matched the developer's run frame for frame: 36,516 frames);
 - disposal fixes landed (W-071);
-- the 40 km Endless memory result is in section C.
+- 40 km of Endless Whiteout: heap 67–90 MB and geometries 478–572 with no trend, no errors (section C).
 
 ## (a) Scores
 
@@ -124,7 +124,7 @@ Alpine's procedural near rock has 320 triangles.
 - **Clear zones** are cached per band (`field.ts:213-230`).
   - The lee clear-zone grid (16 m steps from z = 0) divides `BAND` (256), so the band split samples the same points.
   - The overlap filter returns a small superset at band edges. That is harmless.
-  - The cache is never evicted within a mountain. It holds about 4 bands per km of small arrays, so it is negligible but unbounded in Endless (see section C).
+  - The cache is never evicted within a mountain. It holds about 4 bands per km of small arrays: unbounded in principle, but no growth shows over 40 km (section C).
 - **Per-grain allocation:** `Grains.update` now writes the buffer in place (`stormCave.ts:88-98`).
 - **Rime instances** are disposed: `fm` is pushed to `disposables` (`stormCave.ts:448`).
 
@@ -332,7 +332,17 @@ All measurements were on the production bundle rebuilt from this tree into `/tmp
     - all 11 e2e specs pass, `game` on its rerun;
     - the build log has no SHA line, but it was committed in `f7d4820` with the others.
 
-ENDLESS_TABLE_PLACEHOLDER
+**Endless memory, 40 km of Whiteout (`medium`, 1 km teleport steps, gc before each sample; `/tmp/revD3/endless_whiteout.json`):**
+
+| | R2 (`b70a793`) | **R3 (`46ed200`)** |
+|---|---|---|
+| JS heap (MB) | 62.7–84.1 | **67.4–90.0** (mean of first 10 km 78.4, last 10 km 80.5) |
+| Geometries | 482–583 | **478–572** (first 10 km 518, last 10 km 540) |
+| Textures | — | **28–35** |
+| Page errors | 0 | **0** |
+| Outcome | ran 40 km | ran 40 km, no catch, caves live ≤ 2 |
+
+There is no upward trend: the round-3 objects and the never-evicted clear-zone cache leave no measurable growth over 40 km. Stability is **verified**.
 
 ## (d) What I could not verify
 
