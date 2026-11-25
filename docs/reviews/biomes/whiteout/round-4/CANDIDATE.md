@@ -1,8 +1,8 @@
 # Round-4 candidate
 
 **Frozen source:** `71c9ceb` (branch `pass5-whiteout`, draft PR #9). Later commits change tests, tools and
-documents only: `git diff 71c9ceb <later> -- src` is empty. The evidence manifests record `6ff50f9`
-(source identical to `71c9ceb`).
+documents only: `git diff 71c9ceb <later> -- src` is empty. The evidence manifests record `6ff50f9` or `0787168`
+(the capture pipeline was restarted after the machine restarted; both have source identical to `71c9ceb`).
 
 **Round 3:** `46ed200`. `git diff 46ed200 71c9ceb -- src` shows every source change since then.
 
