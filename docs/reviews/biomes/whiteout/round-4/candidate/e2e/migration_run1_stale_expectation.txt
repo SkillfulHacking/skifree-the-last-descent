@@ -1,0 +1,42 @@
+SHA e057d6f56101d7bd888584b1d2a810c7912c513b
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 2 tests using 1 worker
+
+[1/2] tests/e2e/migration.spec.ts:103:1 › a Pass 3 save (settings + per-course records, no progress key) loads unchanged in the pass-4 build and stays playable
+  1) tests/e2e/migration.spec.ts:103:1 › a Pass 3 save (settings + per-course records, no progress key) loads unchanged in the pass-4 build and stays playable 
+
+    Error: expect(received).toEqual(expected) // deep equality
+
+    - Expected  - 0
+    + Received  + 1
+
+    @@ -65,6 +65,7 @@
+        "sfxVolume": 0.85,
+        "showFps": false,
+        "showTutorial": false,
+        "steerSensitivity": 1.15,
+        "uiScale": 1,
+    +   "vibration": true,
+      }
+
+      169 |   expect(typeof savedS.seenPoleHint).toBe('boolean');
+      170 |   // (Whiteout round 2: Reduce Weather Effects is a new setting too — written at its default by the save)
+    > 171 |   expect(savedS).toEqual({ ...PASS3_SETTINGS, course: 'classic', controlHints: true, seenPoleHint: savedS.seenPoleHint, reduceWeather: false });
+          |                  ^
+      172 |   if (after[KEY_P] !== undefined) {
+      173 |     const p = JSON.parse(after[KEY_P]!);
+      174 |     expect(p.version).toBe(2);
+        at /home/claude/sf-wo/tests/e2e/migration.spec.ts:171:18
+
+    Error Context: test-results/migration-a-Pass-3-save-se-cbc47--4-build-and-stays-playable/error-context.md
+
+
+[2/2] tests/e2e/migration.spec.ts:188:1 › a v1 progress save migrates to v2 without ?debug: reward granted, unknown data kept, written back as v2
+  1 failed
+    tests/e2e/migration.spec.ts:103:1 › a Pass 3 save (settings + per-course records, no progress key) loads unchanged in the pass-4 build and stays playable 
+  1 did not run
+exit 1

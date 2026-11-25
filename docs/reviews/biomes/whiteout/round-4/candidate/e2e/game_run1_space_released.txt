@@ -1,0 +1,35 @@
+SHA 6b0e7ca26ad2f9c59ebafc77aa30a9ccbd602c4b
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 3 tests using 1 worker
+
+[1/3] tests/e2e/game.spec.ts:60:1 › main menu loads with a rendered 3D background and no fatal errors
+[2/3] tests/e2e/game.spec.ts:74:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory
+  1) tests/e2e/game.spec.ts:74:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      89 |   await page.evaluate(() => window.__skifree.hold(false));
+      90 |   s = await st(page);
+    > 91 |   expect(s.session?.intro).toBe(false);
+         |                            ^
+      92 |   expect(s.session?.phase).toBe('learn');
+      93 |
+      94 |   // keyboard steering changes heading
+        at /home/claude/sf-wo/tests/e2e/game.spec.ts:91:28
+
+    Error Context: test-results/game-full-loop-start-→-lea-2f59d--→-caught-→-retry-→-victory/error-context.md
+
+
+[3/3] tests/e2e/game.spec.ts:197:1 › pause/resume and gamepad hot-plug do not break the game
+  1 failed
+    tests/e2e/game.spec.ts:74:1 › full loop: start → learn → cave cinematic → chase → caught → retry → victory 
+  1 did not run
+  1 passed (5.0m)
+exit 1

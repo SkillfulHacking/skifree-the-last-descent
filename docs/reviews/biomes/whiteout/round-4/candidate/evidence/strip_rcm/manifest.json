@@ -1,0 +1,118 @@
+{
+  "sha": "6ff50f9",
+  "quality": "high",
+  "difficulty": "normal",
+  "reduceCameraMotion": true,
+  "skipAt": null,
+  "viewport": "960x540",
+  "renderer": "SwiftShader (software)",
+  "date": "2026-11-25T00:42:13.578Z",
+  "frames": [
+    {
+      "name": "whiteout_00",
+      "biome": "whiteout",
+      "course": "CLASSIC-SPR@WHITE",
+      "phase": "caveCinematic",
+      "cinematicTime": 14.033333333333294,
+      "chaseTime": 0,
+      "yetiPos": [
+        0,
+        0,
+        0
+      ],
+      "yetiRoot": [
+        -25.13290764487671,
+        -36.913435325370905,
+        260.1012249465348
+      ],
+      "yetiAirborne": false,
+      "yetiVisible": true,
+      "yetiMode": "roar",
+      "z": 282.036599282818,
+      "cam": {
+        "pos": [
+          21.483819341943253,
+          -46.39992232366765,
+          286.2697137124422
+        ],
+        "fov": 44.518518518518725,
+        "dir": [
+          -0.42538783369402844,
+          -0.026514808591982526,
+          -0.9046226593836971
+        ]
+      }
+    },
+    {
+      "name": "whiteout_01",
+      "biome": "whiteout",
+      "course": "CLASSIC-SPR@WHITE",
+      "phase": "caveCinematic",
+      "cinematicTime": 14.29999999999996,
+      "chaseTime": 0,
+      "yetiPos": [
+        0,
+        0,
+        0
+      ],
+      "yetiRoot": [
+        -25.13290764487671,
+        -36.913435325370905,
+        260.1012249465348
+      ],
+      "yetiAirborne": false,
+      "yetiVisible": true,
+      "yetiMode": "stand",
+      "z": 282.036599282818,
+      "cam": {
+        "pos": [
+          24.922077855593763,
+          -46.213596397741725,
+          285.8915578282579
+        ],
+        "fov": 34,
+        "dir": [
+          -0.844838803656256,
+          0.06255481827886554,
+          -0.5313513814292429
+        ]
+      }
+    },
+    {
+      "name": "whiteout_02",
+      "biome": "whiteout",
+      "course": "CLASSIC-SPR@WHITE",
+      "phase": "caveCinematic",
+      "cinematicTime": 14.566666666666626,
+      "chaseTime": 0,
+      "yetiPos": [
+        0,
+        0,
+        0
+      ],
+      "yetiRoot": [
+        -25.13290764487671,
+        -36.913435325370905,
+        260.1012249465348
+      ],
+      "yetiAirborne": false,
+      "yetiVisible": true,
+      "yetiMode": "stand",
+      "z": 282.036599282818,
+      "cam": {
+        "pos": [
+          24.922077855593763,
+          -46.14153713848246,
+          285.8915578282579
+        ],
+        "fov": 34,
+        "dir": [
+          -0.8450237987370431,
+          0.05896464634062709,
+          -0.5314677318990704
+        ]
+      }
+    }
+  ],
+  "errors": []
+}

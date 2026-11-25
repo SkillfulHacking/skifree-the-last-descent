@@ -1,0 +1,10 @@
+
+cornice roots: gather 26.2 ms (rays 5.75 ms) vs Raycaster 143.9 ms, 1107 triangles kept
+
+ Test Files  61 passed (61)
+      Tests  521 passed (521)
+   Start at  07:24:45
+   Duration  677.69s (tests 98%, import 1%, transform 1%)
+
+
+[exited with code 0]
