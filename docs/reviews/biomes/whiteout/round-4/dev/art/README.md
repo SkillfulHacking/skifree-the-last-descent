@@ -11,7 +11,8 @@ what the frame should show).
 Finding: the white puff over the skier in every round-3/round-4 rim capture was an artefact of
 `tools/rim_view.mjs` (90 scripted frames piled the run's spray into one cloud). Hiding the particle layer
 removed it; the live-play evidence frames never show it. The tool now clears particles and runs a second
-of ordinary skiing before the frame. The game's spray is unchanged.
+of ordinary skiing before the frame. Commit `71c9ceb` leaves the game's spray as it was; the earlier round-4 commit
+`3ba0d83` had already lowered the landing burst and thinned the spray (correction after review F4-6).
 
 Status: W-065 still FAILS the "immediately recognisable" bar. Open: the pale vertical sheet at the vanishing
 point (a blizzard cell's telegraph curtain, which a first-time reader takes for a rendering fault), no visible
