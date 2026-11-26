@@ -103,6 +103,8 @@ export class RescueVictory implements VictoryScript {
     // 3) the lantern: from the storm side, low; the skier in the warm doorway, the lantern lifted
     const toHut = () => door.clone().sub(sk()).setY(0).normalize();
     const side = () => new THREE.Vector3(toHut().z, 0, -toHut().x);
+    const fromYeti = () => sk().sub(this.yetiStop).setY(0).normalize();
+    const sideY = () => new THREE.Vector3(fromYeti().z, 0, -fromYeti().x);
     tl.shot({
       start: B.lantern,
       end: B.yeti,
@@ -117,22 +119,34 @@ export class RescueVictory implements VictoryScript {
     tl.shot({
       start: B.yeti,
       end: B.light,
-      from: () => pose(sk().addScaledVector(toHut(), 1.6).addScaledVector(side(), -0.9).add(new THREE.Vector3(0, 2.0, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.0, 0)), 34),
-      to: () => pose(sk().addScaledVector(toHut(), 1.4).addScaledVector(side(), -0.8).add(new THREE.Vector3(0, 1.95, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 2.0, 0)), 28),
+      // (Round 5, review C/F: from 1.6 m the skier was behind the camera) over his shoulder from 3 m back:
+      // the skier and the raised lantern in the near corner, the shape in the white beyond
+      // (the camera on the line from the Yeti through the skier, behind him: the skier at the door is
+      // always between the lens and the shape in the white)
+      from: () => pose(sk().addScaledVector(fromYeti(), 3.2).addScaledVector(sideY(), 1.2).add(new THREE.Vector3(0, 1.85, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 1.0, 0)), 38),
+      to: () => pose(sk().addScaledVector(fromYeti(), 3.0).addScaledVector(sideY(), 1.1).add(new THREE.Vector3(0, 1.8, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 1.1, 0)), 34),
       handheld: 0.015,
     });
-    // 5) the searchlight swings onto him. (Round 4, W-083: framed from the station side the beam came
-    //    from behind the camera and never showed — frame 24.) From his side, a little ahead of him and low,
-    //    so the beam crosses the frame from the station and lands on him: the light, then his flinch
+    // 5) the searchlight swings onto him. (Round 5, W-083: three rounds of an unreadable beat.) Re-staged
+    //    in two shots, and the storm darkens for the beat (update(): gloom), so the light carves through:
+    //    a) the hit — from behind him and to one side, looking back at the station: the lamp blazing on
+    //       its mast, the shaft reaching across the frame to him, the pool of light at his feet;
+    //    b) the recoil — close, a front three-quarter on him, lit, flinching behind a raised forearm.
     tl.at(B.light - 0.6, () => (S.searchTarget = this.yetiStop.clone().add(new THREE.Vector3(0, 1.8, 0))));
-    const toDoor = () => door.clone().sub(st.yetiAI.pos).setY(0).normalize();
+    const toDoor = () => door.clone().sub(this.yetiStop).setY(0).normalize();
     const flank = () => new THREE.Vector3(toDoor().z, 0, -toDoor().x);
+    const lamp = () => S.lampWorld(new THREE.Vector3());
     tl.shot({
       start: B.light,
+      end: B.flinch + 0.6,
+      from: () => pose(this.yetiStop.clone().addScaledVector(toDoor(), -7.5).addScaledVector(flank(), 3.6).add(new THREE.Vector3(0, 2.2, 0)), this.yetiStop.clone().lerp(lamp(), 0.55).add(new THREE.Vector3(0, 0.6, 0)), 52),
+      to: () => pose(this.yetiStop.clone().addScaledVector(toDoor(), -7.0).addScaledVector(flank(), 3.3).add(new THREE.Vector3(0, 2.1, 0)), this.yetiStop.clone().lerp(lamp(), 0.5).add(new THREE.Vector3(0, 0.6, 0)), 50),
+    });
+    tl.shot({
+      start: B.flinch + 0.6,
       end: B.clear,
-      from: () => pose(this.yetiStop.clone().addScaledVector(flank(), 8.5).addScaledVector(toDoor(), 2.5).add(new THREE.Vector3(0, 1.4, 0)), this.yetiStop.clone().addScaledVector(toDoor(), 2.0).add(new THREE.Vector3(0, 2.2, 0)), 44),
-      to: () => pose(this.yetiStop.clone().addScaledVector(flank(), 7.0).addScaledVector(toDoor(), 2.0).add(new THREE.Vector3(0, 1.4, 0)), st.yetiAI.pos.clone().addScaledVector(toDoor(), 1.5).add(new THREE.Vector3(0, 2.2, 0)), 40),
-      handheld: 0.02,
+      from: () => pose(this.yetiStop.clone().addScaledVector(toDoor(), 5.2).addScaledVector(flank(), 2.2).add(new THREE.Vector3(0, 1.7, 0)), st.yetiAI.pos.clone().add(new THREE.Vector3(0, 1.9, 0)), 40),
+      to: () => pose(this.yetiStop.clone().addScaledVector(toDoor(), 4.9).addScaledVector(flank(), 2.0).add(new THREE.Vector3(0, 1.7, 0)), st.yetiAI.pos.clone().addScaledVector(toDoor(), -0.8).add(new THREE.Vector3(0, 1.9, 0)), 38),
     });
     // 6) the storm breaks (fanfare): rise and pull back over the station…
     tl.at(B.clear + 0.4, () => {
@@ -181,6 +195,13 @@ export class RescueVictory implements VictoryScript {
       wo.snowfall = RESCUE_STORM.snowfall * (1 - k) + 0.15 * k;
       wo.windX = RESCUE_STORM.windX * (1 - k) + 1 * k;
     }
+    // (Round 5, W-083) the searchlight beat: the storm closes in dark (dusk-grey air, the ambient and sun
+    // light down) as the light swings round, so the shaft and its pool carve through it; it lifts again
+    // before the storm breaks. Presentation only.
+    const gloom = THREE.MathUtils.smoothstep(t, B.light - 1.6, B.light - 0.2) * (1 - THREE.MathUtils.smoothstep(t, B.leave + 0.2, B.clear + 0.6));
+    st.world.env.setGloom(gloom);
+    st.world.env.setAmbientScale(1 - 0.6 * gloom);
+    st.world.env.setSunScale(1 - 0.7 * gloom);
     this.station.doorOpen = THREE.MathUtils.smoothstep(t, B.door, B.door + 0.9);
     // the lantern swells as it is raised (and stays up)
     this.station.lanternUp = THREE.MathUtils.smoothstep(t, B.lantern + 0.6, B.lantern + 1.8);
@@ -199,7 +220,9 @@ export class RescueVictory implements VictoryScript {
       if (t >= B.flinch) {
         this.yetiState = 'flinch';
         this.yetiT = 0;
-        st.setYetiMode('disgust');
+        // (Round 5, W-083) blinded by the light: he recoils behind a raised forearm (not the 'disgust'
+        // shoo, which read as a snarl)
+        st.setYetiMode('recoil');
         st.audio.playYetiGrowl(ya.pos, false);
       } else if (dist > 0.4) {
         to.normalize();

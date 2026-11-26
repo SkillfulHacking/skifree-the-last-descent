@@ -17,6 +17,7 @@ import { BlowingSnow } from './blowingSnow';
 import { ValleyCloudSea } from './cloudSea';
 import { RidgeRocks } from './ridgeRocks';
 import { ROCK_ORIGIN } from '../../../art/rockMaterial';
+import { A11Y } from '../../../../core/a11y';
 import { buildCorniceGeometry, corniceMaterial, corniceSamples, wandGeometry, wandSpots } from './cornice';
 
 export const MARKER = {
@@ -76,6 +77,11 @@ interface Chunk {
 
 /** the lamps' shared clock (their pulse runs along the line: aPhase = z) */
 const LAMP_TIME = { value: 0 };
+/**
+ * (W-088, round 5 E4-5) 1 while "Reduce flashes & pulsing" is on: the trail-marker lamps burn steady at
+ * their mean brightness instead of pulsing. Exported for the test.
+ */
+export const LAMP_CALM = { value: 0 };
 let lampTex: THREE.Texture | null = null;
 function lampTexture(): THREE.Texture {
   if (lampTex) return lampTex;
@@ -178,9 +184,10 @@ export class WhiteoutScenery implements SceneryView {
     const lampMat = new THREE.PointsMaterial({ size: MARKER.lamp, map: lampTexture(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.NormalBlending, fog: false, sizeAttenuation: true });
     lampMat.onBeforeCompile = (sh) => {
       sh.uniforms.uLampT = LAMP_TIME;
+      sh.uniforms.uLampCalm = LAMP_CALM;
       sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nuniform float uLampT;\nattribute float aPhase;\nvarying float vPulse;')
-        .replace('#include <color_vertex>', '#include <color_vertex>\n  vPulse = pow(0.5 + 0.5 * sin(uLampT * 2.4 - aPhase * 0.045), 3.0);')
+        .replace('#include <common>', '#include <common>\nuniform float uLampT;\nuniform float uLampCalm;\nattribute float aPhase;\nvarying float vPulse;')
+        .replace('#include <color_vertex>', '#include <color_vertex>\n  vPulse = mix(pow(0.5 + 0.5 * sin(uLampT * 2.4 - aPhase * 0.045), 3.0), 0.31, uLampCalm);')
         .replace('gl_PointSize = size;', 'gl_PointSize = size * (0.82 + 0.4 * vPulse);');
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nvarying float vPulse;')
@@ -228,6 +235,7 @@ export class WhiteoutScenery implements SceneryView {
     this.sky.update(dt, time, f);
     this.cloudSea.update(time, f);
     LAMP_TIME.value = time;
+    LAMP_CALM.value = A11Y.reduceFlashes ? 1 : 0;
     ROCK_ORIGIN.value.copy(f.origin);
     // (a scan that arrived since the last stream: place the rocks of the live chunks)
     this.rocks.stream(this.win[0], this.win[1]);

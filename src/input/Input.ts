@@ -247,7 +247,9 @@ export class Input {
     let tuck = this.key('tuck') ? 1 : 0;
     let brake = this.key('brake') ? 1 : 0;
     let drift = this.key('drift');
-    let pop = this.key('pop');
+    // (round 5, review E4-8) a tap of the pop key shorter than one frame (slow frames) still counts as
+    // held for that frame, as recover does: one hop / one intro skip
+    let pop = this.key('pop') || this.keyPressed('pop');
     let recoverPressed = this.keyPressed('recover');
     let recoverHeld = this.key('recover');
     let lookBack = this.key('lookback');

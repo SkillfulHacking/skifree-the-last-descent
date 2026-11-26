@@ -6,8 +6,9 @@
  * HUD weather pill, captions, sounds) are the same at any setting.
  */
 export const weatherFx = { scale: 1 };
-export const WEATHER_FX_REDUCED = 0.45;
+// (round 5, review E4-4: at storm peak the reduced captures looked almost the same as full) stronger
+export const WEATHER_FX_REDUCED = 0.25;
 /** fog: the share of the storm's extra density kept with the setting on */
-export const WEATHER_FX_FOG_KEEP = 0.6;
+export const WEATHER_FX_FOG_KEEP = 0.4;
 /** blizzard walls and telegraphs never fade below this share of their full opacity */
 export const WEATHER_FX_TELEGRAPH_FLOOR = 0.75;

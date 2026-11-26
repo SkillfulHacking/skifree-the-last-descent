@@ -23,7 +23,7 @@
  */
 import { it } from 'vitest';
 import '../../src/world/biomes';
-import { buildMountain, DIFFICULTY, makeCourse, worldSeed, type Difficulty, type LengthMode } from '../../src/game/CourseConfig';
+import { buildMountain, yetiSpeedFor, makeCourse, worldSeed, type Difficulty, type LengthMode } from '../../src/game/CourseConfig';
 import { ObstacleField } from '../../src/physics/obstacles';
 import { simulateCourse } from '../../src/game/simulate';
 import { BiomeEnvironment } from '../../src/world/capabilities/environment';
@@ -37,6 +37,7 @@ import { getBiome } from '../../src/world/biome';
 import { whiteoutDriver } from './whiteoutDriver';
 import { POLICIES } from './balance';
 import { outPath } from './outPath';
+import { applyTune } from './tune';
 
 const P = (globalThis as unknown as { process: { env: Record<string, string | undefined>; stdout: { write(s: string): void } } }).process;
 
@@ -132,7 +133,7 @@ export function runTension(biome: BiomeId, len: LengthMode, diff: Difficulty, b:
     streaming: true,
     environment: env,
     // (W-077 experiment B) a fixed pace multiplier for every encounter, like an encounter's speedMul
-    yetiSpeed: DIFFICULTY[diff].yetiSpeed * pace,
+    yetiSpeed: yetiSpeedFor(diff, biome) * pace,
     snowballs: diff === 'hard',
     dodge: diff === 'hard',
     maxZ: Math.min(enc.triggerZ + 1500, Number.isFinite(m.finishZ) ? m.finishZ + 50 : Infinity),
@@ -206,6 +207,7 @@ export function runTension(biome: BiomeId, len: LengthMode, diff: Difficulty, b:
 it('pursuit tension', async () => {
   const fs = (await import('node:fs' as string)) as { writeFileSync: (p: string, d: string) => void; appendFileSync: (p: string, d: string) => void; existsSync: (p: string) => boolean; readFileSync: (p: string, e: string) => string };
   const out = await outPath(P.env.OUT, '.measure/tension.jsonl');
+  if (P.env.TUNE) applyTune(JSON.parse(P.env.TUNE));
   // resumable: rows already in OUT are kept
   const done = new Set<string>();
   const keyOf = (r: { seed: string; enc: number; pace: number; biome: string; len: string; diff: string; behaviour: string }) => `${r.seed}|${r.enc}|${r.pace}|${r.biome}|${r.len}|${r.diff}|${r.behaviour}`;

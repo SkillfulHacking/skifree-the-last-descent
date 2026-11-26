@@ -46,6 +46,8 @@ export class TrophyHandoff {
       trophy.position.copy(p);
     } else if (trophy.parent !== st.skier.rightHandSocket) {
       st.skier.rightHandSocket.add(trophy);
+      // (Round 5, review C4-5) the hand holding the trophy drops its pole
+      st.skier.setPoleVisible(1, false);
       // held by the stem: the podium plinth stays behind
       if (!this.heldOnly) trophy.children.forEach((c, i) => (c.visible = i === 0));
       trophy.position.set(0, -0.32, 0);

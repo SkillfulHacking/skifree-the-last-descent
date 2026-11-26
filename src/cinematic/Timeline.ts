@@ -45,6 +45,12 @@ export interface TimedEvent {
 
 export class Timeline {
   time = 0;
+  /**
+   * (Round 5, W-098 / review E4-3) Reduce Camera Motion, read live: every shot holds its end framing
+   * (a cut, not a crane or dolly) and the handheld drift is off. A shot that follows a moving subject
+   * still follows it — its end pose is recomputed each frame.
+   */
+  calm: () => boolean = () => false;
   readonly shots: Shot[] = [];
   readonly events: TimedEvent[] = [];
   duration = 0;
@@ -105,7 +111,8 @@ export class Timeline {
       if (!last || this.time < last.end) return false;
       active = last;
     }
-    const raw = clamp((this.time - active.start) / (active.end - active.start), 0, 1);
+    const calm = this.calm();
+    const raw = calm ? 1 : clamp((this.time - active.start) / (active.end - active.start), 0, 1);
     const t = (active.easing ?? ease.inOut)(raw);
     const a = active.from();
     const b = active.to();
@@ -124,7 +131,7 @@ export class Timeline {
       pos.lerpVectors(a.pos, b.pos, t);
       look.lerpVectors(a.look, b.look, t);
     }
-    if (active.handheld) {
+    if (active.handheld && !calm) {
       const h = active.handheld;
       const tt = this.time;
       pos.x += Math.sin(tt * 1.3) * h;

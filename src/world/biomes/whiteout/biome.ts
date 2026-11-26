@@ -88,6 +88,10 @@ export function makeWhiteoutBiome(): Biome {
       // (round 3, W-065) the valley under the ridge reads as depth: the far flank and floor, well below
       // the eye, darker and colder than the snow beside the piste
       valleyShade: { tint: [0.42, 0.5, 0.62], amount: 0.75, below: [40, 260], dist: [220, 800] },
+      // (Round 5, W-065: four blind reads — "the drop is implied, not shown") the flank beyond the rim is
+      // wind-scoured bare rock, dark blue-grey with snow in its gullies: from the line the rim is where the
+      // snow ends against a dark band falling away
+      scouredFlank: { rock: [0.16, 0.18, 0.22], slope: [0.16, 0.26], below: [6, 22], streak: 0.55 },
       skylightTint: [0.9, 0.96, 1.15],
     },
     ranges: { skyColor: [0.6, 0.67, 0.78], snow: [0.9, 0.92, 0.96], stoneDark: [0.11, 0.115, 0.13], stoneLight: [0.3, 0.31, 0.33], lowland: [0.2, 0.22, 0.26], horizonHaze: 0.8, soft: 0.8 },
@@ -113,6 +117,9 @@ export function makeWhiteoutBiome(): Biome {
     terrain: {
       // (W-077) Alpine's fixed Yeti pace is Alpine's own (deriveBiome would inherit it): unchanged here
       encounterPace: 1,
+      // (Round 5, W-095: on Normal a competent weather reader was never pressed — the gap only grew)
+      // Normal's fixed pace ×1.06: a clean run still escapes; mistakes and slow lines now cost ground
+      difficultyPace: { normal: 1.06, hard: 1 },
       // a high bare ridge: broad open bowls and ridgelines, with sheltered gullies and the last
       // trees lower down; steeper and more varied than Fjord's even runs
       slopeScale: 1.0,
@@ -163,7 +170,10 @@ export function makeWhiteoutBiome(): Biome {
       surface: WHITEOUT_SURFACE,
       weather: WHITEOUT_WEATHER,
       // drifts and blizzards on every difficulty; Relaxed softer, long courses × 0.85 (as Fjord)
-      hazards: { kinds: ['wind-drift', 'blizzard'], density: 1, intensity: { relaxed: 0.5, normal: 0.8, hard: 0.8 }, longCourse: 0.85 },
+      // (Round 5, W-094) Hard is the storm, not the Yeti: stronger weather on Hard (× 1.1, was 0.8 as on
+      // Normal), and it builds down the mountain past 3 km (× 1.5 by 8 km) — a long descent now costs more
+      // than a short one; the Sprint course and the Yeti are untouched by the build-up
+      hazards: { kinds: ['wind-drift', 'blizzard'], density: 1, intensity: { relaxed: 0.5, normal: 0.8, hard: 1.1 }, longCourse: 0.85, builds: { from: 3000, to: 8000, amount: { hard: 0.5 } } },
       finish: { id: 'whiteout-rescue' },
       refuge: { id: 'ridge-rescue-hut', name: 'Rescue hut' },
       cave: { id: 'whiteout-storm-cave' },

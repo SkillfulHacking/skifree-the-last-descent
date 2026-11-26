@@ -53,6 +53,19 @@ describe('input', () => {
     expect(detectPadType('8BitDo Pro 2')).toBe('gamepad');
   });
 
+  it('a pop tap shorter than one frame still counts for that frame (round 5, review E4-8)', () => {
+    const w = new FakeWindow();
+    const inp = new Input(settings(), w as unknown as Window);
+    inp.padSource = () => [];
+    w.fire('keydown', { code: 'Space' });
+    w.fire('keyup', { code: 'Space' });
+    inp.poll();
+    expect(inp.gameplay(1 / 15).pop).toBe(true);
+    // and only once
+    inp.poll();
+    expect(inp.gameplay(1 / 15).pop).toBe(false);
+  });
+
   it('keyboard movement works (steer ramps, tuck, brake, drift, pop)', () => {
     const w = new FakeWindow();
     const inp = new Input(settings(), w as unknown as Window);

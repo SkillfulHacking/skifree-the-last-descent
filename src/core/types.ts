@@ -69,6 +69,7 @@ export type YetiMode =
   | 'eat' // comedic: lifts held object to mouth, gulps, pats belly
   | 'disgust' // stops, recoils, shakes head
   | 'gag' // comedic: hunches, left hand to the throat, retches with the jaw wide, shudders
+  | 'recoil' // blinded by a light: jerks back, a forearm thrown up across the eyes, head turned away, a step back
   | 'turnAway'; // turns around and walks off
 
 export interface YetiAnimState {

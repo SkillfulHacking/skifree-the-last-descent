@@ -24,7 +24,7 @@ import * as THREE from 'three';
 import { fbm, hash2 } from '../../../../core/rng';
 import type { Mountain } from '../../../course';
 import { createRockMaterial, disposeRockMaterial } from '../../../art/rockMaterial';
-import { loadScan, type ScanId } from '../../../art/scanModels';
+import { decimateUnit, loadScan, type ScanId } from '../../../art/scanModels';
 import { corniceSamples } from './cornice';
 
 export const RIDGE_ROCK_IDS: ScanId[] = ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'];
@@ -199,9 +199,32 @@ export function ridgeRockPlacements(m: Mountain, z0: number, z1: number): RockPl
 
 const CHUNK = 256;
 
+/**
+ * (Round 5, W-096 / review D4-2: every ridge rock drew the full 5,000-triangle scan on every preset, and
+ * the round-4 rim band doubled their count) vertex-clustering grid per family and preset
+ * (scanModels.decimateUnit): the tors by the piste keep the most detail; the flank rocks and the rim
+ * band, seen beyond the lip and mostly far ahead, take coarse copies.
+ */
+export const RIDGE_ROCK_GRID: Record<'tor' | 'flank' | 'rim', Record<string, number>> = {
+  tor: { low: 9, medium: 10, high: 12, ultra: 12 },
+  flank: { low: 7, medium: 8, high: 9, ultra: 9 },
+  rim: { low: 7, medium: 8, high: 9, ultra: 10 },
+};
+
 export class RidgeRocks {
   readonly group = new THREE.Group();
   private geos = new Map<ScanId, THREE.BufferGeometry>();
+  /** decimated copies, per scan and grid */
+  private lods = new Map<string, THREE.BufferGeometry>();
+  private lod(id: ScanId, g: THREE.BufferGeometry, grid: number): THREE.BufferGeometry {
+    const key = `${id}:${grid}`;
+    let d = this.lods.get(key);
+    if (!d) {
+      d = decimateUnit(g, grid);
+      this.lods.set(key, d);
+    }
+    return d;
+  }
   private mat: THREE.MeshStandardMaterial;
   private spireMat: THREE.MeshStandardMaterial;
   private chunks = new Map<number, THREE.InstancedMesh[]>();
@@ -210,7 +233,7 @@ export class RidgeRocks {
 
   constructor(
     private m: Mountain,
-    quality: string,
+    private quality: string,
   ) {
     this.group.name = 'whiteout-ridge-rocks';
     this.mat = createRockMaterial({
@@ -223,6 +246,8 @@ export class RidgeRocks {
       grade: { lum: 0.055, desat: 0.92, tint: [0.93, 0.97, 1.06] },
       macroSet: { kind: 'cliff_side', tile: 90, strength: 0.35 },
       streaks: 0.35,
+      // (Round 5, W-093) rime feathers on the windward faces: the ridge's own look, by the piste
+      rime: { dir: [1, 0.25], amount: 0.85 },
     });
     // (W-065) the rim spires: wind-scoured faces, dark against the haze (the snow rule would whiten them)
     this.spireMat = createRockMaterial({
@@ -235,6 +260,7 @@ export class RidgeRocks {
       grade: { lum: 0.035, desat: 0.9, tint: [0.9, 0.95, 1.05] },
       macroSet: { kind: 'cliff_side', tile: 90, strength: 0.45 },
       streaks: 0.25,
+      rime: { dir: [1, 0.25], amount: 0.6 },
     });
     for (const id of RIDGE_ROCK_IDS)
       void loadScan(id).then((g) => {
@@ -269,18 +295,19 @@ export class RidgeRocks {
     // (round 4, W-086 / review D3-2) three draw groups per scan: the tors by the piste cast shadows; the
     // rim and flank rocks below the lip and the tall rim spires do not (Whiteout's shadow pass was 2×
     // Alpine's, most of it these full scans throwing shadows nobody on the line can see)
+    const G = (f: 'tor' | 'flank' | 'rim') => RIDGE_ROCK_GRID[f][this.quality] ?? RIDGE_ROCK_GRID[f]['high']!;
     const groups = [
-      { fam: (f: string) => f === 'tor', spire: false, shadow: true },
-      { fam: (f: string) => f === 'flank', spire: false, shadow: false },
+      { fam: (f: string) => f === 'tor', spire: false, shadow: true, grid: G('tor') },
+      { fam: (f: string) => f === 'flank', spire: false, shadow: false, grid: G('flank') },
       // the rim band and the spires: wind-scoured, dark (their own material, little snow on top)
-      { fam: (f: string) => f === 'rim' || f === 'spire', spire: true, shadow: false },
+      { fam: (f: string) => f === 'rim' || f === 'spire', spire: true, shadow: false, grid: G('rim') },
     ];
     for (const id of RIDGE_ROCK_IDS) {
       const g = this.geos.get(id);
       for (const grp of groups) {
         const mine = pls.filter((pl) => pl.id === id && grp.fam(pl.family));
         if (!g || !mine.length) continue;
-        const im = new THREE.InstancedMesh(g, grp.spire ? this.spireMat : this.mat, mine.length);
+        const im = new THREE.InstancedMesh(this.lod(id, g, grp.grid), grp.spire ? this.spireMat : this.mat, mine.length);
         mine.forEach((pl, i) => {
           q.set(...pl.q);
           M.compose(p.set(pl.x, pl.y, pl.z), q, sc.set(pl.sx, pl.sy, pl.sz));
@@ -310,6 +337,8 @@ export class RidgeRocks {
     this.disposed = true;
     for (const list of this.chunks.values()) for (const im of list) im.dispose();
     this.chunks.clear();
+    for (const d of this.lods.values()) d.dispose();
+    this.lods.clear();
     disposeRockMaterial(this.mat);
     disposeRockMaterial(this.spireMat);
   }

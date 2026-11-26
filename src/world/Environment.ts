@@ -217,6 +217,27 @@ export class Environment {
     this.applyLight();
   }
 
+  /**
+   * (Round 5, W-083) a cinematic's gloom, 0..1: the storm air darkens toward a dusk blue-grey (fog and
+   * the storm dome) so a light can carve through it. Presentation only; 0 = untouched.
+   */
+  setGloom(k: number) {
+    if (k === this.gloomK) return;
+    this.gloomK = k;
+    this.applyFogColour();
+  }
+  private gloomK = 0;
+  private applyFogColour() {
+    this.fog.color.copy(this.fogClear).lerp(STORM_GREY, 0.85 * this.storm);
+    if (this.gloomK > 0) this.fog.color.lerp(GLOOM, 0.8 * this.gloomK);
+    atmosphere.uFogColor.value.copy(this.fog.color);
+    if (this.stormDome) {
+      const m = this.stormDome.material as THREE.MeshBasicMaterial;
+      const k = THREE.MathUtils.smoothstep(this.storm, 0.2, 0.75);
+      m.color.copy(this.fog.color).multiply(this.domeTint.setRGB(1 + (STORM_DOME_TINT[0] - 1) * k, 1 + (STORM_DOME_TINT[1] - 1) * k, 1 + (STORM_DOME_TINT[2] - 1) * k));
+    }
+  }
+
   private ambientK = 1;
   private sunK = 1;
   private storm = 0;
@@ -275,6 +296,7 @@ export class Environment {
       atmosphere.uFogFalloff.value = this.falloffBase * (1 - storm);
       this.storm = storm;
       this.fog.color.copy(this.fogClear).lerp(STORM_GREY, 0.85 * storm);
+      if (this.gloomK > 0) this.fog.color.lerp(GLOOM, 0.8 * this.gloomK);
       if (!this.stormDome && storm > 0) {
         const m = new THREE.MeshBasicMaterial({ color: this.fog.color.clone(), side: THREE.BackSide, transparent: true, opacity: 0, depthWrite: false, fog: false });
         this.stormDome = new THREE.Mesh(new THREE.SphereGeometry(1100, 24, 12), m);
@@ -324,6 +346,8 @@ export class Environment {
 
 /** the colour of the air inside a storm front: bright, flat, blue-grey */
 const STORM_GREY = new THREE.Color(0.8, 0.83, 0.87);
+/** (Round 5, W-083) the storm at dusk: what a cinematic gloom darkens the air toward */
+const GLOOM = new THREE.Color(0.17, 0.2, 0.27);
 
 export function makeFlakeTexture(): THREE.Texture {
   const c = document.createElement('canvas');

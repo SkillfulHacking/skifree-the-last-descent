@@ -48,7 +48,16 @@ const ev = (fn, arg) => page.evaluate(fn, arg);
 /** evaluate `(w, m, k) => …` source with the world, mountain and debug API */
 const P = (src) => page.evaluate((s) => { const k = window.__skifree; const w = k.world(); return (0, eval)(s)(w, w.mountain, k); }, src);
 const settle = (ms) => page.waitForTimeout(ms);
-async function shot(name, note) {
+/**
+ * (Round 5, W-097) what a frame must show, checked from the game's own state before the image is kept:
+ *   yeti: 'main' — the Yeti drawn inside the main view and at least `yetiPx` tall (default 12 px)
+ *   skier: 'main' — the skier's feet and head inside the main view
+ *   letterbox: true — the cinematic bars on screen
+ * A failed check stops the capture (LENIENT=1 records it instead, for probing timings). The manifest
+ * records every check and its measured value, so a note can be held to it.
+ */
+const LENIENT = !!process.env.LENIENT;
+async function shot(name, note, expect = {}) {
   await ev(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r)))));
   await settle(400);
   await page.screenshot({ path: `${outDir}/${name}.png`, timeout: 1_200_000 });
@@ -68,9 +77,37 @@ async function shot(name, note) {
       }, [Number(size.split('x')[1])])
     : null;
   const course = await ev(() => window.__skifree.state().course?.id ?? null);
-  manifest.shots.push({ name, note, course, yeti, camera: st.cam, phase: st.s?.phase ?? 'menu', z: st.s?.z ?? null, time: st.s?.time ?? null, front: f, cinematicTime: st.s?.cinematicTime ?? null });
+  // the Yeti's distance from the camera (the AI's chase distance is stale outside a chase)
+  if (yeti && st.cam) {
+    const r = st.s.yetiRoot;
+    yeti.fromCamera = +Math.hypot(r[0] - st.cam.pos[0], r[1] - st.cam.pos[1], r[2] - st.cam.pos[2]).toFixed(1);
+    if (!/chase|cave/i.test(st.s.phase ?? '')) delete yeti.distance;
+  }
+  const skier = st.s
+    ? await ev(() => {
+        const k = window.__skifree;
+        const s = k.state().session;
+        // the skier's chest (a framing may crop the feet under the letterbox)
+        const b = k.projectToScreen({ x: s.x, y: s.y + 1.25, z: s.z });
+        return { inMainView: b.z < 1 && Math.abs(b.x) < 0.98 && Math.abs(b.y) < 0.85 };
+      })
+    : null;
+  const bars = await ev(() => {
+    const t = document.querySelector('.letterbox.top');
+    if (!t) return 0;
+    const r = t.getBoundingClientRect();
+    const cs = getComputedStyle(t);
+    return cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.5 ? 0 : Math.round(r.height);
+  });
+  const checks = {};
+  if (expect.yeti === 'main') checks.yeti = !!(yeti && yeti.inMainView && yeti.heightPx >= (expect.yetiPx ?? 12));
+  if (expect.skier === 'main') checks.skier = !!skier?.inMainView;
+  if (expect.letterbox) checks.letterbox = bars > 0;
+  const failed = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
+  manifest.shots.push({ name, note, expect, checks, failed, course, yeti, skier, letterboxPx: bars, camera: st.cam, phase: st.s?.phase ?? 'menu', z: st.s?.z ?? null, time: st.s?.time ?? null, front: f, cinematicTime: st.s?.cinematicTime ?? null });
   writeFileSync(`${outDir}/manifest.json`, JSON.stringify(manifest, null, 2));
-  log('shot', name, f ? `${f.phase} s=${f.s.toFixed(2)}` : '');
+  log('shot', name, f ? `${f.phase} s=${f.s.toFixed(2)}` : '', failed.length ? `FAILED ${failed.join(',')}` : '');
+  if (failed.length && !LENIENT) throw new Error(`${name}: the frame does not show ${failed.join(', ')} (${note})`);
 }
 /** step deterministic frames until a predicate on the session state holds */
 async function framesUntil(pred, max, dt = 1 / 30) {
@@ -230,15 +267,15 @@ if (want('cave') && G.cave) {
   await ev((tz) => window.__skifree.teleport(tz + 0.5, 16), G.cave.triggerZ);
   const r = await framesUntil('(s) => s.phase === "caveCinematic"', 900);
   log('cinematic', r.ok);
-  for (const [t, name, note] of [
+  for (const [t, name, note, expect] of [
     [3.0, '12_cave_mouth', 'Cave encounter 3 s: the rimed mouth, snow curtain off the brow'],
     [8.6, '13_cave_emerge', 'Emergence (8.6 s): the squall rolling in, spindrift across the mouth'],
     [11.3, '14_cave_roar', 'The roar (11.3 s): snow blasted off the brow'],
-    [15.2, '15_cave_leap', 'The leap (15.2 s)'],
+    [15.2, '15_cave_leap', 'The leap (15.2 s)', { yeti: 'main' }],
   ]) {
     await framesUntil(`(s) => s.cinematicTime >= ${t}`, 900);
     await settle(1200);
-    await shot(name, note);
+    await shot(name, note, expect);
     if (process.env.DIAG && name === '15_cave_leap') {
       log('weather', JSON.stringify(await P(`(w) => ({ weather: w.weather, density: w.env.fog.density, override: w.weatherOverride })`)));
       await ev(() => window.__skifree.setVisible('whiteout-blowing-snow', false));
@@ -275,7 +312,7 @@ if (want('chase')) {
     k.freeCam([s.x + 1.2, s.y + 2.2, s.z - 3], [yp[0], yp[1] + 1.6, yp[2]], 50);
   });
   await settle(2000);
-  await shot('17_yeti_silhouette', 'Looking back from the skier in the storm: the Yeti silhouette in the snow');
+  await shot('17_yeti_silhouette', 'Looking back from the skier in the storm: the Yeti silhouette in the snow', { yeti: 'main' });
 }
 
 // ---- Hard: a snowball landing marker in fog
@@ -293,7 +330,8 @@ if (want('hard')) {
 // ---- the rescue station and the victory (each beat frame-accurate on the cinematic clock)
 if (want('victory')) {
   await startRun('normal');
-  await ev(() => { window.__skifree.hud(false); window.__skifree.autopilot('skilled'); });
+  // (round 5, W-097) the HUD stays on: the cinematic's letterbox and captions are part of what is judged
+  await ev(() => { window.__skifree.hud(true); window.__skifree.autopilot('skilled'); });
   await ev((L) => window.__skifree.teleport(L - 260, 16), G.L);
   // the arrival in a storm
   const ts = await findPhase('storm', 30, 6);
@@ -305,12 +343,13 @@ if (want('victory')) {
   // (round 2) one frame per beat at the beat's mid-point, plus the beat changes that matter; the
   // notes say what each frame was framed to show — check every one against the image
   const beats = [
-    [1.8, '20_v_arrive', 'Victory 1.8 s (beat 1, into the light): behind the skier toward the hut through the storm; letterbox on'],
-    [5.2, '21_v_welcome', 'Victory 5.2 s (beat 2, welcome): in front of the porch looking at the door as it opens, skier arriving'],
-    [8.2, '22_v_lantern', 'Victory 8.2 s (beat 3, the lantern raised in the doorway: halo + light)'],
-    [10.2, '23_v_yeti_white', 'Victory 10.2 s (beat 4): past the skier and lantern, the Yeti coming in from the white'],
-    [11.9, '24_v_yeti_flinch', 'Victory 11.9 s (beat 5): close on the Yeti in the searchlight beam, flinching'],
-    [13.4, '24b_v_yeti_leaves', 'Victory 13.4 s (beat 5 end): turning back into the storm'],
+    [1.8, '20_v_arrive', 'Victory 1.8 s (beat 1, into the light): behind the skier toward the hut through the storm; letterbox on', { skier: 'main', letterbox: true }],
+    [5.2, '21_v_welcome', 'Victory 5.2 s (beat 2, welcome): in front of the porch looking at the door as it opens, skier arriving', { skier: 'main' }],
+    [8.2, '22_v_lantern', 'Victory 8.2 s (beat 3, the lantern raised in the doorway: halo + light)', { skier: 'main' }],
+    [10.2, '23_v_yeti_white', 'Victory 10.2 s (beat 4): past the skier and lantern, the Yeti coming in from the white', { yeti: 'main', skier: 'main' }],
+    [11.6, '24_v_yeti_light', 'Victory 11.6 s (beat 5a, the hit): from behind the Yeti toward the station — the lamp on its mast, the shaft reaching him, the pool of light at his feet', { yeti: 'main', yetiPx: 60 }],
+    [12.7, '24c_v_yeti_recoil', 'Victory 12.7 s (beat 5b): close on the Yeti in the light, recoiling behind a raised forearm', { yeti: 'main', yetiPx: 120 }],
+    [13.4, '24b_v_yeti_leaves', 'Victory 13.4 s (beat 5 end): turning back into the storm', { yeti: 'main' }],
     [16.0, '25_v_break', 'Victory 16.0 s (beat 6): the storm breaking, the camera rising off the station'],
     [20.5, '26_v_reveal', 'Victory 20.5 s (beat 7): settled reveal — station, ridge behind, title'],
   ];
@@ -320,11 +359,11 @@ if (want('victory')) {
     beats.length = 0;
     for (let t = 0.5; t <= 23.5; t += 1) beats.push([t, `strip_${String(t.toFixed(1)).padStart(4, '0')}`, `Victory ${t.toFixed(1)} s`]);
   }
-  for (const [t, name, note] of beats) {
+  for (const [t, name, note, expect] of beats) {
     await framesUntil(`(s) => s.cinematicTime >= ${t}`, 900);
     if (onlyBeats && !onlyBeats.includes(name)) continue;
     await settle(1200);
-    await shot(name, note);
+    await shot(name, note, expect);
   }
 }
 

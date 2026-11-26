@@ -191,6 +191,8 @@ export function makeFjordBiome(): Biome {
     terrain: {
       // (W-077) Alpine's fixed Yeti pace is Alpine's own (deriveBiome would inherit it): unchanged here
       encounterPace: 1,
+      // (Round 5) likewise Alpine's Hard-only pace: Fjord's Hard is already inside the owner's ranges
+      difficultyPace: {},
       // round 3 (B N1, F2): the round-2 terrain (minSlope 14, highspeed-heavy, swing 0.8) made the
       // Fjord the faster mountain on unseen seeds. The terrain alone now skis like Alpine's for a
       // skilled skier (measured route gradient on 8 unseen seeds: Sprint 14.8° / Standard 15.8° /

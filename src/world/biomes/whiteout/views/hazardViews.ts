@@ -30,7 +30,22 @@ let shared: { drift: THREE.MeshStandardMaterial; plume: THREE.PointsMaterial; cu
 function curtainMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: { uOpacity: { value: 0 }, uTime: { value: 0 }, uColor: { value: new THREE.Color(0.9, 0.93, 0.97) } },
-    vertexShader: 'varying vec2 vUv; varying float vD; void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); vD = -mv.z; gl_Position = projectionMatrix * mv; }',
+    // (Round 5, W-065 / A4-3: sheets laid along the course were seen edge-on from the chase camera — a
+    // bright vertical column with a seam at the vanishing point, read as a rendering fault) each sheet is
+    // an upright billboard turned to the camera about its own centre: from any view it is a soft mass of
+    // driven snow, never a plane seen on edge
+    vertexShader: `varying vec2 vUv; varying float vD;
+      void main(){
+        vUv = uv;
+        vec3 c = (modelMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+        vec2 tc = cameraPosition.xz - c.xz;
+        vec2 f = length(tc) > 1e-3 ? normalize(tc) : vec2(0.0, 1.0);
+        vec3 right = vec3(f.y, 0.0, -f.x);
+        vec3 w = c + right * position.x + vec3(0.0, position.y, 0.0);
+        vec4 mv = viewMatrix * vec4(w, 1.0);
+        vD = -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }`,
     fragmentShader: `uniform float uOpacity; uniform float uTime; uniform vec3 uColor; varying vec2 vUv; varying float vD;
       float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
@@ -39,7 +54,9 @@ function curtainMaterial(): THREE.ShaderMaterial {
         float streak = 0.55 + 0.45 * n(vec2(vUv.x * 7.0 - uTime * 0.9, vUv.y * 40.0));
         float billow = 0.6 + 0.4 * n(vec2(vUv.x * 3.0 - uTime * 0.25, vUv.y * 2.5 + 1.7));
         float near = smoothstep(2.0, 9.0, vD);
-        float a = uOpacity * edge * streak * billow * near;
+        // far sheets thin out with distance like the storm air itself (no bright wall at the horizon)
+        float far = 1.0 - smoothstep(70.0, 170.0, vD);
+        float a = uOpacity * edge * streak * billow * near * far;
         if (a < 0.003) discard;
         gl_FragColor = vec4(uColor, a);
       }`,
@@ -282,9 +299,18 @@ function blizzardView(h: HazardInstance<BlizzardParams>, m: Mountain): HazardVie
   // pale curtains (vertical sheets across the fall line, swept along with the cell)
   const curtains: THREE.Mesh[] = [];
   const cm = M.curtain.clone();
-  for (let k = 0; k < 4; k++) {
-    const sheet = new THREE.Mesh(new THREE.PlaneGeometry(2 * R, 26, 1, 1), cm);
-    sheet.rotation.y = Math.PI / 2 + (k - 1.5) * 0.12;
+  // (Round 5) camera-facing sheets scattered through the cell (see curtainMaterial): position, size
+  const NS = 8;
+  const slot: Array<{ dx: number; dz: number; w: number; hgt: number }> = [];
+  for (let k = 0; k < NS; k++) {
+    const a = ((k * 2654435761 + h.seed * 7) >>> 0) / 4294967296;
+    const b = ((k * 40503 + h.seed * 131) % 10007) / 10007;
+    const c = ((k * 69069 + h.seed * 17) % 9973) / 9973;
+    slot.push({ dx: (a * 2 - 1) * R * 0.75, dz: (b * 2 - 1) * R * 0.75, w: R * (0.7 + 0.5 * c), hgt: 15 + 7 * b });
+  }
+  for (let k = 0; k < NS; k++) {
+    const sheet = new THREE.Mesh(new THREE.PlaneGeometry(slot[k]!.w, slot[k]!.hgt, 1, 1), cm);
+    sheet.frustumCulled = false;
     curtains.push(sheet);
     obj.add(sheet);
   }
@@ -314,10 +340,11 @@ function blizzardView(h: HazardInstance<BlizzardParams>, m: Mountain): HazardVie
         p[i * 3 + 2] = h.z + z;
       }
       (g.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
-      cm.uniforms.uOpacity!.value = 0.28 * Math.max(w, ph.phase === 'telegraph' ? 0.6 * ph.u : 0);
+      cm.uniforms.uOpacity!.value = 0.2 * Math.max(w, ph.phase === 'telegraph' ? 0.6 * ph.u : 0);
       cm.uniforms.uTime!.value = t;
       curtains.forEach((sh, k) => {
-        sh.position.set(cx + (k - 1.5) * R * 0.42 + dir * ((t * 9 + k * 13) % 24) - dir * 12, ground + 11, h.z);
+        const s = slot[k]!;
+        sh.position.set(cx + s.dx + dir * ((t * 9 + k * 13) % 24) - dir * 12, ground + s.hgt * 0.42, h.z + s.dz);
       });
     },
     dispose() {

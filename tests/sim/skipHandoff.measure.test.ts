@@ -10,7 +10,7 @@
 import { it } from 'vitest';
 import * as THREE from 'three';
 import '../../src/world/biomes';
-import { buildMountain, DIFFICULTY, makeCourse, worldSeed, type Difficulty, type LengthMode } from '../../src/game/CourseConfig';
+import { buildMountain, yetiSpeedFor, makeCourse, worldSeed, type Difficulty, type LengthMode } from '../../src/game/CourseConfig';
 import { ObstacleField } from '../../src/physics/obstacles';
 import { simulateCourse } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
@@ -50,7 +50,7 @@ it('skip vs watch', async () => {
             let first = true;
             const res = simulateCourse(m, f, (s, t) => autopilotInput(m, s, style, t), {
               streaming: true,
-              yetiSpeed: DIFFICULTY[diff].yetiSpeed,
+              yetiSpeed: yetiSpeedFor(diff, biome),
               maxTime: 200,
               maxZ: m.finishZ,
               handoff: (yeti, sp, e) => {

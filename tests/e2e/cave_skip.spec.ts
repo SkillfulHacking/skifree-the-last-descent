@@ -42,11 +42,25 @@ type W = {
   setCourse(mode: string, len: string, o: Record<string, unknown>): string;
   teleport(z: number, speed?: number): void;
   cameraPose(): { pos: number[]; dir: number[] };
-  world(): { mountain: { profile: { encounters(a: number, b: number): Array<{ triggerZ: number }> } } };
+  world(): { mountain: { routeX(z: number): number; profile: { encounters(a: number, b: number): Array<{ triggerZ: number }> } } };
 };
 const api = 'window.__skifree';
 
 async function boot(page: Page, biome: string, difficulty = 'normal', reduceCameraMotion = false) {
+  // (round 5, review E4-6) "downhill" is measured against the run itself — the course's direction at the
+  // skier (the racing line's tangent), horizontal components only — not world +Z: a curving run must not
+  // pass or fail on its bend
+  await page.addInitScript(() => {
+    (window as unknown as { __runFwd: (k: W) => number }).__runFwd = (k: W) => {
+      const s = k.state().session!;
+      const m = k.world().mountain;
+      const tx = m.routeX(s.z + 6) - m.routeX(s.z - 6);
+      const tl = Math.hypot(tx, 12);
+      const d = k.cameraPose().dir;
+      const dl = Math.hypot(d[0]!, d[2]!) || 1;
+      return ((d[0]! / dl) * tx + (d[2]! / dl) * 12) / tl;
+    };
+  });
   await page.addInitScript(
     ([b, d, r]) => {
       if (!sessionStorage.getItem('seeded')) {
@@ -96,7 +110,7 @@ async function untilChase(page: Page, max = 900) {
     const track: Array<{ t: number; dir: number[] }> = [];
     for (let i = 0; i < n; i++) {
       const s = k.state().session!;
-      if (s.phase === 'chase') return { s: { ...s, cam: k.cameraPose() }, track };
+      if (s.phase === 'chase') return { s: { ...s, cam: k.cameraPose(), fwd: (window as unknown as { __runFwd: (k: W) => number }).__runFwd(k) }, track };
       k.framesLive(1, 1 / 30);
       track.push({ t: s.cinematicTime, dir: k.cameraPose().dir });
     }
@@ -110,7 +124,7 @@ async function after2s(page: Page) {
     let minDirZ = Infinity;
     for (let i = 0; i < 60; i++) {
       k.framesLive(1, 1 / 30);
-      minDirZ = Math.min(minDirZ, k.cameraPose().dir[2]!);
+      minDirZ = Math.min(minDirZ, (window as unknown as { __runFwd: (k: W) => number }).__runFwd(k));
     }
     return { s: { ...k.state().session!, cam: k.cameraPose() }, minDirZ };
   });
@@ -182,12 +196,13 @@ for (const c of CASES) {
     } else expect(big, `the swing turns too fast (frame turns ${steps.map((a) => a.toFixed(1)).join(' ')})`).toEqual([]);
     // (round 4, W-090) downhill means downhill: round 3 accepted dir.z > 0.3 (72° off the run); measured
     // 0.978–0.989 (review E), so ≥ 0.9 (< 26°); the values are logged
-    console.log(`[cave_skip] ${label(c)} first frame dir.z ${watched.cam.dir[2]!.toFixed(3)}`);
-    expect(watched.cam.dir[2]!, 'the first controllable frame looks downhill').toBeGreaterThan(0.9);
+    const fwd0 = (watched as unknown as { fwd: number }).fwd;
+    console.log(`[cave_skip] ${label(c)} first frame along the run ${fwd0.toFixed(3)} (world dir.z ${watched.cam.dir[2]!.toFixed(3)})`);
+    expect(fwd0, 'the first controllable frame looks down the run').toBeGreaterThan(0.95);
     expect(Math.max(...steps.slice(-3)), 'no jump at the hand-off').toBeLessThan(c.reduce ? 1.5 : 7.2);
     const { s: watched2, minDirZ } = await after2s(page);
-    console.log(`[cave_skip] ${label(c)} lowest dir.z over 2 s ${minDirZ.toFixed(3)}`);
-    expect(minDirZ, 'the view never turns back on its own').toBeGreaterThan(0.85);
+    console.log(`[cave_skip] ${label(c)} lowest alignment with the run over 2 s ${minDirZ.toFixed(3)}`);
+    expect(minDirZ, 'the view never turns back on its own').toBeGreaterThan(0.9);
 
     // 2) skips at several moments: before he shows (1 s), mid-reveal (9 s), during the swing (15.2 s),
     // just before the leap (15.7 s)
@@ -224,8 +239,8 @@ for (const c of CASES) {
       same(watched, skipped, 1e-3, `${what}, hand-off frame`);
       const { s: skipped2, minDirZ: mz } = await after2s(page);
       same(watched2, skipped2, 1e-3, `${what}, 2 s into the chase`);
-      console.log(`[cave_skip] ${label(c)} ${what}: lowest dir.z ${mz.toFixed(3)}`);
-      expect(mz, `${what}: the view never turns back on its own`).toBeGreaterThan(0.85);
+      console.log(`[cave_skip] ${label(c)} ${what}: lowest alignment with the run ${mz.toFixed(3)}`);
+      expect(mz, `${what}: the view never turns back on its own`).toBeGreaterThan(0.9);
     }
 
     // 3) the player's own look-back (C) still turns the view round, and lets it go
@@ -234,17 +249,32 @@ for (const c of CASES) {
       const back = await page.evaluate(() => {
         const k = (window as unknown as { __skifree: W }).__skifree;
         k.framesLive(30, 1 / 30);
-        return k.cameraPose().dir[2]!;
+        return (window as unknown as { __runFwd: (k: W) => number }).__runFwd(k);
       });
       await page.keyboard.up('KeyC');
       const fwd = await page.evaluate(() => {
         const k = (window as unknown as { __skifree: W }).__skifree;
         k.framesLive(45, 1 / 30);
-        return k.cameraPose().dir[2]!;
+        return (window as unknown as { __runFwd: (k: W) => number }).__runFwd(k);
       });
       expect(back, 'held look-back faces uphill').toBeLessThan(-0.3);
-      console.log(`[cave_skip] ${label(c)} released look-back dir.z ${fwd.toFixed(3)}`);
-      expect(fwd, 'released, the view faces the run again').toBeGreaterThan(0.85);
+      console.log(`[cave_skip] ${label(c)} released look-back alignment ${fwd.toFixed(3)}`);
+      expect(fwd, 'released, the view faces the run again').toBeGreaterThan(0.9);
+      // (round 5, review E4-6) the controller's B does the same
+      const padB = await page.evaluate(() => {
+        const k = (window as unknown as { __skifree: W }).__skifree;
+        const pad = (down: boolean) => ({ id: 'test pad', connected: true, mapping: 'standard', axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, (_, i) => ({ value: down && i === 1 ? 1 : 0, pressed: down && i === 1 })) });
+        const R = (window as unknown as { __runFwd: (k: W) => number }).__runFwd;
+        k.setInputPads(() => [pad(true)]);
+        k.framesLive(30, 1 / 30);
+        const b = R(k);
+        k.setInputPads(() => [pad(false)]);
+        k.framesLive(45, 1 / 30);
+        return { b, f: R(k) };
+      });
+      console.log(`[cave_skip] ${label(c)} pad B look-back ${padB.b.toFixed(3)}, released ${padB.f.toFixed(3)}`);
+      expect(padB.b, 'held pad B faces uphill').toBeLessThan(-0.3);
+      expect(padB.f, 'released pad B, the view faces the run again').toBeGreaterThan(0.9);
     }
     expect(errors).toEqual([]);
   });

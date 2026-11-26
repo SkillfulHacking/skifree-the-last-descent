@@ -392,6 +392,22 @@ float sf_sideN(vec2 sc, float off){
   rock = mix(rock, snow * 0.92, max(cling, ledge * 0.55));
   rock = mix(rock, rock * 0.62, smoothstep(0.6, 0.95, slope) * 0.55);
 ${coastal ? coastRockGlsl(T, quality === 'low') : ''}
+${
+    T.scouredFlank
+      ? `
+  {
+    // (Round 5, W-065) the wind-scoured flank: steep ground well below the eye is bare dark rock with
+    // snow lodged in fall-line gullies — the face of the drop, seen beyond the rim
+    float fBelow = cameraPosition.y - vWPos.y;
+    float flank = smoothstep(${T.scouredFlank.slope[0].toFixed(3)}, ${T.scouredFlank.slope[1].toFixed(3)}, slope) * smoothstep(${T.scouredFlank.below[0].toFixed(1)}, ${T.scouredFlank.below[1].toFixed(1)}, fBelow);
+    float gully = sf_fbm(vec2((wp.x + wp.z) * 0.06, wp.y * 0.009));
+    float lodged = smoothstep(0.56, 0.68, gully) * ${T.scouredFlank.streak.toFixed(3)};
+    vec3 scour = ${v3(T.scouredFlank.rock)} * (0.78 + 0.44 * n1);
+    rock = mix(rock, mix(scour, snow * 0.82, lodged), flank);
+    sf_rock = max(sf_rock, flank);
+  }`
+      : ''
+  }
   vec3 col = mix(snow, rock, sf_rock);
   // drifting cloud shadows
   float cloud = sf_fbm(wp.xz * 0.0016 + vec2(uTime * 0.004, uTime * 0.0025));

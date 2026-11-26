@@ -272,6 +272,14 @@ export class SkierModel {
     this.root.visible = v;
   }
 
+  /**
+   * (Round 5, review C4-5) a hand that holds something else (the finish trophy, the rescue lantern)
+   * lets its pole go: 0 = left, 1 = right.
+   */
+  setPoleVisible(i: 0 | 1, v: boolean): void {
+    this.poles[i].visible = v;
+  }
+
   /** Cosmetics: recolour the jacket (purely visual). */
   setJacketColor(color: number): void {
     setJacketColor(this.mats, color);

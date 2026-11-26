@@ -16,6 +16,7 @@ export class DefeatCinematic {
   private side = new THREE.Vector3();
 
   constructor(private st: Stage) {
+    this.tl.calm = () => st.settings.reduceCameraMotion;
     const yp = st.yetiAI.pos.clone();
     this.yetiPos.copy(yp);
     const h = st.yetiAI.heading;
@@ -100,6 +101,7 @@ export class VictoryCinematic implements VictoryDirector {
   private script: VictoryScript;
 
   constructor(st: Stage) {
+    this.tl.calm = () => st.settings.reduceCameraMotion;
     const finish = st.world.finish!;
     finish.getStopPoint(this.stopPoint);
     this.script = st.world.finishDef.victory(st, finish, this);

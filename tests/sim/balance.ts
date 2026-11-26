@@ -19,7 +19,7 @@
  * - route: samples on the exposed alternate line vs the sheltered main line.
  */
 import '../../src/world/biomes';
-import { buildMountain, courseId, DIFFICULTY, makeCourse, worldSeed, type Difficulty, type LengthMode } from '../../src/game/CourseConfig';
+import { buildMountain, courseId, yetiSpeedFor, makeCourse, worldSeed, type Difficulty, type LengthMode } from '../../src/game/CourseConfig';
 import { BiomeEnvironment } from '../../src/world/capabilities/environment';
 import { ObstacleField } from '../../src/physics/obstacles';
 import { simulateCourse } from '../../src/game/simulate';
@@ -197,7 +197,7 @@ export function measure(spec: RunSpec): RunResult {
     log: simLog,
     streaming: true,
     environment: env,
-    yetiSpeed: DIFFICULTY[spec.diff].yetiSpeed,
+    yetiSpeed: yetiSpeedFor(spec.diff, spec.biome),
     maxTime: spec.len === 'sprint' ? 900 : 2400,
     snowballs: spec.diff === 'hard',
     dodge: spec.diff === 'hard',

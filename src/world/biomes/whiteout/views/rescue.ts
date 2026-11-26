@@ -183,6 +183,32 @@ const RESCUERS: GuestLook[] = [
   { ...RESCUER_BASE, male: false, height: 1.7, skin: 0xc89070, hair: 0x2a1c14, hairStyle: 'ponytail', headwear: 'beanie', hatColor: 0xc8241a, hatColor2: 0xf2f2ee, top: 'skiJacket', topColor: 0xd02a1c, accent: 0xf0f0ea, pants: 'ski', pantsColor: 0x1d2330, boots: 'snow', bootColor: 0x2a2a2a, gloves: 0x1a1a1a, eyes: 0x5a4030 },
 ];
 
+/** the searchlight's shaft length (m) */
+export const BEAM_LEN = 60;
+/**
+ * The searchlight's visible shaft: an open cone from the lamp (apex at 0) out to BEAM_LEN along +Z, and
+ * its material. `vD` is the distance along the shaft as a fraction (0 at the lamp, 1 at the far end).
+ * (Round 5, W-083) the root cause of three rounds of an invisible beam: vD was computed as −z/BEAM_LEN,
+ * negative everywhere, so smoothstep(0, …, vD) zeroed every fragment's alpha.
+ */
+export function searchBeam(): { geometry: THREE.BufferGeometry; material: THREE.ShaderMaterial } {
+  const geometry = new THREE.ConeGeometry(4.6, BEAM_LEN, 18, 1, true);
+  geometry.translate(0, -BEAM_LEN / 2, 0);
+  geometry.rotateX(-Math.PI / 2);
+  const material = new THREE.ShaderMaterial({
+    uniforms: { uK: { value: 0.12 } },
+    // a warm shaft drawn over the scene (normal blending), so it reads against bright snow as well as the
+    // darkened storm of the beat
+    vertexShader: `varying float vD; varying vec3 vN; varying vec3 vV; void main(){ vD = position.z / ${BEAM_LEN.toFixed(1)}; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: 'uniform float uK; varying float vD; varying vec3 vN; varying vec3 vV; void main(){ float face = abs(dot(normalize(vN), normalize(vV))); float a = uK * (1.0 - 0.75 * vD) * smoothstep(0.0, 0.04, vD) * (0.25 + 0.75 * face); gl_FragColor = vec4(1.0, 0.86, 0.6, a); }',
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.NormalBlending,
+    side: THREE.DoubleSide,
+  });
+  return { geometry, material };
+}
+
 export class RescueStation implements FinishEnvironment {
   readonly group = new THREE.Group();
   readonly trophy: THREE.Object3D;
@@ -205,6 +231,10 @@ export class RescueStation implements FinishEnvironment {
   private doorLight: THREE.PointLight;
   private search: THREE.SpotLight;
   private beam: THREE.Mesh;
+  /** (Round 5, W-083) the warm pool the searchlight throws on the snow around its target */
+  private pool: THREE.Mesh;
+  /** (Round 5, W-083) the lamp's glare on the mast */
+  private glare: THREE.Sprite;
   private searchPivot = new THREE.Object3D();
   private windsock: THREE.Mesh;
   private smoke: THREE.Points;
@@ -218,6 +248,11 @@ export class RescueStation implements FinishEnvironment {
   cheer = 0;
   /** where the searchlight points (world); null: it sweeps the slope */
   searchTarget: THREE.Vector3 | null = null;
+  /** the searchlight's lamp, in world space (cinematic framing) */
+  lampWorld(out: THREE.Vector3): THREE.Vector3 {
+    this.searchPivot.updateWorldMatrix(true, false);
+    return out.setFromMatrixPosition(this.searchPivot.matrixWorld);
+  }
   /** 0..1 the lantern raised (the lantern beat): its glow and light swell (W-042) */
   lanternUp = 0;
   private aimCur: THREE.Vector3 | null = null;
@@ -475,24 +510,54 @@ export class RescueStation implements FinishEnvironment {
     tgt.position.set(0, 0, 30);
     this.searchPivot.add(tgt);
     this.search.target = tgt;
-    const beamG = new THREE.ConeGeometry(4.6, 60, 18, 1, true);
-    beamG.translate(0, -30, 0);
-    beamG.rotateX(-Math.PI / 2);
-    const beamM = mk(
-      new THREE.ShaderMaterial({
-        uniforms: { uK: { value: 0.12 } },
-        vertexShader: 'varying float vD; void main(){ vD = -position.z / 60.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-        fragmentShader: 'uniform float uK; varying float vD; void main(){ gl_FragColor = vec4(1.0, 0.95, 0.85, uK * (1.0 - vD) * smoothstep(0.0, 0.08, vD)); }',
-        transparent: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide,
-      }),
-    );
+    const { geometry: beamG, material: beamMat } = searchBeam();
+    const beamM = mk(beamMat);
     this.beam = new THREE.Mesh(geo(beamG), beamM);
     this.beam.position.set(0, 0, 0.4);
     this.beam.frustumCulled = false;
+    // (Round 5, W-083) the root cause of three rounds of "no beam": the shader's distance along the shaft
+    // was negated (the cone runs 0 → +60 along +Z; vD = −z/60 made every fragment's alpha 0). Exported
+    // geometry facts are pinned by tests/unit/searchlight_beam.test.ts.
+    // (Round 5) drawn after the storm dome (renderOrder 5): the beam writes no depth, so the dome — opaque
+    // at full storm — painted over it wherever there was sky behind the shaft
+    this.beam.renderOrder = 8;
     this.searchPivot.add(this.beam);
+    // the lamp's glare: a hard bright star on the mast while the light is on its target
+    const glareTex = (() => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 64;
+      const g = c.getContext('2d')!;
+      const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gr.addColorStop(0, 'rgba(255,248,230,1)');
+      gr.addColorStop(0.18, 'rgba(255,232,190,0.85)');
+      gr.addColorStop(0.5, 'rgba(255,210,150,0.22)');
+      gr.addColorStop(1, 'rgba(255,200,140,0)');
+      g.fillStyle = gr;
+      g.fillRect(0, 0, 64, 64);
+      return new THREE.CanvasTexture(c);
+    })();
+    this.glare = new THREE.Sprite(mk(new THREE.SpriteMaterial({ map: glareTex, transparent: true, depthWrite: false, fog: false, toneMapped: false, opacity: 0 })) as THREE.SpriteMaterial);
+    this.glare.position.set(0, 0, 0.45);
+    this.glare.scale.setScalar(3.2);
+    this.glare.renderOrder = 9;
+    this.searchPivot.add(this.glare);
+    const poolM = mk(
+      new THREE.ShaderMaterial({
+        uniforms: { uK: { value: 0 } },
+        vertexShader: 'varying vec2 vP; void main(){ vP = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'uniform float uK; varying vec2 vP; void main(){ float r = length(vP) / 3.4; float a = uK * pow(1.0 - smoothstep(0.0, 1.0, r), 1.6); gl_FragColor = vec4(1.0, 0.86, 0.6, a); }',
+        transparent: true,
+        depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2,
+      }),
+    );
+    this.pool = new THREE.Mesh(new THREE.CircleGeometry(3.4, 32).rotateX(-Math.PI / 2), poolM);
+    this.pool.name = 'searchlight-pool';
+    this.pool.renderOrder = 6;
+    this.pool.visible = false;
+    this.group.add(this.pool);
     // --- the snowcat, half inside the garage (nose out), and the akja sled
     const cat = new THREE.Group();
     cat.position.set(gx, FL - 0.35, gz + C.garageD / 2 + 0.6);
@@ -657,9 +722,22 @@ export class RescueStation implements FinishEnvironment {
     else this.aimCur.lerp(aim, 1 - Math.exp(-(this.searchTarget ? 4.5 : 8) * Math.max(0, dt)));
     P.lookAt(this.aimCur);
     const uK = (this.beam.material as THREE.ShaderMaterial).uniforms.uK!;
-    uK.value += ((this.searchTarget ? 0.42 : 0.12) - uK.value) * (1 - Math.exp(-3 * Math.max(0, dt)));
+    uK.value += ((this.searchTarget ? 0.85 : 0.12) - uK.value) * (1 - Math.exp(-3 * Math.max(0, dt)));
+    // the pool on the snow where the light lands (on a target only)
+    const pK = (this.pool.material as THREE.ShaderMaterial).uniforms.uK!;
+    pK.value += ((this.searchTarget ? 0.6 : 0) - pK.value) * (1 - Math.exp(-4 * Math.max(0, dt)));
+    this.pool.visible = pK.value > 0.01;
+    (this.glare.material as THREE.SpriteMaterial).opacity = Math.min(1, pK.value / 0.6);
+    this.glare.visible = pK.value > 0.01;
+    if (this.pool.visible && this.searchTarget) {
+      const g = this.searchTarget.clone();
+      g.y -= 1.72;
+      this.pool.position.copy(this.group.worldToLocal(g));
+    }
     // (round 4, W-083) on its target the light is a hard, bright pool: it must read on the Yeti's pale fur
     this.search.intensity = this.searchTarget ? 1400 : 220;
+    // (Round 5) on its target the light is the lamp's warm white, like its shaft and pool
+    this.search.color.setHex(this.searchTarget ? 0xffd9a6 : 0xfff0d8);
     this.search.angle = this.searchTarget ? 0.2 : 0.16;
     // the lantern swells as it is raised
     if (this.flame) this.flame.intensity = 4 + 14 * this.lanternUp;

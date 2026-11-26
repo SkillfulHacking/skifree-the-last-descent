@@ -182,6 +182,12 @@ export interface RockMaterialOptions {
   macroSet?: { kind: RockKind; tile?: number; strength?: number };
   /** dark seepage / wet streaks running down steep faces (0 = none) */
   streaks?: number;
+  /**
+   * (Round 5, W-093) rime ice: feathers of hoar-frost grown into the wind on the faces turned to it
+   * (`dir`, the wind's horizontal direction *from* which it blows, x/z), white and fibrous, pointing
+   * upwind. `amount` 0..1. A high storm-blasted ridge's signature; none on Alpine or Fjord.
+   */
+  rime?: { dir: [number, number]; amount: number };
 }
 
 export interface RockUniforms {
@@ -215,6 +221,10 @@ export function createRockMaterial(o: RockMaterialOptions = {}): THREE.MeshStand
   const msK = o.macroSet?.strength ?? 1;
   if (ms) m.defines = { ...(m.defines ?? {}), RK_MACRO: '' };
   if ((o.streaks ?? 0) > 0) m.defines = { ...(m.defines ?? {}), RK_STREAKS: (o.streaks ?? 0).toFixed(3) };
+  if (o.rime && o.rime.amount > 0) {
+    const l = Math.hypot(o.rime.dir[0], o.rime.dir[1]) || 1;
+    m.defines = { ...(m.defines ?? {}), RK_RIME: o.rime.amount.toFixed(3), RK_RIME_DIR: `vec2(${(o.rime.dir[0] / l).toFixed(4)}, ${(o.rime.dir[1] / l).toFixed(4)})` };
+  }
   const lumRef = SCAN_LUM[kind] ?? (kind === 'basalt' ? 0.045 : 0.075);
   if (o.caveAttr) m.defines = { ...(m.defines ?? {}), RK_CAVE: '' };
   m.onBeforeCompile = (sh) => {
@@ -381,6 +391,17 @@ rkSnow *= mix(1.0, smoothstep(8.0, 22.0, rkAbove), step(-1e8, uWater));
 rkSnow *= smoothstep(0.55, 0.85, vRkCave.x) * (1.0 - step(0.5, vRkCave.z));
 #endif
 rkSnow = max(rkSnow, rkIce * 0.55);
+#ifdef RK_RIME
+{
+  // windward faces carry rime: fibrous white feathers along the wind, thickest on edges and bumps
+  float facing = dot(normalize(rkN.xz + 1e-4), RK_RIME_DIR) * length(rkN.xz);
+  float wind = smoothstep(0.05, 0.55, facing);
+  vec2 along = vec2(dot(rkP.xz, RK_RIME_DIR), dot(rkP.xz, vec2(-RK_RIME_DIR.y, RK_RIME_DIR.x)));
+  float fib = rk_n(vec2(along.x * 0.9, along.y * 7.0 + rkP.y * 7.0)) * 0.6 + rk_n(vec2(along.x * 2.3, rkP.y * 16.0 + along.y * 16.0)) * 0.4;
+  float rime = wind * smoothstep(0.32, 0.62, fib + 0.25 * (rkH - 0.5)) * RK_RIME;
+  rkSnow = max(rkSnow, rime);
+}
+#endif
 // surf (round 4b, A r4 M7: "no foam where the cliffs meet the water"): a broken white wash line at
 // the waterline, widening with distance so it still reads from far out on the fjord
 float rkFoam = 0.0;
@@ -428,7 +449,7 @@ reflectedLight.indirectDiffuse += uFill * diffuseColor.rgb * vec3(0.55, 0.68, 0.
       )
       .replace('#include <fog_fragment>', 'gl_FragColor.rgb = sf_atmosphere(gl_FragColor.rgb, vRkW);');
   };
-  m.customProgramCacheKey = () => `art-rock-${kind}-${hq ? 2 : 1}-${macro}-${o.vertexColors ? 1 : 0}-${o.caveAttr ? 1 : 0}-${o.snowFrom ?? 0.6}-${o.grade ? JSON.stringify(o.grade) : ''}-${tile}-${ms ? `${o.macroSet!.kind}:${msTile}:${msK}` : ''}-${o.streaks ?? 0}`;
+  m.customProgramCacheKey = () => `art-rock-${kind}-${hq ? 2 : 1}-${macro}-${o.vertexColors ? 1 : 0}-${o.caveAttr ? 1 : 0}-${o.snowFrom ?? 0.6}-${o.grade ? JSON.stringify(o.grade) : ''}-${tile}-${ms ? `${o.macroSet!.kind}:${msTile}:${msK}` : ''}-${o.streaks ?? 0}-${o.rime ? `${o.rime.dir.join(',')}:${o.rime.amount}` : ''}`;
   m.userData = { rock: U, kind, macroKind: ms ? o.macroSet!.kind : undefined };
   return m as THREE.MeshStandardMaterial & { userData: { rock: RockUniforms; kind: RockKind; macroKind?: RockKind } };
 }

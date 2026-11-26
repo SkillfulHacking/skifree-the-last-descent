@@ -27,6 +27,14 @@ export const DIFFICULTY: Record<Difficulty, { yetiSpeed: number; label: string; 
   hard: { yetiSpeed: 1.07, label: 'Hard', code: 'H' },
 };
 
+/**
+ * The Yeti's pace multiplier for a difficulty at a location: the difficulty's pace × the location's
+ * difficulty-specific pace (BiomeTerrain.difficultyPace, Round 5 W-094). Fixed for the whole run.
+ */
+export function yetiSpeedFor(d: Difficulty, biome: BiomeId | undefined): number {
+  return DIFFICULTY[d].yetiSpeed * (getBiome(biome ?? DEFAULT_BIOME).terrain.difficultyPace?.[d] ?? 1);
+}
+
 export const LENGTH_MODES: readonly LengthMode[] = ['sprint', 'standard', 'endurance', 'expedition', 'endless'];
 
 export const LENGTH_INFO: Record<LengthMode, { metres: number; label: string; short: string; blurb: string }> = {
@@ -231,9 +239,9 @@ export function courseSpec(c: CourseConfig, upToZ = 60000) {
     config: c,
     profile: P.kind,
     finishZ: Number.isFinite(m.finishZ) ? m.finishZ : null,
-    difficulty: { name: c.difficulty, yetiSpeed: DIFFICULTY[c.difficulty].yetiSpeed },
+    difficulty: { name: c.difficulty, yetiSpeed: +yetiSpeedFor(c.difficulty, c.biome).toFixed(3) },
     segments: segs.filter((s) => s.z0 < end).map((s) => ({ type: s.type, z0: Math.round(s.z0), z1: Number.isFinite(s.z1) ? Math.round(s.z1) : null })),
-    encounters: P.encounters(-Infinity, end).map((e) => ({ index: e.index, caveZ: e.caveZ, side: e.anchor.side, chaseEndZ: e.chaseEndZ, refugeZ: e.checkpointZ, yetiSpeed: +(e.speedMul * DIFFICULTY[c.difficulty].yetiSpeed).toFixed(3) })),
+    encounters: P.encounters(-Infinity, end).map((e) => ({ index: e.index, caveZ: e.caveZ, side: e.anchor.side, chaseEndZ: e.chaseEndZ, refugeZ: e.checkpointZ, yetiSpeed: +(e.speedMul * yetiSpeedFor(c.difficulty, c.biome)).toFixed(3) })),
     refuges: P.checkpoints(-Infinity, end),
     alternateLines: P.altRoutes(-Infinity, end).map((a) => ({ type: a.type, z0: Math.round(a.z0), z1: Math.round(a.z1) })),
     route,

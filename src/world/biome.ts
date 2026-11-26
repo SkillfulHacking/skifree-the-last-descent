@@ -110,6 +110,13 @@ export interface BiomeTerrainLook {
    * under a ridge reads as depth, not as a snow bank beside the piste. Absent = none (bit-identical).
    */
   valleyShade?: { tint: RGB; amount: number; below: [number, number]; dist: [number, number] };
+  /**
+   * Optional (Whiteout, Round 5 W-065): the wind-scoured flank. Ground that is both steep (`slope`
+   * 1 − n.y from [0] to [1]) and well below the eye (`below` m) is bare, dark rock streaked down the
+   * fall line with snow (`streak` share): the drop beyond a ridge's rim reads as a dark cliff band
+   * falling away, where the geometry really falls. Presentation only. Absent = none.
+   */
+  scouredFlank?: { rock: RGB; slope: [number, number]; below: [number, number]; streak: number };
 }
 
 /** Distant skyline palette (look/ranges.ts). */
@@ -225,6 +232,12 @@ export interface BiomeTerrain {
   minSlope?: number;
   /** (W-077) the location's fixed Yeti pace on every encounter; omit for 1 (see profile.ts ProfileKnobs) */
   encounterPace?: number;
+  /**
+   * (Round 5, W-094) the location's Yeti pace on one difficulty only, × the difficulty's own pace
+   * (DIFFICULTY.yetiSpeed); omit for 1. Lets a location's Hard be tuned without touching its Normal or
+   * Relaxed — never a response to how the player is skiing.
+   */
+  difficultyPace?: Partial<Record<'relaxed' | 'normal' | 'hard', number>>;
   /** ridgeline spines with gap jumps; omit for none (see profile.ts ProfileKnobs) */
   spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
   /** run-in slope at the start gate (degrees, default 6) */
@@ -405,7 +418,8 @@ export const ALPINE: Biome = {
   // (round 4, W-079) 1.05, not 1.10: the same graded Normal pressure on a crash (Standard crash 2/7, min 11 m)
   // without making Hard disproportionately punishing (1.10: Sprint, every crash a capture; Hard clean
   // skilled caught 4/7) — balance/w080/README.md
-  terrain: { encounterPace: 1.05, slopeScale: 1, widthScale: 1, swingScale: 1, wallHeight: 330, wallRelief: 64, rangeHeight: 900, undulation: 7, detail: 1.4, moguls: 0.42, drifts: 0.9, driftsPowder: 0.6, rollers: 0.6 },
+  // (Round 5, W-094) Alpine's Hard: ×1.09 on Hard only (owner's ranges; Normal and Relaxed unchanged)
+  terrain: { encounterPace: 1.05, difficultyPace: { hard: 1.09 }, slopeScale: 1, widthScale: 1, swingScale: 1, wallHeight: 330, wallRelief: 64, rangeHeight: 900, undulation: 7, detail: 1.4, moguls: 0.42, drifts: 0.9, driftsPowder: 0.6, rollers: 0.6 },
   audio: { ambience: 'wind', windGain: 1, windPitch: 1 },
 };
 

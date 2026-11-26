@@ -50,9 +50,12 @@ float n(vec2 p) {
   return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y);
 }
 float fbm(vec2 p) { float a = 0.5, s = 0.0; for (int k = 0; k < 4; k++) { s += a * n(p); p *= 2.03; a *= 0.5; } return s; }
+// (Round 5, W-096 / review D4-3: four 4-octave fbm per pixel) two octaves for the detail terms
+float fbm2(vec2 p) { return 0.667 * n(p) + 0.333 * n(p * 2.03 + 11.0); }
 void main() {
   vec2 p = vW.xz / 1300.0 + vec2(uTime * 0.004, uTime * 0.0015);
-  float c = fbm(p) * 0.7 + fbm(p * 3.1 + 7.0) * 0.3;
+  float det = fbm2(p * 3.1 + 7.0);
+  float c = fbm(p) * 0.7 + det * 0.3;
   // (round 4, W-065 blind review A: the round-3 deck was the shaded piste's own colour and read as a
   // frozen plain) sunlit billow tops brighter and warmer than the snow, deep blue-grey hollows between
   // them: a sea of cloud seen from above, with the far peaks rising out of it (ridge.farRanges)
@@ -60,15 +63,17 @@ void main() {
   // brightness") the deep valley seen through broken cloud: dark forested floor and rock (blue-green,
   // well below the snow's value) with ragged pale cloud banks lying on it — the dark is what reads as
   // depth from the rim
-  vec3 floorC = mix(vec3(0.15, 0.20, 0.24), vec3(0.27, 0.32, 0.37), smoothstep(0.3, 0.7, fbm(p * 6.0 + 3.0)));
+  // (Round 5, review A4-4: hazed to lighter than the shaded piste from the line) darker floor, the
+  // tone reusing the cloud's detail term
+  vec3 floorC = mix(vec3(0.10, 0.14, 0.18), vec3(0.21, 0.26, 0.31), smoothstep(0.3, 0.7, det));
   // snow-streaked spurs and gullies (ridged noise) so the floor reads as land far below, not water
-  float rdg = 1.0 - abs(fbm(p * 3.5 + 5.0) * 2.0 - 1.0);
+  float rdg = 1.0 - abs(fbm2(p * 3.5 + 5.0) * 2.0 - 1.0);
   floorC = mix(floorC, vec3(0.55, 0.60, 0.67), smoothstep(0.7, 0.95, rdg) * 0.55);
   vec3 col = mix(floorC, vec3(0.86, 0.88, 0.92), smoothstep(0.55, 0.75, c));
   float d = length(vW.xz - uCam.xz);
   // into the haze with distance (gentler than the terrain's fog: the deck is what the eye reads as depth)
   // aerial perspective: the floor pales into the haze toward its horizon (no hard sea-line)
-  col = mix(col, uHaze, 0.92 * (1.0 - exp(-d * 0.00042)));
+  col = mix(col, uHaze, 0.88 * (1.0 - exp(-d * 0.00024)));
   // a soft edge where it meets the flank, and a ragged one
   float e = (vW.x - uRimX) * uSide;
   float a = uOpacity * smoothstep(${CLOUD_SEA.from.toFixed(1)}, ${(CLOUD_SEA.from + 500).toFixed(1)}, e + (c - 0.5) * 300.0);

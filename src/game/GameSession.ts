@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import type { Encounter, Sighting } from '../world/course';
-import { DIFFICULTY } from './CourseConfig';
+import { yetiSpeedFor } from './CourseConfig';
 import { capabilitiesOf } from '../world/capabilities';
 
 /** style points for discovering a scenic viewpoint (they sit outside the chases: exploring is free) */
@@ -785,7 +785,7 @@ export class GameSession implements Stage {
     this.world.caveFor(e);
     // documented ceiling: never more than +33 % over the classic Yeti, whatever the escalation
     // and difficulty (B13); a skilled skier must always be able to escape
-    this.yetiAI.speedMul = Math.min(1.33, e.speedMul * DIFFICULTY[this.world.course.difficulty].yetiSpeed);
+    this.yetiAI.speedMul = Math.min(1.33, e.speedMul * yetiSpeedFor(this.world.course.difficulty, this.world.course.biome));
     this.cave = new CaveCinematic(this);
     this.cave.onRunPrompt = () => {};
     this.input.steer = 0;

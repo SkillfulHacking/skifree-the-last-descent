@@ -64,6 +64,7 @@ export class CaveCinematic {
   private path: Array<{ s: number; p: THREE.Vector3 }> = [];
 
   constructor(private st: Stage) {
+    this.tl.calm = () => st.settings.reduceCameraMotion;
     {
       const ep = st.world.cave.exitPath;
       ep.forEach((p, i) => this.path.push({ s: i === ep.length - 1 ? LEDGE_AT : 14 - 0.75 * i, p }));

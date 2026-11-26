@@ -33,6 +33,16 @@ import { AchievementToast, achievementsGrid, achievementsSummary } from '../ui/a
 
 type Mode = 'loading' | 'menu' | 'playing' | 'paused' | 'results';
 
+/** (Round 5, W-082) the rear-view inset's share of the storm fog */
+export const REAR_INSET_FOG = 0.45;
+/** the Yeti's share of the inset height the telephoto glance frames for */
+export const REAR_INSET_FILL = 0.32;
+/** the inset's field of view (deg) for the Yeti `d` m away: about REAR_INSET_FILL of the height, 9°–48° */
+export function rearInsetFov(d: number): number {
+  const f = (2 * Math.atan(2.6 / (REAR_INSET_FILL * 2 * Math.max(1, d))) * 180) / Math.PI;
+  return Math.min(48, Math.max(9, f));
+}
+
 export class App {
   readonly renderer: THREE.WebGLRenderer;
   readonly camera: THREE.PerspectiveCamera;
@@ -243,6 +253,7 @@ export class App {
     this.skier.root.position.set(x, this.world.mountain.heightAt(x, 1), 1);
     this.skier.root.rotation.set(0, 0, 0);
     this.skier.setVisible(true);
+    this.skier.setPoleVisible(1, true);
   }
 
   // --- progression ---------------------------------------------------------------
@@ -665,7 +676,7 @@ export class App {
       { kind: 'slider', label: 'Effects', min: 0, max: 1, step: 0.05, get: () => s.sfxVolume, set: (v) => ((s.sfxVolume = v), changed()), fmt: pct },
       { kind: 'info', html: '<h3>Camera & accessibility</h3>' },
       { kind: 'slider', label: 'Camera shake', min: 0, max: 1, step: 0.1, get: () => s.cameraShake, set: (v) => ((s.cameraShake = v), changed()), fmt: pct },
-      { kind: 'toggle', label: 'Reduce camera motion', get: () => s.reduceCameraMotion, set: (v) => ((s.reduceCameraMotion = v), changed()) },
+      { kind: 'toggle', label: 'Reduce camera motion', note: 'No shake; cinematics cut between held views', get: () => s.reduceCameraMotion, set: (v) => ((s.reduceCameraMotion = v), changed()) },
       { kind: 'toggle', label: 'Reduce flashes & pulsing', get: () => s.reduceFlashes, set: (v) => ((s.reduceFlashes = v), changed()) },
       { kind: 'toggle', label: 'Controller vibration', get: () => s.vibration, set: (v) => ((s.vibration = v), changed()) },
       // (W-049) presentation only: hazards, physics and every warning are unchanged
@@ -869,7 +880,9 @@ export class App {
     // (round 4, W-082) on Low the inset still shows the leap and the landing (2–3 s, a small viewport):
     // the chase's first beat had no image at all there; the player's own setting still turns it off
     const leap = s ? s.rearViewZoom() : 0;
-    const k = s && this.mode === 'playing' && this.settings.rearView && (this.world?.quality !== 'low' || leap > 0) && !s.isCinematic() ? s.rearView(this.rearPose) : 0;
+    // (Round 5, W-082 / review F4-2: no inset on Low after the leap) on Low too, for the whole chase: the
+    // telephoto inset (below) culls most of the scene, so it is cheap
+    const k = s && this.mode === 'playing' && this.settings.rearView && !s.isCinematic() ? s.rearView(this.rearPose) : 0;
     if (!this.rearFrame) {
       this.rearFrame = document.createElement('div');
       this.rearFrame.className = 'rear-view';
@@ -893,7 +906,9 @@ export class App {
     // (W-076 review F, F2) the leap and landing framed tight in the inset: 22° while he is in the air
     // and for a second after the landing, then the usual 48° (eased)
     const zoom = this.session?.rearViewZoom() ?? 0;
-    this.rearCam.fov = 48 + (22 - 48) * zoom;
+    // (Round 5, W-082 / review F4-2: the Yeti was ~15 px at 28 m, 3–4 px at 75 m) a telephoto glance: the
+    // lens narrows with his distance so he fills about a third of the inset's height (12°–48°)
+    this.rearCam.fov = Math.min(48 + (22 - 48) * zoom, rearInsetFov(this.rearPose.pos.distanceTo(this.rearPose.look)));
     this.rearCam.aspect = w / h;
     this.rearCam.updateProjectionMatrix();
     this.rearCam.updateMatrixWorld();
@@ -913,7 +928,15 @@ export class App {
     r.setScissor(x, v.y, w, h);
     r.autoClear = false;
     r.clearDepth();
+    // (Round 5, W-082) the glance sees through the storm better than the eye: the inset's fog is lighter
+    const fog = this.world.scene.fog as THREE.FogExp2 | null;
+    const d0 = fog?.density ?? 0;
+    const u0 = atmosphere.uFogExp.value;
+    if (fog) fog.density = d0 * REAR_INSET_FOG;
+    atmosphere.uFogExp.value = u0 * REAR_INSET_FOG;
     r.render(this.world.scene, this.rearCam);
+    if (fog) fog.density = d0;
+    atmosphere.uFogExp.value = u0;
     r.autoClear = true;
     r.setScissorTest(false);
     r.setViewport(0, 0, W, H);
@@ -991,7 +1014,7 @@ export class App {
       perf: () => {
         const s = [...this.perf.samples].sort((a, b) => a - b);
         const i = this.renderer.info;
-        return { fps: this.perf.fps, p50: s[Math.floor(s.length * 0.5)] ?? 0, p95: s[Math.floor(s.length * 0.95)] ?? 0, calls: i.render.calls, triangles: i.render.triangles, geometries: i.memory.geometries, textures: i.memory.textures, particles: this.world?.particles.aliveCount ?? 0, terrainPending: this.world?.terrain.pending ?? 0 };
+        return { fps: this.perf.fps, p50: s[Math.floor(s.length * 0.5)] ?? 0, p95: s[Math.floor(s.length * 0.95)] ?? 0, calls: i.render.calls, triangles: i.render.triangles, geometries: i.memory.geometries, textures: i.memory.textures, programs: i.programs?.length ?? 0, particles: this.world?.particles.aliveCount ?? 0, terrainPending: this.world?.terrain.pending ?? 0, caveSliceMaxMs: +(this.world?.caveSliceMaxMs ?? 0).toFixed(2), caveSlice: this.world ? { dressing: +this.world.caveSliceMax.dressing.toFixed(2), cave: +this.world.caveSliceMax.cave.toFixed(2) } : null };
       },
       startRun: (skipIntro = true) => this.startRun(skipIntro, false),
       toMenu: () => this.toMenu(),

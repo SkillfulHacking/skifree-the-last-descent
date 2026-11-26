@@ -6,7 +6,7 @@ import type { MenuInput } from '../input/Input';
 export type MenuItem =
   | { kind: 'button'; label: string; action: () => void; hint?: string; primary?: boolean }
   | { kind: 'slider'; label: string; get: () => number; set: (v: number) => void; min: number; max: number; step: number; fmt?: (v: number) => string }
-  | { kind: 'toggle'; label: string; get: () => boolean; set: (v: boolean) => void }
+  | { kind: 'toggle'; label: string; get: () => boolean; set: (v: boolean) => void; note?: string }
   | { kind: 'select'; label: string; options: Array<{ value: string; label: string }>; get: () => string; set: (v: string) => void; note?: string }
   | { kind: 'bind'; label: string; get: () => string; listen: (done: () => void) => void }
   | { kind: 'text'; label: string; get: () => string; set: (v: string) => boolean | void; placeholder?: string; maxLength?: number; note?: string }
@@ -194,7 +194,7 @@ export class MenuSystem {
         break;
       }
       case 'toggle':
-        row.innerHTML = `<span class="label">${it.label}</span><span class="ctl"><span class="dec">◀</span><span class="val">${it.get() ? 'On' : 'Off'}</span><span class="inc">▶</span></span>`;
+        row.innerHTML = `<span class="label">${it.label}${it.note ? `<small>${it.note}</small>` : ''}</span><span class="ctl"><span class="dec">◀</span><span class="val">${it.get() ? 'On' : 'Off'}</span><span class="inc">▶</span></span>`;
         break;
       case 'select': {
         const cur = it.options.find((o) => o.value === it.get());

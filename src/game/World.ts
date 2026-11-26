@@ -241,6 +241,22 @@ export class World {
     });
   }
 
+  /**
+   * (Round 5, W-096 / review D4-4) the longest single slice of cave building (dressing or cave) seen in
+   * play, ms of main thread: what one frame of streaming a cave costs at worst. Read by perf captures.
+   */
+  caveSliceMaxMs = 0;
+  /** the same, per kind */
+  readonly caveSliceMax = { dressing: 0, cave: 0 };
+  private timeSlice<T>(kind: 'dressing' | 'cave', f: () => T): T {
+    const t0 = performance.now();
+    const r = f();
+    const ms = performance.now() - t0;
+    if (ms > this.caveSliceMax[kind]) this.caveSliceMax[kind] = ms;
+    if (ms > this.caveSliceMaxMs) this.caveSliceMaxMs = ms;
+    return r;
+  }
+
   /** Advance pending cave builds by one slice (called every frame): dressings first, then caves. */
   private stepCaves() {
     for (const i of this.dressJobs.keys()) {
@@ -248,7 +264,7 @@ export class World {
       return; // one slice per frame
     }
     for (const [i, j] of this.caveJobs) {
-      const r = j.job.next();
+      const r = this.timeSlice('cave', () => j.job.next());
       if (r.done) {
         this.caveJobs.delete(i);
         this.installCave(j.enc, r.value);
@@ -298,7 +314,7 @@ export class World {
   private stepDressing(i: number, all: boolean) {
     const job = this.dressJobs.get(i);
     if (!job) return;
-    let r = job.next();
+    let r = all ? job.next() : this.timeSlice('dressing', () => job.next());
     while (all && !r.done) r = job.next();
     if (!r.done) return;
     this.dressJobs.delete(i);

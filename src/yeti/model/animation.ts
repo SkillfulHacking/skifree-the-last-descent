@@ -719,6 +719,55 @@ function disgust(o: PoseSample, t: number, c: AnimCtx): void {
 }
 
 /**
+ * (Round 5, W-083) The Whiteout searchlight beat: the light hits him and he recoils — a sharp jerk back
+ * from the hips, the left forearm thrown up across his eyes (palm out, against the glare), the head
+ * turned down and away, the right arm flung back for balance and the right foot stepping back; then he
+ * holds behind the raised arm, squinting, the jaw in a grimace. Reads at a distance by silhouette: the
+ * raised forearm across the face and the backward lean.
+ */
+function recoil(o: PoseSample, t: number, c: AnimCtx): void {
+  const jerk = smooth(0, 0.18, t);
+  const settle = smooth(0.18, 0.7, t);
+  const flinch = jerk * (1 - 0.35 * settle);
+  const shield = smooth(0.04, 0.3, t);
+  const tremor = smooth(0.4, 0.7, t) * Math.sin(TAU * 7 * t) * 0.5;
+  posture(o, 0.4);
+  // lean back from the hips, chest away from the light
+  o.add('spine1', -0.16 * flinch);
+  o.add('spine2', -0.2 * flinch, 0.08 * flinch);
+  o.add('spine3', -0.14 * flinch, 0.1 * flinch);
+  o.hips.z += -0.22 * flinch;
+  o.foot[R].z += -0.38 * jerk;
+  o.foot[L].z += -0.08 * jerk;
+  // left forearm up across the eyes, palm out against the glare
+  o.armIK[L] = shield;
+  // the hand follows the head (the mouth target, raised to the eyes): wherever the lean takes it
+  o.mouthHand[L] = 1;
+  o.mouthOff[L].set(0.08, 0.2 + 0.02 * tremor, 0.3);
+  o.hand[L].set(0.02, 2.2 + 0.03 * tremor, 0.55);
+  o.elbow[L].set(1, -0.15, 0.35);
+  o.handAim[L] = shield;
+  o.handDir[L].set(-0.85, 0.35, 0.1).normalize();
+  o.palmDir[L].set(-0.1, 0.1, 1).normalize();
+  o.curl[L] = 0.25;
+  o.curl2[L] = 0.2;
+  o.thumb[L] = 0.3;
+  // right arm flung back and out for balance
+  o.addSide('upperArm', R, 0.75 * jerk, 0, -0.55 * jerk);
+  o.addSide('forearm', R, -0.35 * jerk);
+  o.curl[R] = 0.7;
+  o.curl2[R] = 0.6;
+  // head turned down and away, eyes screwed shut behind the arm
+  o.look = 1;
+  o.lookPitch = 0.28 * flinch;
+  o.lookYaw = -0.5 * flinch;
+  o.lookRoll = 0.15 * flinch;
+  o.add('neck', -0.1 * flinch);
+  o.jaw = 0.12 + 0.18 * jerk * (1 - settle) + 0.05 * Math.abs(tremor);
+  void c;
+}
+
+/**
  * The Fjord victory gag (round-3 C #4: "no body business, hands hang at his sides"): he hunches
  * over the bite, the left hand flies to his throat, he retches twice with the jaw wide and the
  * head thrust forward, and a shudder runs through the shoulders. The right hand (with the cod)
@@ -891,6 +940,9 @@ export function sampleMode(mode: YetiMode, o: PoseSample, t: number, c: AnimCtx)
       break;
     case 'gag':
       gag(o, t, c);
+      break;
+    case 'recoil':
+      recoil(o, t, c);
       break;
     case 'turnAway':
       turnAway(o, t, c);

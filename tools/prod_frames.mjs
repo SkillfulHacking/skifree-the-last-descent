@@ -46,7 +46,22 @@ const res = await p.evaluate(
     let lastZ = 0;
     let i = 0;
     const z = () => s.state().session.z ?? 0;
+    // (round 5, W-096) per km: heap (after a GC where exposed), shader programs, geometries and textures
+    // (Endless memory: does anything grow without bound?), and the frame's draw calls and triangles
+    const perKm = [];
+    let nextKm = 0;
+    const sample = () => {
+      s.gc?.();
+      const pf = s.perf();
+      perKm.push({ km: +(z() / 1000).toFixed(1), heapMB: s.heap?.() ? +(s.heap() / 1048576).toFixed(1) : null, programs: pf.programs, geometries: pf.geometries, textures: pf.textures, calls: pf.calls, triangles: pf.triangles });
+    };
+    const programs0 = s.perf().programs;
     while (true) {
+      if (z() >= nextKm * 1000) {
+        await new Promise((r) => requestAnimationFrame(() => r()));
+        sample();
+        nextKm++;
+      }
       const st = s.state().session;
       if (st.phase === 'caveCinematic') s.skipCave();
       if (st.outcome && st.outcome !== 'none') {
@@ -69,7 +84,8 @@ const res = await p.evaluate(
       }
       if (i > KM * 1000 * 6) break; // safety: < ~10 m/s average
     }
-    return { step, render, restarts, z: lastZ, heapMB: s.heap?.() ? s.heap() / 1048576 : null, perf: s.perf() };
+    sample();
+    return { step, render, restarts, z: lastZ, heapMB: s.heap?.() ? s.heap() / 1048576 : null, perf: s.perf(), perKm, programs0 };
   },
   [KM, RENDER_EVERY],
 );
@@ -90,6 +106,13 @@ const summary = {
   softwareRenderMs: { n: res.render.length, median: res.render.length ? +res.render.sort((a, c) => a - c)[Math.floor(res.render.length / 2)].toFixed(0) : null },
   heapMB: res.heapMB && +res.heapMB.toFixed(1),
   renderer: res.perf,
+  // shader programs linked after the run began (compiles during play; the warm-up happens before)
+  programsCompiledInPlay: res.perf.programs - res.programs0,
+  caveSliceMaxMs: res.perf.caveSliceMaxMs,
+  caveSlice: res.perf.caveSlice,
+  maxCalls: Math.max(...res.perKm.map((k) => k.calls)),
+  maxTriangles: Math.max(...res.perKm.map((k) => k.triangles)),
+  perKm: res.perKm,
   errors,
   seconds: Math.round((Date.now() - t0) / 1000),
 };

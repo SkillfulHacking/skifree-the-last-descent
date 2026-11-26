@@ -146,8 +146,21 @@ export function* dressStormCaveSteps(ctx: CaveDressingContext): Generator<void, 
     gr.life = 2 + rnd() * 1.5;
   });
   group.add(curtain.points, skate.points);
-  yield;
-  const built = yield* buildStormArchitectureSteps(cave.lipTop, cave.mouth, O, rock ?? null);
+  // (round 5, review D4-5) World.disposeCave abandons a half-built dressing (job.return): what was built
+  // so far is released here, as Fjord's dressSeaCaveSteps does
+  let built!: StormArchitecture;
+  let done = false;
+  try {
+    yield;
+    built = yield* buildStormArchitectureSteps(cave.lipTop, cave.mouth, O, rock ?? null);
+    done = true;
+  } finally {
+    if (!done) {
+      if (U) U.uRime.value = 0;
+      curtain.dispose();
+      skate.dispose();
+    }
+  }
   group.add(built.group);
   let burst = 0;
   const dressing: CaveDressing & { setWind(w: number): void; roar(): void } = {
@@ -345,12 +358,32 @@ export function rayTris(o: THREE.Vector3, dir: THREE.Vector3, tris: Float32Array
 
 /** (round 4, W-086 / review D3-1) the architecture built in slices: a pause after the brow's triangles are
  * gathered, after the roots, the cornice, the feathers and the bank (round 3: one ~22 ms frame) */
-function* buildStormArchitectureSteps(lip: THREE.Vector3, mouth: THREE.Vector3, out: THREE.Vector3, rock: THREE.Mesh | null) {
+interface StormArchitecture {
+  group: THREE.Group;
+  update(dt: number, wind: number): void;
+  dispose(): void;
+}
+
+function* buildStormArchitectureSteps(lip: THREE.Vector3, mouth: THREE.Vector3, out: THREE.Vector3, rock: THREE.Mesh | null): Generator<void, StormArchitecture, void> {
+  const disposables: Array<{ dispose(): void }> = [];
+  let done = false;
+  try {
+    const a = yield* buildStormArchitecture(lip, mouth, out, rock, disposables);
+    done = true;
+    return a;
+  } finally {
+    // (round 5, review D4-5) abandoned mid-build: release every material, geometry and texture made so far
+    if (!done) for (const d of disposables) d.dispose();
+  }
+}
+
+function* buildStormArchitecture(lip: THREE.Vector3, mouth: THREE.Vector3, out: THREE.Vector3, rock: THREE.Mesh | null, disposables: Array<{ dispose(): void }>): Generator<void, StormArchitecture, void> {
   const C = STORM_CAVE.cornice;
   const group = new THREE.Group();
   group.name = 'storm-cave-architecture';
+  // every mesh's geometry under the group, whenever it was added (an abandoned build included)
+  disposables.push({ dispose: () => group.traverse((o) => (o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry.dispose()) });
   const along = new THREE.Vector3(out.z, 0, -out.x).normalize();
-  const disposables: Array<{ dispose(): void }> = [];
   const snow = new THREE.MeshStandardMaterial({ color: 0xf2f6fc, roughness: 0.88, metalness: 0 });
   const rime = new THREE.MeshStandardMaterial({ color: 0xdfeaf6, roughness: 0.55, metalness: 0, emissive: new THREE.Color(0.05, 0.08, 0.12) });
   disposables.push(snow, rime);
@@ -479,7 +512,9 @@ function* buildStormArchitectureSteps(lip: THREE.Vector3, mouth: THREE.Vector3, 
   // (alphaMap, not repeated) so it never shows as a rectangle against the rock
   // (round 4, W-086 / review D3-1) both textures are module singletons: they are the same for every cave,
   // and drawing the wisps (1,260 gradient strokes) took 3–7 ms of the dressing frame each time
-  const sheetTex = spindriftSheetTexture();
+  // (round 5, review D4-6) this cave's own view of the shared image: each live cave scrolls its own offset
+  const sheetTex = spindriftSheetTexture().clone();
+  disposables.push(sheetTex);
   const sheetFade = spindriftSheetFade();
   const sheetM = new THREE.MeshBasicMaterial({ map: sheetTex, alphaMap: sheetFade, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide });
   disposables.push(sheetM);
