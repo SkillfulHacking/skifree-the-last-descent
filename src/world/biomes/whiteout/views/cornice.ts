@@ -25,10 +25,12 @@ export const CORNICE = {
   /** overhang beyond the rim (m), min/max */
   overhang: [1.8, 4.8] as const,
   /** rim wands: spacing (m) and how far in from the rim they stand (m) */
-  wandStep: 36,
-  wandIn: 6,
-  // (round 4, W-065: 1.9 m poles were 1–2 px at 40–50 m from the line) 2.4 m, with a flag panel
-  wandH: 2.4,
+  // (round 5, W-065 / review A4-2: 6 m in from the rim the roll-down bank hid every wand from the line, and
+  // the closest the line comes to the rim is ~55 m) on the crest of the lip itself, taller and closer:
+  // from the line a row of 3.4 m wands traces the edge in any weather (~38 px tall at 55 m, 768p)
+  wandStep: 24,
+  wandIn: 1.5,
+  wandH: 3.4,
 } as const;
 
 export interface CorniceSample {
@@ -184,8 +186,8 @@ export function wandGeometry(): THREE.BufferGeometry {
     else col.push(0.05, 0.05, 0.05);
   }
   pole.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-  const flag = new THREE.BoxGeometry(0.62, 0.42, 0.03);
-  flag.translate(0.31, CORNICE.wandH - 0.3, 0);
+  const flag = new THREE.BoxGeometry(0.9, 0.6, 0.03);
+  flag.translate(0.45, CORNICE.wandH - 0.4, 0);
   const fc: number[] = [];
   for (let i = 0; i < flag.getAttribute('position').count; i++) fc.push(1.0, 0.36, 0.04);
   flag.setAttribute('color', new THREE.Float32BufferAttribute(fc, 3));

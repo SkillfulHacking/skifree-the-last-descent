@@ -104,3 +104,21 @@ describe('migration of the old global flag', () => {
     expect(out.seenCave).toEqual({ alpine: true });
   });
 });
+
+describe('cave history keying (round 5, review E4-9)', () => {
+  it('seed, length and difficulty never change which location a course counts for', async () => {
+    await import('../../src/world/biomes');
+    const { courseBiome } = await import('../../src/core/settings');
+    const { listBiomes } = await import('../../src/world/biome');
+    const biomeCodes = () => Object.fromEntries(listBiomes().map((b) => [b.code, b.id]));
+    const { courseId, makeCourse } = await import('../../src/game/CourseConfig');
+    const ids = [
+      courseId(makeCourse('classic', 'sprint', { biome: 'whiteout', difficulty: 'normal' })),
+      courseId(makeCourse('custom', 'standard', { biome: 'whiteout', customText: 'ROUND5', difficulty: 'hard' })),
+      courseId(makeCourse('daily', 'endless', { biome: 'whiteout', date: '2026-11-26', difficulty: 'relaxed' })),
+      courseId(makeCourse('classic', 'expedition', { biome: 'whiteout', difficulty: 'hard' })),
+    ];
+    expect(new Set(ids).size).toBe(4);
+    for (const id of ids) expect(courseBiome(id, biomeCodes()), id).toBe('whiteout');
+  });
+});

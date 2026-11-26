@@ -192,7 +192,7 @@ export const BEAM_LEN = 60;
  * negative everywhere, so smoothstep(0, …, vD) zeroed every fragment's alpha.
  */
 export function searchBeam(): { geometry: THREE.BufferGeometry; material: THREE.ShaderMaterial } {
-  const geometry = new THREE.ConeGeometry(4.6, BEAM_LEN, 18, 1, true);
+  const geometry = new THREE.ConeGeometry(3.0, BEAM_LEN, 18, 1, true);
   geometry.translate(0, -BEAM_LEN / 2, 0);
   geometry.rotateX(-Math.PI / 2);
   const material = new THREE.ShaderMaterial({
@@ -722,7 +722,7 @@ export class RescueStation implements FinishEnvironment {
     else this.aimCur.lerp(aim, 1 - Math.exp(-(this.searchTarget ? 4.5 : 8) * Math.max(0, dt)));
     P.lookAt(this.aimCur);
     const uK = (this.beam.material as THREE.ShaderMaterial).uniforms.uK!;
-    uK.value += ((this.searchTarget ? 0.85 : 0.12) - uK.value) * (1 - Math.exp(-3 * Math.max(0, dt)));
+    uK.value += ((this.searchTarget ? 0.6 : 0.12) - uK.value) * (1 - Math.exp(-3 * Math.max(0, dt)));
     // the pool on the snow where the light lands (on a target only)
     const pK = (this.pool.material as THREE.ShaderMaterial).uniforms.uK!;
     pK.value += ((this.searchTarget ? 0.6 : 0) - pK.value) * (1 - Math.exp(-4 * Math.max(0, dt)));

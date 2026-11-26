@@ -251,8 +251,12 @@ export function blizzardPushDir(h: { params: BlizzardParams; seed?: number }, t:
   const s = x * period;
   // the telegraph start of this gust (in the lull: of the coming one)
   const g0 = s < T.dormant ? t + (T.dormant - s) : t - (s - T.dormant);
-  const key = `${seed}:${h.seed ?? 0}:${h.params.dir}:${Math.round(g0 * 1000)}`;
-  const hit = gustDir.get(key);
+  // (round 5, review D4-10) no string built at the physics rate: per cell (object identity, which also fixes
+  // the course and its seed), then the gust's start in ms
+  let perCell = gustDir.get(h);
+  if (!perCell) gustDir.set(h, (perCell = new Map<number, number>()));
+  const key = Math.round(g0 * 1000);
+  const hit = perCell.get(key);
   if (hit !== undefined) return hit;
   let best = 0;
   let dir = h.params.dir;
@@ -262,12 +266,12 @@ export function blizzardPushDir(h: { params: BlizzardParams; seed?: number }, t:
     if (f.s > best) { best = f.s; dir = f.dir; }
   }
   const d = best > 0.3 ? dir : h.params.dir;
-  if (gustDir.size > 512) gustDir.delete(gustDir.keys().next().value!);
-  gustDir.set(key, d);
+  if (perCell.size > 64) perCell.delete(perCell.keys().next().value!);
+  perCell.set(key, d);
   return d;
 }
 const pushFront: FrontState = { s: 0, dir: 1, phase: 'clear', left: 0, k: 0 };
-const gustDir = new Map<string, number>();
+const gustDir = new WeakMap<object, Map<number, number>>();
 
 /**
  * (W-056) Every chase opens on a fair stretch: from the cave trigger to CHASE_OPENING m past it — about

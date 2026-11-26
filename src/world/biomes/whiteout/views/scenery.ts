@@ -19,6 +19,7 @@ import { RidgeRocks } from './ridgeRocks';
 import { ROCK_ORIGIN } from '../../../art/rockMaterial';
 import { A11Y } from '../../../../core/a11y';
 import { buildCorniceGeometry, corniceMaterial, corniceSamples, wandGeometry, wandSpots } from './cornice';
+import { buildRimSpindrift, rimSpindriftMaterial } from './rimSpindrift';
 
 export const MARKER = {
   step: 28,
@@ -64,6 +65,8 @@ export function markerSpots(m: Mountain, z0: number, z1: number): MarkerSpot[] {
 }
 
 interface Chunk {
+  /** (round 5) spindrift veils off the lip */
+  veils: THREE.Mesh | null;
   group: THREE.Group;
   poles: THREE.InstancedMesh;
   lamps: THREE.Points;
@@ -198,7 +201,11 @@ export class WhiteoutScenery implements SceneryView {
     group.add(poles, lamps);
     // the corniced rim (a little overlap between chunks so the strip has no seams)
     let cornice: THREE.Mesh | null = null;
-    const cg = buildCorniceGeometry(this.m, corniceSamples(this.m, k * CHUNK - 3, (k + 1) * CHUNK + 3));
+    const cs = corniceSamples(this.m, k * CHUNK - 3, (k + 1) * CHUNK + 3);
+    const cg = buildCorniceGeometry(this.m, cs);
+    // (round 5, W-065) spindrift pouring off the lip into the drop (presentation only, beyond the lip)
+    const veils = buildRimSpindrift(this.m, cs.filter((s) => s.z >= k * CHUNK && s.z < (k + 1) * CHUNK));
+    if (veils) group.add(veils);
     if (cg) {
       cornice = new THREE.Mesh(cg, this.snowMat ?? corniceMaterial());
       cornice.receiveShadow = true;
@@ -218,7 +225,7 @@ export class WhiteoutScenery implements SceneryView {
       group.add(wands);
     }
     this.group.add(group);
-    this.chunks.set(k, { group, poles, lamps, lampMat, phase, geo, cornice, wands });
+    this.chunks.set(k, { group, poles, lamps, lampMat, phase, geo, cornice, wands, veils });
   }
 
   private drop(k: number, ch: Chunk) {
@@ -227,6 +234,7 @@ export class WhiteoutScenery implements SceneryView {
     ch.geo.dispose();
     ch.lampMat.dispose();
     ch.cornice?.geometry.dispose();
+    ch.veils?.geometry.dispose();
     ch.wands?.dispose();
     this.chunks.delete(k);
   }
@@ -235,6 +243,10 @@ export class WhiteoutScenery implements SceneryView {
     this.sky.update(dt, time, f);
     this.cloudSea.update(time, f);
     LAMP_TIME.value = time;
+    // the veils smoke harder the stronger the wind (always a little: the ridge is never still)
+    const vm = rimSpindriftMaterial();
+    vm.uniforms.uTime!.value = time;
+    vm.uniforms.uK!.value = 0.55 + 0.35 * Math.min(1, f.storm ?? 0);
     LAMP_CALM.value = A11Y.reduceFlashes ? 1 : 0;
     ROCK_ORIGIN.value.copy(f.origin);
     // (a scan that arrived since the last stream: place the rocks of the live chunks)

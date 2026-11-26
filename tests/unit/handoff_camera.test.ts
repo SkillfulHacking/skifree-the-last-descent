@@ -77,6 +77,13 @@ describe('W-076 decision 1: the hand-off camera faces the run', () => {
       const shoulders = ndcOf(turnFrom, skierHead.clone().add(new THREE.Vector3(0, -0.3, 0)));
       expect(shoulders.y, 'shoulders above the bottom bar').toBeGreaterThan(-0.74);
       expect(yeti.y, 'the Yeti below the top bar').toBeLessThan(0.74);
+      // (round 5, review C4-3: the frames show him in a tuck — the head ~1.05 m, the waist ~0.7 m — and the
+      // round-4 test measured an upright 1.5 m head) the tucked skier's head and waist clear the bottom bar
+      const P = skierHead.clone().add(new THREE.Vector3(0, -LEAP_SETUP.head, 0));
+      for (const [what, h] of [['tucked head', 1.05], ['waist', 0.7]] as const) {
+        const v = ndcOf(turnFrom, P.clone().add(new THREE.Vector3(0, h, 0)));
+        expect(v.y, `${biome}: ${what} above the bottom bar`).toBeGreaterThan(-0.7);
+      }
     });
 
   it('orbitPose: ends exactly on both poses, takes the shorter way round, keeps its distance', () => {

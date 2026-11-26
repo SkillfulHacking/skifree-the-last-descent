@@ -87,9 +87,12 @@ async function shot(name, note, expect = {}) {
     ? await ev(() => {
         const k = window.__skifree;
         const s = k.state().session;
-        // the skier's chest (a framing may crop the feet under the letterbox)
-        const b = k.projectToScreen({ x: s.x, y: s.y + 1.25, z: s.z });
-        return { inMainView: b.z < 1 && Math.abs(b.x) < 0.98 && Math.abs(b.y) < 0.85 };
+        // the skier's chest or head (a framing may crop the feet under the letterbox, or frame him over
+        // the shoulder)
+        const inV = (p) => p.z < 1 && Math.abs(p.x) < 0.98 && Math.abs(p.y) < 0.85;
+        const chest = k.projectToScreen({ x: s.x, y: s.y + 1.25, z: s.z });
+        const head = k.projectToScreen({ x: s.x, y: s.y + 1.7, z: s.z });
+        return { inMainView: inV(chest) || inV(head) };
       })
     : null;
   const bars = await ev(() => {

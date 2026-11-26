@@ -15,6 +15,8 @@ type W = {
   hold(v: boolean): void;
   autopilot(style: string | null): void;
   caveHistory(): { book: Record<string, boolean>; legacy: boolean; stored: string | null };
+  pressMenu(label: string): boolean;
+  setCourse(mode: string, length: string, opts?: { custom?: string; difficulty?: string; biome?: string }): string;
 };
 const K = (page: Page) => page.evaluate(() => (window as unknown as { __skifree: W }).__skifree.state());
 const hist = (page: Page) => page.evaluate(() => (window as unknown as { __skifree: W }).__skifree.caveHistory());
@@ -127,5 +129,39 @@ test('old save: Alpine history kept; Whiteout first viewing pauses, completes, p
   expect(after.book).toEqual({ alpine: true, whiteout: true });
   expect(JSON.parse(after.stored!).seenCave).toEqual({ alpine: true, whiteout: true });
 
+  expect(errors).toEqual([]);
+});
+
+// (Round 5, review E4-9) the pause menu's Restart Run and Exit to Menu before the first viewing completes
+// do not mark the location seen; a completed viewing then holds across another seed, length and difficulty
+test('pause-menu Restart Run / Exit to Menu mid-cinematic leave it unseen; seed, length and difficulty do not reset it', async ({ page }) => {
+  test.setTimeout(60 * 60 * 1000);
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await boot(page, 'whiteout', false);
+  expect((await hist(page)).book.whiteout).toBeUndefined();
+  for (const choice of ['Restart Run', 'Exit to Menu']) {
+    await toCave(page);
+    await escape(page);
+    expect((await K(page)).mode, `${choice}: first viewing, Escape pauses`).toBe('paused');
+    expect(await page.evaluate((c) => (window as unknown as { __skifree: W }).__skifree.pressMenu(c), choice), `${choice} is on the pause menu`).toBe(true);
+    await page.evaluate(() => (window as unknown as { __skifree: W }).__skifree.framesLive(2, 1 / 30));
+    expect((await hist(page)).book.whiteout, `${choice} part-way: not seen`).toBeUndefined();
+  }
+  // watched to the end: seen
+  await toCave(page);
+  await page.evaluate(() => {
+    const k = (window as unknown as { __skifree: W }).__skifree;
+    for (let i = 0; i < 900 && k.state().session!.phase === 'caveCinematic'; i++) k.framesLive(1, 1 / 30);
+  });
+  expect((await K(page)).session!.phase).toBe('chase');
+  expect((await hist(page)).book.whiteout).toBe(true);
+  // another seed, length and difficulty on the same location: still seen, Escape skips
+  await page.evaluate(() => (window as unknown as { __skifree: W }).__skifree.setCourse('custom', 'standard', { custom: 'ROUND5', difficulty: 'hard', biome: 'whiteout' }));
+  await toCave(page);
+  await escape(page);
+  expect((await K(page)).mode, 'another seed/length/difficulty: Escape skips (seen)').toBe('playing');
+  expect((await K(page)).session!.phase).toBe('chase');
+  expect((await hist(page)).book).toEqual({ whiteout: true });
   expect(errors).toEqual([]);
 });

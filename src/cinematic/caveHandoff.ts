@@ -35,7 +35,8 @@ export const CAVE_TURN_AT = 14.7;
  */
 // (round 4, W-091 / review C R3-C2) toSkier 0.6 and a 34° lens (were 0.5 and 40°): the skier's head and
 // shoulders clear the bottom bar (round 3: a red sliver on it) and the Yeti on his ledge is ~1.2× larger
-export const LEAP_SETUP = { back: 6, lift: 0.3, toSkier: 0.6, fov: 34, side: 1.3, eye: 1.35, head: 1.5 } as const;
+// (round 5, review C4-3: in his tuck the skier's waist fell under the bottom bar at 34°) 38°
+export const LEAP_SETUP = { back: 6, lift: 0.3, toSkier: 0.6, fov: 38, side: 1.3, eye: 1.35, head: 1.5 } as const;
 /** where the set-up shot looks from `cam` (the angular blend; see LEAP_SETUP) */
 export function leapSetupLook(cam: THREE.Vector3, yeti: THREE.Vector3, skierHead: THREE.Vector3): THREE.Vector3 {
   const a = yeti.clone().sub(cam).normalize();
