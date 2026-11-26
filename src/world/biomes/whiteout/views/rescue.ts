@@ -149,6 +149,8 @@ function glow(): THREE.Texture {
   g.fillRect(0, 0, 64, 64);
   glowTex = new THREE.CanvasTexture(c);
   glowTex.colorSpace = THREE.SRGBColorSpace;
+  // a module singleton shared by every station's sprites: never disposed (tests exempt `userData.shared`)
+  glowTex.userData.shared = true;
   return glowTex;
 }
 
@@ -534,7 +536,9 @@ export class RescueStation implements FinishEnvironment {
       gr.addColorStop(1, 'rgba(255,200,140,0)');
       g.fillStyle = gr;
       g.fillRect(0, 0, 64, 64);
-      return new THREE.CanvasTexture(c);
+      const t = new THREE.CanvasTexture(c);
+      this.disposables.push(t);
+      return t;
     })();
     this.glare = new THREE.Sprite(mk(new THREE.SpriteMaterial({ map: glareTex, transparent: true, depthWrite: false, fog: false, toneMapped: false, opacity: 0 })) as THREE.SpriteMaterial);
     this.glare.position.set(0, 0, 0.45);
@@ -553,7 +557,8 @@ export class RescueStation implements FinishEnvironment {
         polygonOffsetUnits: -2,
       }),
     );
-    this.pool = new THREE.Mesh(new THREE.CircleGeometry(3.4, 32).rotateX(-Math.PI / 2), poolM);
+    // (Gitar, round 5) every geometry and texture made here goes on the disposables list
+    this.pool = new THREE.Mesh(geo(new THREE.CircleGeometry(3.4, 32).rotateX(-Math.PI / 2)), poolM);
     this.pool.name = 'searchlight-pool';
     this.pool.renderOrder = 6;
     this.pool.visible = false;
