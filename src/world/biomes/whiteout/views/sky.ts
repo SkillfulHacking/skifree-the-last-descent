@@ -125,17 +125,22 @@ void main() {
   vec2 p = vec2(vUv.x * 28000.0, vUv.y * 1800.0);
   // a towering, rounded cumuliform top (low frequencies only: the higher ones aliased into spikes and
   // hanging "drips" kilometres away) that rises as the front comes on
-  float top = (0.5 + 0.2 * sf_cNoise(vec2(vUv.x * 9.0, uTime * 0.015)) + 0.08 * sf_cNoise(vec2(vUv.x * 23.0, 2.0 + uTime * 0.01))) * mix(0.55, 1.0, uVis);
-  float body = 1.0 - smoothstep(top - 0.22, top, vUv.y);
+  // (Round 5, blind reads: "a cardboard backdrop with a stepped, flat top and a hard side") rounded
+  // cauliflower towers along the top and a ragged, billowing edge that dissolves into the sky
+  float top = (0.5 + 0.2 * sf_cNoise(vec2(vUv.x * 9.0, uTime * 0.015)) + 0.08 * sf_cNoise(vec2(vUv.x * 23.0, 2.0 + uTime * 0.01)) + 0.07 * sf_cNoise(vec2(vUv.x * 61.0, 5.0 + uTime * 0.02))) * mix(0.55, 1.0, uVis);
+  float rag = sf_cloudDensity(p * 0.6 + vec2(uTime * 9.0, 31.0), 0.7);
+  float body = 1.0 - smoothstep(top - 0.34 + 0.12 * rag, top + 0.04 * rag, vUv.y);
   // precipitation under the base: broad, soft shafts (no sub-pixel streak texture)
   float shafts = 0.85 + 0.15 * sf_cNoise(vec2(vUv.x * 70.0, vUv.y * 2.0 - uTime * 0.05));
   float billow = sf_cloudDensity(p * 0.25 + vec2(uTime * 6.0, 0.0), 0.8);
   float alpha = body * mix(0.75, 1.0, billow) * shafts;
-  // soft ends along the wall
-  alpha *= smoothstep(0.0, 0.15, vUv.x) * smoothstep(1.0, 0.85, vUv.x);
+  // soft ends along the wall, and its foot melts into the haze on the ground (no hard line where it stands)
+  alpha *= smoothstep(0.0, 0.3, vUv.x) * smoothstep(1.0, 0.7, vUv.x);
+  alpha *= smoothstep(0.0, 0.08, vUv.y);
   vec3 col = mix(uBase, uTop, smoothstep(0.0, 0.9, vUv.y) * (0.6 + 0.4 * billow));
   // aerial perspective: kilometres off, the wall is a blue-grey mass in the haze, not a dark smear
-  col = mix(col, uFog, uHaze);
+  // (Round 5) snow-laden and dark at the base — a front, not a pale sheet — the haze takes less of it
+  col = mix(col, uFog, uHaze * 0.7);
   gl_FragColor = vec4(col, min(1.0, alpha * uVis * 1.2));
 }`;
 
@@ -171,7 +176,7 @@ export class StormSky {
     this.wallU = {
       uTime: { value: 0 },
       uTop: { value: new THREE.Color(0.62, 0.66, 0.73) },
-      uBase: { value: new THREE.Color(0.36, 0.4, 0.47) },
+      uBase: { value: new THREE.Color(0.27, 0.31, 0.38) },
       uVis: { value: 0 },
       uHaze: { value: 0 },
       uFog: { value: new THREE.Color(0.74, 0.79, 0.86) },

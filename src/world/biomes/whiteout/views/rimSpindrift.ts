@@ -1,8 +1,9 @@
 /**
  * (Round 5, W-065: four blind reads — "the drop is implied, not shown"; the racing line comes no nearer
- * than ~55 m to the rim, from where the flank below the lip is out of sight) wind-blown snow pouring off
- * the cornice: veils of spindrift spilling over the lip and falling away into the void below it, the way
- * a corniced edge smokes in a wind. Only an edge does this, so from the line the rim reads as a drop.
+ * than ~55 m to the rim, from where everything below the lip is out of sight) the wind coming up the flank
+ * lifts snow over the cornice: plumes of spindrift rising from below the lip into the air above it and
+ * streaming away, the way a corniced edge smokes. Only an edge does this, and it shows above the lip —
+ * against the dark valley beyond — so from the line the rim reads as a drop.
  *
  * Presentation only and beyond the lip: nothing here is on (or claims to be) skiable ground. One merged
  * mesh per chunk of camera-facing quads (billboarded in the vertex shader about each veil's top), one
@@ -16,9 +17,9 @@ export const RIM_SPINDRIFT = {
   /** one veil every `step` m of rim where the cornice is full (k ≥ kMin) */
   step: 34,
   kMin: 0.45,
-  /** veil width and drop (m) */
-  width: [12, 20] as [number, number],
-  drop: [26, 44] as [number, number],
+  /** plume width and rise (m) */
+  width: [14, 24] as [number, number],
+  drop: [16, 28] as [number, number],
   /** how far out past the rim the veil hangs (× the lip's overhang, + m) */
   out: [0.7, 1.2] as [number, number],
 };
@@ -30,7 +31,7 @@ varying vec2 vUv;
 varying float vSeed;
 varying float vD;
 void main() {
-  vUv = vec2(position.x + 0.5, -position.y);
+  vUv = vec2(position.x + 0.5, position.y);
   vSeed = aSize.z;
   vec3 c = (modelMatrix * vec4(aTop, 1.0)).xyz;
   vec2 tc = cameraPosition.xz - c.xz;
@@ -51,13 +52,13 @@ varying float vD;
 float h(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float n(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
 void main() {
-  // streaks falling down the veil, curling apart as they fall
+  // streaks rising up the plume, leaning downwind and tearing apart as they climb
   float y = vUv.y;
-  float x = vUv.x + 0.12 * (n(vec2(y * 2.0 + vSeed, uTime * 0.2)) - 0.5) * y;
-  float st = n(vec2(x * 9.0 + vSeed * 7.0, y * 2.2 - uTime * 0.9)) * 0.65 + n(vec2(x * 23.0 + vSeed, y * 5.0 - uTime * 1.6)) * 0.35;
-  float body = smoothstep(0.0, 0.22, x) * smoothstep(1.0, 0.78, x);
-  // dense at the lip, thinning out as it falls
-  float fall = smoothstep(0.0, 0.06, y) * (1.0 - smoothstep(0.25, 1.0, y));
+  float x = vUv.x - 0.35 * y * y + 0.1 * (n(vec2(y * 2.0 + vSeed, uTime * 0.25)) - 0.5) * y;
+  float st = n(vec2(x * 7.0 + vSeed * 7.0, y * 2.0 - uTime * 0.8)) * 0.6 + n(vec2(x * 19.0 + vSeed, y * 4.5 - uTime * 1.4)) * 0.4;
+  float body = smoothstep(0.0, 0.25, x) * smoothstep(1.0, 0.7, x);
+  // dense where it comes over the lip, thinning out as it rises
+  float fall = smoothstep(0.0, 0.12, y) * (1.0 - smoothstep(0.2, 1.0, y));
   float near = smoothstep(8.0, 30.0, vD);
   float far = 1.0 - smoothstep(700.0, 1400.0, vD);
   float a = uK * body * fall * smoothstep(0.35, 0.8, st) * near * far;
@@ -97,7 +98,8 @@ export function rimSpindriftVeils(m: Mountain, samples: CorniceSample[]): Array<
     const u = hash(Math.round(s.z), 3.1);
     const o = s.ov * (R.out[0] + (R.out[1] - R.out[0]) * u) + 1.0;
     out.push({
-      top: new THREE.Vector3(s.x + side * o, s.y + s.h * 0.55, s.z),
+      // the plume's base: just past the lip and a few metres below it (it comes up the face)
+      top: new THREE.Vector3(s.x + side * o, s.y - 4, s.z),
       w: R.width[0] + (R.width[1] - R.width[0]) * hash(Math.round(s.z), 5.7),
       drop: R.drop[0] + (R.drop[1] - R.drop[0]) * hash(Math.round(s.z), 9.3),
       seed: u * 17,
@@ -119,8 +121,8 @@ export function buildRimSpindrift(m: Mountain, samples: CorniceSample[]): THREE.
     const corners = [
       [-0.5, 0],
       [0.5, 0],
-      [0.5, -1],
-      [-0.5, -1],
+      [0.5, 1],
+      [-0.5, 1],
     ];
     for (const [cx, cy] of corners) {
       pos.push(cx!, cy!, 0);

@@ -5,7 +5,6 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // node modules loaded at run time (the project's tsconfig carries no node types; as scan_lod.test.ts)
 type Fn = (...a: never[]) => never;
 let spawnSync: Fn, mkdtempSync: Fn, mkdirSync: Fn, writeFileSync: Fn, symlinkSync: Fn, cpSync: Fn, tmpdir: Fn, join: (...p: string[]) => string;
-let TOOL = '';
 let TOOLS_DIR = '';
 beforeAll(async () => {
   const cp = (await import('node:child_process' as string)) as Record<string, Fn>;
@@ -17,7 +16,7 @@ beforeAll(async () => {
   ({ tmpdir } = os);
   join = path.join!;
   TOOLS_DIR = path.resolve!(path.dirname!(new URL(import.meta.url).pathname), '../../tools');
-  TOOL = join(TOOLS_DIR, 'tension_summary.py');
+
 });
 const ROW = JSON.stringify({ biome: 'alpine', len: 'sprint', diff: 'normal', behaviour: 'clean', outcome: 'escaped', minGap: 40, t45: 0, t25: 0, t110: 3, enc: 0 });
 
