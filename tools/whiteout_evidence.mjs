@@ -274,12 +274,16 @@ if (want('cave') && G.cave) {
     [3.0, '12_cave_mouth', 'Cave encounter 3 s: the rimed mouth, snow curtain off the brow'],
     [8.6, '13_cave_emerge', 'Emergence (8.6 s): the squall rolling in, spindrift across the mouth'],
     [11.3, '14_cave_roar', 'The roar (11.3 s): snow blasted off the brow'],
-    [15.2, '15_cave_leap', 'The leap (15.2 s)', { yeti: 'main' }],
+    // the set-up shot (CAVE_GATHER_AT 14.2 → CAVE_TURN_AT 14.7): the Yeti on the ledge past the skier's shoulder
+    [14.45, '15_cave_setup', "Set-up (14.45 s): the Yeti on the ledge past the skier's shoulder", { yeti: 'main', skier: 'main' }],
+    // the turn to the chase camera (14.7 → 15.8). The leap itself plays after control returns, as the chase's
+    // first second (caveHandoff.ts), so it is in the hand-off strips (tools/handoff_strip.mjs), not here.
+    [15.2, '15b_cave_turn', 'The turn to the chase camera (15.2 s); the leap follows once control returns', { skier: 'main' }],
   ]) {
     await framesUntil(`(s) => s.cinematicTime >= ${t}`, 900);
     await settle(1200);
     await shot(name, note, expect);
-    if (process.env.DIAG && name === '15_cave_leap') {
+    if (process.env.DIAG && name === '15b_cave_turn') {
       log('weather', JSON.stringify(await P(`(w) => ({ weather: w.weather, density: w.env.fog.density, override: w.weatherOverride })`)));
       await ev(() => window.__skifree.setVisible('whiteout-blowing-snow', false));
       await shot('15b_no_blowing_snow', 'diagnostic');
