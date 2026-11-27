@@ -1,0 +1,14 @@
+SHA 729e22655eb3f26eb1c52e81a0e8b4534c758023
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 2 tests using 1 worker
+
+[1/2] tests/e2e/cave_history.spec.ts:66:1 › old save: Alpine history kept; Whiteout first viewing pauses, completes, persists and is skippable after; Fjord abandoned part-way is not counted
+[2/2] tests/e2e/cave_history.spec.ts:137:1 › pause-menu Restart Run / Exit to Menu mid-cinematic leave it unseen; seed, length and difficulty do not reset it
+  Slow test file: tests/e2e/cave_history.spec.ts (19.4m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  2 passed (19.5m)
+exit 0

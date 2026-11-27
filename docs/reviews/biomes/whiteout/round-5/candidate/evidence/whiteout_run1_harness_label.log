@@ -1,0 +1,33 @@
+[211s] course verified SEED-3403625622-SPR@WHITE normal
+[222s] course {"L":3000,"cave":{"index":0,"caveZ":260,"triggerZ":282,"foreshadowZ":180,"anchor":{"z":260,"centerX":6.185433809964871,"side":-1,"d":46},"chaseEndZ":3000,"checkpointZ":null,"speedMul":1},"rimSide":1}
+[492s] shot 01_clear_window clear s=0.00 
+[729s] shot 02_wall_far clear s=0.00 
+[938s] shot 03_wall_near clear s=0.00 
+[1157s] shot 04_build build s=0.81 
+[1389s] shot 05_storm storm s=0.82 
+[1646s] shot 06_easing ease s=0.07 
+[1907s] shot 07_clearing clear s=0.00 
+[2199s] shot 08_cornice_edge clear s=0.00 
+[2327s] shot 09_valley_view clear s=0.00 
+[2458s] shot 10_crest clear s=0.00 
+[2673s] shot 11_ridge_overview clear s=0.00 
+[2713s] rim {"z":1380,"d":54.79364705379366}
+[2992s] shot 27_play_rim_clear clear s=0.00 
+[3280s] shot 28_play_rim_storm storm s=0.84 
+[3293s] row {"z":1201.4536421000957,"gap":11.2120708115858,"line":-3.8440111865761715}
+[3628s] shot 29_play_drift_row_storm storm s=0.86 
+[3691s] course verified SEED-3403625622-SPR@WHITE normal
+[3730s] cinematic true
+[3975s] shot 12_cave_mouth clear s=0.00 
+[4221s] shot 13_cave_emerge clear s=0.00 
+[4543s] shot 14_cave_roar clear s=0.00 
+[4722s] shot 15_cave_leap clear s=0.00 FAILED yeti
+file:///home/claude/sf-wo/tools/whiteout_evidence.mjs:113
+  if (failed.length && !LENIENT) throw new Error(`${name}: the frame does not show ${failed.join(', ')} (${note})`);
+                                       ^
+
+Error: 15_cave_leap: the frame does not show yeti (The leap (15.2 s))
+    at shot (file:///home/claude/sf-wo/tools/whiteout_evidence.mjs:113:40)
+    at async file:///home/claude/sf-wo/tools/whiteout_evidence.mjs:281:5
+
+Node.js v22.23.4
