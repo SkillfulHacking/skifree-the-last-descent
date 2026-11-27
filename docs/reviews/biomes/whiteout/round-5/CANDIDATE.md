@@ -3,7 +3,7 @@
 **Frozen source:** `729e226` (branch `pass5-whiteout`, draft PR #9).
 - **Later commits change only tests, tools and documents.** `bbbef83` changes the evidence harness's cave-shot labelling. `git diff 729e226 <later> -- src` is empty.
 - **Two SHAs appear in the logs:**
-  - the evidence re-run and the perf JSON record `bbbef83`;
+  - the evidence re-run (`whiteout/`) and the perf JSON record `bbbef83`; `whiteout_victory/` and `a11y_rcm_flash/` record `f71f1b4` (a documents-only commit; source and harness identical to `bbbef83`);
   - the unit, tsc, build, e2e and balance logs record `729e226`.
 
 **Round 4:** `71c9ceb`. `git diff 71c9ceb 729e226 -- src` shows every source change since then: 36 files, +701 / −93.
