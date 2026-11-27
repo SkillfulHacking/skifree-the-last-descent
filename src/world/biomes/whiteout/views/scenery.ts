@@ -125,7 +125,6 @@ export class WhiteoutScenery implements SceneryView {
     this.group.name = 'whiteout-scenery';
     this.snow = new BlowingSnow(ctx.quality);
     this.rocks = new RidgeRocks(ctx.mountain, ctx.quality);
-    void this.rocks.loadScans();
     this.cloudSea = new ValleyCloudSea(ctx.mountain, ctx.biome.atmosphere.fogColor as [number, number, number]);
     this.group.add(this.sky.group, this.snow.mesh, this.rocks.group, this.cloudSea.mesh);
     // a slim pole with reflective orange/black bands (vertex colours)
@@ -151,6 +150,10 @@ export class WhiteoutScenery implements SceneryView {
     for (let k = Math.max(0, c0); k <= c1; k++) if (!this.chunks.has(k)) this.build(k);
     this.win = [c0, c1];
     this.rocks.stream(c0, c1);
+  }
+
+  loadAssets(): Promise<void> {
+    return this.rocks.loadScans();
   }
 
   flush(): void {}

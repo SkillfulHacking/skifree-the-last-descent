@@ -132,7 +132,6 @@ export class World {
     this.env = new Environment(this.scene, renderer, quality, this.biome);
     this.terrain.uniforms.uSunDir.value.copy(this.env.sunDir);
     this.vegetation = new Vegetation(this.mountain, this.obstacles, quality, this.seed);
-    void this.vegetation.loadScans();
     this.scene.add(this.vegetation.group);
     this.footprints = new Footprints(this.mountain, 160);
     this.yetiPrints = new Footprints(this.mountain, 500);
@@ -164,6 +163,9 @@ export class World {
     onProgress(0.02, 'Shaping the mountain');
     await tick();
     const w = new World(renderer, quality, course);
+    // scanned meshes stream in after construction (they replace placeholders when ready)
+    void w.vegetation.loadScans();
+    void w.scenery?.loadAssets?.();
     onProgress(0.08, 'Growing the forest');
     await tick();
     const x0 = w.mountain.routeX(0);

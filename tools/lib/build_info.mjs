@@ -13,8 +13,8 @@ function gitDir(root) {
   const g = join(root, '.git');
   if (!existsSync(g)) return null;
   if (statSync(g).isDirectory()) return g;
-  const m = /^gitdir:\s*(.+)\s*$/m.exec(readFileSync(g, 'utf8'));
-  return m ? resolve(root, m[1]) : null;
+  const line = readFileSync(g, 'utf8').split('\n').find((l) => l.startsWith('gitdir:'));
+  return line ? resolve(root, line.slice('gitdir:'.length).trim()) : null;
 }
 
 /** the checked-out commit (full SHA), or 'unknown'; never spawns a process */

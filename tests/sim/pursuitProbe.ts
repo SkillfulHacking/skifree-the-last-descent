@@ -24,6 +24,6 @@ export function settledSpeed(m: Mountain, f: ObstacleField | null, z: number, ga
 /** a z where the course slope is within 0.5° of `deg` (searching downhill from 400 m), or NaN */
 export function zAtSlope(m: Mountain, deg: number, from = 400, to = 2800): number {
   for (let z = from; z < to; z += 5) if (Math.abs(m.slopeDeg(z) - deg) < 0.5) return z;
-  return NaN;
+  return Number.NaN;
 }
 

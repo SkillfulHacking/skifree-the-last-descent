@@ -64,6 +64,8 @@ export interface SceneryView {
   readonly pending?: number;
   /** finish every queued build now (loading, teleports) */
   flush?(): void;
+  /** start loading optional assets (scanned meshes); World.create calls it once after construction */
+  loadAssets?(): Promise<void>;
   update(dt: number, time: number, f: SceneryFrame): void;
   /** optional main-menu camera (the location's establishing view around the start); null = default */
   menuCamera?(time: number, out: { pos: THREE.Vector3; look: THREE.Vector3; fov: number }): boolean;
