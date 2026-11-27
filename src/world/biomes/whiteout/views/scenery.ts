@@ -18,6 +18,7 @@ import { ValleyCloudSea } from './cloudSea';
 import { RidgeRocks } from './ridgeRocks';
 import { ROCK_ORIGIN } from '../../../art/rockMaterial';
 import { A11Y } from '../../../../core/a11y';
+import { weatherFx } from '../../../look/weatherFx';
 import { buildCorniceGeometry, corniceMaterial, corniceSamples, wandGeometry, wandSpots } from './cornice';
 import { buildRimSpindrift, rimSpindriftMaterial } from './rimSpindrift';
 
@@ -250,7 +251,8 @@ export class WhiteoutScenery implements SceneryView {
     // the veils smoke harder the stronger the wind (always a little: the ridge is never still)
     const vm = rimSpindriftMaterial();
     vm.uniforms.uTime!.value = time;
-    vm.uniforms.uK!.value = 0.55 + 0.35 * Math.min(1, f.storm ?? 0);
+    // (round 6, W-103 / review E5-4) "Reduce weather effects" thins the rim spindrift like the other weather
+    vm.uniforms.uK!.value = (0.55 + 0.35 * Math.min(1, f.storm ?? 0)) * weatherFx.scale;
     LAMP_CALM.value = A11Y.reduceFlashes ? 1 : 0;
     ROCK_ORIGIN.value.copy(f.origin);
     // (a scan that arrived since the last stream: place the rocks of the live chunks)

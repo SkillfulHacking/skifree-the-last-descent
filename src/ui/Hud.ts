@@ -189,11 +189,43 @@ export class Hud {
 
   /** Big centred title (e.g. RUN., YOU SURVIVED THE MOUNTAIN). */
   title(text: string, sub = '', cls = '', duration = 2.5) {
+    this.center.removeAttribute('style');
     this.center.className = `hud-center on ${cls}`;
     this.center.textContent = text;
     this.sub.className = `hud-sub ${sub ? 'on' : ''} ${cls}`;
     this.sub.textContent = sub;
     this.centerTimer = duration;
+  }
+
+  /**
+   * (Round 6, W-103 / review E5-1) keep RUN. clear of both the rear-view inset (above it) and the skier
+   * (below it): `headY` is the top of the skier's helmet on screen (viewport px). The banner sits just
+   * under the inset; if it would reach the helmet it shrinks, and if it would then be too small to read
+   * it moves to the left half of the screen, beside the skier, at its full size.
+   */
+  fitRun(headY: number) {
+    const el = this.center;
+    if (!el.classList.contains('run')) return;
+    el.style.removeProperty('font-size');
+    el.style.removeProperty('top');
+    el.style.removeProperty('right');
+    const scale = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
+    const inset = document.querySelector('.rear-view') as HTMLElement | null;
+    const ib = inset && inset.offsetParent !== null ? inset.getBoundingClientRect().bottom : 0;
+    const top = Math.max(ib + 8, innerHeight * 0.12);
+    const natural = el.getBoundingClientRect().height; // line-height 1: the glyph box, zoomed
+    const room = headY - 14 - top;
+    el.style.top = `${top / scale}px`;
+    if (natural <= room) return;
+    const fs = Number.parseFloat(getComputedStyle(el).fontSize) || 96;
+    const fit = fs * (room / natural);
+    if (fit * scale >= 44) {
+      el.style.fontSize = `${fit}px`;
+      return;
+    }
+    // too little room above the skier: beside him instead, at full size
+    el.style.right = '50%';
+    el.style.top = `${Math.max(top, innerHeight * 0.3) / scale}px`;
   }
 
   clearTitle() {

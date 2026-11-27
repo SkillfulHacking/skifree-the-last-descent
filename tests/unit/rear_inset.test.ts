@@ -21,3 +21,22 @@ describe('rear-view inset lens', () => {
     }
   });
 });
+
+describe('W-103: Reduce Camera Motion holds the inset lens', () => {
+  it('holds a fixed lens while the wanted one drifts, and cuts only on a large change', async () => {
+    const { heldInsetFov, HELD_INSET_FOVS } = await import('../../src/game/App');
+    let held = 48;
+    const seen = new Set<number>();
+    let changes = 0;
+    // the Yeti closing from 120 m to 15 m: the continuous lens narrows smoothly; the held one steps
+    for (let d = 120; d >= 15; d -= 0.5) {
+      const want = Math.min(48, (2 * Math.atan(2.6 / (0.32 * 2 * d)) * 180) / Math.PI);
+      const f = heldInsetFov(held, Math.max(9, want));
+      if (f !== held) changes++;
+      held = f;
+      seen.add(f);
+    }
+    for (const f of seen) expect(HELD_INSET_FOVS).toContain(f);
+    expect(changes).toBeLessThanOrEqual(4);
+  });
+});

@@ -26,6 +26,7 @@ await import('../../src/world/biomes');
 const { buildMountain, makeCourse } = await import('../../src/game/CourseConfig');
 const { RescueStation } = await import('../../src/world/biomes/whiteout/views/rescue');
 const { getBiome } = await import('../../src/world/biome');
+const { A11Y } = await import('../../src/core/a11y');
 
 describe('rescue station disposal (Gitar, round 5)', () => {
   it('dispose() releases every geometry, material and texture in the station', () => {
@@ -56,5 +57,33 @@ describe('rescue station disposal (Gitar, round 5)', () => {
     st.dispose();
     const missed = [...held].filter((_, i) => spies[i]!.mock.calls.length === 0).map((h) => owner.get(h) ?? h.constructor.name);
     expect(missed, `not disposed: ${missed.join('; ')}`).toEqual([]);
+  });
+});
+
+// (Round 6, W-103 / review E5-3: claimed but untested) with Reduce flashes & pulsing, the beacon and the
+// snowcat's light bar burn steadily; without it they flash
+describe('rescue station under Reduce flashes', () => {
+  const m = buildMountain(makeCourse('classic', 'sprint', { biome: 'whiteout', difficulty: 'normal' }));
+  const fx = m.routeX(m.finishZ);
+  const make = () => new RescueStation({ quality: 'high', mountain: m, biome: getBiome('whiteout'), heightAt: (x, z) => m.heightAt(x, z), finishCenter: new THREE.Vector3(fx, m.heightAt(fx, m.finishZ), m.finishZ) });
+  const sample = (calm: boolean) => {
+    A11Y.reduceFlashes = calm;
+    const st = make() as unknown as { update(dt: number, t: number, s: object): void; beacon: THREE.Sprite; lightBar: THREE.Mesh };
+    const vals: number[] = [];
+    for (let t = 0; t < 2; t += 0.05) {
+      st.update(0.05, t, { cheer: 0, lookAt: null, welcome: 0 });
+      vals.push(st.beacon.material.opacity, (st.lightBar.material as THREE.Material).opacity);
+    }
+    A11Y.reduceFlashes = false;
+    return { beacon: vals.filter((_, i) => i % 2 === 0), bar: vals.filter((_, i) => i % 2 === 1) };
+  };
+  const spread = (a: number[]) => Math.max(...a) - Math.min(...a);
+  it('steady with the setting on, flashing with it off', () => {
+    const calm = sample(true);
+    const live = sample(false);
+    expect(spread(calm.beacon)).toBeLessThan(1e-6);
+    expect(spread(calm.bar)).toBeLessThan(1e-6);
+    expect(spread(live.beacon)).toBeGreaterThan(0.3);
+    expect(spread(live.bar)).toBeGreaterThan(0.3);
   });
 });

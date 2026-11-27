@@ -126,6 +126,7 @@ export class GameSession implements Stage {
   // --- gameplay events (achievements / statistics; see events.ts) ---------------------------
   /** Gameplay event bus of this run. Subscribe before the first frame (RunStarted is emitted on the first simulated step). */
   readonly events: EventBus;
+  private readonly tmpHead = new THREE.Vector3();
   private telemetry: RunTelemetry;
   private runStartedSent = false;
   private runFinishedSent = false;
@@ -1322,6 +1323,11 @@ export class GameSession implements Stage {
     const L = m.finishZ;
     const enc = this.run.encounter;
     const nextRefuge = this.endless ? (enc?.checkpointZ ?? null) : null;
+    // (round 6, W-103) RUN. between the rear-view inset and the skier's helmet, wherever the camera puts him
+    if (this.run.phase === 'chase' && this.sinceControl < 2) {
+      const h = this.skier.getHeadTopWorldPosition(this.tmpHead).project(this.camera);
+      this.hud.fitRun(((1 - h.y) / 2) * innerHeight);
+    }
     this.hud.update(dt, {
       speedKmh: s.speed * 3.6,
       distanceToFinish: L - s.pos.z,

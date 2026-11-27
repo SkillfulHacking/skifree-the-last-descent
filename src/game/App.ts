@@ -1,6 +1,7 @@
 /**
  * Application shell: renderer, loading, menus, settings, run lifecycle, perf overlay, debug harness.
  */
+import { applyWhiteoutProto } from '../world/biomes/whiteout/protos';
 import { PlaytestLog } from './playtestLog';
 import { A11Y } from '../core/a11y';
 import * as THREE from 'three';
@@ -39,6 +40,15 @@ export const REAR_INSET_FOG = 0.45;
 /** the Yeti's share of the inset height the telephoto glance frames for */
 export const REAR_INSET_FILL = 0.32;
 /** the inset's field of view (deg) for the Yeti `d` m away: about REAR_INSET_FILL of the height, 9°–48° */
+/** (round 6, W-103) the inset lenses under Reduce Camera Motion: hold `held` until `want` is 35 % away, then cut */
+export const HELD_INSET_FOVS = [48, 30, 18, 11] as const;
+export function heldInsetFov(held: number, want: number): number {
+  if (HELD_INSET_FOVS.includes(held as (typeof HELD_INSET_FOVS)[number]) && Math.abs(Math.log(want / held)) < Math.log(1.35)) return held;
+  let best: number = HELD_INSET_FOVS[0];
+  for (const f of HELD_INSET_FOVS) if (Math.abs(Math.log(want / f)) < Math.abs(Math.log(want / best))) best = f;
+  return best;
+}
+
 export function rearInsetFov(d: number): number {
   const f = (2 * Math.atan(2.6 / (REAR_INSET_FILL * 2 * Math.max(1, d))) * 180) / Math.PI;
   return Math.min(48, Math.max(9, f));
@@ -78,6 +88,7 @@ export class App {
   /** (round 6, owner ruling 3) the consented playtest log: only with ?playtest (see playtestLog.ts) */
   readonly playtest = typeof location !== 'undefined' && new URLSearchParams(location.search).has('playtest') ? new PlaytestLog() : null;
   private detachPlaytest: (() => void) | null = null;
+  private rearFovHeld = 48;
   progress!: ProgressTracker;
   private progressNote: string | null = null;
   private toast!: AchievementToast;
@@ -188,6 +199,9 @@ export class App {
   }
 
   async start() {
+    // (round 6, art prototypes) ?debug&proto=A|B|C: a Whiteout art-direction prototype (debug harness only)
+    const proto = this.debugHarness ? new URLSearchParams(location.search).get('proto') : null;
+    if (proto === 'A' || proto === 'B' || proto === 'C') applyWhiteoutProto(proto);
     await this.buildWorld(this.settings.quality, this.currentCourse());
     this.loop();
     if (new URLSearchParams(location.search).has('debug')) this.installDebug();
@@ -943,7 +957,11 @@ export class App {
     const zoom = this.session?.rearViewZoom() ?? 0;
     // (Round 5, W-082 / review F4-2: the Yeti was ~15 px at 28 m, 3–4 px at 75 m) a telephoto glance: the
     // lens narrows with his distance so he fills about a third of the inset's height (12°–48°)
-    this.rearCam.fov = Math.min(48 + (22 - 48) * zoom, rearInsetFov(this.rearPose.pos.distanceTo(this.rearPose.look)));
+    const fov = Math.min(48 + (22 - 48) * zoom, rearInsetFov(this.rearPose.pos.distanceTo(this.rearPose.look)));
+    // (round 6, W-103 / review E5-5) with "Reduce camera motion" the inset's lens does not zoom: it holds one
+    // of a few fixed lenses and cuts to the next only when the Yeti's size has drifted well away from it
+    this.rearCam.fov = this.settings.reduceCameraMotion ? heldInsetFov(this.rearFovHeld, fov) : fov;
+    this.rearFovHeld = this.rearCam.fov;
     this.rearCam.aspect = w / h;
     this.rearCam.updateProjectionMatrix();
     this.rearCam.updateMatrixWorld();
@@ -1329,6 +1347,14 @@ export class App {
       projectToScreen: (p: { x: number; y: number; z: number }) => {
         const v = new THREE.Vector3(p.x, p.y, p.z).project(this.camera);
         return { x: v.x, y: v.y, z: v.z };
+      },
+      /** (round 6, W-103) the skier on screen, viewport px: helmet top, and the body's x span (head to skis) */
+      skierScreen: () => {
+        if (!this.skier) return null;
+        const px = (v: THREE.Vector3) => ({ x: ((v.x + 1) / 2) * innerWidth, y: ((1 - v.y) / 2) * innerHeight });
+        const head = px(this.skier.getHeadTopWorldPosition(new THREE.Vector3()).project(this.camera));
+        const feet = px(this.skier.root.getWorldPosition(new THREE.Vector3()).project(this.camera));
+        return { headY: head.y, feetY: feet.y, x0: Math.min(head.x, feet.x) - 40, x1: Math.max(head.x, feet.x) + 40 };
       },
     };
     (window as unknown as { __skifree: typeof api }).__skifree = api;
