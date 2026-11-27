@@ -9,21 +9,16 @@
 // manifest.json records the build SHA, viewport, course, every shot's time/phase/camera and page errors.
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { servedBuild } from './lib/build_info.mjs';
 
 const [outDir = 'docs/reviews/biomes/whiteout/round-1', size = '1920x1080', seed = 'WO-R1', only = 'all', length = 'sprint'] = process.argv.slice(2);
 const base = process.env.BASE ?? 'http://127.0.0.1:4471';
 const [W, H] = size.split('x').map(Number);
 const want = (k) => only === 'all' || only.split(',').includes(k);
 mkdirSync(outDir, { recursive: true });
-const sha = (() => {
-  try {
-    return execSync('git rev-parse --short HEAD').toString().trim() + (execSync('git status --porcelain --untracked-files=no -- src').toString().trim() ? '+dirty' : '');
-  } catch {
-    return 'unknown';
-  }
-})();
-const manifest = { biome: 'whiteout', seed, length, viewport: size, sha, settingsOverride: process.env.SETTINGS ? JSON.parse(process.env.SETTINGS) : null, renderer: 'SwiftShader (software)', date: new Date().toISOString(), shots: [], errors: [] };
+const build = await servedBuild(base);
+const sha = build.sha;
+const manifest = { biome: 'whiteout', seed, length, viewport: size, sha, build, settingsOverride: process.env.SETTINGS ? JSON.parse(process.env.SETTINGS) : null, renderer: 'SwiftShader (software)', date: new Date().toISOString(), shots: [], errors: [] };
 const t0 = Date.now();
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s]`, ...a);
 
@@ -46,7 +41,8 @@ await page.waitForFunction(() => window.__ready === true, null, { timeout: 900_0
 
 const ev = (fn, arg) => page.evaluate(fn, arg);
 /** evaluate `(w, m, k) => …` source with the world, mountain and debug API */
-const P = (src) => page.evaluate((s) => { const k = window.__skifree; const w = k.world(); return (0, eval)(s)(w, w.mountain, k); }, src);
+// world queries: real functions passed to Playwright (round 6: no code built from strings)
+const P = (fn, arg) => page.evaluate(fn, arg);
 const settle = (ms) => page.waitForTimeout(ms);
 /**
  * (Round 5, W-097) what a frame must show, checked from the game's own state before the image is kept:
@@ -112,17 +108,27 @@ async function shot(name, note, expect = {}) {
   log('shot', name, f ? `${f.phase} s=${f.s.toFixed(2)}` : '', failed.length ? `FAILED ${failed.join(',')}` : '');
   if (failed.length && !LENIENT) throw new Error(`${name}: the frame does not show ${failed.join(', ')} (${note})`);
 }
-/** step deterministic frames until a predicate on the session state holds */
-async function framesUntil(pred, max, dt = 1 / 30) {
-  return ev(([p, n, d]) => {
-    const f = (0, eval)(p);
+/**
+ * step deterministic frames until a condition on the session state holds (round 6: a declarative condition,
+ * not code built from a string). cond: { phase: [..] } | { atLeast: [field, v] } | { above: [field, v] }
+ * | { between: [field, lo, hi] } | { truthy: field } | { never: true }
+ */
+async function framesUntil(cond, max, dt = 1 / 30) {
+  return ev(([c, n, d]) => {
+    const f = (s) =>
+      c.phase ? c.phase.includes(s.phase)
+      : c.atLeast ? s[c.atLeast[0]] >= c.atLeast[1]
+      : c.above ? s[c.above[0]] > c.above[1]
+      : c.between ? s[c.between[0]] > c.between[1] && s[c.between[0]] < c.between[2]
+      : c.truthy ? !!s[c.truthy]
+      : false;
     for (let i = 0; i < n; i++) {
       const s = window.__skifree.state().session;
       if (s && f(s)) return { ok: true, i };
       window.__skifree.frames(1, d);
     }
     return { ok: false, i: n };
-  }, [pred, max, dt]);
+  }, [cond, max, dt]);
 }
 /** the first time ≥ from (s) where the front is in `phase` with `left` (s) to go, or `into` s into it */
 async function findPhase(phase, from, into = null, left = null) {
@@ -159,7 +165,7 @@ async function startRun(difficulty) {
 }
 const G = await (async () => {
   await startRun('normal');
-  const g = await P(`(w, m) => ({ L: m.finishZ, cave: m.profile.encounters(0, m.finishZ)[0] ?? null, rimSide: m.biome.terrain.ridge.dropSide })`);
+  const g = await P((a) => { const k = window.__skifree; const w = k.world(); const m = w.mountain; return ((w, m, k, a) => ({ L: m.finishZ, cave: m.profile.encounters(0, m.finishZ)[0] ?? null, rimSide: m.biome.terrain.ridge.dropSide }))(w, m, k, a); });
   log('course', JSON.stringify(g));
   manifest.course = g;
   return g;
@@ -169,7 +175,7 @@ const G = await (async () => {
 async function skiAt(z, t, speed = 16) {
   await ev(([zz, sp]) => { window.__skifree.hold(true); window.__skifree.freeCam(null); window.__skifree.teleport(zz, sp); window.__skifree.autopilot('skilled'); window.__skifree.placeYeti(260); }, [z, speed]);
   await ev((tt) => window.__skifree.setTime(tt), t);
-  await framesUntil('(s) => false', 45);
+  await framesUntil({ never: true }, 45);
   await ev(() => window.__skifree.placeYeti(260));
 }
 
@@ -179,8 +185,8 @@ if (want('weather')) {
   // past the encounter (teleporting over its trigger would start the cave cinematic): the chase is
   // on, the Yeti held 260 m back so the weather shots are not chase shots
   await ev(() => window.__skifree.toChase());
-  await framesUntil('(s) => s.phase === "chase"', 300);
-  await framesUntil('(s) => false', 240); // the RUN. banner clears
+  await framesUntil({ phase: ['chase'] }, 300);
+  await framesUntil({ never: true }, 240); // the RUN. banner clears
   const z = Math.min((G.cave?.triggerZ ?? 0) + 120, G.L * 0.4);
   await skiAt(z, 8);
   await shot('01_clear_window', 'Third-person, clear window (start): broken cloud deck, cloud shadows on the snow, the ridge in sun');
@@ -211,23 +217,23 @@ if (want('weather')) {
 if (want('vista')) {
   await ev(() => window.__skifree.hud(false));
   await ev(() => window.__skifree.toChase());
-  await framesUntil('(s) => s.phase === "chase"', 300);
+  await framesUntil({ phase: ['chase'] }, 300);
   const zr = Math.round(G.L * 0.55);
   await skiAt(zr, 6, 0);
   await ev(() => window.__skifree.autopilot(null));
   // the corniced rim: from just inside it, along the edge, the flank falling away
   // (from the inside the raised lip hides the drop: the cornice is framed from just off the edge,
   // looking back along the rim — the overhang, its break-offs, the wands behind it on the piste side)
-  await P(`(w, m, k) => { const z = ${zr}; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cz = z - 45; const rxc = m.ridgeRimX(cz); const cx = rxc + s * 12; const ry = m.heightAt(rx, z); k.freeCam([cx, Math.max(m.heightAt(cx, cz), m.heightAt(rxc, cz)) + 3, cz], [rx, ry + 0.5, z + 20], 58); }`);
+  await P((a) => { const k = window.__skifree; const w = k.world(); const m = w.mountain; return ((w, m, k, a) => { const z = a; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cz = z - 45; const rxc = m.ridgeRimX(cz); const cx = rxc + s * 12; const ry = m.heightAt(rx, z); k.freeCam([cx, Math.max(m.heightAt(cx, cz), m.heightAt(rxc, cz)) + 3, cz], [rx, ry + 0.5, z + 20], 58); })(w, m, k, a); }, zr);
   await settle(2500);
   await shot('08_cornice_edge', 'The corniced rim (drop side), from just off the edge: the lip curling over the flank, rim wands set back from it');
-  await P(`(w, m, k) => { const z = ${zr} + 60; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cx = rx + s * 8, cz = z; k.freeCam([cx, Math.max(m.heightAt(cx, cz), m.heightAt(rx, cz)) + 6, cz], [rx + s * 900, m.heightAt(rx, z) - 420, z + 380], 60); }`);
+  await P((a) => { const k = window.__skifree; const w = k.world(); const m = w.mountain; return ((w, m, k, a) => { const z = a + 60; const s = m.biome.terrain.ridge.dropSide; const rx = m.ridgeRimX(z); const cx = rx + s * 8, cz = z; k.freeCam([cx, Math.max(m.heightAt(cx, cz), m.heightAt(rx, cz)) + 6, cz], [rx + s * 900, m.heightAt(rx, z) - 420, z + 380], 60); })(w, m, k, a); }, zr);
   await settle(2500);
   await shot('09_valley_view', 'Over the edge: the flank falling ~500 m into the valley, far ranges across it');
-  await P(`(w, m, k) => { const z = ${zr} + 120; const s = m.biome.terrain.ridge.dropSide; const cx = m.routeX(z) + s * 12, cz = z - 30; const tx = m.profile.centerX(z) - s * (m.profile.halfWidth(z) + 140); k.freeCam([cx, m.heightAt(cx, cz) + 2.6, cz], [tx, m.heightAt(tx, z + 40) + 20, z + 40], 58); }`);
+  await P((a) => { const k = window.__skifree; const w = k.world(); const m = w.mountain; return ((w, m, k, a) => { const z = a + 120; const s = m.biome.terrain.ridge.dropSide; const cx = m.routeX(z) + s * 12, cz = z - 30; const tx = m.profile.centerX(z) - s * (m.profile.halfWidth(z) + 140); k.freeCam([cx, m.heightAt(cx, cz) + 2.6, cz], [tx, m.heightAt(tx, z + 40) + 20, z + 40], 58); })(w, m, k, a); }, zr);
   await settle(2500);
   await shot('10_crest', 'Across the piste to the crest side: the rocky crest and its tors, sky behind it');
-  await P(`(w, m, k) => { const z = ${zr}; const cz = z - 160; const cx = m.routeX(cz); k.freeCam([cx, m.heightAt(cx, cz) + 45, cz], [m.routeX(z + 250), m.heightAt(m.routeX(z + 250), z + 250) - 20, z + 250], 62); }`);
+  await P((a) => { const k = window.__skifree; const w = k.world(); const m = w.mountain; return ((w, m, k, a) => { const z = a; const cz = z - 160; const cx = m.routeX(cz); k.freeCam([cx, m.heightAt(cx, cz) + 45, cz], [m.routeX(z + 250), m.heightAt(m.routeX(z + 250), z + 250) - 20, z + 250], 62); })(w, m, k, a); }, zr);
   await settle(2500);
   await shot('11_ridge_overview', 'The ridge from above the piste: the course along the top, the drop on one side, the crest on the other');
 }
@@ -237,26 +243,26 @@ if (want('vista')) {
 // storm, and a marked drift row coming up in a storm
 if (want('play')) {
   await ev(() => { window.__skifree.hud(true); window.__skifree.freeCam(null); window.__skifree.toChase(); });
-  await framesUntil('(s) => s.phase === "chase"', 300);
+  await framesUntil({ phase: ['chase'] }, 300);
   // where the racing line runs closest to the rim (the drop in view), in the middle of the course
-  const zRim = await P(`(w, m) => { let best = null, bd = 1e9; for (let z = 300; z < m.finishZ - 300; z += 20) { const d = Math.abs(m.routeX(z) - m.ridgeRimX(z)); if (d < bd) { bd = d; best = z; } } return { z: best, d: bd }; }`);
+  const zRim = await P((a) => { const k = window.__skifree; const w = k.world(); const m = w.mountain; return ((w, m, k, a) => { let best = null, bd = 1e9; for (let z = 300; z < m.finishZ - 300; z += 20) { const d = Math.abs(m.routeX(z) - m.ridgeRimX(z)); if (d < bd) { bd = d; best = z; } } return { z: best, d: bd }; })(w, m, k, a); });
   log('rim', JSON.stringify(zRim));
   const clearT = await findPhase('clear', 30, 4);
   await skiAt(zRim.z - 60, clearT ?? 8);
-  await framesUntil('(s) => false', 90);
+  await framesUntil({ never: true }, 90);
   await shot('27_play_rim_clear', `Gameplay camera, clear window, where the line runs ${zRim.d.toFixed(0)} m from the rim`);
   const stormT = await findPhase('storm', 40, 8);
   await skiAt(zRim.z - 60, stormT ?? 60);
   await ev(() => window.__skifree.settleWeather());
-  await framesUntil('(s) => false', 90);
+  await framesUntil({ never: true }, 90);
   await shot('28_play_rim_storm', 'Gameplay camera, full storm, same stretch of rim');
   // a drift row whose gap is off the line, approached in a storm (its gap markers)
-  const row = await P(`(w, m) => { const H = w.environment.hazards; H.ensure(300, m.finishZ - 200); for (const h of H.peek(300, m.finishZ - 200)) { const p = h.params; if (h.kind === 'wind-drift' && p.lead && Math.abs(p.gapX - m.routeX(p.rowZ)) > 10) return { z: p.rowZ, gap: p.gapX, line: m.routeX(p.rowZ) }; } return null; }`);
+  const row = await P((a) => { const k = window.__skifree; const w = k.world(); const m = w.mountain; return ((w, m, k, a) => { const H = w.environment.hazards; H.ensure(300, m.finishZ - 200); for (const h of H.peek(300, m.finishZ - 200)) { const p = h.params; if (h.kind === 'wind-drift' && p.lead && Math.abs(p.gapX - m.routeX(p.rowZ)) > 10) return { z: p.rowZ, gap: p.gapX, line: m.routeX(p.rowZ) }; } return null; })(w, m, k, a); });
   log('row', JSON.stringify(row));
   if (row) {
     await skiAt(row.z - 95, stormT ?? 60);
     await ev(() => window.__skifree.settleWeather());
-    await framesUntil('(s) => false', 30);
+    await framesUntil({ never: true }, 30);
     await shot('29_play_drift_row_storm', `Gameplay camera, storm: a drift row ~${(row.z).toFixed(0)} m, its gap ${(row.gap - row.line).toFixed(0)} m off the line, marked by the orange poles`);
   }
 }
@@ -268,7 +274,7 @@ if (want('cave') && G.cave) {
   await ev(() => { window.__skifree.freeCam(null); window.__skifree.hud(false); window.__skifree.autopilot('skilled'); });
   // the run is held (frozen) between shots: put the skier just over the trigger, which starts the encounter
   await ev((tz) => window.__skifree.teleport(tz + 0.5, 16), G.cave.triggerZ);
-  const r = await framesUntil('(s) => s.phase === "caveCinematic"', 900);
+  const r = await framesUntil({ phase: ['caveCinematic'] }, 900);
   log('cinematic', r.ok);
   for (const [t, name, note, expect] of [
     [3.0, '12_cave_mouth', 'Cave encounter 3 s: the rimed mouth, snow curtain off the brow'],
@@ -280,11 +286,11 @@ if (want('cave') && G.cave) {
     // first second (caveHandoff.ts), so it is in the hand-off strips (tools/handoff_strip.mjs), not here.
     [15.2, '15b_cave_turn', 'The turn to the chase camera (15.2 s); the leap follows once control returns', { skier: 'main' }],
   ]) {
-    await framesUntil(`(s) => s.cinematicTime >= ${t}`, 900);
+    await framesUntil({ atLeast: ['cinematicTime', t] }, 900);
     await settle(1200);
     await shot(name, note, expect);
     if (process.env.DIAG && name === '15b_cave_turn') {
-      log('weather', JSON.stringify(await P(`(w) => ({ weather: w.weather, density: w.env.fog.density, override: w.weatherOverride })`)));
+      log('weather', JSON.stringify(await P((a) => { const k = window.__skifree; const w = k.world(); const m = w.mountain; return ((w, m, k, a) => ({ weather: w.weather, density: w.env.fog.density, override: w.weatherOverride }))(w, m, k, a); })));
       await ev(() => window.__skifree.setVisible('whiteout-blowing-snow', false));
       await shot('15b_no_blowing_snow', 'diagnostic');
       await ev(() => window.__skifree.setVisible('storm-dome', false));
@@ -303,10 +309,10 @@ if (want('chase')) {
   // (round 4, W-084) round 3 logged `gap false` and shot anyway (the Yeti at 117 m with no inset under a
   // note saying 18–34 m): the gap is now set (debug placeYeti) and checked, and the harness stops if it
   // is not what the note says
-  let r = await framesUntil('(s) => s.yetiDistance < 34 && s.yetiDistance > 18', 300);
+  let r = await framesUntil({ between: ['yetiDistance', 18, 34] }, 300);
   if (!r.ok) {
     await ev(() => window.__skifree.placeYeti(26));
-    r = await framesUntil('(s) => s.yetiDistance < 34 && s.yetiDistance > 18', 30);
+    r = await framesUntil({ between: ['yetiDistance', 18, 34] }, 30);
   }
   log('gap', r.ok);
   if (!r.ok) throw new Error('chase gap could not be set to 18–34 m: refusing to shoot 16/17 under that note');
@@ -328,9 +334,9 @@ if (want('hard')) {
   await ev(() => { window.__skifree.hud(true); window.__skifree.autopilot('skilled'); window.__skifree.toChase(); });
   const ts = await findPhase('storm', 40, 8);
   if (ts !== null) await ev((tt) => window.__skifree.setTime(tt), ts);
-  const r = await framesUntil('(s) => !!s.snowballMarker', 3000);
+  const r = await framesUntil({ truthy: 'snowballMarker' }, 3000);
   log('throw', r.ok);
-  await framesUntil('(s) => false', 8);
+  await framesUntil({ never: true }, 8);
   await shot('18_hard_snowball_fog', `Hard, in a storm: a snowball's landing ring drawn over the fog (${r.ok ? 'marker up' : 'no throw seen'})`);
 }
 
@@ -343,9 +349,9 @@ if (want('victory')) {
   // the arrival in a storm
   const ts = await findPhase('storm', 30, 6);
   if (ts !== null) await ev((tt) => window.__skifree.setTime(tt), ts);
-  await framesUntil('(s) => s.z > ' + (G.L - 120), 900);
+  await framesUntil({ above: ['z', G.L - 120] }, 900);
   await shot('19_station_approach', 'Approaching the rescue station through the storm (gameplay camera)');
-  const r = await framesUntil('(s) => s.phase === "victory" || s.phase === "finish"', 1200);
+  const r = await framesUntil({ phase: ['victory', 'finish'] }, 1200);
   log('finish', r.ok);
   // (round 2) one frame per beat at the beat's mid-point, plus the beat changes that matter; the
   // notes say what each frame was framed to show — check every one against the image
@@ -367,7 +373,7 @@ if (want('victory')) {
     for (let t = 0.5; t <= 23.5; t += 1) beats.push([t, `strip_${String(t.toFixed(1)).padStart(4, '0')}`, `Victory ${t.toFixed(1)} s`]);
   }
   for (const [t, name, note, expect] of beats) {
-    await framesUntil(`(s) => s.cinematicTime >= ${t}`, 900);
+    await framesUntil({ atLeast: ['cinematicTime', t] }, 900);
     if (onlyBeats && !onlyBeats.includes(name)) continue;
     await settle(1200);
     await shot(name, note, expect);

@@ -6,15 +6,16 @@
 //   BASE=http://127.0.0.1:4472 node tools/rim_view.mjs <outDir> [WxH=960x540] [courses=classic:sprint,classic:standard]
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { servedBuild } from './lib/build_info.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const [outDir = join(tmpdir(), 'rim'), size = '960x540', list = 'classic:sprint,classic:standard'] = process.argv.slice(2);
 const base = process.env.BASE ?? 'http://127.0.0.1:4471';
 const [W, H] = size.split('x').map(Number);
 mkdirSync(outDir, { recursive: true });
-const sha = (() => { try { return execSync('git rev-parse --short HEAD').toString().trim() + (execSync('git status --porcelain --untracked-files=no -- src').toString().trim() ? '+dirty' : ''); } catch { return 'unknown'; } })();
-const manifest = { sha, viewport: size, renderer: 'SwiftShader (software)', quality: process.env.Q ?? 'high', date: new Date().toISOString(), frames: [], errors: [] };
+const build = await servedBuild(base);
+const sha = build.sha;
+const manifest = { sha, build, viewport: size, renderer: 'SwiftShader (software)', quality: process.env.Q ?? 'high', date: new Date().toISOString(), frames: [], errors: [] };
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROME ?? '/usr/bin/google-chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 for (const item of list.split(',')) {
   const [mode, len, key] = item.split(':');

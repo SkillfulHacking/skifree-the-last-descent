@@ -31,15 +31,23 @@ type K = {
   world(): { mountain: { finishZ: number; profile: { encounters(a: number, b: number): { triggerZ: number }[] }; biome: { weather: { flakeSize: number }; lighting: { sunIntensity: number }; atmosphere: { falloff: number } } } };
   renderProbe(n?: string[]): { snow: Snow };
 };
-const k = <R>(page: Page, src: string, arg?: unknown) => page.evaluate(([s, a]) => (0, eval)(s)((window as unknown as { __skifree: K }).__skifree, a), [src, arg] as const) as Promise<R>;
+// round 6: the function runs on a handle to the debug API (Playwright passes it in); no code built from strings
+const k = async <R = unknown>(page: Page, fn: (k: K, a: never) => R, arg?: unknown): Promise<R> => {
+  const h = await page.evaluateHandle(() => (window as unknown as { __skifree: K }).__skifree);
+  try {
+    return (await h.evaluate(fn as never, arg)) as R;
+  } finally {
+    await h.dispose();
+  }
+};
 
 async function run(page: Page, biome = 'whiteout') {
-  await k(page, '(k) => { k.hold(false); k.freeCam(null); k.toMenu(); }');
+  await k(page, (k: K) => { k.hold(false); k.freeCam(null); k.toMenu(); });
   await page.waitForTimeout(1500);
-  await k(page, `(k) => k.setCourse('custom', 'sprint', { difficulty: 'normal', biome: '${biome}', custom: 'WO-RERUN' })`);
-  await k(page, '(k) => k.startRun(true)');
+  await k(page, (k: K, a: string) => k.setCourse('custom', 'sprint', { difficulty: 'normal', biome: a, custom: 'WO-RERUN' }), biome);
+  await k(page, (k: K) => k.startRun(true));
   await page.waitForTimeout(2500);
-  await k(page, '(k) => { k.seenCave(false); k.hold(true); k.hud(false); }');
+  await k(page, (k: K) => { k.seenCave(false); k.hold(true); k.hud(false); });
 }
 
 test('Whiteout: a second run keeps its environment bases; the cave leap is not a white-out (W-031)', async ({ page }) => {
@@ -53,21 +61,21 @@ test('Whiteout: a second run keeps its environment bases; the cave leap is not a
   // run 1: an early restart — over before the weather's first storm change (a retry reuses the same
   // world and environment; the old session's teardown reset the ambient light with the sun's base still 0)
   await run(page);
-  await k(page, '(k) => k.frames(30, 1 / 30)');
+  await k(page, (k: K) => k.frames(30, 1 / 30));
 
   // run 2: the original failure
   await run(page);
-  const look = await k<{ flake: number; sun: number; falloff: number }>(page, '(k) => { const b = k.world().mountain.biome; return { flake: b.weather.flakeSize, sun: b.lighting.sunIntensity, falloff: b.atmosphere.falloff }; }');
-  await k(page, '(k) => { for (let t = 20; t < 80; t += 0.5) { k.setTime(t); k.frames(1, 1 / 30); } }');
-  const tz = await k<number>(page, '(k) => { const m = k.world().mountain; return m.profile.encounters(0, m.finishZ)[0].triggerZ; }');
-  await k(page, '(k, z) => k.teleport(z + 0.5, 16)', tz);
+  const look = await k<{ flake: number; sun: number; falloff: number }>(page, (k: K) => { const b = k.world().mountain.biome; return { flake: b.weather.flakeSize, sun: b.lighting.sunIntensity, falloff: b.atmosphere.falloff }; });
+  await k(page, (k: K) => { for (let t = 20; t < 80; t += 0.5) { k.setTime(t); k.frames(1, 1 / 30); } });
+  const tz = await k<number>(page, (k: K) => { const m = k.world().mountain; return m.profile.encounters(0, m.finishZ)[0].triggerZ; });
+  await k(page, (k: K, z: number) => k.teleport(z + 0.5, 16), tz);
   // (round 3: the cinematic ends as the Yeti leaps — the leap is the chase's first seconds, the camera
   // swinging back to third person over the flight) the frame as he lands, the swing complete: the
   // gameplay camera at the cave, where the W-031 white-out was
-  const reached = await k<boolean>(page, '(k) => { for (let i = 0; i < 2000; i++) { const s = k.state().session; if (s && s.phase === "chase") { for (let j = 0; j < 150 && k.state().session.yetiAirborne; j++) k.frames(1, 1 / 30); k.frames(2, 1 / 30); return k.state().session.yetiAirborne === false; } k.frames(1, 1 / 30); } return false; }');
+  const reached = await k<boolean>(page, (k: K) => { for (let i = 0; i < 2000; i++) { const s = k.state().session; if (s && s.phase === "chase") { for (let j = 0; j < 150 && (k.state().session as { yetiAirborne?: boolean } | null)?.yetiAirborne; j++) k.frames(1, 1 / 30); k.frames(2, 1 / 30); return (k.state().session as { yetiAirborne?: boolean } | null)?.yetiAirborne === false; } k.frames(1, 1 / 30); } return false; });
   expect(reached).toBe(true);
 
-  const snow = (await k<{ snow: Snow }>(page, '(k) => k.renderProbe([])')).snow;
+  const snow = (await k<{ snow: Snow }>(page, (k: K) => k.renderProbe([]))).snow;
   expect(snow.flakeBase).toBeCloseTo(look.flake, 6);
   expect(snow.sunBase).toBeCloseTo(look.sun, 6);
   expect(snow.falloffBase).toBeCloseTo(look.falloff, 9);
@@ -92,11 +100,11 @@ for (const biome of ['alpine', 'fjord']) {
     await page.goto('/?debug');
     await page.waitForFunction(() => (window as unknown as { __ready?: boolean }).__ready === true, null, { timeout: 900_000, polling: 1000 });
     await run(page, biome);
-    await k(page, '(k) => k.frames(30, 1 / 30)');
+    await k(page, (k: K) => k.frames(30, 1 / 30));
     await run(page, biome);
-    await k(page, '(k) => k.frames(30, 1 / 30)');
-    const sunLook = await k<number>(page, '(k) => k.world().mountain.biome.lighting.sunIntensity');
-    const snow = (await k<{ snow: Snow }>(page, '(k) => k.renderProbe([])')).snow;
+    await k(page, (k: K) => k.frames(30, 1 / 30));
+    const sunLook = await k<number>(page, (k: K) => k.world().mountain.biome.lighting.sunIntensity);
+    const snow = (await k<{ snow: Snow }>(page, (k: K) => k.renderProbe([]))).snow;
     expect(snow.sunBase).toBeCloseTo(sunLook, 6);
     expect(snow.sun).toBeCloseTo(sunLook, 6);
   });

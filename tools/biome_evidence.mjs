@@ -13,21 +13,16 @@
 // Rendering is software (SwiftShader): a 1920×1080 frame takes 1–4 minutes.
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { servedBuild } from './lib/build_info.mjs';
 
 const [biome = 'fjord', course = 'classic:sprint', outDir = `docs/reviews/biomes/${biome}/round-1`, size = '1920x1080', base = 'http://127.0.0.1:4471', only = 'all'] = process.argv.slice(2);
 const [W, H] = size.split('x').map(Number);
 const [mode, length] = course.split(':');
 const want = (k) => only === 'all' || only.split(',').includes(k);
 mkdirSync(outDir, { recursive: true });
-const sha = (() => {
-  try {
-    return execSync('git rev-parse --short HEAD').toString().trim() + (execSync('git status --porcelain --untracked-files=no').toString().trim() ? '+dirty' : '');
-  } catch {
-    return 'unknown';
-  }
-})();
-const manifest = { biome, course, viewport: size, sha, date: new Date().toISOString(), shots: [], errors: [] };
+const build = await servedBuild(base);
+const sha = build.sha;
+const manifest = { biome, course, viewport: size, sha, build, date: new Date().toISOString(), shots: [], errors: [] };
 const t0 = Date.now();
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s]`, ...a);
 

@@ -32,7 +32,13 @@ await page.addInitScript((s) => {
 await page.goto(`${process.env.BASE ?? 'http://127.0.0.1:4471'}/?debug`);
 await page.waitForFunction(() => window.__ready === true, null, { timeout: 900_000, polling: 1000 });
 const ev = (fn, a) => page.evaluate(fn, a);
-const frames = (pred, n) => ev(([p, m]) => { const f = (0, eval)(p); for (let i = 0; i < m; i++) { const s = window.__skifree.state().session; if (s && f(s)) return true; window.__skifree.frames(1, 1 / 30); } return false; }, [pred, n]);
+// step frames until the session matches a named condition (no code is built from strings: round 6)
+const frames = (cond, n, arg = 0) => ev(([c, m, a]) => {
+  const test = { cinematic: (s) => s.phase === 'caveCinematic', chase: (s) => s.phase === 'chase', cineAt: (s) => s.cinematicTime >= a, never: () => false }[c];
+  if (!test) throw new Error(`unknown condition ${c}`);
+  for (let i = 0; i < m; i++) { const s = window.__skifree.state().session; if (s && test(s)) return true; window.__skifree.frames(1, 1 / 30); }
+  return false;
+}, [cond, n, arg]);
 const RUNS = Number(process.env.RUNS ?? 1);
 let courseId = null;
 for (let run = 0; run < RUNS; run++) {
@@ -52,10 +58,10 @@ log('encounters', JSON.stringify(encs.map((e) => e.triggerZ)), 'using', ENC);
 const enc = encs[ENC];
 // later encounters: ski to just before the trigger (teleport; the earlier encounters are skipped by the chase rule)
 await ev((z) => window.__skifree.teleport(z + 0.5, 16), enc.triggerZ);
-log('cinematic started', await frames('(s) => s.phase === "caveCinematic"', 900));
+log('cinematic started', await frames('cinematic', 900));
 const report = { seed, courseId, length, biome, size, frames: [] };
 for (const t of TIMES) {
-  await frames(`(s) => s.cinematicTime >= ${t}`, 2000);
+  await frames('cineAt', 2000, t);
   if (process.env.SETTLE) await page.waitForTimeout(Number(process.env.SETTLE));
   const probe = await ev(() => window.__skifree.renderProbe(['terrain-chunk', 'cave-rock', 'cave-icicles', 'whiteout-storm-cave']));
   const s = await ev(() => window.__skifree.state().session);
@@ -91,8 +97,8 @@ for (const t of TIMES) {
 }
 // the hand-over into the chase
 if (process.env.CHASE) {
-  const ok = await frames('(s) => s.phase === "chase"', 900);
-  await frames('(s) => false', 45);
+  const ok = await frames('chase', 900);
+  await frames('never', 45);
   const f = `${outDir}/chase.png`;
   await ev(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(r)))));
   await page.screenshot({ path: f, timeout: 1_200_000 });

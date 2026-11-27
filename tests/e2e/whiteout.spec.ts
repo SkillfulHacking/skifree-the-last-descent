@@ -49,7 +49,15 @@ async function boot(page: Page, settings: object) {
   await page.goto('/?debug');
   await page.waitForFunction(() => (window as unknown as W).__ready === true, null, { timeout: 240_000, polling: 1000 });
 }
-const api = <R>(page: Page, fn: (w: W['__skifree'], arg: number) => R, arg = 0) => page.evaluate(([f, a]) => new Function('w', 'a', `return (${f})(w, a)`)((window as unknown as W).__skifree, a), [fn.toString(), arg] as const) as Promise<R>;
+// round 6: the function runs on a handle to the debug API (Playwright passes it in); no code built from strings
+const api = async <R>(page: Page, fn: (w: W['__skifree'], arg: number) => R, arg = 0): Promise<R> => {
+  const h = await page.evaluateHandle(() => (window as unknown as W).__skifree);
+  try {
+    return (await h.evaluate(fn as never, arg)) as R;
+  } finally {
+    await h.dispose();
+  }
+};
 const sess = (page: Page) => api(page, (w) => w.state().session!);
 const frames = (page: Page, n: number) => api(page, (w, k) => w.frames(k), n);
 /** the first physics time ≥ from at which the front is in `phase` (searched in 1 s steps) */

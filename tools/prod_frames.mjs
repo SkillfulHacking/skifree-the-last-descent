@@ -11,12 +11,13 @@
 // those render calls are timed separately and reported as software-renderer numbers only.
 import { chromium } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { servedBuild } from './lib/build_info.mjs';
 // (round 4, W-084) the build and the settings a result belongs to are part of the result
-const sha = (() => { try { return execSync('git rev-parse --short HEAD').toString().trim() + (execSync('git status --porcelain --untracked-files=no -- src').toString().trim() ? '+dirty' : ''); } catch { return 'unknown'; } })();
 const QUALITY = process.env.Q ?? 'high';
 
 const [base = 'http://127.0.0.1:4471', biome = 'fjord', out = `/tmp/prod_frames_${biome}.json`, kmArg = '12', reArg = '240'] = process.argv.slice(2);
+const build = await servedBuild(base);
+const sha = build.sha;
 const KM = Number(kmArg);
 const RENDER_EVERY = Number(reArg);
 const b = await chromium.launch({ executablePath: process.env.PW_CHROME ?? '/usr/bin/google-chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--js-flags=--expose-gc'] });
@@ -117,6 +118,6 @@ const summary = {
   seconds: Math.round((Date.now() - t0) / 1000),
 };
 const course = await p.evaluate(() => window.__skifree.state().course?.id ?? null).catch(() => null);
-writeFileSync(out, JSON.stringify({ sha, quality: QUALITY, biome, course, summary, step: res.step.map((x) => +x.toFixed(2)) }));
+writeFileSync(out, JSON.stringify({ sha, build, quality: QUALITY, biome, course, summary, step: res.step.map((x) => +x.toFixed(2)) }));
 console.log(JSON.stringify(summary));
 await b.close();
