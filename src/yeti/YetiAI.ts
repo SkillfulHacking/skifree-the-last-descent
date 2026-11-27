@@ -25,6 +25,34 @@ export const YETI = {
   accel: 6.5,
   catchUpGap: 60, // beyond this distance the yeti pushes harder
   catchUpBoost: 9,
+  /**
+   * Round 6 (owner ruling 2): every distance-dependent part of the pursuit, named so it can be measured
+   * and switched off. Defaults reproduce rounds 1–5 exactly (see tests/unit/yeti_pursuit.test.ts).
+   *  - near: + catchUpBoost m/s ramping in from catchUpGap to catchUpGap + nearSpan m behind;
+   *  - far: + farBoost m/s ramping in from farFrom to farTo m behind;
+   *  - farCap: his top-speed cap rises by up to farCap m/s over the same far range.
+   * `distanceScale` multiplies all three (0 = no distance-dependent speed at all).
+   * Round 6 experiment, a telegraphed sprint on a fixed clock (off while sprintEvery is 0): every
+   * `sprintEvery` s of chase he rears and roars for `sprintTell` s (running at `tellPace` of his pace),
+   * then sprints `sprintBoost` m/s faster for `sprintTime` s. It depends on the chase clock only, never
+   * on the gap or on how the skier is doing.
+   */
+  pursuit: {
+    nearSpan: 120,
+    farBoost: 7,
+    farFrom: 105,
+    farTo: 170,
+    farCap: 6,
+    distanceScale: 1,
+    sprintEvery: 0,
+    sprintTell: 1.5,
+    sprintTime: 4,
+    sprintBoost: 6,
+    tellPace: 0.85,
+    /** his top speed on gentle ground (below 12°): base + perDeg × slope (rounds 1–5: 13 + 0.5°) */
+    gentleBase: 13,
+    gentlePerDeg: 0.5,
+  },
   lungeRange: 13,
   lungeBoost: 7,
   lungeTime: 0.75,
@@ -87,6 +115,8 @@ export class YetiAI {
   startSkierSpeed = NaN;
   /** the start cap's clock (s) */
   syncClock = 0;
+  /** the telegraphed sprint (YETI.pursuit.sprintEvery): 'tell' while he rears and roars, 'sprint' while it runs */
+  sprintPhase: 'none' | 'tell' | 'sprint' = 'none';
 
 
   constructor(
@@ -238,7 +268,9 @@ export class YetiAI {
     const gap = target.pos.z - this.pos.z;
     // pressure: digs in when behind, harder when far behind (keeps it within earshot/sight),
     // still capped so a clean, fast skier keeps their lead
-    const pressure = smoothstep(YETI.catchUpGap, YETI.catchUpGap + 120, gap) * YETI.catchUpBoost + smoothstep(105, 170, gap) * 7;
+    const P = YETI.pursuit;
+    const far = smoothstep(P.farFrom, P.farTo, gap);
+    const pressure = (smoothstep(YETI.catchUpGap, YETI.catchUpGap + P.nearSpan, gap) * YETI.catchUpBoost + far * P.farBoost) * P.distanceScale;
     // ramp in over the first seconds of the chase
     const warm = smoothstep(0, 4, this.chaseTime);
     const ramp = terrain * (0.55 + 0.45 * warm);
@@ -247,7 +279,16 @@ export class YetiAI {
     const own = Math.min(YETI.baseSpeed * this.speedMul * ramp, (this.startSkierSpeed + YETI.syncMargin + YETI.syncAccel * this.syncClock) * this.speedMul);
     let desired = own + pressure * ramp;
     // on gentle ground a running beast is not much faster than a gliding skier
-    if (slope < 12) desired = Math.min(desired, 13 + 0.5 * slope);
+    if (slope < 12) desired = Math.min(desired, P.gentleBase + P.gentlePerDeg * slope);
+    // the telegraphed sprint: on the chase clock only (after the start delay), never on the gap
+    this.sprintPhase = 'none';
+    if (P.sprintEvery > 0 && this.delay <= 0) {
+      const t = this.chaseTime % P.sprintEvery;
+      if (t >= P.sprintEvery - P.sprintTime) this.sprintPhase = 'sprint';
+      else if (t >= P.sprintEvery - P.sprintTime - P.sprintTell) this.sprintPhase = 'tell';
+      if (this.sprintPhase === 'tell') desired *= P.tellPace;
+      else if (this.sprintPhase === 'sprint') desired += P.sprintBoost * terrain;
+    }
 
     // lunge
     this.lungeCooldown = Math.max(0, this.lungeCooldown - dt);
@@ -257,7 +298,7 @@ export class YetiAI {
       this.lungeCooldown = YETI.lungeCooldown;
     }
     if (this.lungeTimer > 0) desired += YETI.lungeBoost;
-    desired = Math.min(desired, YETI.maxSpeed * this.speedMul + smoothstep(105, 170, gap) * 6 + (this.lungeTimer > 0 ? YETI.lungeBoost : 0));
+    desired = Math.min(desired, YETI.maxSpeed * this.speedMul + far * P.farCap * P.distanceScale + (this.lungeTimer > 0 ? YETI.lungeBoost : 0));
     if (this.delay > 0) desired = 0;
     this.desired = desired;
 

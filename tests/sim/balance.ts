@@ -84,6 +84,8 @@ export interface RunResult extends RunSpec {
   minGap: number | null;
   finalGap: number | null;
   gapAt: (number | null)[];
+  /** round 6: [chase time s, gap m, skier z m] every 2 s of each chase (encounter index first) */
+  gapTrace: [number, number, number, number][];
   knocks: number;
   snowballThrows: number;
   snowballHits: number;
@@ -191,7 +193,10 @@ export function measure(spec: RunSpec): RunResult {
 
   // ---- Yeti gap trajectory (per chase: the gap at 10 / 20 / 30 s into it) ----
   const gapAt: (number | null)[] = [];
+  const gapTrace: [number, number, number, number][] = [];
   let mark = 0;
+  let traceMark = 0;
+  let enc = -1;
   const simLog: string[] = [];
   const res = simulateCourse(m, field, driver, {
     log: simLog,
@@ -201,10 +206,16 @@ export function measure(spec: RunSpec): RunResult {
     maxTime: spec.len === 'sprint' ? 900 : 2400,
     snowballs: spec.diff === 'hard',
     dodge: spec.diff === 'hard',
-    trace: (_e, ct, _s, yeti, start) => {
+    trace: (_e, ct, sk, yeti, start) => {
       if (start) {
         mark = 0;
+        traceMark = 0;
+        enc++;
         return;
+      }
+      while (ct >= traceMark * 2) {
+        if (yeti.phase === 'chase') gapTrace.push([enc, r1(ct), r1(yeti.distance), Math.round(sk.pos.z)]);
+        traceMark++;
       }
       while (mark < 3 && ct >= (mark + 1) * 10) {
         gapAt.push(yeti.phase === 'chase' ? r1(yeti.distance) : null);
@@ -224,6 +235,7 @@ export function measure(spec: RunSpec): RunResult {
     minGap: Number.isFinite(res.minGap) ? r1(res.minGap) : null,
     finalGap: Number.isFinite(res.finalGap) ? r1(res.finalGap) : null,
     gapAt,
+    gapTrace,
     knocks,
     snowballThrows: res.snowballs?.throws ?? 0,
     snowballHits: res.snowballs?.hits ?? 0,

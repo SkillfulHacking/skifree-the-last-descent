@@ -10,6 +10,7 @@ import { WHITEOUT_WEATHER, LEE, CREST_LEE } from '../../src/world/biomes/whiteou
 import { BLIZZARD, DRIFT } from '../../src/world/biomes/whiteout/hazards';
 import { HEADWIND_STANCE } from '../../src/physics/environment';
 import { FJORD_WEATHER } from '../../src/world/biomes/fjord/biome';
+import { YETI } from '../../src/yeti/YetiAI';
 
 type Obj = Record<string, unknown>;
 const TARGETS: Record<string, () => Obj> = {
@@ -20,6 +21,7 @@ const TARGETS: Record<string, () => Obj> = {
   'whiteout:CREST_LEE': () => CREST_LEE as unknown as Obj,
   'weather:fjord': () => FJORD_WEATHER as unknown as Obj,
   'physics:HEADWIND_STANCE': () => HEADWIND_STANCE as unknown as Obj,
+  'yeti:YETI': () => YETI as unknown as Obj,
 };
 
 function merge(dst: Obj, src: Obj, path: string) {
