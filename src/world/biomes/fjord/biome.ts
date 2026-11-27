@@ -192,7 +192,7 @@ export function makeFjordBiome(): Biome {
       // (W-077) Alpine's fixed Yeti pace is Alpine's own (deriveBiome would inherit it): unchanged here
       encounterPace: 1,
       // (Round 5) likewise Alpine's Hard-only pace: Fjord's Hard is already inside the owner's ranges
-      difficultyPace: {},
+      difficultyPace: { hard: 1 },
       // (round 6) a competent skier's measured speed by grade here (balance/r6/data/speed_slope.json)
       pursuitLine: { base: 7.6, slope: 0.749 },
       // round 3 (B N1, F2): the round-2 terrain (minSlope 14, highspeed-heavy, swing 0.8) made the

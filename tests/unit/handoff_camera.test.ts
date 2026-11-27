@@ -80,7 +80,9 @@ describe('W-076 decision 1: the hand-off camera faces the run', () => {
       // (round 5, review C4-3: the frames show him in a tuck — the head ~1.05 m, the waist ~0.7 m — and the
       // round-4 test measured an upright 1.5 m head) the tucked skier's head and waist clear the bottom bar
       const P = skierHead.clone().add(new THREE.Vector3(0, -LEAP_SETUP.head, 0));
-      for (const [what, h] of [['tucked head', 1.05], ['waist', 0.7]] as const) {
+      // (round 6, review C5-2: in the hand-off strips the tucked skier's legs were under the bar) and his
+      // knees and boots too
+      for (const [what, h] of [['tucked head', 1.05], ['waist', 0.7], ['knees', 0.35], ['boots', 0.1]] as const) {
         const v = ndcOf(turnFrom, P.clone().add(new THREE.Vector3(0, h, 0)));
         expect(v.y, `${biome}: ${what} above the bottom bar`).toBeGreaterThan(-0.7);
       }
