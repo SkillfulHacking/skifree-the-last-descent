@@ -71,7 +71,7 @@ const res = await p.evaluate(
       for (const p of s.renderer.info.programs ?? []) {
         if (seenIds.has(p.id)) continue;
         seenIds.add(p.id);
-        links.push({ km: +(z() / 1000).toFixed(2), name: p.name ?? '', relink: seenKeys.has(p.cacheKey) });
+        links.push({ km: +(z() / 1000).toFixed(2), name: p.name || String(p.cacheKey).slice(0, 48).replace(/\s+/g, ' '), relink: seenKeys.has(p.cacheKey) });
         seenKeys.add(p.cacheKey);
       }
     };

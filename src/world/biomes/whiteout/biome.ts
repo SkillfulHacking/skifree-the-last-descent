@@ -152,7 +152,9 @@ export function makeWhiteoutBiome(): Biome {
       // the drop-side bank no longer climbs to the rim: it rolls down 2 m to it
       // (round 4, W-065 / W-093) farRanges 0.3: the ranges beyond the drop rise out of the valley cloud
       // sea below eye height — the drop reads as depth, not as a plateau above a plain (blind review A)
-      ridge: { dropSide: 1, rim: 10, lip: 1.5, depth: 520, flank: 680, crest: 75, crestE: 150, backDrop: 380, rollDown: 2, farRanges: 0.3 },
+      // (round 6, art direction C) a higher crest on the far side: a saddle between a dark rock wall and the
+      // spire-lined rim
+      ridge: { dropSide: 1, rim: 10, lip: 1.5, depth: 520, flank: 680, crest: 160, crestE: 150, backDrop: 380, rollDown: 2, farRanges: 0.3 },
       caveSide: -1,
       wallHeight: 130,
       wallRelief: 95,

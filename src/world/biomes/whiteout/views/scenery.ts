@@ -88,6 +88,8 @@ const LAMP_TIME = { value: 0 };
  * their mean brightness instead of pulsing. Exported for the test.
  */
 export const LAMP_CALM = { value: 0 };
+/** (round 6) the rim spindrift plumes: off (read as light shafts / sprites in two blind reads) */
+export const RIM_SPINDRIFT_ON = false;
 /** (round 6, W-065) steady red rim lights: on every `every`-th wand, `height` m up, `size` m across */
 export const RIM_LAMPS = { on: true, every: 2, height: 3.5, size: 1.6 };
 let lampTex: THREE.Texture | null = null;
@@ -215,7 +217,8 @@ export class WhiteoutScenery implements SceneryView {
     const cs = corniceSamples(this.m, k * CHUNK - 3, (k + 1) * CHUNK + 3);
     const cg = buildCorniceGeometry(this.m, cs);
     // (round 5, W-065) spindrift pouring off the lip into the drop (presentation only, beyond the lip)
-    const veils = buildRimSpindrift(this.m, cs.filter((s) => s.z >= k * CHUNK && s.z < (k + 1) * CHUNK));
+    // (round 6: two blind reads took the plumes for light shafts, steam or sprites) off
+    const veils = RIM_SPINDRIFT_ON ? buildRimSpindrift(this.m, cs.filter((s) => s.z >= k * CHUNK && s.z < (k + 1) * CHUNK)) : null;
     if (veils) group.add(veils);
     if (cg) {
       cornice = new THREE.Mesh(cg, this.snowMat ?? corniceMaterial());

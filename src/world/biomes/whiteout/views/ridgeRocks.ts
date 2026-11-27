@@ -28,7 +28,9 @@ import { decimateUnit, loadScan, type ScanId } from '../../../art/scanModels';
 import { corniceSamples } from './cornice';
 
 /** (W-065) the rim spires: spacing (m), rise above the rim (m: min + random extra), share left out */
-export const RIM_SPIRES = { every: 100, rise: [6, 12] as [number, number], skip: 0.15 };
+// (Round 6, art direction C chosen by blind read: the rim traced by a chain of spires reads as the edge,
+// 8/10 in clear weather against 6/10 for the round-5 look) close-set, taller, varied
+export const RIM_SPIRES = { every: 45, rise: [10, 20] as [number, number], skip: 0.08 };
 
 export const RIDGE_ROCK_IDS: ScanId[] = ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'];
 

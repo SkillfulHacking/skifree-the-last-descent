@@ -11,7 +11,7 @@ describe('per-location difficulty pace', () => {
   it('Alpine: Hard only', () => {
     expect(yetiSpeedFor('normal', 'alpine')).toBe(DIFFICULTY.normal.yetiSpeed);
     expect(yetiSpeedFor('relaxed', 'alpine')).toBe(DIFFICULTY.relaxed.yetiSpeed);
-    expect(yetiSpeedFor('hard', 'alpine')).toBeCloseTo(DIFFICULTY.hard.yetiSpeed * 1.09, 9);
+    expect(yetiSpeedFor('hard', 'alpine')).toBeCloseTo(DIFFICULTY.hard.yetiSpeed * 1.135, 9);
   });
   it('Fjord does not inherit Alpine’s Hard pace', () => {
     for (const d of ['relaxed', 'normal', 'hard'] as const) expect(yetiSpeedFor(d, 'fjord')).toBe(DIFFICULTY[d].yetiSpeed);

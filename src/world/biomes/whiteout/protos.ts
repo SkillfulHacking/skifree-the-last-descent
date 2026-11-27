@@ -9,7 +9,8 @@
  *      lower than the wall's top;
  *   C. a high-alpine saddle: a higher crest on the far side and close-set tall dark spires standing out of
  *      the drop along the rim, silhouetted against the void.
- * Nothing here is used unless a prototype is asked for.
+ * Nothing here is used unless a prototype is asked for. Round 6's blind read chose C, which is now the
+ * production default (RIM_SPIRES, ridge.crest); the knobs stay for comparison captures.
  */
 import { getBiome } from '../../biome';
 import { CLOUD_SEA } from './views/cloudSea';
