@@ -120,6 +120,8 @@ export function makeWhiteoutBiome(): Biome {
       // (Round 5, W-095: on Normal a competent weather reader was never pressed — the gap only grew)
       // Normal's fixed pace ×1.06: a clean run still escapes; mistakes and slow lines now cost ground
       difficultyPace: { normal: 1.06, hard: 1 },
+      // (round 6) a competent skier's measured speed by grade here (balance/r6/data/speed_slope.json)
+      pursuitLine: { base: 11.5, slope: 0.462 },
       // a high bare ridge: broad open bowls and ridgelines, with sheltered gullies and the last
       // trees lower down; steeper and more varied than Fjord's even runs
       slopeScale: 1.0,

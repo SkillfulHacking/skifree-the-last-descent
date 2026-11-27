@@ -239,6 +239,11 @@ export interface BiomeTerrain {
    * Relaxed — never a response to how the player is skiing.
    */
   difficultyPace?: Partial<Record<'relaxed' | 'normal' | 'hard', number>>;
+  /**
+   * (Round 6, owner ruling 2, terrain-paced pursuit) a competent skier's measured speed (m/s) by grade on
+   * this location: base + slope × grade° (balance/r6/data/speed_slope.json). The Yeti's pace follows it.
+   */
+  pursuitLine?: { base: number; slope: number };
   /** ridgeline spines with gap jumps; omit for none (see profile.ts ProfileKnobs) */
   spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
   /** run-in slope at the start gate (degrees, default 6) */
@@ -420,7 +425,7 @@ export const ALPINE: Biome = {
   // without making Hard disproportionately punishing (1.10: Sprint, every crash a capture; Hard clean
   // skilled caught 4/7) — balance/w080/README.md
   // (Round 5, W-094) Alpine's Hard: ×1.09 on Hard only (owner's ranges; Normal and Relaxed unchanged)
-  terrain: { encounterPace: 1.05, difficultyPace: { hard: 1.09 }, slopeScale: 1, widthScale: 1, swingScale: 1, wallHeight: 330, wallRelief: 64, rangeHeight: 900, undulation: 7, detail: 1.4, moguls: 0.42, drifts: 0.9, driftsPowder: 0.6, rollers: 0.6 },
+  terrain: { encounterPace: 1.05, difficultyPace: { hard: 1.09 }, pursuitLine: { base: 10.3, slope: 0.657 }, slopeScale: 1, widthScale: 1, swingScale: 1, wallHeight: 330, wallRelief: 64, rangeHeight: 900, undulation: 7, detail: 1.4, moguls: 0.42, drifts: 0.9, driftsPowder: 0.6, rollers: 0.6 },
   audio: { ambience: 'wind', windGain: 1, windPitch: 1 },
 };
 

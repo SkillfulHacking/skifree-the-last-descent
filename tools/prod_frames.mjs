@@ -57,10 +57,29 @@ const res = await p.evaluate(
       perKm.push({ km: +(z() / 1000).toFixed(1), heapMB: s.heap?.() ? +(s.heap() / 1048576).toFixed(1) : null, programs: pf.programs, geometries: pf.geometries, textures: pf.textures, calls: pf.calls, triangles: pf.triangles });
     };
     const programs0 = s.perf().programs;
+    // (round 6, W-105 / review D5-2: the net count hid programs released and re-linked) every program that
+    // links after the run began, by id (gross), its name, and whether one with the same cache key had
+    // linked before (a re-link)
+    const seenIds = new Set();
+    const seenKeys = new Set();
+    for (const p of s.renderer.info.programs ?? []) {
+      seenIds.add(p.id);
+      seenKeys.add(p.cacheKey);
+    }
+    const links = [];
+    const watchPrograms = () => {
+      for (const p of s.renderer.info.programs ?? []) {
+        if (seenIds.has(p.id)) continue;
+        seenIds.add(p.id);
+        links.push({ km: +(z() / 1000).toFixed(2), name: p.name ?? '', relink: seenKeys.has(p.cacheKey) });
+        seenKeys.add(p.cacheKey);
+      }
+    };
     while (true) {
       if (z() >= nextKm * 1000) {
         await new Promise((r) => requestAnimationFrame(() => r()));
         sample();
+        watchPrograms();
         nextKm++;
       }
       const st = s.state().session;
@@ -82,11 +101,13 @@ const res = await p.evaluate(
         const r0 = performance.now();
         await new Promise((r) => requestAnimationFrame(() => r()));
         render.push(performance.now() - r0);
+        watchPrograms();
       }
       if (i > KM * 1000 * 6) break; // safety: < ~10 m/s average
     }
     sample();
-    return { step, render, restarts, z: lastZ, heapMB: s.heap?.() ? s.heap() / 1048576 : null, perf: s.perf(), perKm, programs0 };
+    watchPrograms();
+    return { step, render, restarts, z: lastZ, heapMB: s.heap?.() ? s.heap() / 1048576 : null, perf: s.perf(), perKm, programs0, links };
   },
   [KM, RENDER_EVERY],
 );
@@ -109,6 +130,10 @@ const summary = {
   renderer: res.perf,
   // shader programs linked after the run began (compiles during play; the warm-up happens before)
   programsCompiledInPlay: res.perf.programs - res.programs0,
+  // (round 6) gross: every link after the run began (named), and how many re-linked a program seen before
+  programLinksInPlay: res.links.length,
+  programRelinks: res.links.filter((l) => l.relink).length,
+  programLinks: res.links,
   caveSliceMaxMs: res.perf.caveSliceMaxMs,
   caveSlice: res.perf.caveSlice,
   maxCalls: Math.max(...res.perKm.map((k) => k.calls)),

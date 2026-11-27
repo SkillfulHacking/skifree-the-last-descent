@@ -15,7 +15,7 @@ const [W, H] = size.split('x').map(Number);
 mkdirSync(outDir, { recursive: true });
 const build = await servedBuild(base);
 const sha = build.sha;
-const manifest = { sha, build, viewport: size, renderer: 'SwiftShader (software)', quality: process.env.Q ?? 'high', date: new Date().toISOString(), frames: [], errors: [] };
+const manifest = { sha, build, proto: process.env.PROTO ?? null, viewport: size, renderer: 'SwiftShader (software)', quality: process.env.Q ?? 'high', date: new Date().toISOString(), frames: [], errors: [] };
 const browser = await chromium.launch({ executablePath: process.env.PW_CHROME ?? '/usr/bin/google-chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 for (const item of list.split(',')) {
   const [mode, len, key] = item.split(':');
@@ -27,7 +27,7 @@ for (const item of list.split(',')) {
       localStorage.setItem('skifree-tld.settings.v1', JSON.stringify({ quality: q, biome: 'whiteout', course: m, courseLength: l, ...(k ? { customText: k } : {}), difficulty: 'normal', showTutorial: false, seenPoleHint: true }));
     }
   }, [mode, len, key ?? null, process.env.Q ?? 'high']);
-  await page.goto(`${base}/?debug`);
+  await page.goto(`${base}/?debug${process.env.PROTO ? `&proto=${process.env.PROTO}` : ''}`);
   await page.waitForFunction(() => window.__ready === true, null, { timeout: 900_000, polling: 1000 });
   await page.evaluate(async () => { const k = window.__skifree; await k.startRun(true); k.hold(true); });
   const stretches = process.env.ZAT ? process.env.ZAT.split(',').map((z) => [Number(z) - 40, Number(z) + 40]) : await page.evaluate(() => {

@@ -16,7 +16,7 @@ describe('Yeti pursuit: speed against distance (round 1–5 behaviour)', () => {
   it('defaults reproduce the shipped constants', () => {
     expect(YETI.catchUpGap).toBe(60);
     expect(YETI.catchUpBoost).toBe(9);
-    expect(YETI.pursuit).toMatchObject({ nearSpan: 120, farBoost: 7, farFrom: 105, farTo: 170, farCap: 6, distanceScale: 1, sprintEvery: 0, gentleBase: 13, gentlePerDeg: 0.5 });
+    expect(YETI.pursuit).toMatchObject({ nearSpan: 120, farBoost: 7, farFrom: 105, farTo: 170, farCap: 6, distanceScale: 1, sprintEvery: 0, gentleBase: 13, gentlePerDeg: 0.5, gentleTerminal: true, mode: 'legacy' });
   });
 
   it('on a 15° slope his speed rises with the gap (the hidden catch-up)', () => {
@@ -38,6 +38,27 @@ describe('Yeti pursuit: speed against distance (round 1–5 behaviour)', () => {
       expect(Math.max(...s) - Math.min(...s)).toBeLessThan(0.05);
     } finally {
       YETI.pursuit.distanceScale = keep;
+    }
+  });
+});
+
+describe('W-101 / W-102: on gentle ground the Yeti is no faster than a tucked skier settles there', () => {
+  it('below 12° his settled speed never exceeds the tucked terminal speed (or the 9 m/s run floor)', async () => {
+    const { tuckedTerminalSpeed } = await import('../../src/yeti/YetiAI');
+    for (const biome of ['alpine', 'whiteout'] as const) {
+      const m = buildMountain(makeCourse('classic', 'standard', { biome, difficulty: 'hard' }));
+      let n = 0;
+      for (const deg of [4, 6, 8, 9, 10, 11]) {
+        const z = zAtSlope(m, deg, 300, 9800);
+        if (!Number.isFinite(z)) continue;
+        n++;
+        // far behind (the old boost's range) and at Hard's pace: still capped on this ground
+        for (const gap of [40, 150]) {
+          const v = settledSpeed(m, null, z, gap, 16, 1.07 * 1.13);
+          expect(v, `${biome} ${deg}° gap ${gap}`).toBeLessThanOrEqual(Math.max(YETI.pursuit.runFloor, tuckedTerminalSpeed(m.slopeDeg(z))) + 0.05);
+        }
+      }
+      expect(n).toBeGreaterThan(1);
     }
   });
 });

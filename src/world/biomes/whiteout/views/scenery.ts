@@ -77,6 +77,8 @@ interface Chunk {
   /** the corniced rim and its wands (terrain.ridge) */
   cornice: THREE.Mesh | null;
   wands: THREE.InstancedMesh | null;
+  /** (round 6) the steady red lights on the rim wands */
+  rimLamps: THREE.Points | null;
 }
 
 /** the lamps' shared clock (their pulse runs along the line: aPhase = z) */
@@ -86,6 +88,8 @@ const LAMP_TIME = { value: 0 };
  * their mean brightness instead of pulsing. Exported for the test.
  */
 export const LAMP_CALM = { value: 0 };
+/** (round 6, W-065) steady red rim lights: on every `every`-th wand, `height` m up, `size` m across */
+export const RIM_LAMPS = { on: true, every: 2, height: 3.5, size: 1.6 };
 let lampTex: THREE.Texture | null = null;
 function lampTexture(): THREE.Texture {
   if (lampTex) return lampTex;
@@ -111,6 +115,7 @@ export class WhiteoutScenery implements SceneryView {
   private poleMat: THREE.MeshStandardMaterial;
   private wandMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, emissive: new THREE.Color(0.3, 0.22, 0.0), emissiveIntensity: 0.35 });
   private m: Mountain;
+  private rimLampMat: THREE.PointsMaterial;
   private sky = new StormSky();
   private snow: BlowingSnow;
   private rocks: RidgeRocks;
@@ -123,6 +128,7 @@ export class WhiteoutScenery implements SceneryView {
   constructor(ctx: SceneryContext) {
     this.m = ctx.mountain;
     this.snowMat = ctx.terrainMaterial ?? null;
+    this.rimLampMat = new THREE.PointsMaterial({ size: RIM_LAMPS.size, map: lampTexture(), color: new THREE.Color(1.0, 0.1, 0.06), transparent: true, depthWrite: false, fog: false, sizeAttenuation: true });
     this.group.name = 'whiteout-scenery';
     this.snow = new BlowingSnow(ctx.quality);
     this.rocks = new RidgeRocks(ctx.mountain, ctx.quality);
@@ -218,6 +224,7 @@ export class WhiteoutScenery implements SceneryView {
       group.add(cornice);
     }
     let wands: THREE.InstancedMesh | null = null;
+    let rimLamps: THREE.Points | null = null;
     const ws = wandSpots(this.m, k * CHUNK, (k + 1) * CHUNK);
     if (ws.length) {
       wands = new THREE.InstancedMesh(wandGeometry(), this.wandMat, ws.length);
@@ -228,9 +235,22 @@ export class WhiteoutScenery implements SceneryView {
       });
       wands.instanceMatrix.needsUpdate = true;
       group.add(wands);
+      // (round 6, W-065 storm: the wands wash out to specks in a whiteout) a steady red light on every
+      // second wand, drawn over the fog like the trail lamps: in a storm the drop's edge is a row of red
+      // lights on the left, the way down a row of amber ones. Steady (never pulsing: Reduce flashes)
+      if (RIM_LAMPS.on) {
+        const lit = ws.filter((_, i) => i % RIM_LAMPS.every === 0);
+        const rp = new Float32Array(lit.length * 3);
+        lit.forEach((w, i) => rp.set([w.x, w.y + RIM_LAMPS.height, w.z], i * 3));
+        const rg = new THREE.BufferGeometry();
+        rg.setAttribute('position', new THREE.BufferAttribute(rp, 3));
+        rimLamps = new THREE.Points(rg, this.rimLampMat);
+        rimLamps.frustumCulled = false;
+        group.add(rimLamps);
+      }
     }
     this.group.add(group);
-    this.chunks.set(k, { group, poles, lamps, lampMat, phase, geo, cornice, wands, veils });
+    this.chunks.set(k, { group, poles, lamps, lampMat, phase, geo, cornice, wands, veils, rimLamps });
   }
 
   private drop(k: number, ch: Chunk) {
@@ -241,6 +261,7 @@ export class WhiteoutScenery implements SceneryView {
     ch.cornice?.geometry.dispose();
     ch.veils?.geometry.dispose();
     ch.wands?.dispose();
+    ch.rimLamps?.geometry.dispose();
     this.chunks.delete(k);
   }
 
@@ -288,6 +309,7 @@ export class WhiteoutScenery implements SceneryView {
     this.poleGeo.dispose();
     this.poleMat.dispose();
     this.wandMat.dispose();
+    this.rimLampMat.dispose();
     this.sky.dispose();
     this.snow.dispose();
     this.rocks.dispose();

@@ -30,6 +30,8 @@ import { whiteoutDriver, type WhiteoutPolicy } from './whiteoutDriver';
 import { readerDriver } from './readerDriver';
 import { POLE, type SkierInput, type SkierState } from '../../src/physics/SkierPhysics';
 import type { BiomeId } from '../../src/world/biome';
+import type { Mountain } from '../../src/world/course';
+import type { YetiAI } from '../../src/yeti/YetiAI';
 
 export const POLICIES: Record<string, WhiteoutPolicy> = {
   informed: { lines: 'weather', drifts: 'gap', blizzard: 'brake' },
@@ -120,6 +122,9 @@ export function withPoles(base: (s: SkierState, t: number) => SkierInput): (s: S
   };
 }
 
+/** round 6: an optional per-step sampler during chases (pursuit research); null in normal runs */
+export const CHASE_SAMPLER: { fn: null | ((m: Mountain, s: SkierState, yeti: YetiAI, ct: number) => void) } = { fn: null };
+
 export function measure(spec: RunSpec): RunResult {
   // (round 3) seed 'CLASSIC': the location's Classic course (the default course); 'DAILY:<date>': that day's Daily
   const c =
@@ -207,6 +212,7 @@ export function measure(spec: RunSpec): RunResult {
     snowballs: spec.diff === 'hard',
     dodge: spec.diff === 'hard',
     trace: (_e, ct, sk, yeti, start) => {
+      if (!start) CHASE_SAMPLER.fn?.(m, sk, yeti, ct);
       if (start) {
         mark = 0;
         traceMark = 0;

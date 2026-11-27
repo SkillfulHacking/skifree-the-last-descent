@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { clamp, damp, smoothstep, wrapAngle } from '../core/rng';
 import type { YetiMode } from '../core/types';
+import { TUNING } from '../physics/SkierPhysics';
 import type { Mountain } from '../world/course';
 import type { ObstacleField } from '../physics/obstacles';
 
@@ -52,6 +53,26 @@ export const YETI = {
     /** his top speed on gentle ground (below 12°): base + perDeg × slope (rounds 1–5: 13 + 0.5°) */
     gentleBase: 13,
     gentlePerDeg: 0.5,
+    /**
+     * (Round 6, W-101/W-102) and, on that gentle ground, no faster than a tucked skier settles at there
+     * (tuckedTerminalSpeed, never below runFloor) + gentleMargin: the rule's own intent ("not much faster
+     * than a gliding skier"), which 13 + 0.5° broke on long basins (17.5 m/s at 9°, a tucked skier 15.4)
+     * and on the finish run-outs (15.5 m/s at 5°, a skier ~8–9).
+     */
+    gentleTerminal: true as boolean,
+    gentleMargin: 0,
+    /**
+     * Round 6 experiment, terrain-paced pursuit (mode 'terrain'): his own pace on the ground under him is
+     * `terrainPace` × speedMul × min(paceBase + paceSlope × grade°, the speed a tucked skier settles at on
+     * that grade (never below `runFloor`)). The line is fitted to measured skier speeds by grade
+     * (balance/r6/data/speed_slope.json); the cap means that on gentle ground he is never faster than a
+     * tucked skier can be. No distance term: the same for every player, wherever the skier is.
+     */
+    mode: 'legacy' as 'legacy' | 'terrain',
+    terrainPace: 1,
+    paceBase: 12,
+    paceSlope: 0.5,
+    runFloor: 9,
   },
   lungeRange: 13,
   lungeBoost: 7,
@@ -74,6 +95,13 @@ export const YETI = {
   syncSlow: 11,
   slowDelay: 1.6,
 };
+
+/** the speed (m/s) a tucked skier settles at on a straight run down `slopeDeg` of packed snow */
+export function tuckedTerminalSpeed(slopeDeg: number): number {
+  const a = (slopeDeg * Math.PI) / 180;
+  const net = 9.81 * (Math.sin(a) - TUNING.mu.snow * Math.cos(a));
+  return net > 0 ? Math.sqrt(net / TUNING.dragTuck) : 0;
+}
 
 export type YetiPhase = 'dormant' | 'scripted' | 'chase' | 'caught' | 'stopped';
 
@@ -276,10 +304,16 @@ export class YetiAI {
     const ramp = terrain * (0.55 + 0.45 * warm);
     // a slow start: his own pace comes up with the skier's, not at once (YETI.syncMargin). Only his
     // own pace: the catch-up pressure when far behind is untouched.
-    const own = Math.min(YETI.baseSpeed * this.speedMul * ramp, (this.startSkierSpeed + YETI.syncMargin + YETI.syncAccel * this.syncClock) * this.speedMul);
-    let desired = own + pressure * ramp;
+    const terrainMode = P.mode === 'terrain';
+    const line = this.mountain.biome.terrain.pursuitLine ?? { base: P.paceBase, slope: P.paceSlope };
+    const pace = terrainMode ? P.terrainPace * Math.min(line.base + line.slope * slope, Math.max(P.runFloor, tuckedTerminalSpeed(slope))) : YETI.baseSpeed;
+    const own = Math.min(pace * this.speedMul * ramp, (this.startSkierSpeed + YETI.syncMargin + YETI.syncAccel * this.syncClock) * this.speedMul);
+    let desired = own + (terrainMode ? 0 : pressure * ramp);
     // on gentle ground a running beast is not much faster than a gliding skier
-    if (slope < 12) desired = Math.min(desired, P.gentleBase + P.gentlePerDeg * slope);
+    if (!terrainMode && slope < 12) {
+      desired = Math.min(desired, P.gentleBase + P.gentlePerDeg * slope);
+      if (P.gentleTerminal) desired = Math.min(desired, Math.max(P.runFloor, tuckedTerminalSpeed(slope)) + P.gentleMargin);
+    }
     // the telegraphed sprint: on the chase clock only (after the start delay), never on the gap
     this.sprintPhase = 'none';
     if (P.sprintEvery > 0 && this.delay <= 0) {
@@ -298,7 +332,7 @@ export class YetiAI {
       this.lungeCooldown = YETI.lungeCooldown;
     }
     if (this.lungeTimer > 0) desired += YETI.lungeBoost;
-    desired = Math.min(desired, YETI.maxSpeed * this.speedMul + far * P.farCap * P.distanceScale + (this.lungeTimer > 0 ? YETI.lungeBoost : 0));
+    desired = Math.min(desired, YETI.maxSpeed * this.speedMul + (terrainMode ? 0 : far * P.farCap * P.distanceScale) + (this.lungeTimer > 0 ? YETI.lungeBoost : 0));
     if (this.delay > 0) desired = 0;
     this.desired = desired;
 

@@ -27,6 +27,9 @@ import { createRockMaterial, disposeRockMaterial } from '../../../art/rockMateri
 import { decimateUnit, loadScan, type ScanId } from '../../../art/scanModels';
 import { corniceSamples } from './cornice';
 
+/** (W-065) the rim spires: spacing (m), rise above the rim (m: min + random extra), share left out */
+export const RIM_SPIRES = { every: 100, rise: [6, 12] as [number, number], skip: 0.15 };
+
 export const RIDGE_ROCK_IDS: ScanId[] = ['namaqualand_boulder_02', 'boulder_01', 'namaqualand_boulder_06'];
 
 export interface RockPlacement {
@@ -155,17 +158,17 @@ export function ridgeRockPlacements(m: Mountain, z0: number, z1: number): RockPl
   // racing line (40+ m away, the camera 2–3 m above the snow) the flank itself can never be seen, so
   // the drop reads through what stands up out of it: dark rock standing beyond the snow edge with its
   // foot falling out of sight. Past the rim (the rim guard's ground), so no collider is needed.
-  const SP = 100;
+  const SP = RIM_SPIRES.every;
   for (let z = Math.ceil(z0 / SP) * SP; z < z1 && z < end; z += SP) {
     if (z < 160) continue;
     const k = Math.round(z / SP);
-    if (hash2(k, 41, s) < 0.15) continue;
+    if (hash2(k, 41, s) < RIM_SPIRES.skip) continue;
     const zz = z + (hash2(k, 42, s) - 0.5) * 50;
     const rim = m.ridgeRimX(zz);
     const rimY = m.heightAt(rim - R.dropSide * 2, zz);
     const x = rim + R.dropSide * (14 + 22 * hash2(k, 43, s));
     const footY = m.heightAt(x, zz);
-    const top = rimY + 6 + 12 * hash2(k, 44, s);
+    const top = rimY + RIM_SPIRES.rise[0] + RIM_SPIRES.rise[1] * hash2(k, 44, s);
     const tall = top - footY;
     if (tall < 14) continue;
     // sized until its top clears the rim by the wanted rise: it is sunk 27 % and lowered again where its

@@ -24,7 +24,9 @@ export const CLOUD_SEA = {
   /** size across × along the course (m) */
   across: 16000,
   along: 16000,
-} as const;
+  /** (round 6 art prototype A) no deck at all */
+  hidden: false as boolean,
+};
 
 const VERT = /* glsl */ `
 varying vec3 vW;
@@ -134,7 +136,7 @@ export class ValleyCloudSea {
     // a storm closes the view: the deck is gone in a full storm
     const s = f.storm ?? 0;
     u.uOpacity!.value = 1 - THREE.MathUtils.smoothstep(s, 0.35, 0.8);
-    this.mesh.visible = u.uOpacity!.value > 0.01;
+    this.mesh.visible = u.uOpacity!.value > 0.01 && !CLOUD_SEA.hidden;
   }
 
   dispose() {
