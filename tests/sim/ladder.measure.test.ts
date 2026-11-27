@@ -26,6 +26,7 @@ import { measure, POLICIES, type RunSpec } from './balance';
 import { applyTune } from './tune';
 import { EXPERT_TUCK } from './whiteoutDriver';
 import { outPath } from './outPath';
+import { expectResumedRows } from './checkRows';
 
 const P = (globalThis as unknown as { process: { env: Record<string, string | undefined>; stdout: { write(s: string): void } } }).process;
 const E = P.env;
@@ -67,4 +68,6 @@ it('ladder', async () => {
     fs.appendFileSync(out, JSON.stringify({ ...r, pace: s.pace, tag }) + '\n');
     P.stdout.write(`${key({ ...s, tag })}: ${r.outcome} min ${r.minGap}\n`);
   });
+  const wanted = specs.filter((_, i) => i % shards === shard).map((s) => key({ ...s, tag }));
+  expectResumedRows(fs.readFileSync(out, 'utf8'), (r) => key(r as Parameters<typeof key>[0]), wanted, ['time', 'distance', 'minGap']);
 }, 86_400_000);

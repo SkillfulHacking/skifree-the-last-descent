@@ -64,7 +64,7 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
   const ids: number[] = [];
   /** on an alternate line (from its fork until the lines rejoin); the last planned aim (checks) */
   let stickyAlt = false;
-  let lastAim = NaN;
+  let lastAim = Number.NaN;
   /** a player steers round rock and logs they can see: the nearest clear lateral offset of the aim */
   const clearOf = (sx: number, sz: number, tx: number, tz: number): number => {
     if (!field) return tx;
@@ -188,7 +188,7 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     plan += clamp(want - plan, -rate * dtPlan, rate * dtPlan);
     tx = (onAlt ? tx : m.routeX(tz)) + plan;
     // (regression check) how far the planned aim jumps between two reads
-    if (stats && lastAim === lastAim) stats.maxAimJump = Math.max(stats.maxAimJump ?? 0, Math.abs(tx - lastAim));
+    if (stats && !Number.isNaN(lastAim)) stats.maxAimJump = Math.max(stats.maxAimJump ?? 0, Math.abs(tx - lastAim));
     lastAim = tx;
     if (stats && Math.abs(plan) > 3 && Math.sign(plan) === Math.sign(f.dir) && p.lee) stats.lee = (stats.lee ?? 0) + 1;
     let edgeUp = false;

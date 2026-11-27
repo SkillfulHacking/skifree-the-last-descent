@@ -152,7 +152,7 @@ export class StormSky {
   private wallU: Record<string, THREE.IUniform>;
   private f: FrontState = { s: 0, dir: 1, phase: 'clear', left: 0, k: 0 };
   private off = new THREE.Vector2();
-  private lastClock = NaN;
+  private lastClock = Number.NaN;
 
   constructor() {
     this.group.name = 'whiteout-sky';

@@ -262,12 +262,18 @@ export class RidgeRocks {
       streaks: 0.25,
       rime: { dir: [1, 0.25], amount: 0.6 },
     });
-    for (const id of RIDGE_ROCK_IDS)
-      void loadScan(id).then((g) => {
+  }
+
+  /** load the scanned rock families; the caller starts it after construction (round 6, SonarCloud) */
+  async loadScans(): Promise<void> {
+    await Promise.all(
+      RIDGE_ROCK_IDS.map(async (id) => {
+        const g = await loadScan(id);
         if (this.disposed || !g) return;
         this.geos.set(id, g);
         this.stale = true;
-      });
+      }),
+    );
   }
 
   /** keep the chunks around z; rebuild the live ones when a scan arrives */

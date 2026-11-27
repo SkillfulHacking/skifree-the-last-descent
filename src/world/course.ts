@@ -305,19 +305,19 @@ export class Mountain {
     return up - back + 0.55 * rough * (1 - smoothstep(R.crestE + 60, R.crestE + 300, es)) + 0.02 * es + ranges;
   }
 
-  /** world X of the ridge's corniced rim at z (terrain.ridge), or NaN without one */
+  /** world X of the ridge's corniced rim at z (terrain.ridge), or Number.NaN without one */
   ridgeRimX(z: number): number {
     const R = this.kRidge;
-    if (!R) return NaN;
+    if (!R) return Number.NaN;
     const P = this.profile;
     const w = P.halfWidth(z);
     return P.centerX(z) + R.dropSide * (Math.max(w, w * P.sideSetback(z, R.dropSide)) + R.rim);
   }
 
-  /** metres beyond the ridge rim at (x, z) (negative = on the ridge side), NaN without a ridge */
+  /** metres beyond the ridge rim at (x, z) (negative = on the ridge side), Number.NaN without a ridge */
   beyondRidgeRim(x: number, z: number): number {
     const R = this.kRidge;
-    if (!R) return NaN;
+    if (!R) return Number.NaN;
     return (x - this.ridgeRimX(z)) * R.dropSide;
   }
 

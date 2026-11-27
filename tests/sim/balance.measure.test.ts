@@ -8,6 +8,7 @@
 import { it } from 'vitest';
 import { measure, POLICIES, type RunSpec } from './balance';
 import { outPath } from './outPath';
+import { expectResumedRows } from './checkRows';
 
 const E = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env;
 const list = (v: string | undefined, d: string) => (v ?? d).split(',').map((s) => s.trim()).filter(Boolean);
@@ -36,4 +37,6 @@ it('measure', async () => {
     if (i % shards !== shard || done.has(key(s))) return;
     appendFileSync(out, JSON.stringify(measure(s)) + '\n');
   });
+  const wanted = specs.filter((_, i) => i % shards === shard).map(key);
+  expectResumedRows(fsx.readFileSync(out, 'utf8'), (r) => key(r as Parameters<typeof key>[0]), wanted, ['time', 'distance', 'minGap']);
 }, 86_400_000);

@@ -7,10 +7,12 @@ import { ObstacleField } from '../../src/physics/obstacles';
 import { simulateCourse } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
 import { whiteoutDriver } from './whiteoutDriver';
+import { expectSimRows } from './checkRows';
 const E = (globalThis as any).process.env;
 it('knock probe', async () => {
   const fs = await import('node:fs' as string);
   const out = E.OUT;
+  const rows: Record<string, unknown>[] = [];
   for (const biome of (E.BIOMES ?? 'fjord').split(','))
     for (const diff of (E.DIFFS ?? 'normal,hard').split(',') as Difficulty[])
       for (let i = 1; i <= Number(E.N ?? 24); i++)
@@ -28,6 +30,9 @@ it('knock probe', async () => {
           });
           const driver = drv === 'skilled' ? (s: any, t: number) => autopilotInput(m, s, 'skilled', t) : whiteoutDriver(m, env, ws, { lines: 'always', drifts: 'ignore', blizzard: 'ignore' }, undefined, 0.25, field);
           const r = simulateCourse(m, field, driver, { streaming: true, environment: env, yetiSpeed: DIFFICULTY[diff].yetiSpeed, maxTime: 900, snowballs: diff === 'hard', dodge: diff === 'hard' });
-          fs.appendFileSync(out, JSON.stringify({ biome, diff, seed, courseId: courseId(c), drv, outcome: r.outcome, time: +r.time.toFixed(1), distance: Math.round(r.distance), minGap: Number.isFinite(r.minGap) ? +r.minGap.toFixed(1) : null, knocks: [...hits.values()] }) + '\n');
+          const row = { biome, diff, seed, courseId: courseId(c), drv, outcome: r.outcome, time: +r.time.toFixed(1), distance: Math.round(r.distance), minGap: Number.isFinite(r.minGap) ? +r.minGap.toFixed(1) : null, knocks: [...hits.values()] };
+          rows.push(row);
+          fs.appendFileSync(out, JSON.stringify(row) + '\n');
         }
+  expectSimRows(rows, ['time', 'distance']);
 }, 86_400_000);

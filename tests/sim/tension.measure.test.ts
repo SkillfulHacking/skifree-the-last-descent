@@ -38,6 +38,7 @@ import { whiteoutDriver } from './whiteoutDriver';
 import { POLICIES } from './balance';
 import { outPath } from './outPath';
 import { applyTune } from './tune';
+import { expectResumedRows } from './checkRows';
 
 const P = (globalThis as unknown as { process: { env: Record<string, string | undefined>; stdout: { write(s: string): void } } }).process;
 
@@ -239,4 +240,18 @@ it('pursuit tension', async () => {
               fs.appendFileSync(out, JSON.stringify(row) + '\n');
               P.stdout.write(`${key}: ${row.outcome} start ${row.startGap} m, min ${row.minGap} m, <45 m ${row.t45} s\n`);
             }
+  // every requested behaviour run is in OUT, each finished with a known outcome
+  const wanted: string[] = [];
+  for (const seed of (P.env.SEEDS ?? 'CLASSIC').split(','))
+    for (const biome of biomes)
+      for (const len of (P.env.LENS ?? 'sprint').split(',') as LengthMode[])
+        for (const enc of (P.env.ENCS ?? '0').split(',').map(Number))
+          for (const diff of (P.env.DIFFS ?? 'normal,hard').split(',') as Difficulty[])
+            for (const b of (P.env.BEHAVIOURS?.split(',') as Behaviour[] | undefined) ?? BEHAVIOURS) wanted.push(keyOf({ seed, enc, pace: paceOf(biome), biome, len, diff, behaviour: b }));
+  expectResumedRows(
+    fs.readFileSync(out, 'utf8'),
+    (r) => keyOf({ ...(r as unknown as TensionRow), seed: (r.seed as string | undefined) ?? 'CLASSIC', enc: (r.enc as number | undefined) ?? 0, pace: (r.pace as number | undefined) ?? 1 }),
+    wanted,
+    ['startGap'],
+  );
 });

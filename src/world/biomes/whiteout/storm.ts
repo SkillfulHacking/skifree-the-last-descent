@@ -199,7 +199,7 @@ export function skiableAcross(m: ExposureQuery & { heightAt?(x: number, z: numbe
   if (!h) return true;
   const S = SKIABLE;
   const check = (pts: Array<[number, number]>) => {
-    let prev = NaN;
+    let prev = Number.NaN;
     for (let i = 1; i < pts.length; i++) {
       const [ax, az] = pts[i - 1]!;
       const [bx, bz] = pts[i]!;

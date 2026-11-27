@@ -18,6 +18,7 @@ import { CAVE_LEAP_AT, startCanonicalChase } from '../../src/cinematic/caveHando
 import { LEGACY_CINEMATIC_END, cinematicLeapAt, legacyHandoffYeti } from '../support/legacyCaveHandoff';
 import type { BiomeId } from '../../src/world/biome';
 import { outPath } from './outPath';
+import { expectSimRows } from './checkRows';
 
 const P = (globalThis as unknown as { process: { env: Record<string, string | undefined>; stdout: { write(s: string): void } } }).process;
 
@@ -83,5 +84,6 @@ it('skip vs watch', async () => {
           }
         }
   fs.writeFileSync(await outPath(P.env.OUT, '.measure/skip_handoff.json'), JSON.stringify(rows, null, 1));
+  expectSimRows(rows as Record<string, unknown>[], ['time', 'minGap', 'separation'], biomes.length * diffs.length * (P.env.LENS ?? 'sprint').split(',').length * 2 * SKIP_CASES.length);
   P.stdout.write('\n');
 }, 3_600_000);

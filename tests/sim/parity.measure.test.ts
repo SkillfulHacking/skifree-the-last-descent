@@ -13,6 +13,7 @@ import { simulateCourse } from '../../src/game/simulate';
 import { autopilotInput } from '../../src/debug/autopilot';
 import type { BiomeId } from '../../src/world/biome';
 import { outPath } from './outPath';
+import { expectSimRows } from './checkRows';
 
 const P = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process;
 it('parity', async () => {
@@ -37,4 +38,5 @@ it('parity', async () => {
     rows.push({ biome, len, diff, outcome: r.outcome, time: r.time, minGap: r.minGap, distance: r.distance, gapAt });
   }
   fs.writeFileSync(await outPath(P.env.OUT, '.measure/parity_sim.json'), JSON.stringify(rows, null, 1));
+  expectSimRows(rows as Record<string, unknown>[], ['time', 'distance'], (P.env.RUNS ?? 'alpine:sprint:hard').split(',').length);
 }, 86_400_000);

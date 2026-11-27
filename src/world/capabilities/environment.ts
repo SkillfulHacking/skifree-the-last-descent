@@ -314,7 +314,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     //    or airborne and well below it) is put back on the piste, crashed, with a cue — the flank is a
     //    long fall into the valley, not a route
     const rb = this.mountain.beyondRidgeRim(q.x, q.z);
-    if (rb === rb && !q.crashed && !out.relocate) {
+    if (!Number.isNaN(rb) && !q.crashed && !out.relocate) {
       if (!q.grounded && rb > -RIDGE_GUARD.reach) out.airAccelX -= this.mountain.biome.terrain.ridge!.dropSide * RIDGE_GUARD.updraft * smoothstep(-RIDGE_GUARD.reach, 0, rb);
       const rimY = this.mountain.heightAt(this.mountain.ridgeRimX(q.z), q.z);
       if (rb > RIDGE_GUARD.over && (q.grounded || q.y < rimY - RIDGE_GUARD.drop)) {
@@ -339,7 +339,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     const near = this.hazards.near(q.x, q.z + HAZARD_ALERT_RANGE * 0.5, HAZARD_ALERT_RANGE * 0.5 + HAZARD_PASS_RANGE, this.near);
     const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensityAt(q.z), seed: this.seed, tuck: q.tuck, clearance: 0 };
     // (airborne: the height over the ground right beneath the skier, measured once per step, only when needed)
-    let clearance = NaN;
+    let clearance = Number.NaN;
     const clearanceNow = () => (q.grounded ? 0 : Number.isNaN(clearance) ? (clearance = Math.max(0, q.y - this.mountain.heightAt(q.x, q.z))) : clearance);
     for (const h of near) {
       let tr = this.tracks.get(h.id);

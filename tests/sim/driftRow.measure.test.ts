@@ -7,7 +7,7 @@
  * Time to 40 m past the row, exit and minimum speed, path length, time in deep snow, knocks.
  *   N=24 OUT=… npx vitest run --config vitest.sim.config.ts tests/sim/driftRow.measure.test.ts
  */
-import { it } from 'vitest';
+import { expect, it } from 'vitest';
 import '../../src/world/biomes';
 import { buildMountain, makeCourse, worldSeed } from '../../src/game/CourseConfig';
 import { BiomeEnvironment } from '../../src/world/capabilities/environment';
@@ -90,6 +90,11 @@ it('drift micro', async () => {
   fs.writeFileSync(outFile + '.crashes.txt', crashLog.join('\n'));
   const med = (k: string, f: string) => { const v = out.map((r) => r[k][f]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
   console.log('rows', out.length);
+  // every drift row measured every approach, each a finished pass with finite timings
+  expect(out.length).toBeGreaterThan(0);
+  for (const r of out)
+    for (const k of ['plough', 'gap40', 'gap70', 'gap100', 'hopTimed', 'hopSpam', 'hopClip'])
+      for (const f of ['t', 'vExit', 'minV', 'path', 'inDrift']) expect(Number.isFinite(r[k][f]), `${k}.${f}`).toBe(true);
   console.log(crashLog.join('\n'));
   for (const k of ['plough', 'gap40', 'gap70', 'gap100', 'hopTimed', 'hopSpam']) console.log(k, 't', med(k, 't'), 'vExit', med(k, 'vExit'), 'minV', med(k, 'minV'), 'path', med(k, 'path'), 'inDrift', med(k, 'inDrift'));
 });

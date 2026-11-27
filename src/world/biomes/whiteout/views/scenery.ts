@@ -125,6 +125,7 @@ export class WhiteoutScenery implements SceneryView {
     this.group.name = 'whiteout-scenery';
     this.snow = new BlowingSnow(ctx.quality);
     this.rocks = new RidgeRocks(ctx.mountain, ctx.quality);
+    void this.rocks.loadScans();
     this.cloudSea = new ValleyCloudSea(ctx.mountain, ctx.biome.atmosphere.fogColor as [number, number, number]);
     this.group.add(this.sky.group, this.snow.mesh, this.rocks.group, this.cloudSea.mesh);
     // a slim pole with reflective orange/black bands (vertex colours)
