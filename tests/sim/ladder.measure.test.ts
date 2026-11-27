@@ -24,7 +24,7 @@ import '../../src/world/biomes';
 import { getBiome, type BiomeId } from '../../src/world/biome';
 import { measure, POLICIES, type RunSpec } from './balance';
 import { applyTune } from './tune';
-import { EXPERT_TUCK } from './whiteoutDriver';
+import { BINARY_TUCK, EXPERT_TUCK } from './whiteoutDriver';
 import { outPath } from './outPath';
 import { expectResumedRows } from './checkRows';
 
@@ -43,6 +43,7 @@ it('ladder', async () => {
   }
   if (E.TUNE) applyTune(JSON.parse(E.TUNE));
   if (E.XTUCK) Object.assign(EXPERT_TUCK, { on: true, band: Number(E.XTUCK) });
+  if (E.TTOL) BINARY_TUCK.tol = Number(E.TTOL);
   const tag = E.TAG ?? 'base';
   const out = await outPath(E.OUT, '.measure/ladder.jsonl');
   const key = (r: { biome: string; len: string; diff: string; seed: string; policy: string; pace: number; tag: string }) => `${r.biome}|${r.len}|${r.diff}|${r.seed}|${r.policy}|${r.pace}|${r.tag}`;

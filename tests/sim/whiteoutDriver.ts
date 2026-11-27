@@ -59,6 +59,9 @@ export const FOG_READ = 60;
  */
 /** (round 4 ladder) the expert's tuck: progressive through turns (measurement only; off = round 3's driver) */
 export const EXPERT_TUCK = { on: false, band: 0.25, lead: 0.45 };
+/** (round 6, W-101) the keyboard (all-or-nothing) tuck's heading tolerance, rad: 0.16 by default (a cautious
+ *  player who drops the tuck for any turn); higher holds the full tuck through more of the turning */
+export const BINARY_TUCK = { tol: 0.16 };
 
 export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number, p: WhiteoutPolicy, stats?: { alt: number; main: number; gapSteers: number; brakes: number; lee?: number; maxAimJump?: number }, react = 0.25, field?: ObstacleField) {
   const ids: number[] = [];
@@ -138,7 +141,7 @@ export function whiteoutDriver(m: Mountain, env: BiomeEnvironment, seed: number,
     let tuckOk = true;
     env.hazards.near(s.pos.x, s.pos.z + 60, 110, near);
     // drifts: steer for the nearest clear x across the line ahead
-    let tuckTol = 0.16;
+    let tuckTol = EXPERT_TUCK.on ? 0.16 : BINARY_TUCK.tol;
     // ---- the line across the piste (round 2): one plan, an offset from the racing line, that moves
     // at a rate a skier can carve (≈ 0.22 × speed sideways) — never re-aimed from scratch each look:
     //  - in a front, onto the marked lee shoulder (where there is one);

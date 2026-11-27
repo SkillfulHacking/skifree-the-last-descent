@@ -185,15 +185,27 @@ export class Cave {
     const keep: number[] = [];
     const I = nets.indices;
     const buried = new Uint8Array(P.length / 3);
-    for (let i = 0; i < buried.length; i++) buried[i] = P[i * 3 + 1]! < groundMin(P[i * 3]!, P[i * 3 + 2]!) - 0.3 ? 1 : 0;
+    // (round 6, W-105: the cull, the normals and the orientation shared one 25–31 ms slice) each in
+    // slices of its own
+    for (let i = 0; i < buried.length; i++) {
+      if ((i & 1023) === 0 && tk.over()) {
+        yield;
+        tk.reset();
+      }
+      buried[i] = P[i * 3 + 1]! < groundMin(P[i * 3]!, P[i * 3 + 2]!) - 0.3 ? 1 : 0;
+    }
     for (let t = 0; t < I.length; t += 3) {
       if (buried[I[t]!]! && buried[I[t + 1]!]! && buried[I[t + 2]!]!) continue;
       keep.push(I[t]!, I[t + 1]!, I[t + 2]!);
     }
+    yield;
+    tk.reset();
     const rockGeo = compactGeometry(P, keep);
     yield;
     tk.reset();
     rockGeo.computeVertexNormals();
+    yield;
+    tk.reset();
     orientOutward(rockGeo, field);
     yield;
     tk.reset();
@@ -217,6 +229,8 @@ export class Cave {
     rockGeo.dispose();
     floorGeo.dispose();
     geo.computeBoundingSphere();
+    yield;
+    tk.reset();
 
     // --- key points
     const at = (s: number, out: THREE.Vector3) => {
@@ -251,6 +265,8 @@ export class Cave {
     this.disposables.push(geo, rockMat);
 
     phase('claw+points');
+    yield;
+    tk.reset();
     // --- icicles under the brow
     const ice = this.buildIcicles(field, new Rng(seed ^ 0x1c1c1e));
     if (ice) {

@@ -118,6 +118,20 @@ for (const item of list.split(',')) {
         }, process.env.PROBE === '1' ? '' : process.env.PROBE);
         process.stdout.write(`probe ${JSON.stringify(found)}\n`);
       }
+      if (process.env.HIDE || process.env.NAMES) {
+        // (debugging a capture) list the scene's named objects, and hide those whose name holds a HIDE term
+        const names = await page.evaluate((hide) => {
+          const terms = hide ? hide.split(',') : [];
+          const seen = {};
+          window.__skifree.world().scene.traverse((o) => {
+            if (!o.name) return;
+            seen[o.name] = (seen[o.name] ?? 0) + 1;
+            if (terms.some((t) => o.name.includes(t))) o.visible = false;
+          });
+          return seen;
+        }, process.env.HIDE ?? '');
+        if (process.env.NAMES) process.stdout.write(`names ${JSON.stringify(names)}\n`);
+      }
       const name = `${item.replace(/:/g, '_')}_${i}_${wx}`;
       await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
       await page.screenshot({ path: `${outDir}/${name}.png`, timeout: 1_200_000 });
