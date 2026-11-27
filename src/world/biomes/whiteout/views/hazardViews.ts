@@ -21,6 +21,8 @@ const smoothstep01 = (x: number) => {
   const k = Math.min(1, Math.max(0, x));
   return k * k * (3 - 2 * k);
 };
+/** (round 6, W-105) blizzard curtain materials, reused (their program stays linked) */
+const curtainPool: THREE.ShaderMaterial[] = [];
 let shared: { drift: THREE.MeshStandardMaterial; plume: THREE.PointsMaterial; curtain: THREE.ShaderMaterial; flake: THREE.Texture } | null = null;
 
 /**
@@ -298,7 +300,9 @@ function blizzardView(h: HazardInstance<BlizzardParams>, m: Mountain): HazardVie
   obj.add(pts);
   // pale curtains (vertical sheets across the fall line, swept along with the cell)
   const curtains: THREE.Mesh[] = [];
-  const cm = M.curtain.clone();
+  // (round 6, W-105: disposing each blizzard's material released the program and the next blizzard re-linked
+  // it mid-run) materials are pooled, not disposed
+  const cm = curtainPool.pop() ?? M.curtain.clone();
   // (Round 5) camera-facing sheets scattered through the cell (see curtainMaterial): position, size
   const NS = 8;
   const slot: Array<{ dx: number; dz: number; w: number; hgt: number }> = [];
@@ -350,7 +354,8 @@ function blizzardView(h: HazardInstance<BlizzardParams>, m: Mountain): HazardVie
     dispose() {
       g.dispose();
       flakeMat.dispose();
-      cm.dispose();
+      cm.uniforms.uOpacity!.value = 0;
+      curtainPool.push(cm);
       curtains.forEach((sh) => sh.geometry.dispose());
     },
   };

@@ -135,3 +135,8 @@ Validation on fresh held-out seeds (`R6V-…`) is in the round-6 candidate.
 ### Watch and skip parity with the gentle-ground cap (`catchup/skip_gterm.json`)
 - **Coverage:** every location; Normal and Hard; skilled and cautious arrivals; all six skip moments.
 - **Result:** the Yeti's hand-off position is identical whether the cinematic is watched or skipped (spread 0.0 m), and so is the gap 3 s into the chase.
+
+### Endless with the gentle-ground cap (`catchup/endless_{legacy,gterm}.jsonl`)
+- **Coverage:** all three locations; Classic plus 3 seeds; encounters 0–3; Normal and Hard; skilled, competent and early-crash drivers.
+- **Normal:** unchanged.
+- **Hard:** a skilled skier's second encounter is caught 5/12, against 10/12 before. That is the basins again. Encounters 3 and later are unchanged: 11/12 and 12/12 caught, as Endless escalation intends.

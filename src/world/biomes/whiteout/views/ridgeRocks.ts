@@ -269,6 +269,24 @@ export class RidgeRocks {
     });
   }
 
+  /**
+   * (Round 6, W-105: the rock and spire programs linked mid-run, the first time a streamed rock came into
+   * view) one-instance meshes of both rock materials, instanced as the streamed ones are, for the load-time
+   * compile; hidden again by the scenery's next update
+   */
+  warmupProbes(): THREE.Object3D[] {
+    const g = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+    this.probeGeo = g;
+    return [this.mat, this.spireMat].map((m) => {
+      const im = new THREE.InstancedMesh(g, m, 1);
+      im.setMatrixAt(0, new THREE.Matrix4());
+      im.frustumCulled = false;
+      im.castShadow = true;
+      return im;
+    });
+  }
+  private probeGeo: THREE.BufferGeometry | null = null;
+
   /** load the scanned rock families; the caller starts it after construction (round 6, SonarCloud) */
   async loadScans(): Promise<void> {
     await Promise.all(
@@ -352,5 +370,6 @@ export class RidgeRocks {
     this.lods.clear();
     disposeRockMaterial(this.mat);
     disposeRockMaterial(this.spireMat);
+    this.probeGeo?.dispose();
   }
 }

@@ -91,7 +91,7 @@ export const LAMP_CALM = { value: 0 };
 /** (round 6) the rim spindrift plumes: off (read as light shafts / sprites in two blind reads) */
 export const RIM_SPINDRIFT_ON = false;
 /** (round 6, W-065) steady red rim lights: on every `every`-th wand, `height` m up, `size` m across */
-export const RIM_LAMPS = { on: true, every: 2, height: 3.5, size: 1.6 };
+export const RIM_LAMPS = { on: true, every: 1, height: 3.5, size: 3.2 };
 let lampTex: THREE.Texture | null = null;
 function lampTexture(): THREE.Texture {
   if (lampTex) return lampTex;
@@ -238,8 +238,8 @@ export class WhiteoutScenery implements SceneryView {
       });
       wands.instanceMatrix.needsUpdate = true;
       group.add(wands);
-      // (round 6, W-065 storm: the wands wash out to specks in a whiteout) a steady red light on every
-      // second wand, drawn over the fog like the trail lamps: in a storm the drop's edge is a row of red
+      // (round 6, W-065 storm: the wands wash out to specks in a whiteout) a steady red light on each
+      // wand (RIM_LAMPS), drawn over the fog like the trail lamps: in a storm the drop's edge is a row of red
       // lights on the left, the way down a row of amber ones. Steady (never pulsing: Reduce flashes)
       if (RIM_LAMPS.on) {
         const lit = ws.filter((_, i) => i % RIM_LAMPS.every === 0);
@@ -269,6 +269,7 @@ export class WhiteoutScenery implements SceneryView {
   }
 
   update(dt: number, time: number, f: SceneryFrame): void {
+    if (this.probes) this.probes.visible = false;
     this.sky.update(dt, time, f);
     this.cloudSea.update(time, f);
     LAMP_TIME.value = time;
@@ -298,7 +299,27 @@ export class WhiteoutScenery implements SceneryView {
     // the storm dome and wall, the cloud sea and the blowing snow: shown for the load-time compile,
     // restored by the next update (W-086)
     this.group.traverse((o) => (o.visible = true));
+    // (round 6, W-105) and one of each streamed kind that may not exist yet at the start: the rock and
+    // spire materials (instanced), the trail lamps' and the rim lights' point sprites, the wands
+    if (!this.probes) {
+      this.probes = new THREE.Group();
+      this.probes.name = 'warmup-probes';
+      const dot = new THREE.BufferGeometry();
+      dot.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3), 3));
+      dot.setAttribute('color', new THREE.BufferAttribute(new Float32Array([1, 1, 1]), 3));
+      dot.setAttribute('aPhase', new THREE.BufferAttribute(new Float32Array(1), 1));
+      this.probeGeos.push(dot);
+      const wand = new THREE.InstancedMesh(wandGeometry(), this.wandMat, 1);
+      wand.setMatrixAt(0, new THREE.Matrix4());
+      this.probeGeos.push(wand.geometry);
+      this.probes.add(...this.rocks.warmupProbes(), new THREE.Points(dot, this.rimLampMat), wand);
+      for (const o of this.probes.children) o.frustumCulled = false;
+      this.group.add(this.probes);
+    }
+    this.probes.visible = true;
   }
+  private probes: THREE.Group | null = null;
+  private probeGeos: THREE.BufferGeometry[] = [];
 
   stats(): Record<string, number> {
     let n = 0;
@@ -313,6 +334,7 @@ export class WhiteoutScenery implements SceneryView {
     this.poleMat.dispose();
     this.wandMat.dispose();
     this.rimLampMat.dispose();
+    for (const g of this.probeGeos) g.dispose();
     this.sky.dispose();
     this.snow.dispose();
     this.rocks.dispose();
