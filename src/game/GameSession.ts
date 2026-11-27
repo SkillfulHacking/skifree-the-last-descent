@@ -484,6 +484,17 @@ export class GameSession implements Stage {
     }
     this.telemetry.step(s, PHYS_DT);
     this.checkLookouts();
+    // (round 6, W-102 / review B5-1: the Hard storm build-up had no cue) where the weather starts to build
+    // down the mountain, and again where it is at its strongest, the player is told
+    {
+      const env = this.world.environment;
+      const k = env.intensity > 0 ? env.intensityAt(s.pos.z) / env.intensity - 1 : 0;
+      const step = k >= 0.45 ? 2 : k >= 0.05 ? 1 : 0;
+      if (step > this.buildCaptioned && this.run.controllable) {
+        this.buildCaptioned = step;
+        this.envCaption(step === 1 ? '[the storms grow stronger from here down the mountain]' : '[the storms are at their fiercest now]', 3.5, `build${step}`, CAPTION_PRIORITY.warning);
+      }
+    }
     if (this.pendingSurfCaption && s.time > 4 && this.run.controllable) {
       this.pendingSurfCaption = false;
       this.envCaption('[surf booms against the cliffs far below]', 3, 'surf', CAPTION_PRIORITY.ambient);
@@ -915,6 +926,8 @@ export class GameSession implements Stage {
   private blizzardWarned = new Set<number>();
   /** last time each kind of location caption was shown (separate throttles: round 2, E3) */
   private envCaptionAt = new Map<string, number>();
+  /** (round 6) the storm build-up's captions already given this run: 0 none, 1 building, 2 strongest */
+  private buildCaptioned = 0;
   /**
    * Caption a location sound (squall, rock, surf, viewpoint). Never replaces a Yeti caption; a
    * warning that asks for a decision (a squall ahead) replaces a report (rock under the skis) that is
