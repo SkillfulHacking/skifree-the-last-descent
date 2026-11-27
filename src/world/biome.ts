@@ -116,7 +116,8 @@ export interface BiomeTerrainLook {
    * fall line with snow (`streak` share): the drop beyond a ridge's rim reads as a dark cliff band
    * falling away, where the geometry really falls. Presentation only. Absent = none.
    */
-  scouredFlank?: { rock: RGB; slope: [number, number]; below: [number, number]; streak: number };
+  /** (W-065/W-100) dark scoured rock on steep ground `past` m beyond the ridge rim, drop side only */
+  scouredFlank?: { rock: RGB; slope: [number, number]; past: [number, number]; streak: number };
 }
 
 /** Distant skyline palette (look/ranges.ts). */

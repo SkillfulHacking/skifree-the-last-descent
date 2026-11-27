@@ -403,6 +403,9 @@ export class TerrainRenderer {
     const pos = new Float32Array(vCount * 3);
     const nor = new Float32Array(vCount * 3);
     const surf = new Float32Array(vCount * 3);
+    // (W-100) metres past the ridge rim on the drop side (negative on the ridge side; none without a ridge)
+    const ridge = Number.isFinite(m.ridgeRimX(z0));
+    const rim = ridge ? new Float32Array(vCount) : null;
     let k = 0;
     const vRows = step <= 8 ? Math.max(1, Math.floor(256 / vs)) : 64;
     yield;
@@ -433,6 +436,7 @@ export class TerrainRenderer {
           surf[k * 3 + 1] = w.powder;
           surf[k * 3 + 2] = w.groomed;
         } else surf[k * 3 + 1] = 0.5;
+        if (rim) rim[k] = m.beyondRidgeRim(x, z);
         k++;
       }
       if (j % vRows === vRows - 1) yield;
@@ -476,6 +480,7 @@ export class TerrainRenderer {
       surf[k * 3] = surf[bi * 3]!;
       surf[k * 3 + 1] = surf[bi * 3 + 1]!;
       surf[k * 3 + 2] = surf[bi * 3 + 2]!;
+      if (rim) rim[k] = rim[bi]!;
       k++;
     }
     for (let e = 0; e < border.length; e++) {
@@ -490,6 +495,7 @@ export class TerrainRenderer {
     geo.setAttribute('position', new THREE.BufferAttribute(pos.subarray(0, k * 3), 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(nor.subarray(0, k * 3), 3));
     geo.setAttribute('aSurf', new THREE.BufferAttribute(surf.subarray(0, k * 3), 3));
+    if (rim) geo.setAttribute('aRim', new THREE.BufferAttribute(rim.subarray(0, k), 1));
     geo.setIndex(new THREE.BufferAttribute(idx.subarray(0, t), 1));
     geo.userData['y0'] = y0;
     geo.computeBoundingSphere();
@@ -542,6 +548,7 @@ export class TerrainRenderer {
     const y0 = Math.round(H[(vs >> 1) * vs + (vs >> 1)]!);
     const pos = new Float32Array(vs * vs * 3);
     const surf = new Float32Array(vs * vs * 3);
+    const farRim = Number.isFinite(m.ridgeRimX(Z0)) ? new Float32Array(vs * vs) : null;
     for (let j = 0; j <= n; j++)
       for (let i = 0; i <= n; i++) {
         const k = j * vs + i;
@@ -554,6 +561,7 @@ export class TerrainRenderer {
         pos[k * 3 + 1] = H[k]! - y0 - sunk;
         pos[k * 3 + 2] = j * FAR_S;
         surf[k * 3 + 1] = 0.6;
+        if (farRim) farRim[k] = m.beyondRidgeRim(x, Z0 + j * FAR_S);
       }
     if (n <= 0) return null;
     // (the same index width three picked for the old JS array: 16-bit below 65 536 vertices)
@@ -569,6 +577,7 @@ export class TerrainRenderer {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('aSurf', new THREE.BufferAttribute(surf, 3));
+    if (farRim) geo.setAttribute('aRim', new THREE.BufferAttribute(farRim, 1));
     geo.setIndex(new THREE.BufferAttribute(idx, 1));
     geo.computeVertexNormals();
     geo.computeBoundingSphere();

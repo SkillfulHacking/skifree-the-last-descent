@@ -91,7 +91,7 @@ export function makeWhiteoutBiome(): Biome {
       // (Round 5, W-065: four blind reads — "the drop is implied, not shown") the flank beyond the rim is
       // wind-scoured bare rock, dark blue-grey with snow in its gullies: from the line the rim is where the
       // snow ends against a dark band falling away
-      scouredFlank: { rock: [0.16, 0.18, 0.22], slope: [0.16, 0.26], below: [6, 22], streak: 0.55 },
+      scouredFlank: { rock: [0.16, 0.18, 0.22], slope: [0.16, 0.26], past: [1, 8], streak: 0.55 },
       skylightTint: [0.9, 0.96, 1.15],
     },
     ranges: { skyColor: [0.6, 0.67, 0.78], snow: [0.9, 0.92, 0.96], stoneDark: [0.11, 0.115, 0.13], stoneLight: [0.3, 0.31, 0.33], lowland: [0.2, 0.22, 0.26], horizonHaze: 0.8, soft: 0.8 },

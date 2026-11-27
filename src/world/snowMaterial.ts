@@ -230,7 +230,9 @@ export function createSnowMaterial(quality: 'low' | 'medium' | 'high' | 'ultra',
         '#include <common>',
         `#include <common>
 attribute vec3 aSurf;
+attribute float aRim;
 uniform vec3 uOrigin;
+varying float vRim;
 varying vec3 vNPos;
 varying vec3 vWPos;
 varying vec3 vWNormal;
@@ -242,7 +244,8 @@ varying vec3 vSurf;`,
 vWPos = (modelMatrix * vec4(position,1.0)).xyz;
 vNPos = vWPos + uOrigin;
 vWNormal = normalize(mat3(modelMatrix) * normal);
-vSurf = aSurf;`,
+vSurf = aSurf;
+vRim = aRim;`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
@@ -257,6 +260,7 @@ varying vec3 vNPos;
 varying vec3 vWPos;
 varying vec3 vWNormal;
 varying vec3 vSurf;
+varying float vRim;
 ${GLSL_NOISE}
 ${GLSL_NOISE_BL}
 ${ATMOSPHERE_GLSL}
@@ -396,10 +400,11 @@ ${
     T.scouredFlank
       ? `
   {
-    // (Round 5, W-065) the wind-scoured flank: steep ground well below the eye is bare dark rock with
-    // snow lodged in fall-line gullies — the face of the drop, seen beyond the rim
-    float fBelow = cameraPosition.y - vWPos.y;
-    float flank = smoothstep(${T.scouredFlank.slope[0].toFixed(3)}, ${T.scouredFlank.slope[1].toFixed(3)}, slope) * smoothstep(${T.scouredFlank.below[0].toFixed(1)}, ${T.scouredFlank.below[1].toFixed(1)}, fBelow);
+    // (Round 5, W-065; round 6, W-100) the wind-scoured flank: steep ground beyond the ridge rim, on the
+    // drop side only (vRim: metres past the rim, from Mountain.beyondRidgeRim), is bare dark rock with
+    // snow lodged in fall-line gullies. Round 5 keyed it to the camera's height instead, which darkened
+    // the uphill crest wall in every gameplay view.
+    float flank = smoothstep(${T.scouredFlank.slope[0].toFixed(3)}, ${T.scouredFlank.slope[1].toFixed(3)}, slope) * smoothstep(${T.scouredFlank.past[0].toFixed(1)}, ${T.scouredFlank.past[1].toFixed(1)}, vRim);
     float gully = sf_fbm(vec2((wp.x + wp.z) * 0.06, wp.y * 0.009));
     float lodged = smoothstep(0.56, 0.68, gully) * ${T.scouredFlank.streak.toFixed(3)};
     vec3 scour = ${v3(T.scouredFlank.rock)} * (0.78 + 0.44 * n1);
