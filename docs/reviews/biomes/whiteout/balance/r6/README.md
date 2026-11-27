@@ -125,7 +125,36 @@ The basin trap had been holding Alpine Hard down. With it gone, Alpine Hard need
 | Binary (keyboard) tuck | 63% | 21% | lost |
 | Pooled | 75% | 42% | |
 
-The gap between the two techniques is W-101's "tuck sensitivity". It is unresolved and goes to the round-7 order. A control change, such as easing a held digital tuck during turns, would alter feel for every player and needs the playtest first.
+The gap between the two techniques is W-101's "tuck sensitivity".
+
+#### Alternative keyboard strategies (`keyboard/tol*.jsonl`, R6T-01…24, Alpine Hard)
+The binary driver above is a cautious keyboard player: it drops the tuck whenever its heading is more than 0.16 rad off the line. A keyboard player can instead hold the full tuck through moderate turns (the tuck halves the turn rate, so the turn is wider). Before changing the course or the controls, the brief asks whether another strategy wins:
+
+| Keyboard tuck held up to | Sprint | Standard | Classic Hard |
+|---|---|---|---|
+| 0.16 rad (the cautious driver) | 63% | 21% | lost |
+| 0.30 rad | 92% | 58% | won |
+| 0.45 rad | 92% | 88% | won |
+| 0.70 rad | 96% | 83% | won |
+
+A winning keyboard strategy exists: hold the tuck through the gentle turns and drop it only for the sharp ones. So the course is not unwinnable on a keyboard, and nothing in the terrain or controls was changed for it. Two points stay open for round 7:
+- whether players find this technique without being told (a playtest question; the tutorial never mentions it);
+- with it, Alpine Hard Standard is above the 25–50% target. Hard is now bounded by technique rather than by a hidden pace.
+
+### Fjord and Whiteout Hard pace (`tuning/wfH*.jsonl`, R6T-01…24)
+Before this round, Whiteout Hard Sprint was too easy for the weather reader (100%). Fjord Hard Standard was at 62–71%. Both locations' `difficultyPace.hard` were swept:
+
+| Hard pace | Fjord Sprint (expert / keyboard) | Fjord Standard | Whiteout Sprint | Whiteout Standard | Classic Hard Standard, expert (Fjord, Whiteout) |
+|---|---|---|---|---|---|
+| 1.00 | 92 / 83 | 50 / 33 | 92 / 88 | 71 / 46 | won, won |
+| 1.02 | 79 / 62 | 50 / 33 | 67 / 58 | 54 / 33 | won, won |
+| 1.04 | 83 / 62 | 21 / 25 | 50 / 50 | 29 / 4 | lost, won |
+| 1.07 | 58 / 50 | 17 / 25 | 29 / 21 | 12 / 0 | lost, lost |
+
+The response is steep: 2% of Yeti pace moves Whiteout Hard Standard keyboard wins from 33% to 4%. Both locations now use **1.02**, the largest value that keeps Classic Hard winnable and both techniques inside or near the bands. Held-out validation on R6V is in `validate2/`.
+
+### Storm build-up cue (review B5-1)
+Whiteout Hard's storms strengthen past 3 km (×1.5 by 8 km), and until now nothing told the player. A caption now appears when the build-up begins and again when it peaks (`GameSession`, test `storm_build_cue`).
 
 ### Labels (ruling 1)
 `difficultySummary()` (see `CourseConfig.ts`).
