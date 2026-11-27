@@ -38,6 +38,9 @@ await page.addInitScript((s) => {
 }, settings('normal'));
 await page.goto(`${base}/?debug`);
 await page.waitForFunction(() => window.__ready === true, null, { timeout: 900_000, polling: 1000 });
+// (round 6, W-106) the settings the page actually runs with (preset, accessibility), as stored
+manifest.settings = await page.evaluate(() => JSON.parse(localStorage.getItem('skifree-tld.settings.v1') ?? 'null'));
+manifest.preset = manifest.settings?.quality ?? null;
 
 const ev = (fn, arg) => page.evaluate(fn, arg);
 /** evaluate `(w, m, k) => …` source with the world, mountain and debug API */
@@ -103,7 +106,14 @@ async function shot(name, note, expect = {}) {
   if (expect.skier === 'main') checks.skier = !!skier?.inMainView;
   if (expect.letterbox) checks.letterbox = bars > 0;
   const failed = Object.entries(checks).filter(([, v]) => !v).map(([k]) => k);
-  manifest.shots.push({ name, note, expect, checks, failed, course, yeti, skier, letterboxPx: bars, camera: st.cam, phase: st.s?.phase ?? 'menu', z: st.s?.z ?? null, time: st.s?.time ?? null, front: f, cinematicTime: st.s?.cinematicTime ?? null });
+  // (round 6, W-106 / review E5-6: notes were template text) `intent` is what the shot was set up to
+  // show; `observed` is written only from what was measured in this frame
+  const seen = [];
+  if (yeti) seen.push(yeti.inMainView ? `Yeti in frame, ${yeti.heightPx} px tall, ${yeti.fromCamera ?? '?'} m from the camera` : yeti.drawn ? 'Yeti drawn but outside the frame' : 'Yeti not drawn');
+  if (skier) seen.push(skier.inMainView ? 'skier in frame' : 'skier not in frame');
+  seen.push(bars > 0 ? `letterbox ${bars} px` : 'no letterbox');
+  if (f) seen.push(`weather ${f.phase} (${f.s.toFixed(2)})`);
+  manifest.shots.push({ name, intent: note, observed: seen.join('; '), expect, checks, failed, course, yeti, skier, letterboxPx: bars, camera: st.cam, phase: st.s?.phase ?? 'menu', z: st.s?.z ?? null, time: st.s?.time ?? null, front: f, cinematicTime: st.s?.cinematicTime ?? null });
   writeFileSync(`${outDir}/manifest.json`, JSON.stringify(manifest, null, 2));
   log('shot', name, f ? `${f.phase} s=${f.s.toFixed(2)}` : '', failed.length ? `FAILED ${failed.join(',')}` : '');
   if (failed.length && !LENIENT) throw new Error(`${name}: the frame does not show ${failed.join(', ')} (${note})`);
