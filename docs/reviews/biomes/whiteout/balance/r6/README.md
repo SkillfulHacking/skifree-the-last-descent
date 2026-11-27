@@ -169,3 +169,29 @@ Validation on fresh held-out seeds (`R6V-…`) is in the round-6 candidate.
 - **Coverage:** all three locations; Classic plus 3 seeds; encounters 0–3; Normal and Hard; skilled, competent and early-crash drivers.
 - **Normal:** unchanged.
 - **Hard:** a skilled skier's second encounter is caught 5/12, against 10/12 before. That is the basins again. Encounters 3 and later are unchanged: 11/12 and 12/12 caught, as Endless escalation intends.
+
+## 5. Held-out validation of the Hard pace (R6V-01…24, `validate2/`)
+Fresh seeds that were not used for tuning, with the shipped 1.02 pace. Wilson 95% intervals; n = 24 per cell.
+
+| Location | Technique | Sprint | Standard | Classic Hard Standard |
+|---|---|---|---|---|
+| Fjord | progressive tuck | 71% [51–85] | 42% [24–61] | won |
+| Fjord | cautious keyboard | 75% [55–88] | 29% [15–49] | won |
+| Fjord | keyboard, tuck held to 0.45 rad | 75% [55–88] | 29% [15–49] | won |
+| Whiteout | weather reader, progressive | 92% [74–98] | 38% [21–57] | won |
+| Whiteout | weather reader, cautious keyboard | 83% [64–93] | 42% [24–61] | lost |
+| Whiteout | keyboard, tuck held to 0.45 rad | 88% [69–96] | 38% [21–57] | lost |
+| Whiteout | does not read the weather | 21% | 0% | lost |
+| Alpine | keyboard, tuck held to 0.45 rad | 92% [74–98] | 58% [39–76] | won |
+| Fjord / Whiteout | sloppy (mistakes) | 4% / 12% | 0% / 0% | lost |
+
+- Fjord is inside both bands.
+- Whiteout Standard is inside its band.
+- **Whiteout Hard Sprint is above its band on R6V (83–92%), though it was inside it on R6T (58–67%).** Pooled over both seed sets the reader wins 79%. The pace was not re-tuned on the validation seeds, because that would fit those seeds. Record this as uncertain, slightly above target.
+- Classic Hard Standard is won in every location by the progressive tuck. In Whiteout the keyboard drivers lose it.
+- A skier who does not read the weather cannot win Whiteout Hard. That is by design: Hard is about reading the storm. It is also why the playtest asks whether players can see the next hazard.
+
+Single-encounter tension on Hard (`validate2/tension.jsonl`, 9 seeds; summarise with `tools/tension_summary.py`):
+- the skilled skier is caught 0–4 times in 9;
+- crashing, a poor route and caution are each caught in most runs;
+- a competent skier is caught 5–8 times in 9.
