@@ -56,7 +56,9 @@ export function rescueLayout(m: { routeX(z: number): number; centerX(z: number):
 }
 /** the door's offset along the front of the hall, and the skier's mark this far out from it */
 const DOOR_X = -2.4;
-const STOP_OUT = 8;
+// (round 6, W-104 / review C5-1: at 8 m out the skier stopped short of the porch and outside the welcome
+// shot; at 4.6 m he glides up to the deck's edge, 2.8 m short of it, clear of the akja and the probes)
+const STOP_OUT = 4.6;
 
 function signTexture(): THREE.Texture {
   const c = document.createElement('canvas');
@@ -202,7 +204,7 @@ export function searchBeam(): { geometry: THREE.BufferGeometry; material: THREE.
     // a warm shaft drawn over the scene (normal blending), so it reads against bright snow as well as the
     // darkened storm of the beat
     vertexShader: `varying float vD; varying vec3 vN; varying vec3 vV; void main(){ vD = position.z / ${BEAM_LEN.toFixed(1)}; vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: 'uniform float uK; varying float vD; varying vec3 vN; varying vec3 vV; void main(){ float face = abs(dot(normalize(vN), normalize(vV))); float a = uK * (1.0 - 0.75 * vD) * smoothstep(0.0, 0.04, vD) * (0.25 + 0.75 * face); gl_FragColor = vec4(1.0, 0.86, 0.6, a); }',
+    fragmentShader: 'uniform float uK; varying float vD; varying vec3 vN; varying vec3 vV; void main(){ float face = abs(dot(normalize(vN), normalize(vV))); float a = uK * (1.0 - 0.75 * vD) * smoothstep(0.0, 0.04, vD) * (1.0 - smoothstep(0.8, 1.0, vD)) * face * face; gl_FragColor = vec4(1.0, 0.86, 0.6, a); }',
     transparent: true,
     depthWrite: false,
     blending: THREE.NormalBlending,
@@ -251,6 +253,37 @@ export class RescueStation implements FinishEnvironment {
   /** where the searchlight points (world); null: it sweeps the slope */
   searchTarget: THREE.Vector3 | null = null;
   /** the searchlight's lamp, in world space (cinematic framing) */
+  /** the lit interior seen through the open door (W-104): a canvas gradient with a bench and a coat */
+  private doorwayMaterial(): THREE.MeshBasicMaterial {
+    const c = document.createElement('canvas');
+    c.width = 64;
+    c.height = 96;
+    const g = c.getContext('2d');
+    if (g) {
+      const bg = g.createRadialGradient(32, 70, 4, 32, 60, 70);
+      bg.addColorStop(0, 'rgb(255,214,140)');
+      bg.addColorStop(0.45, 'rgb(236,146,58)');
+      bg.addColorStop(1, 'rgb(120,58,20)');
+      g.fillStyle = bg;
+      g.fillRect(0, 0, 64, 96);
+      g.fillStyle = 'rgba(60,26,10,0.85)';
+      g.fillRect(4, 74, 30, 5); // bench seat
+      g.fillRect(6, 79, 3, 12);
+      g.fillRect(29, 79, 3, 12);
+      g.beginPath(); // a coat on a peg
+      g.moveTo(48, 20); g.lineTo(56, 26); g.lineTo(58, 56); g.lineTo(44, 56); g.lineTo(44, 26); g.closePath();
+      g.fill();
+      g.fillStyle = 'rgba(70,30,10,0.5)'; // the far wall's floor line
+      g.fillRect(0, 88, 64, 8);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    this.disposables.push(t);
+    const m = new THREE.MeshBasicMaterial({ map: t, fog: false, toneMapped: false });
+    this.disposables.push(m);
+    return m;
+  }
+
   lampWorld(out: THREE.Vector3): THREE.Vector3 {
     this.searchPivot.updateWorldMatrix(true, false);
     return out.setFromMatrixPosition(this.searchPivot.matrixWorld);
@@ -392,7 +425,10 @@ export class RescueStation implements FinishEnvironment {
     for (const wz of [-1.8, 1.8]) window(-C.hutW / 2 - 0.01, wz, -Math.PI / 2);
     // --- the porch and the door
     const doorX = DOOR_X;
-    const doorFrame = add(new THREE.BoxGeometry(1.5, 2.3, 0.1), warm, doorX, FL + 1.15, C.hutD / 2 + 0.02, hut, false);
+    // (round 6, W-104 / review C4-4: the open doorway was one flat tan, tone-mapped from orange) a lit
+    // interior: a warm gradient, brightest low in the middle where the stove light falls, darker at the
+    // frame, with the silhouette of a bench and a coat on a peg, drawn untone-mapped so it reads as light
+    const doorFrame = add(new THREE.BoxGeometry(1.5, 2.3, 0.1), this.doorwayMaterial(), doorX, FL + 1.15, C.hutD / 2 + 0.02, hut, false);
     doorFrame.name = 'door-light';
     add(new THREE.BoxGeometry(1.8, 0.16, 0.16), trim, doorX, FL + 2.38, C.hutD / 2 + 0.06, hut, false);
     const leafG = new THREE.BoxGeometry(1.4, 2.2, 0.08);
@@ -643,6 +679,8 @@ export class RescueStation implements FinishEnvironment {
     halo.renderOrder = 9;
     lantern.add(halo);
     this.halo = halo;
+    // (round 6, W-104) carried by its bail: the ring's top, 0.70 m up
+    lantern.userData['hangFrom'] = 0.7;
     tro.add(lantern);
     const plinth = new THREE.Group();
     add(new THREE.BoxGeometry(0.6, 1.1, 0.6), stone, 0, -0.55, 0, plinth);
@@ -740,7 +778,9 @@ export class RescueStation implements FinishEnvironment {
       this.pool.position.copy(this.group.worldToLocal(g));
     }
     // (round 4, W-083) on its target the light is a hard, bright pool: it must read on the Yeti's pale fur
-    this.search.intensity = this.searchTarget ? 1400 : 220;
+    // (round 6, W-104 / review C5-4: the spot snapped from 220 to 1400 as the beam found him, a lighting
+    // pop between the shots) it swells over ~0.7 s as the beam swings onto him
+    this.search.intensity += ((this.searchTarget ? 1400 : 220) - this.search.intensity) * (1 - Math.exp(-4.5 * Math.max(0, dt)));
     // (Round 5) on its target the light is the lamp's warm white, like its shaft and pool
     this.search.color.setHex(this.searchTarget ? 0xffd9a6 : 0xfff0d8);
     this.search.angle = this.searchTarget ? 0.2 : 0.16;

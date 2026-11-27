@@ -1547,6 +1547,9 @@ export class GameSession implements Stage {
     for (const t of this.timers) clearTimeout(t);
     this.world.env.setAmbientScale(1);
     this.world.env.setSunScale(1);
+    // (round 6, review D5-4) the victory searchlight beat darkens the storm: a skip and a quick Retry
+    // must not carry the gloom into the next run on the same world
+    this.world.env.setGloom(0);
     this.timers = [];
     this.yeti.onFootstep = null;
     // an abandoned run (restart / exit) still reports its last partial pizza chunk and open drift

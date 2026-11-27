@@ -26,6 +26,15 @@ import type { FinishEnvironment, VictoryDirector, VictoryScript } from '../../..
 import { TrophyHandoff } from '../../../../cinematic/victory/trophy';
 import type { RescueStation } from './rescue';
 
+/** (round 6, W-104) the welcome shot's camera: 13 m out from the door, low and to one side (see the shot) */
+export function welcomePoses(door: THREE.Vector3, faces: THREE.Vector3, across: THREE.Vector3) {
+  const at = (out: number, side: number, up: number) => door.clone().addScaledVector(faces, out).addScaledVector(across, side).add(new THREE.Vector3(0, up, 0));
+  return {
+    from: pose(at(13.5, -2.8, 1.9), at(2.2, 0, 1.2), 46),
+    to: pose(at(12.2, -2.4, 1.8), at(1.8, 0, 1.25), 42),
+  };
+}
+
 /** the Yeti walks in from this far beyond his stop (m) */
 const YETI_IN = 14;
 
@@ -96,8 +105,12 @@ export class RescueVictory implements VictoryScript {
       start: B.welcome,
       end: B.lantern,
       // (round-2 check: from 7 m and 1.7 m up the camera sat among the sled and the searchlight housing)
-      from: () => pose(door.clone().addScaledVector(faces, 10.5).addScaledVector(across, -1.6).add(new THREE.Vector3(0, 2.6, 0)), door.clone().addScaledVector(faces, 1.5).add(new THREE.Vector3(0, 1.4, 0)), 50),
-      to: () => pose(door.clone().addScaledVector(faces, 9.4).addScaledVector(across, -1.2).add(new THREE.Vector3(0, 2.4, 0)), door.clone().addScaledVector(faces, 1.2).add(new THREE.Vector3(0, 1.4, 0)), 46),
+      // (round 6, W-104 / review C5-1: from 9.4–10.5 m out and 2.4 m up, behind and above the skier's
+      // 8 m mark, the shot looked down past him: the rescuers waved at an empty frame) now 13 m out, low
+      // and to one side, the skier's mark (4.6 m out) between the lens and the door: he glides up the
+      // frame to the deck as the door opens and the rescuers welcome him
+      from: () => welcomePoses(door, faces, across).from,
+      to: () => welcomePoses(door, faces, across).to,
       easing: ease.inOut,
     });
     // 3) the lantern: from the storm side, low; the skier in the warm doorway, the lantern lifted
