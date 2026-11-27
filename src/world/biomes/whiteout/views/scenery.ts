@@ -91,7 +91,7 @@ export const LAMP_CALM = { value: 0 };
 /** (round 6) the rim spindrift plumes: off (read as light shafts / sprites in two blind reads) */
 export const RIM_SPINDRIFT_ON = false;
 /** (round 6, W-065) steady red rim lights: on every `every`-th wand, `height` m up, `size` m across */
-export const RIM_LAMPS = { on: true, every: 1, height: 3.5, size: 3.2 };
+export const RIM_LAMPS = { on: true, every: 1, height: 3.5, size: 3.2, stormGrow: 1.2 };
 let lampTex: THREE.Texture | null = null;
 function lampTexture(): THREE.Texture {
   if (lampTex) return lampTex;
@@ -293,6 +293,10 @@ export class WhiteoutScenery implements SceneryView {
     // (round 4, W-065) the rim wands' flags carry through the storm: in a whiteout they are what marks
     // the edge (the drop itself is hidden), so they glow brighter as it closes in, like the lamps
     this.wandMat.emissiveIntensity = 0.35 + 1.1 * s;
+    // (round 6, W-065 storm: the C1 captures showed the rim lamps as specks in a storm) the drop's red
+    // lights grow with the storm too; in clear weather they stay small and a little dimmer
+    this.rimLampMat.size = RIM_LAMPS.size * (1 + RIM_LAMPS.stormGrow * s);
+    this.rimLampMat.opacity = 0.7 + 0.3 * s;
   }
 
   warmup(): void {
