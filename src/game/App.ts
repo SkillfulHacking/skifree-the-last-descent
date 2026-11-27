@@ -1,6 +1,7 @@
 /**
  * Application shell: renderer, loading, menus, settings, run lifecycle, perf overlay, debug harness.
  */
+import { PlaytestLog } from './playtestLog';
 import { A11Y } from '../core/a11y';
 import * as THREE from 'three';
 import { weatherFx, WEATHER_FX_REDUCED } from '../world/look/weatherFx';
@@ -74,6 +75,9 @@ export class App {
   // --- progression (achievements; see docs/PROGRESSION.md) ---
   /** automated test harness (?debug): runs never persist progress */
   readonly debugHarness = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+  /** (round 6, owner ruling 3) the consented playtest log: only with ?playtest (see playtestLog.ts) */
+  readonly playtest = typeof location !== 'undefined' && new URLSearchParams(location.search).has('playtest') ? new PlaytestLog() : null;
+  private detachPlaytest: (() => void) | null = null;
   progress!: ProgressTracker;
   private progressNote: string | null = null;
   private toast!: AchievementToast;
@@ -187,6 +191,7 @@ export class App {
     await this.buildWorld(this.settings.quality, this.currentCourse());
     this.loop();
     if (new URLSearchParams(location.search).has('debug')) this.installDebug();
+    if (this.playtest) this.installPlaytest();
     this.toMenu();
     (window as unknown as { __ready: boolean }).__ready = true;
   }
@@ -319,14 +324,40 @@ export class App {
   }
 
   /** Start evaluating achievements for the session's events (persist policy: a real, unassisted run). */
+  /** the playtest log's visible tag and the facilitator's download (Ctrl+Shift+L) */
+  private installPlaytest() {
+    const log = this.playtest!;
+    void fetch('build-info.json').then((r) => (r.ok ? r.json() : null)).then((b) => b && Object.assign(log.build, b)).catch(() => undefined);
+    const tag = document.createElement('div');
+    tag.className = 'playtest-tag';
+    tag.textContent = 'Playtest log on';
+    document.body.appendChild(tag);
+    addEventListener('keydown', (e) => {
+      if (!(e.ctrlKey && e.shiftKey && e.code === 'KeyL')) return;
+      e.preventDefault();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(log.toJSON())], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `playtest_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+  }
+
   private trackSession(s: GameSession) {
     this.untrackSession();
     this.detachProgress = this.progress.attach(s.events, () => !this.debugHarness && !s.debugUsed);
+    if (this.playtest && this.world) {
+      this.detachPlaytest = this.playtest.attach(s.events);
+      this.playtest.runStarted(this.world.id, this.settings as unknown as Record<string, unknown>);
+    }
   }
 
   private untrackSession() {
     this.detachProgress?.();
     this.detachProgress = null;
+    this.detachPlaytest?.();
+    this.detachPlaytest = null;
   }
 
   private achievementsScreen(): Screen {
@@ -801,6 +832,10 @@ export class App {
     try {
       this.frame(dt);
       this.errorStreak = 0;
+      if (this.playtest) {
+        const d = this.mode === 'playing' ? this.session?.debugState() : null;
+        this.playtest.tick(dt, d ? { phase: d.phase, z: d.z, speed: d.speed, yetiDistance: d.yetiDistance, crashes: d.crashes } : null);
+      }
     } catch (err) {
       this.errorStreak++;
       if (this.errorStreak <= 3) console.error(err);

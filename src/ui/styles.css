@@ -248,3 +248,6 @@ kbd {
 .hud-mult.hot { color: #ffd28a; }
 /* a one-time control hint in the caption line: wraps instead of running off narrow screens */
 .hud-caption.hint { white-space: normal; max-width: min(78vw, 640px); text-align: center; }
+
+/* round 6: the consented playtest log is visibly on (docs/playtest/WHITEOUT_PLAYTEST.md) */
+.playtest-tag { position: fixed; left: 8px; bottom: 6px; z-index: 50; pointer-events: none; font: 600 11px/1.2 system-ui, sans-serif; letter-spacing: 0.04em; color: #fff; background: rgba(160, 30, 30, 0.75); padding: 3px 7px; border-radius: 4px; }
