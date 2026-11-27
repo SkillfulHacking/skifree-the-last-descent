@@ -34,8 +34,8 @@ Work order: `../round-4/CONSOLIDATED.md`, plus the owner's round-5 brief (`OWNER
   - no pole in the lantern hand.
 
 **Yeti in the inset (W-082).** Commit `946b531`.
-- During the inset render, inset fog is lowered and a fill light is added.
-- The inset FOV narrows with distance (9°–48°), keeping the Yeti at least 40 px tall within 60 m (`rear_inset.test`).
+- During the inset render, inset fog is lowered to 0.45×.
+- The inset FOV narrows with distance (9°–48°) so the Yeti fills about 0.32 of the inset's height, keeping him at least 40 px tall within 60 m (`rear_inset.test`). (Corrected after Reviewer D: an earlier draft called `REAR_INSET_FILL` a fill light; it is a framing fraction. There is no added light.)
 - The inset now shows on Low for the whole chase.
 - The set-up shot is at 38°, with the tucked head and waist in frame (`handoff_camera.test`).
 
@@ -49,7 +49,7 @@ Work order: `../round-4/CONSOLIDATED.md`, plus the owner's round-5 brief (`OWNER
   - billowing top, soft foot and ends;
   - reworked after a blind read called it "a cardboard backdrop";
   - **not blind-read again since that change.**
-- **Rocks:** rimed rock; rim rocks use LOD per family.
+- **Rocks:** rimed rock; rim rocks use a fixed decimated mesh per rock family (not distance LOD).
 - **Racing line:** unchanged; W-056 holds.
 - **Blind read** during development, before the storm-wall change: 5/10. The drop was "inferred".
 
@@ -112,13 +112,18 @@ Work order: `../round-4/CONSOLIDATED.md`, plus the owner's round-5 brief (`OWNER
   - The round-4 note for the same frame was wrong in the same way.
   - The harness was corrected in `bbbef83`: shot 15 is now the set-up shot (14.45 s, Yeti required), and 15b is the turn.
 - **`whiteout/`: the re-run with the corrected harness.** Course WO-R1 (`SEED-3403625622-SPR@WHITE`), 1366×768.
+  - Shots 01–20 pass their checks. The Yeti is in frame in the set-up shot (15).
+  - **The run stopped by design at 21 (victory beat 2, welcome, 5.2 s): the skier is not in the frame.** The rescuers wave from the porch at someone off-screen.
+  - The round-4 frame is the same, and its note ("skier arriving") was wrong.
+  - This is reported as a finding against the game (the beat's staging), not fixed on this candidate.
+- **`whiteout_victory/`: the victory beats (20–26), captured with `LENIENT=1`** so that the beats after 21 exist. The manifest lists the failed checks.
 - **`strip_high/`:** hand-off strips for all three locations.
 - **`strip_low/`:** Alpine and Whiteout on Low.
 - **`strip_rcm/`:** Whiteout with Reduce Camera Motion.
 - **`rim_1366/` and `rim_1920/`:** gameplay-camera rim views. They include the closest approach to the lip.
 - **`a11y_reduce_weather/`, `a11y_ui150/` (1280×720) and `a11y_low/`.**
 - **`a11y_rcm_flash_run1_strict/`: the victory with Reduce Camera Motion and Reduce Flashes. It stopped at shot 21.**
-  - Under Reduce Camera Motion, beat 2 (welcome, 5.2 s) is a held view of the porch, and the skier is not in it.
+  - Beat 2 (welcome, 5.2 s) does not show the skier. The default-motion run shows the same, so Reduce Camera Motion is not the cause.
   - **This is a finding against the game, not the harness.** It is not fixed on this candidate.
   - `a11y_rcm_flash/` is the same run with `LENIENT=1`, so the remaining beats are captured. The manifest lists every failed check.
 
@@ -133,6 +138,6 @@ Work order: `../round-4/CONSOLIDATED.md`, plus the owner's round-5 brief (`OWNER
 - W-087 BLOCKED (above).
 - Hard Sprint is at or just above the owner's range for the progressive-tuck expert (79–83%).
 - The storm wall has not been blind-read since its change.
-- Under Reduce Camera Motion, the welcome beat does not show the skier.
+- The victory welcome beat (beat 2) does not show the skier, in default motion or with Reduce Camera Motion.
 - W-086 frame and compile targets (above).
 - No human playtest.
