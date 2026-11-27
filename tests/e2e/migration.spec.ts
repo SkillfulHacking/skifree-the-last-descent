@@ -119,7 +119,7 @@ test('a Pass 3 save (settings + per-course records, no progress key) loads uncha
   await expect(page.locator('.course-card .code')).toHaveText('SEED-3803621719-SPR-H');
   await expect(page.locator('.course-card .rec')).toContainText('Best 21,004 pts · 2:29.8');
   await expect(page.locator('.course-card .rec')).toContainText('5 runs');
-  await expect(page.locator('.menu-row', { hasText: 'Yeti' }).locator('.val')).toHaveText(/Hard/);
+  await expect(page.locator('.menu-row', { hasText: 'Difficulty' }).locator('.val')).toHaveText(/Hard/);
   await expect(page.locator('.menu-row', { hasText: 'Achievements' }).locator('.hint')).toHaveText('0 / 12');
   await focusRow(page, 'Achievements');
   await press(page, 'Enter');

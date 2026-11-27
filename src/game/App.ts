@@ -20,7 +20,7 @@ import { Hud } from '../ui/Hud';
 import { MenuSystem, type Screen, type MenuItem } from '../ui/Menu';
 import { applyRun, caveSeen, loadRecordBook, loadSettings, markCaveSeen, recordsFor, saveRecordBook, saveSettings, type RecordBook, type RunStats, type Settings, type Records } from '../core/settings';
 import type { QualityPreset } from '../core/types';
-import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, exampleCodes, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
+import { DIFFICULTY, difficultySummary, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, exampleCodes, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
 import { fmtDistance } from '../ui/Hud';
 import { DEFAULT_BIOME, getBiome, hasBiome, listBiomes, type BiomeId } from '../world/biome';
 import { capabilitiesOf } from '../world/capabilities';
@@ -471,7 +471,10 @@ export class App {
     ];
     items.push({
       kind: 'select',
-      label: 'Yeti',
+      // (round 6, owner ruling 1) "Difficulty", with what it changes here (not "Yeti": on some mountains
+      // the pursuit pace barely differs, and the difference is the weather)
+      label: 'Difficulty',
+      note: difficultySummary(st.difficulty, st.biome ?? DEFAULT_BIOME),
       options: (Object.keys(DIFFICULTY) as Difficulty[]).map((d) => ({ value: d, label: DIFFICULTY[d].label })),
       get: () => st.difficulty,
       set: (v) => {

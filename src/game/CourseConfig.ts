@@ -16,6 +16,7 @@
  */
 import { Mountain, SEED_DEFAULT } from '../world/course';
 import { DEFAULT_BIOME, biomeByCode, getBiome, hasBiome, listBiomes, type BiomeId } from '../world/biome';
+import { capabilitiesOf } from '../world/capabilities';
 
 export type CourseMode = 'classic' | 'daily' | 'custom';
 export type LengthMode = 'sprint' | 'standard' | 'endurance' | 'expedition' | 'endless';
@@ -276,4 +277,28 @@ export function buildMountain(c: CourseConfig): Mountain {
   const biome = getBiome(c.biome);
   if (usesClassicLayout(c)) return Mountain.classic(worldSeed(c), biome);
   return Mountain.generated(worldSeed(c), LENGTH_INFO[c.length].metres, biome);
+}
+
+/**
+ * (Round 6, owner ruling 1) What a difficulty actually changes on a location, worded for the menu, from
+ * the live configuration — so the label never claims a difference the game does not make:
+ *  - the Yeti's pace against Normal's on that location (only named when it differs by 3 % or more);
+ *  - the location's hazards (strength against Normal, and a build-up over long courses);
+ *  - Hard's snowballs.
+ */
+export function difficultySummary(d: Difficulty, biome: BiomeId): string {
+  if (d === 'normal') return 'The standard pursuit and weather for this mountain';
+  const parts: string[] = [];
+  const caps = capabilitiesOf(getBiome(biome)) as { hazards?: { intensity?: Partial<Record<Difficulty, number>>; builds?: { amount: Partial<Record<Difficulty, number>> } } };
+  const hz = caps.hazards;
+  const hi = hz?.intensity?.[d];
+  const hn = hz?.intensity?.normal;
+  if (hi !== undefined && hn !== undefined && hn > 0 && Math.abs(hi / hn - 1) >= 0.05) parts.push(hi > hn ? `${Math.round((hi / hn - 1) * 100)}% stronger hazards` : `${Math.round((1 - hi / hn) * 100)}% gentler hazards`);
+  if (hz?.builds?.amount[d]) parts.push('storms build over long courses');
+  if (d === 'hard') parts.push('the Yeti throws snowballs');
+  const pace = yetiSpeedFor(d, biome) / yetiSpeedFor('normal', biome);
+  if (Math.abs(pace - 1) >= 0.03) parts.push(pace > 1 ? `a ${Math.round((pace - 1) * 100)}% faster Yeti` : `a ${Math.round((1 - pace) * 100)}% slower Yeti`);
+  else parts.push('the Yeti at about Normal pace');
+  const s = parts.join(' · ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
