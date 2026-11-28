@@ -18,3 +18,22 @@ describe('W-103 Whiteout scenery accessibility', () => {
     expect(s).toMatch(/vm\.uniforms\.uK!\.value = \([^;]*\) \* weatherFx\.scale;/);
   });
 });
+
+describe('RUN. below the rear-view inset (round 6, W-103)', () => {
+  it('Hud.fitRun takes the inset box from the shared layout, not the DOM', async () => {
+    const { rearInsetRect } = await import('../../src/ui/scale');
+    const r = rearInsetRect(1280, 1.5);
+    expect(r.top + r.h).toBe(117 + 160);
+    const src = ((await import('node:fs' as string)) as { readFileSync(p: string, e: string): string }).readFileSync('src/ui/Hud.ts', 'utf8');
+    expect(src).toMatch(/const r = rearInsetRect\(innerWidth, scale\)/);
+    expect(src).not.toMatch(/querySelector\('\.rear-view'\)/);
+  });
+});
+
+describe('RUN. shrink wins over the stylesheet (round 6, W-103)', () => {
+  it('the fitted font size is set !important, like the stylesheet rule it overrides', async () => {
+    const fs = (await import('node:fs' as string)) as { readFileSync(p: string, e: string): string };
+    expect(fs.readFileSync('src/ui/styles.css', 'utf8')).toMatch(/\.hud-center\.run \{[^}]*font-size:[^;]*!important/);
+    expect(fs.readFileSync('src/ui/Hud.ts', 'utf8')).toMatch(/setProperty\('font-size', `\$\{fit\}px`, 'important'\)/);
+  });
+});

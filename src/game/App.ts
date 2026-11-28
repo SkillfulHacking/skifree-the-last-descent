@@ -9,7 +9,7 @@ import { weatherFx, WEATHER_FX_REDUCED } from '../world/look/weatherFx';
 import { atmosphere } from '../world/look/atmosphere';
 import { World } from './World';
 import { GameSession } from './GameSession';
-import { autoUiScale } from '../ui/scale';
+import { autoUiScale, rearInsetRect } from '../ui/scale';
 import { SkierModel } from '../player/SkierModel';
 import { YetiModel } from '../yeti/YetiModel';
 import { AudioEngine } from '../audio/AudioEngine';
@@ -948,10 +948,7 @@ export class App {
     const H = innerHeight;
     // (round 4b, E r4: the window and its label scale with the UI, like the HUD around it)
     const ui = this.settings.uiScale * autoUiScale(W, H);
-    const w = Math.round(Math.min(420 * ui, W * 0.3));
-    const h = Math.round(w / 2.4);
-    const x = Math.round((W - w) / 2);
-    const top = Math.round(78 * ui);
+    const { x, top, w, h } = rearInsetRect(W, ui);
     this.rearFrame.style.cssText = `left:${x}px;top:${top}px;width:${w}px;height:${h}px;opacity:${k}`;
     this.rearCam.position.copy(this.rearPose.pos);
     this.rearCam.lookAt(this.rearPose.look);

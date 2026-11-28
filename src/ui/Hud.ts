@@ -1,5 +1,6 @@
 /** In-game HUD (DOM overlay): speed, distance, score, airtime, Yeti proximity, prompts, cinematics. */
 import { glyph, type Action, type Device } from '../input/Input';
+import { rearInsetRect } from './scale';
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, parent?: HTMLElement, html?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -210,8 +211,11 @@ export class Hud {
     el.style.removeProperty('top');
     el.style.removeProperty('right');
     const scale = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--ui-scale')) || 1;
-    const inset = document.querySelector('.rear-view') as HTMLElement | null;
-    const ib = inset && inset.offsetParent !== null ? inset.getBoundingClientRect().bottom : 0;
+    // (round 6, W-103) the inset's box from the same layout App gives it (borders 2 px): on the hand-off's
+    // first frame the DOM element still has its pre-chase box. The space is kept whether or not the
+    // glance is on, so RUN. sits in one place for every player
+    const r = rearInsetRect(innerWidth, scale);
+    const ib = r.top + r.h + 4;
     const top = Math.max(ib + 8, innerHeight * 0.12);
     const natural = el.getBoundingClientRect().height; // line-height 1: the glyph box, zoomed
     const room = headY - 14 - top;
@@ -220,7 +224,8 @@ export class Hud {
     const fs = Number.parseFloat(getComputedStyle(el).fontSize) || 96;
     const fit = fs * (room / natural);
     if (fit * scale >= 44) {
-      el.style.fontSize = `${fit}px`;
+      // (the stylesheet's RUN. size is !important: the fitted size must be too)
+      el.style.setProperty('font-size', `${fit}px`, 'important');
       return;
     }
     // too little room above the skier: beside him instead, at full size
