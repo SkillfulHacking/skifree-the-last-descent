@@ -333,7 +333,7 @@ export class YetiModel {
     const g = this.ground;
     g.debug = this.debugOn;
     // standing still the yeti keeps a staggered stance rather than shuffling its feet into the authored one
-    g.stepThreshold = curGait ? 0.15 : mode === 'grab' || mode === 'disgust' || mode === 'gag' ? 0.2 : 0.42;
+    g.stepThreshold = curGait ? 0.15 : mode === 'grab' || mode === 'disgust' || mode === 'gag' || mode === 'recoil' ? 0.2 : 0.42;
     g.prepare(out, M, dt, snap, this.rebaseLocks);
     this.rebaseLocks = false;
     sv.applyFK(out);
@@ -427,6 +427,11 @@ export class YetiModel {
 
   setEyeGlow(v: number): void {
     this.eyeGlow.value = THREE.MathUtils.clamp(v, 0, 1);
+  }
+
+  /** the current light factor (as set: the uniform holds its square) and eye glow — tests, diagnostics */
+  get look(): { shade: number; eyeGlow: number } {
+    return { shade: Math.sqrt(this.shade.value), eyeGlow: this.eyeGlow.value };
   }
 
   setVisible(v: boolean): void {

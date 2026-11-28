@@ -1,0 +1,14 @@
+SHA 729e22655eb3f26eb1c52e81a0e8b4534c758023
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 2 tests using 1 worker
+
+[1/2] tests/e2e/migration.spec.ts:103:1 › a Pass 3 save (settings + per-course records, no progress key) loads unchanged in the pass-4 build and stays playable
+[2/2] tests/e2e/migration.spec.ts:189:1 › a v1 progress save migrates to v2 without ?debug: reward granted, unknown data kept, written back as v2
+  Slow test file: tests/e2e/migration.spec.ts (15.4m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  2 passed (15.4m)
+exit 0

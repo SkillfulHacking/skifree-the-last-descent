@@ -9,10 +9,11 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { focusRow, press } from './keyboard-menu';
+import { shotPath } from './shots';
 
 const KEY_S = 'skifree-tld.settings.v1';
 const KEY_P = 'skifree-tld.progress';
-const OUT = 'docs/reviews/pass4/release-verification';
+const OUT = shotPath('docs/reviews/pass4/release-verification');
 const T0 = Date.parse('2026-11-08T17:30:00Z');
 
 const SETTINGS = { quality: 'low', course: 'classic', courseLength: 'sprint', showTutorial: false };
@@ -49,10 +50,13 @@ test('all 12 achievements display at 1366x768, 1920x1080 and 2560x1440', async (
   await expect(page.locator('.ach-card')).toHaveCount(12);
   await expect(page.locator('.ach-card.earned')).toHaveCount(3);
   await expect(page.locator('.ach-card.secret .ach-name')).toHaveText('???');
-  // (Fjord Coast build: Scenic Route is earnable — only the three achievements of the locations still to come wait)
-  await expect(page.locator('.ach-card.future')).toHaveCount(3);
-  await expect(page.locator('.ach-card.future[data-id="scenic-route"]')).toHaveCount(0);
-  for (const id of ['whiteout-survivor', 'ice-dancer', 'steam-runner']) await expect(page.locator(`.ach-card.future[data-id="${id}"] .ach-req`)).toContainText('coming soon');
+  // (Fjord Coast and Whiteout Ridge ship: only the two achievements of the locations still to come wait — W-050)
+  await expect(page.locator('.ach-card.future')).toHaveCount(2);
+  for (const id of ['scenic-route', 'whiteout-survivor']) {
+    await expect(page.locator(`.ach-card.future[data-id="${id}"]`)).toHaveCount(0);
+    await expect(page.locator(`.ach-card[data-id="${id}"]`)).not.toContainText('coming soon');
+  }
+  for (const id of ['ice-dancer', 'steam-runner']) await expect(page.locator(`.ach-card.future[data-id="${id}"] .ach-req`)).toContainText('coming soon');
   await expect(page.locator('.ach-card[data-id="pizza-party"] .ach-count')).toHaveText('990 / 1,000 m');
   await expect(page.locator('.menu-subtitle')).toContainText('3 / 12 earned');
   for (const [w, h] of [

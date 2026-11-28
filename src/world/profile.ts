@@ -337,7 +337,11 @@ export class ClassicProfile implements CourseProfile {
   private cliffs: CliffBand[] = [];
   private enc: Encounter[];
 
-  constructor(readonly seed: number) {
+  constructor(
+    readonly seed: number,
+    /** (W-077) the location's fixed Yeti pace (ProfileKnobs.encounterPace) */
+    private pace = 1,
+  ) {
     this.slope.anchorZero(0);
     const rng = new Rng(seed ^ 0x51f15e);
     const tk = this.tutorialEndZ - 45; // the tutorial kicker, just before the tutorial ends
@@ -379,7 +383,7 @@ export class ClassicProfile implements CourseProfile {
         anchor: { z: caveZ, centerX: this.centerX(caveZ), side: 1, d: CAVE_D },
         chaseEndZ: this.finishZ,
         checkpointZ: null,
-        speedMul: 1,
+        speedMul: this.pace,
       },
     ];
   }
@@ -524,6 +528,13 @@ export interface ProfileKnobs {
    * to jump from a take-off kicker halfway along. Omit for none (original courses).
    */
   spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
+  /**
+   * (W-077) The location's fixed Yeti pace: every encounter's speedMul is multiplied by it when the
+   * encounter is created (deterministic, the same for every chase; no dependence on the gap). Default 1.
+   * Alpine 1.10: its steep runs let a competent skier outrun the shipped pace, so mistakes cost nothing
+   * (balance/w077/).
+   */
+  encounterPace?: number;
   /** slope (degrees) of the run-in at the start gate (default 6): steeper = no stall on a bump */
   startSlope?: number;
   /**
@@ -703,7 +714,9 @@ export class GeneratedProfile implements CourseProfile {
       anchor: { z: caveZ, centerX: 0, side: this.knobs.caveSide ?? 1, d: CAVE_D }, // centerX resolved once the keys exist
       chaseEndZ: chaseEnd,
       checkpointZ,
-      speedMul,
+      // (W-077) the location's pace: it scales the course's own encounters (≤ 1, the eased early legs
+      // included); Endless's escalation above 1 keeps its shipped schedule, with the pace as its floor
+      speedMul: speedMul <= 1 ? speedMul * (this.knobs.encounterPace ?? 1) : Math.max(speedMul, this.knobs.encounterPace ?? 1),
     });
   }
 

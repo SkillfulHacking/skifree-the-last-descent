@@ -1,0 +1,100 @@
+SHA 729e22655eb3f26eb1c52e81a0e8b4534c758023
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 6 tests using 1 worker
+
+[1/6] tests/e2e/cave_skip.spec.ts:163:3 › alpine, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+tests/e2e/cave_skip.spec.ts:163:3 › alpine, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[cave_skip] alpine, normal first frame along the run 1.000 (world dir.z 0.914)
+
+[cave_skip] alpine, normal lowest alignment with the run over 2 s 0.996
+
+[cave_skip] alpine, normal Escape at 1 s: lowest alignment with the run 0.996
+
+[cave_skip] alpine, normal controller Start at 9 s: lowest alignment with the run 0.996
+
+[cave_skip] alpine, normal Escape during the swing: lowest alignment with the run 0.996
+
+[cave_skip] alpine, normal controller Start just before the leap: lowest alignment with the run 0.996
+
+[cave_skip] alpine, normal released look-back alignment 0.975
+
+[cave_skip] alpine, normal pad B look-back -0.940, released 0.938
+
+[2/6] tests/e2e/cave_skip.spec.ts:163:3 › fjord, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+tests/e2e/cave_skip.spec.ts:163:3 › fjord, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[cave_skip] fjord, normal first frame along the run 1.000 (world dir.z 0.987)
+
+[cave_skip] fjord, normal lowest alignment with the run over 2 s 0.999
+
+[cave_skip] fjord, normal Escape at 1 s: lowest alignment with the run 0.999
+
+[cave_skip] fjord, normal controller Start at 9 s: lowest alignment with the run 0.999
+
+[cave_skip] fjord, normal Escape during the swing: lowest alignment with the run 0.999
+
+[cave_skip] fjord, normal controller Start just before the leap: lowest alignment with the run 0.999
+
+[3/6] tests/e2e/cave_skip.spec.ts:163:3 › whiteout, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+tests/e2e/cave_skip.spec.ts:163:3 › whiteout, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[cave_skip] whiteout, normal first frame along the run 0.998 (world dir.z 0.973)
+
+[cave_skip] whiteout, normal lowest alignment with the run over 2 s 0.997
+
+[cave_skip] whiteout, normal Escape at 1 s: lowest alignment with the run 0.997
+
+[cave_skip] whiteout, normal controller Start at 9 s: lowest alignment with the run 0.997
+
+[cave_skip] whiteout, normal Escape during the swing: lowest alignment with the run 0.997
+
+[cave_skip] whiteout, normal controller Start just before the leap: lowest alignment with the run 0.997
+
+[4/6] tests/e2e/cave_skip.spec.ts:163:3 › alpine, normal, slow arrival: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+tests/e2e/cave_skip.spec.ts:163:3 › alpine, normal, slow arrival: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[cave_skip] alpine, normal, slow arrival first frame along the run 1.000 (world dir.z 0.911)
+
+[cave_skip] alpine, normal, slow arrival lowest alignment with the run over 2 s 0.999
+
+[cave_skip] alpine, normal, slow arrival Escape at 1 s: lowest alignment with the run 0.999
+
+[cave_skip] alpine, normal, slow arrival controller Start at 9 s: lowest alignment with the run 0.999
+
+[cave_skip] alpine, normal, slow arrival Escape during the swing: lowest alignment with the run 0.999
+
+[cave_skip] alpine, normal, slow arrival controller Start just before the leap: lowest alignment with the run 0.999
+
+[5/6] tests/e2e/cave_skip.spec.ts:163:3 › whiteout, hard: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+tests/e2e/cave_skip.spec.ts:163:3 › whiteout, hard: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[cave_skip] whiteout, hard first frame along the run 0.998 (world dir.z 0.972)
+
+[cave_skip] whiteout, hard lowest alignment with the run over 2 s 0.996
+
+[cave_skip] whiteout, hard Escape at 1 s: lowest alignment with the run 0.996
+
+[cave_skip] whiteout, hard controller Start at 9 s: lowest alignment with the run 0.996
+
+[cave_skip] whiteout, hard Escape during the swing: lowest alignment with the run 0.996
+
+[cave_skip] whiteout, hard controller Start just before the leap: lowest alignment with the run 0.996
+
+[6/6] tests/e2e/cave_skip.spec.ts:163:3 › fjord, hard, Reduce Camera Motion: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+tests/e2e/cave_skip.spec.ts:163:3 › fjord, hard, Reduce Camera Motion: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera
+[cave_skip] fjord, hard, Reduce Camera Motion first frame along the run 1.000 (world dir.z 0.987)
+
+[cave_skip] fjord, hard, Reduce Camera Motion lowest alignment with the run over 2 s 0.999
+
+[cave_skip] fjord, hard, Reduce Camera Motion Escape at 1 s: lowest alignment with the run 0.999
+
+[cave_skip] fjord, hard, Reduce Camera Motion controller Start at 9 s: lowest alignment with the run 0.999
+
+[cave_skip] fjord, hard, Reduce Camera Motion Escape during the swing: lowest alignment with the run 0.999
+
+[cave_skip] fjord, hard, Reduce Camera Motion controller Start just before the leap: lowest alignment with the run 0.999
+
+  Slow test file: tests/e2e/cave_skip.spec.ts (1.0h)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  6 passed (1.0h)
+exit 0

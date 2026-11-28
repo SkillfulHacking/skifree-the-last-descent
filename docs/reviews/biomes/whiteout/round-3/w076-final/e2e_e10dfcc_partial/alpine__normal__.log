@@ -1,0 +1,9 @@
+case 'alpine, normal:' on e10dfcc (src identical at 09322b3) (dist built from e10dfcc (src identical at 09322b3))
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 1 test using 1 worker
+
+[1/1] tests/e2e/cave_skip.spec.ts:149:3 › alpine, normal: watching the cave cinematic or skipping it (Escape, controller Start) starts the same chase on the same forward camera

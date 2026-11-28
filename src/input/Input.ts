@@ -107,6 +107,12 @@ export class Input {
   private pressedQ = new Set<string>();
   private padPrev: boolean[] = [];
   private padNow: boolean[] = [];
+  /**
+   * pad presses already read this poll (round 3, W-076 review E F1): a Start press that closed the
+   * pause menu was read again by the gameplay in the same frame — resume, then pause or skip at
+   * once. Keyboard presses were already consumed (pressedQ is cleared by the reader).
+   */
+  private padUsed = new Set<number>();
   private steerKb = 0;
   private mouseDX = 0;
   private mouseDY = 0;
@@ -209,6 +215,7 @@ export class Input {
     }
     this.padPrev = this.padNow;
     this.padNow = [];
+    this.padUsed.clear();
     if (!this.pad) {
       this.padConnected = false;
       return;
@@ -225,7 +232,7 @@ export class Input {
   }
 
   private padPressed(i: number): boolean {
-    return !!this.padNow[i] && !this.padPrev[i];
+    return !!this.padNow[i] && !this.padPrev[i] && !this.padUsed.has(i);
   }
 
   /** Read gameplay input. dt drives keyboard steering ramp (keyboard acts as a quick analog). */
@@ -240,7 +247,9 @@ export class Input {
     let tuck = this.key('tuck') ? 1 : 0;
     let brake = this.key('brake') ? 1 : 0;
     let drift = this.key('drift');
-    let pop = this.key('pop');
+    // (round 5, review E4-8) a tap of the pop key shorter than one frame (slow frames) still counts as
+    // held for that frame, as recover does: one hop / one intro skip
+    let pop = this.key('pop') || this.keyPressed('pop');
     let recoverPressed = this.keyPressed('recover');
     let recoverHeld = this.key('recover');
     let lookBack = this.key('lookback');
@@ -270,6 +279,7 @@ export class Input {
       lookBack = lookBack || !!this.padNow[PAD.B];
       pausePressed = pausePressed || this.padPressed(PAD.START);
       skipPressed = skipPressed || this.padPressed(PAD.START);
+      this.padUsed.add(PAD.Y).add(PAD.START);
       camX += rx * dt * 2.2 * s.cameraSensitivity;
       camY += ry * dt * 1.6 * s.cameraSensitivity;
     }
@@ -300,6 +310,7 @@ export class Input {
       for (const b of [PAD.UP, PAD.DOWN, PAD.LEFT, PAD.RIGHT]) this.padPressed(b);
       m.confirm ||= this.padPressed(PAD.A);
       m.back ||= this.padPressed(PAD.B) || this.padPressed(PAD.START);
+      for (const b of [PAD.A, PAD.B, PAD.START, PAD.UP, PAD.DOWN, PAD.LEFT, PAD.RIGHT]) this.padUsed.add(b);
       const held = (b: number) => !!p.buttons[b] && (p.buttons[b]!.pressed || p.buttons[b]!.value > 0.5);
       const ay = held(PAD.UP) ? -1 : held(PAD.DOWN) ? 1 : (p.axes[1] ?? 0);
       const ax = held(PAD.LEFT) ? -1 : held(PAD.RIGHT) ? 1 : (p.axes[0] ?? 0);

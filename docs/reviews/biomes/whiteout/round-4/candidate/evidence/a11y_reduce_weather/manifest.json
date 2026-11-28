@@ -1,0 +1,297 @@
+{
+  "biome": "whiteout",
+  "seed": "WO-R1",
+  "length": "sprint",
+  "viewport": "1366x768",
+  "sha": "0787168",
+  "settingsOverride": {
+    "reduceWeather": true
+  },
+  "renderer": "SwiftShader (software)",
+  "date": "2026-11-25T01:39:10.891Z",
+  "shots": [
+    {
+      "name": "01_clear_window",
+      "note": "Third-person, clear window (start): broken cloud deck, cloud shadows on the snow, the ridge in sun",
+      "course": "SEED-3403625622-SPR@WHITE",
+      "yeti": {
+        "distance": 263.9,
+        "phase": "chase",
+        "drawn": true,
+        "inMainView": false,
+        "heightPx": 0
+      },
+      "camera": {
+        "pos": [
+          0.7041899269823118,
+          -88.74174445851317,
+          418.5802431934071
+        ],
+        "fov": 67.89958496903522,
+        "dir": [
+          0.03353606831599274,
+          -0.2786860558759128,
+          0.9597965484321314
+        ]
+      },
+      "phase": "chase",
+      "z": 425.27493100947663,
+      "time": 9.499999999999915,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 12.500000000000085,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "02_wall_far",
+      "note": "Third-person, 24 s before a front: the storm wall on the windward horizon",
+      "course": "SEED-3403625622-SPR@WHITE",
+      "yeti": {
+        "distance": 265.3,
+        "phase": "chase",
+        "drawn": true,
+        "inMainView": false,
+        "heightPx": 0
+      },
+      "camera": {
+        "pos": [
+          27.474000727758725,
+          -168.5065179983247,
+          614.7132578895362
+        ],
+        "fov": 66.4760862543053,
+        "dir": [
+          0.12383253514532933,
+          -0.34780246215520716,
+          0.9293540501650901
+        ]
+      },
+      "phase": "chase",
+      "z": 621.1240080985025,
+      "time": -0.5000000000000053,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 22,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "03_wall_near",
+      "note": "9 s before the front: the wall crossing the ridges, the deck thickening and lowering, spindrift rising",
+      "course": "SEED-3403625622-SPR@WHITE",
+      "yeti": {
+        "distance": 260.1,
+        "phase": "chase",
+        "drawn": true,
+        "inMainView": false,
+        "heightPx": 0
+      },
+      "camera": {
+        "pos": [
+          35.132464106391545,
+          -197.42477571777096,
+          677.8199943891314
+        ],
+        "fov": 67.82014693222824,
+        "dir": [
+          0.11375934319903028,
+          -0.30738876019471356,
+          0.9447597376798411
+        ]
+      },
+      "phase": "chase",
+      "z": 684.4668485048588,
+      "time": 14.499999999999915,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 7.500000000000085,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "04_build",
+      "note": "Building (5 s in): the wall over the course, wind and blowing snow up, light flattening",
+      "course": "SEED-3403625622-SPR@WHITE",
+      "yeti": {
+        "distance": 263.2,
+        "phase": "chase",
+        "drawn": true,
+        "inMainView": false,
+        "heightPx": 0
+      },
+      "camera": {
+        "pos": [
+          42.18916964697039,
+          -223.06551387788923,
+          737.9968790869875
+        ],
+        "fov": 67.0843302598777,
+        "dir": [
+          0.044156540859331246,
+          -0.2521543791658654,
+          0.9666790413404107
+        ]
+      },
+      "phase": "chase",
+      "z": 744.6251225328205,
+      "time": 28.499999999999915,
+      "front": {
+        "s": 0.8113854595335963,
+        "dir": 1,
+        "phase": "build",
+        "left": 2.5000000000000853,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "05_storm",
+      "note": "Storm (14 s in): visibility ~80 m, driving snow streaks, trail-marker lamps and rim wands the way through",
+      "course": "SEED-3403625622-SPR@WHITE",
+      "yeti": {
+        "distance": 261.4,
+        "phase": "chase",
+        "drawn": true,
+        "inMainView": false,
+        "heightPx": 0
+      },
+      "camera": {
+        "pos": [
+          45.84808416398364,
+          -254.28875926430925,
+          818.0821235610952
+        ],
+        "fov": 67.15877593924739,
+        "dir": [
+          -0.06195299098464699,
+          -0.2832427158230358,
+          0.957045135216332
+        ]
+      },
+      "phase": "chase",
+      "z": 824.7118360654283,
+      "time": 46.499999999999915,
+      "front": {
+        "s": 0.8177933192313022,
+        "dir": 1,
+        "phase": "storm",
+        "left": 32.077723168768074,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "06_easing",
+      "note": "Easing (5 s in): the trailing edge tearing open",
+      "course": "SEED-3403625622-SPR@WHITE",
+      "yeti": {
+        "distance": 256.8,
+        "phase": "chase",
+        "drawn": true,
+        "inMainView": false,
+        "heightPx": 0
+      },
+      "camera": {
+        "pos": [
+          40.6420925786503,
+          -284.10162107231076,
+          898.5556368434147
+        ],
+        "fov": 67.11240061495813,
+        "dir": [
+          -0.05288694246933424,
+          -0.2398439205076394,
+          0.9693698288639743
+        ]
+      },
+      "phase": "chase",
+      "z": 905.1914610631306,
+      "time": 85.2500000000012,
+      "front": {
+        "s": 0.0734906661822956,
+        "dir": 1,
+        "phase": "ease",
+        "left": 1.327723168766795,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "07_clearing",
+      "note": "Clearing (~2 s after the storm): sun back through the gaps, cloud shadows breaking up over the ridge",
+      "course": "SEED-3403625622-SPR@WHITE",
+      "yeti": {
+        "distance": 254.6,
+        "phase": "chase",
+        "drawn": true,
+        "inMainView": false,
+        "heightPx": 0
+      },
+      "camera": {
+        "pos": [
+          37.00626315528437,
+          -298.03564313379746,
+          938.1761391937572
+        ],
+        "fov": 67.25805497246591,
+        "dir": [
+          -0.06478448493533982,
+          -0.24862138063213868,
+          0.9664317770045809
+        ]
+      },
+      "phase": "chase",
+      "z": 944.8115737716945,
+      "time": 94.2500000000012,
+      "front": {
+        "s": 0,
+        "dir": -1,
+        "phase": "clear",
+        "left": 31.34218455571562,
+        "k": 1
+      },
+      "cinematicTime": -1
+    }
+  ],
+  "errors": [],
+  "courseId": "SEED-3403625622-SPR@WHITE",
+  "runs": [
+    {
+      "difficulty": "normal",
+      "requestedSeed": "WO-R1",
+      "courseId": "SEED-3403625622-SPR@WHITE",
+      "builtWorldId": "SEED-3403625622-SPR@WHITE",
+      "seed": 3403625622,
+      "verified": true
+    }
+  ],
+  "course": {
+    "L": 3000,
+    "cave": {
+      "index": 0,
+      "caveZ": 260,
+      "triggerZ": 282,
+      "foreshadowZ": 180,
+      "anchor": {
+        "z": 260,
+        "centerX": 6.185433809964871,
+        "side": -1,
+        "d": 46
+      },
+      "chaseEndZ": 3000,
+      "checkpointZ": null,
+      "speedMul": 1
+    },
+    "rimSide": 1
+  }
+}

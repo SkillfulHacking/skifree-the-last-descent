@@ -1,10 +1,15 @@
 /**
  * Application shell: renderer, loading, menus, settings, run lifecycle, perf overlay, debug harness.
  */
+import { applyWhiteoutProto } from '../world/biomes/whiteout/protos';
+import { PlaytestLog } from './playtestLog';
+import { A11Y } from '../core/a11y';
 import * as THREE from 'three';
+import { weatherFx, WEATHER_FX_REDUCED } from '../world/look/weatherFx';
+import { atmosphere } from '../world/look/atmosphere';
 import { World } from './World';
 import { GameSession } from './GameSession';
-import { autoUiScale } from '../ui/scale';
+import { autoUiScale, rearInsetRect } from '../ui/scale';
 import { SkierModel } from '../player/SkierModel';
 import { YetiModel } from '../yeti/YetiModel';
 import { AudioEngine } from '../audio/AudioEngine';
@@ -13,11 +18,11 @@ import { Input, ACTION_LABELS, keyName, type Action, DEFAULT_BINDINGS, type Game
 const NEUTRAL_INPUT: GameplayInput = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recoverPressed: false, recoverHeld: false, lookBack: false, pausePressed: false, skipPressed: false, camX: 0, camY: 0 };
 import { Hud } from '../ui/Hud';
 import { MenuSystem, type Screen, type MenuItem } from '../ui/Menu';
-import { applyRun, loadRecordBook, loadSettings, recordsFor, saveRecordBook, saveSettings, type RecordBook, type RunStats, type Settings, type Records } from '../core/settings';
+import { applyRun, caveSeen, loadRecordBook, loadSettings, markCaveSeen, recordsFor, saveRecordBook, saveSettings, type RecordBook, type RunStats, type Settings, type Records } from '../core/settings';
 import type { QualityPreset } from '../core/types';
-import { DIFFICULTY, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, exampleCodes, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
+import { DIFFICULTY, difficultySummary, LENGTH_INFO, LENGTH_MODES, type Difficulty, addDays, courseId, courseLabel, exampleCodes, makeCourse, msUntilRollover, parseCourseId, utcDate, type CourseConfig, type CourseMode, type LengthMode } from './CourseConfig';
 import { fmtDistance } from '../ui/Hud';
-import { getBiome, hasBiome, listBiomes } from '../world/biome';
+import { DEFAULT_BIOME, getBiome, hasBiome, listBiomes, type BiomeId } from '../world/biome';
 import { capabilitiesOf } from '../world/capabilities';
 import { getHazardKind, hazardPhase } from '../world/hazards/hazard';
 import { locationNoteHtml, locationOptionLabel } from '../ui/location';
@@ -29,6 +34,25 @@ import { COSMETIC_CATEGORY_LABEL, equip, getCosmetic, grantRewards, lockerItems,
 import { AchievementToast, achievementsGrid, achievementsSummary } from '../ui/achievementsView';
 
 type Mode = 'loading' | 'menu' | 'playing' | 'paused' | 'results';
+
+/** (Round 5, W-082) the rear-view inset's share of the storm fog */
+export const REAR_INSET_FOG = 0.45;
+/** the Yeti's share of the inset height the telephoto glance frames for */
+export const REAR_INSET_FILL = 0.32;
+/** the inset's field of view (deg) for the Yeti `d` m away: about REAR_INSET_FILL of the height, 9°–48° */
+/** (round 6, W-103) the inset lenses under Reduce Camera Motion: hold `held` until `want` is 35 % away, then cut */
+export const HELD_INSET_FOVS = [48, 30, 18, 11] as const;
+export function heldInsetFov(held: number, want: number): number {
+  if (HELD_INSET_FOVS.includes(held as (typeof HELD_INSET_FOVS)[number]) && Math.abs(Math.log(want / held)) < Math.log(1.35)) return held;
+  let best: number = HELD_INSET_FOVS[0];
+  for (const f of HELD_INSET_FOVS) if (Math.abs(Math.log(want / f)) < Math.abs(Math.log(want / best))) best = f;
+  return best;
+}
+
+export function rearInsetFov(d: number): number {
+  const f = (2 * Math.atan(2.6 / (REAR_INSET_FILL * 2 * Math.max(1, d))) * 180) / Math.PI;
+  return Math.min(48, Math.max(9, f));
+}
 
 export class App {
   readonly renderer: THREE.WebGLRenderer;
@@ -61,6 +85,10 @@ export class App {
   // --- progression (achievements; see docs/PROGRESSION.md) ---
   /** automated test harness (?debug): runs never persist progress */
   readonly debugHarness = typeof location !== 'undefined' && new URLSearchParams(location.search).has('debug');
+  /** (round 6, owner ruling 3) the consented playtest log: only with ?playtest (see playtestLog.ts) */
+  readonly playtest = typeof location !== 'undefined' && new URLSearchParams(location.search).has('playtest') ? new PlaytestLog() : null;
+  private detachPlaytest: (() => void) | null = null;
+  private rearFovHeld = 48;
   progress!: ProgressTracker;
   private progressNote: string | null = null;
   private toast!: AchievementToast;
@@ -71,6 +99,9 @@ export class App {
     this.book = loadRecordBook();
     this.renderer = new THREE.WebGLRenderer({ antialias: this.settings.quality !== 'low', powerPreference: 'high-performance', stencil: false });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // (round 4, W-086 / review D3-3) no synchronous shader status query per program in production
+    // (getProgramInfoLog after each link: 80 ms stalls in a profile); dev and tests keep the checks
+    if (import.meta.env.PROD) this.renderer.debug.checkShaderErrors = false;
     this.renderer.toneMapping = THREE.AgXToneMapping;
     this.renderer.toneMappingExposure = 0.78;
     this.renderer.shadowMap.enabled = true;
@@ -96,6 +127,8 @@ export class App {
     this.hud = new Hud(this.ui, this.settings.bindings);
     this.applyUiScale();
     this.hud.reduceFlashes = this.settings.reduceFlashes;
+    A11Y.reduceFlashes = this.settings.reduceFlashes;
+    weatherFx.scale = this.settings.reduceWeather ? WEATHER_FX_REDUCED : 1;
     this.hud.showFps(this.settings.showFps);
     this.menu = new MenuSystem(this.ui);
     this.initProgress();
@@ -154,6 +187,8 @@ export class App {
     this.input.settings = this.inputSettings();
     this.hud.bindings = this.settings.bindings;
     this.hud.reduceFlashes = this.settings.reduceFlashes;
+    A11Y.reduceFlashes = this.settings.reduceFlashes;
+    weatherFx.scale = this.settings.reduceWeather ? WEATHER_FX_REDUCED : 1;
     this.hud.showFps(this.settings.showFps);
     this.hud.captionsOn = this.settings.captions;
     if (this.session) {
@@ -164,9 +199,13 @@ export class App {
   }
 
   async start() {
+    // (round 6, art prototypes) ?debug&proto=A|B|C: a Whiteout art-direction prototype (debug harness only)
+    const proto = this.debugHarness ? new URLSearchParams(location.search).get('proto') : null;
+    if (proto === 'A' || proto === 'B' || proto === 'C') applyWhiteoutProto(proto);
     await this.buildWorld(this.settings.quality, this.currentCourse());
     this.loop();
     if (new URLSearchParams(location.search).has('debug')) this.installDebug();
+    if (this.playtest) this.installPlaytest();
     this.toMenu();
     (window as unknown as { __ready: boolean }).__ready = true;
   }
@@ -233,6 +272,7 @@ export class App {
     this.skier.root.position.set(x, this.world.mountain.heightAt(x, 1), 1);
     this.skier.root.rotation.set(0, 0, 0);
     this.skier.setVisible(true);
+    this.skier.setPoleVisible(1, true);
   }
 
   // --- progression ---------------------------------------------------------------
@@ -298,14 +338,40 @@ export class App {
   }
 
   /** Start evaluating achievements for the session's events (persist policy: a real, unassisted run). */
+  /** the playtest log's visible tag and the facilitator's download (Ctrl+Shift+L) */
+  private installPlaytest() {
+    const log = this.playtest!;
+    void fetch('build-info.json').then((r) => (r.ok ? r.json() : null)).then((b) => b && Object.assign(log.build, b)).catch(() => undefined);
+    const tag = document.createElement('div');
+    tag.className = 'playtest-tag';
+    tag.textContent = 'Playtest log on';
+    document.body.appendChild(tag);
+    addEventListener('keydown', (e) => {
+      if (!(e.ctrlKey && e.shiftKey && e.code === 'KeyL')) return;
+      e.preventDefault();
+      const url = URL.createObjectURL(new Blob([JSON.stringify(log.toJSON())], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `playtest_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+  }
+
   private trackSession(s: GameSession) {
     this.untrackSession();
     this.detachProgress = this.progress.attach(s.events, () => !this.debugHarness && !s.debugUsed);
+    if (this.playtest && this.world) {
+      this.detachPlaytest = this.playtest.attach(s.events);
+      this.playtest.runStarted(this.world.id, this.settings as unknown as Record<string, unknown>);
+    }
   }
 
   private untrackSession() {
     this.detachProgress?.();
     this.detachProgress = null;
+    this.detachPlaytest?.();
+    this.detachPlaytest = null;
   }
 
   private achievementsScreen(): Screen {
@@ -405,7 +471,10 @@ export class App {
     ];
     items.push({
       kind: 'select',
-      label: 'Yeti',
+      // (round 6, owner ruling 1) "Difficulty", with what it changes here (not "Yeti": on some mountains
+      // the pursuit pace barely differs, and the difference is the weather)
+      label: 'Difficulty',
+      note: difficultySummary(st.difficulty, st.biome ?? DEFAULT_BIOME),
       options: (Object.keys(DIFFICULTY) as Difficulty[]).map((d) => ({ value: d, label: DIFFICULTY[d].label })),
       get: () => st.difficulty,
       set: (v) => {
@@ -514,15 +583,22 @@ export class App {
     this.trackSession(this.session);
     // compile what the session brings (Hard: the snowball glint sprite) now, not at the first throw
     for (const o of this.session.warmupObjects) this.renderer.compile(o, this.camera, this.world.scene);
-    this.session.recordsSeenCave = this.book.seenCaveCinematic;
+    // (round 4, owner's decision B) each location keeps its own cave-cinematic history: the first
+    // complete viewing in this location can only be paused, never skipped, whatever was seen elsewhere
+    const biome = this.world.course.biome;
+    this.session.recordsSeenCave = caveSeen(this.book, biome);
     this.session.onCaveSeen = () => {
-      this.book.seenCaveCinematic = true;
+      if (caveSeen(this.book, biome)) return;
+      markCaveSeen(this.book, biome);
       saveRecordBook(this.book);
     };
     // the controls are taught once: after a run that showed the tutorial (or once every lesson is
     // done) it is switched off; Settings → Tutorial prompts turns it back on for another pass
     this.session.onTutorialDone = () => this.retireTutorial();
-    this.session.rumble = (a, b, ms) => this.input.rumble(a, b, ms);
+    // (W-088) the player can turn vibration off (Settings → Controller vibration)
+    this.session.rumble = (a, b, ms) => {
+      if (this.settings.vibration) this.input.rumble(a, b, ms);
+    };
     // the one-time pole push hint is remembered (no tutorial reset; Settings → Control hints)
     this.session.onPoleHint = () => saveSettings(this.settings);
     this.mode = 'playing';
@@ -648,8 +724,11 @@ export class App {
       { kind: 'slider', label: 'Effects', min: 0, max: 1, step: 0.05, get: () => s.sfxVolume, set: (v) => ((s.sfxVolume = v), changed()), fmt: pct },
       { kind: 'info', html: '<h3>Camera & accessibility</h3>' },
       { kind: 'slider', label: 'Camera shake', min: 0, max: 1, step: 0.1, get: () => s.cameraShake, set: (v) => ((s.cameraShake = v), changed()), fmt: pct },
-      { kind: 'toggle', label: 'Reduce camera motion', get: () => s.reduceCameraMotion, set: (v) => ((s.reduceCameraMotion = v), changed()) },
+      { kind: 'toggle', label: 'Reduce camera motion', note: 'No shake; cinematics cut between held views', get: () => s.reduceCameraMotion, set: (v) => ((s.reduceCameraMotion = v), changed()) },
       { kind: 'toggle', label: 'Reduce flashes & pulsing', get: () => s.reduceFlashes, set: (v) => ((s.reduceFlashes = v), changed()) },
+      { kind: 'toggle', label: 'Controller vibration', get: () => s.vibration, set: (v) => ((s.vibration = v), changed()) },
+      // (W-049) presentation only: hazards, physics and every warning are unchanged
+      { kind: 'toggle', label: 'Reduce weather effects', get: () => s.reduceWeather, set: (v) => ((s.reduceWeather = v), changed()) },
       { kind: 'slider', label: 'Interface text size', min: 0.85, max: 1.5, step: 0.05, get: () => s.uiScale, set: (v) => ((s.uiScale = v), changed()), fmt: pct },
       { kind: 'toggle', label: 'Sound captions', get: () => s.captions, set: (v) => ((s.captions = v), changed()) },
       { kind: 'toggle', label: 'Tutorial prompts', get: () => s.showTutorial, set: (v) => ((s.showTutorial = v), changed()) },
@@ -770,6 +849,10 @@ export class App {
     try {
       this.frame(dt);
       this.errorStreak = 0;
+      if (this.playtest) {
+        const d = this.mode === 'playing' ? this.session?.debugState() : null;
+        this.playtest.tick(dt, d ? { phase: d.phase, z: d.z, speed: d.speed, yetiDistance: d.yetiDistance, crashes: d.crashes } : null);
+      }
     } catch (err) {
       this.errorStreak++;
       if (this.errorStreak <= 3) console.error(err);
@@ -846,25 +929,39 @@ export class App {
   /** A small "glance back" window during the chase so the threat is visible, not just a HUD bar. */
   private prepareRearView(): { x: number; y: number; w: number; h: number } | null {
     const s = this.session;
-    const k = s && this.mode === 'playing' && this.settings.rearView && this.world?.quality !== 'low' && !s.isCinematic() ? s.rearView(this.rearPose) : 0;
+    // (round 4, W-082) on Low the inset still shows the leap and the landing (2–3 s, a small viewport):
+    // the chase's first beat had no image at all there; the player's own setting still turns it off
+    const leap = s ? s.rearViewZoom() : 0;
+    // (Round 5, W-082 / review F4-2: no inset on Low after the leap) on Low too, for the whole chase: the
+    // telephoto inset (below) culls most of the scene, so it is cheap
+    const k = s && this.mode === 'playing' && this.settings.rearView && !s.isCinematic() ? s.rearView(this.rearPose) : 0;
     if (!this.rearFrame) {
       this.rearFrame = document.createElement('div');
       this.rearFrame.className = 'rear-view';
       document.body.appendChild(this.rearFrame);
     }
     this.rearFrame.style.opacity = String(k);
+    // (W-082) the leap's inset is there at once (no 0.3 s fade-in over the first beat)
+    this.rearFrame.classList.toggle('snap', leap > 0);
     if (k <= 0.02 || !this.world) return null;
     const W = innerWidth;
     const H = innerHeight;
     // (round 4b, E r4: the window and its label scale with the UI, like the HUD around it)
     const ui = this.settings.uiScale * autoUiScale(W, H);
-    const w = Math.round(Math.min(420 * ui, W * 0.3));
-    const h = Math.round(w / 2.4);
-    const x = Math.round((W - w) / 2);
-    const top = Math.round(78 * ui);
+    const { x, top, w, h } = rearInsetRect(W, ui);
     this.rearFrame.style.cssText = `left:${x}px;top:${top}px;width:${w}px;height:${h}px;opacity:${k}`;
     this.rearCam.position.copy(this.rearPose.pos);
     this.rearCam.lookAt(this.rearPose.look);
+    // (W-076 review F, F2) the leap and landing framed tight in the inset: 22° while he is in the air
+    // and for a second after the landing, then the usual 48° (eased)
+    const zoom = this.session?.rearViewZoom() ?? 0;
+    // (Round 5, W-082 / review F4-2: the Yeti was ~15 px at 28 m, 3–4 px at 75 m) a telephoto glance: the
+    // lens narrows with his distance so he fills about a third of the inset's height (12°–48°)
+    const fov = Math.min(48 + (22 - 48) * zoom, rearInsetFov(this.rearPose.pos.distanceTo(this.rearPose.look)));
+    // (round 6, W-103 / review E5-5) with "Reduce camera motion" the inset's lens does not zoom: it holds one
+    // of a few fixed lenses and cuts to the next only when the Yeti's size has drifted well away from it
+    this.rearCam.fov = this.settings.reduceCameraMotion ? heldInsetFov(this.rearFovHeld, fov) : fov;
+    this.rearFovHeld = this.rearCam.fov;
     this.rearCam.aspect = w / h;
     this.rearCam.updateProjectionMatrix();
     this.rearCam.updateMatrixWorld();
@@ -884,7 +981,15 @@ export class App {
     r.setScissor(x, v.y, w, h);
     r.autoClear = false;
     r.clearDepth();
+    // (Round 5, W-082) the glance sees through the storm better than the eye: the inset's fog is lighter
+    const fog = this.world.scene.fog as THREE.FogExp2 | null;
+    const d0 = fog?.density ?? 0;
+    const u0 = atmosphere.uFogExp.value;
+    if (fog) fog.density = d0 * REAR_INSET_FOG;
+    atmosphere.uFogExp.value = u0 * REAR_INSET_FOG;
     r.render(this.world.scene, this.rearCam);
+    if (fog) fog.density = d0;
+    atmosphere.uFogExp.value = u0;
     r.autoClear = true;
     r.setScissorTest(false);
     r.setViewport(0, 0, W, H);
@@ -936,6 +1041,7 @@ export class App {
 
   // --- debug harness (only with ?debug in the URL; never shown in the UI) ---------
   private installDebug() {
+    let debugVeils: THREE.Object3D[] = [];
     const api = {
       state: () => ({ mode: this.mode, menu: this.menu.current?.id ?? null, session: this.session?.debugState() ?? null, records: this.records, course: this.world ? { id: this.world.id, label: courseLabel(this.world.course), seed: this.world.seed, finishZ: this.world.mountain.finishZ } : null }),
       /** select a course like the menu does (persists to settings), e.g. setCourse('daily','sprint',{date}) */
@@ -961,17 +1067,30 @@ export class App {
       perf: () => {
         const s = [...this.perf.samples].sort((a, b) => a - b);
         const i = this.renderer.info;
-        return { fps: this.perf.fps, p50: s[Math.floor(s.length * 0.5)] ?? 0, p95: s[Math.floor(s.length * 0.95)] ?? 0, calls: i.render.calls, triangles: i.render.triangles, geometries: i.memory.geometries, textures: i.memory.textures, particles: this.world?.particles.aliveCount ?? 0, terrainPending: this.world?.terrain.pending ?? 0 };
+        return { fps: this.perf.fps, p50: s[Math.floor(s.length * 0.5)] ?? 0, p95: s[Math.floor(s.length * 0.95)] ?? 0, calls: i.render.calls, triangles: i.render.triangles, geometries: i.memory.geometries, textures: i.memory.textures, programs: i.programs?.length ?? 0, particles: this.world?.particles.aliveCount ?? 0, terrainPending: this.world?.terrain.pending ?? 0, caveSliceMaxMs: +(this.world?.caveSliceMaxMs ?? 0).toFixed(2), caveSlice: this.world ? { dressing: +this.world.caveSliceMax.dressing.toFixed(2), cave: +this.world.caveSliceMax.cave.toFixed(2) } : null };
       },
       startRun: (skipIntro = true) => this.startRun(skipIntro, false),
       toMenu: () => this.toMenu(),
       /** (evidence captures) optional x and heading (rad, 0 = down the course +Z) */
       teleport: (z: number, speed = 18, x?: number, heading?: number) => this.session?.debugTeleport(z, speed, x, heading),
+      /** (evidence captures) set the physics clock (s): the weather timeline jumps with it */
+      setTime: (t: number) => this.session?.debugSetTime(t),
+      /** (evidence captures) end a cinematic's weather hand-back now (World.finishWeatherBlend) */
+      settleWeather: () => this.session?.world.finishWeatherBlend(),
+      /** (evidence captures) the weather front at physics time t (Whiteout), or null */
+      front: (t: number) => {
+        const env = this.session?.world.environment;
+        if (!env) return null;
+        const f = env.caps.weather.front?.(t, env.seed);
+        return f ? { ...f } : null;
+      },
       toCave: () => {
         const e = this.session?.run.encounter;
         if (e) this.session?.debugTeleport(e.triggerZ - 12, 16);
       },
       advance: (sec: number) => this.session?.debugAdvance(sec),
+      /** (tests) what the HUD tells the player about the weather: the pill and the caption on screen */
+      weatherHud: () => ({ pill: this.hud.weatherPillText, caption: this.hud.captionText }),
       /** (captures/tests) buttons held while frames() steps the game, e.g. { recoverHeld: true } */
       holdInput: (inp: Partial<GameplayInput>) => {
         if (this.session) this.session.debugHeld = { ...inp };
@@ -982,10 +1101,15 @@ export class App {
         if (this.session) this.session.autopilot = style;
       },
       placeYeti: (gap: number) => this.session?.debugPlaceYeti(gap),
-      seenCave: (v: boolean) => {
-        this.book.seenCaveCinematic = v;
-        if (this.session) this.session.recordsSeenCave = v;
+      /** set a location's cave-cinematic history in memory (default: the current course's location) */
+      seenCave: (v: boolean, biome?: BiomeId) => {
+        const b = biome ?? this.world?.course.biome ?? DEFAULT_BIOME;
+        if (v) markCaveSeen(this.book, b);
+        else delete this.book.seenCave[b];
+        if (this.session && (!biome || biome === this.world?.course.biome)) this.session.recordsSeenCave = v;
       },
+      /** (round 4) the per-location cave-cinematic history, in memory and as stored */
+      caveHistory: () => ({ book: { ...this.book.seenCave }, legacy: this.book.seenCaveCinematic, stored: localStorage.getItem('skifree-tld.records.v2') }),
       pause: () => this.pause(),
       menuId: () => this.menu.current?.id ?? null,
       progress: () => ({ saved: structuredClone(this.progress.saved), persisting: this.progress.persisting, attached: this.progress.attached, toast: this.toast.text, jacket: this.skier?.jacketColor ?? null, events: this.session ? this.session.events.history.map((e) => e.type) : [] }),
@@ -999,11 +1123,157 @@ export class App {
       },
       input: this.input,
       frames: (n: number, dt = 1 / 30) => this.session?.debugFrames(n, dt),
+      /**
+       * (tests) step n frames at a fixed dt through the REAL input pipeline (keyboard, pads), as the
+       * loop does when playing — with hold(true) the loop itself steps nothing, so the run is
+       * deterministic while a real key press or pad button still goes through Input (round 3, the
+       * cinematic-skip test). Stops when the game leaves 'playing' (a pause).
+       */
+      framesLive: (n: number, dt = 1 / 30) => {
+        for (let i = 0; i < n && this.session && this.mode === 'playing'; i++) {
+          this.input.poll();
+          this.session.frame(dt, this.input.gameplay(dt), this.input.activeDevice);
+        }
+      },
       hold: (v: boolean) => {
         this.hold = v;
       },
       freeCam: (pos: number[] | null, look?: number[], fov = 50) => {
         this.freeCam = pos && look ? { pos: new THREE.Vector3(...pos), look: new THREE.Vector3(...look), fov } : null;
+      },
+      /** (diagnostics) hide/show scene objects by name; returns how many matched (kept hidden by a flag
+       *  the game does not reset: hidden objects stay hidden until shown again) */
+      /** (diagnostics, W-031) shared-atmosphere debug view: see atmosphere.uAtmDebug */
+      atmoDebug: (mode: number) => {
+        atmosphere.uAtmDebug.value = mode;
+      },
+      /** (diagnostics, W-031) set a scalar shared-atmosphere uniform (it is rewritten by the game's own updates) */
+      atmoSet: (key: string, v: number) => {
+        const u = (atmosphere as unknown as Record<string, { value: unknown }>)[key];
+        if (u && typeof u.value === 'number') u.value = v;
+        return u?.value;
+      },
+      /**
+       * (diagnostics, W-031) the render transform as the next frame will use it: the camera in
+       * simulation (absolute) coordinates, the render origin, the camera as the shader will see it
+       * (absolute − origin), whether matrixWorld agrees with position/quaternion, the projection, the
+       * fog uniforms, and named objects' world positions (absolute)
+       */
+      renderProbe: (names: string[] = []) => {
+        const w = this.world;
+        const c = this.camera;
+        const o = w?.origin ?? new THREE.Vector3();
+        c.updateMatrixWorld();
+        const mp = new THREE.Vector3().setFromMatrixPosition(c.matrixWorld);
+        const dir = c.getWorldDirection(new THREE.Vector3());
+        const objs: Record<string, number[][]> = {};
+        if (w)
+          for (const n of names) {
+            const list: number[][] = [];
+            w.scene.traverse((ob) => {
+              if (ob.name === n || (n.endsWith('*') && ob.name.startsWith(n.slice(0, -1)))) {
+                const box = new THREE.Box3().setFromObject(ob);
+                const ctr = box.isEmpty() ? ob.getWorldPosition(new THREE.Vector3()) : box.getCenter(new THREE.Vector3());
+                list.push([...ctr.toArray(), ob.visible ? 1 : 0]);
+              }
+            });
+            objs[n] = list.slice(0, 8);
+          }
+        const fog = w?.scene.fog as THREE.FogExp2 | null;
+        // every visible transparent / non-depth-writing drawable, nearest first (what could veil the frame)
+        const veils: { name: string; type: string; mat: string; parent: string; dist: number; size: number; opacity: number; renderOrder: number; ref?: THREE.Object3D }[] = [];
+        if (w)
+          w.scene.traverseVisible((ob) => {
+            const m = (ob as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+            if (!m) return;
+            const mats = Array.isArray(m) ? m : [m];
+            if (!mats.some((x) => x.transparent || !x.depthWrite)) return;
+            const box = new THREE.Box3().setFromObject(ob);
+            if (box.isEmpty()) return;
+            const sph = box.getBoundingSphere(new THREE.Sphere());
+            veils.push({
+              name: ob.name || '(unnamed)',
+              type: ob.type,
+              mat: mats.map((x) => x.type + (x.name ? ':' + x.name : '')).join('+'),
+              parent: ob.parent?.name || ob.parent?.type || '',
+              dist: Math.max(0, sph.center.distanceTo(c.position) - sph.radius),
+              size: sph.radius,
+              opacity: (mats[0] as THREE.MeshBasicMaterial).opacity ?? 1,
+              renderOrder: ob.renderOrder,
+              ref: ob,
+            });
+          });
+        veils.sort((a, b) => a.dist - b.dist);
+        debugVeils = veils.map((v) => v.ref!);
+        return {
+          snow: (w?.env as unknown as { debugSnow?: (c: THREE.Vector3) => unknown })?.debugSnow?.(c.position) ?? null,
+          veils: veils.slice(0, 40).map(({ ref: _r, ...v }) => v),
+          camAbs: c.position.toArray(),
+          camMatrixPos: mp.toArray(),
+          matrixAgrees: mp.distanceTo(c.position) < 1e-3,
+          camRender: c.position.clone().sub(o).toArray(),
+          origin: o.toArray(),
+          dir: dir.toArray(),
+          near: c.near,
+          far: c.far,
+          fov: c.fov,
+          parent: c.parent ? c.parent.name || c.parent.type : null,
+          fogDensity: fog?.density ?? null,
+          uFogExp: atmosphere.uFogExp.value,
+          uFogLin: atmosphere.uFogLin.value,
+          uFogFalloff: atmosphere.uFogFalloff.value,
+          uFogColor: atmosphere.uFogColor.value.toArray(),
+          uCloudK: atmosphere.uCloudK.value,
+          uDriftK: atmosphere.uDriftK.value,
+          objs,
+        };
+      },
+      /** (diagnostics, W-031) disable frustum culling scene-wide (is something culled that should draw?) */
+      noCull: () => {
+        let n = 0;
+        this.world?.scene.traverse((o) => {
+          if (o.frustumCulled) {
+            o.frustumCulled = false;
+            n++;
+          }
+        });
+        return n;
+      },
+      /** (diagnostics, W-031) terrain chunks: how many, how many visible, the nearest to a point */
+      terrainProbe: (x: number, z: number) => {
+        const out: { n: number; visible: number; nearest: number[][] } = { n: 0, visible: 0, nearest: [] };
+        const list: number[][] = [];
+        this.world?.scene.traverse((o) => {
+          if (o.name !== 'terrain-chunk' && o.name !== 'terrain-far') return;
+          out.n++;
+          if (o.visible && o.parent?.visible !== false) out.visible++;
+          const p = o.getWorldPosition(new THREE.Vector3());
+          const g = (o as THREE.Mesh).geometry;
+          g.computeBoundingSphere();
+          list.push([Math.hypot(p.x + 32 - x, p.z + 32 - z), p.x, p.y, p.z, o.visible ? 1 : 0, o.name === 'terrain-far' ? 1 : 0, g.boundingSphere?.radius ?? -1, g.boundingSphere?.center.y ?? 0]);
+        });
+        list.sort((a, b) => a[0]! - b[0]!);
+        out.nearest = list.slice(0, 6);
+        return out;
+      },
+      /** (diagnostics, W-031) hide the i-th drawable of the last renderProbe's veil list */
+      hideVeil: (i: number) => {
+        const o = debugVeils[i];
+        if (!o) return null;
+        o.visible = false;
+        o.userData.debugHidden = true;
+        return `${o.type} ${(o as THREE.Mesh).material ? ((o as THREE.Mesh).material as THREE.Material).type : ''} parent=${o.parent?.name || o.parent?.type}`;
+      },
+      setVisible: (name: string, v: boolean) => {
+        let n = 0;
+        this.world?.scene.traverse((o) => {
+          if (o.name === name) {
+            o.visible = v;
+            o.userData.debugHidden = !v;
+            n++;
+          }
+        });
+        return n;
       },
       breakdown: () => {
         const out: Record<string, { meshes: number; tris: number }> = {};
@@ -1072,7 +1342,20 @@ export class App {
       scenery: () => this.world?.scenery?.stats?.() ?? null,
       renderer: this.renderer,
       camera: this.camera,
-      cameraPose: () => ({ pos: this.camera.position.toArray(), fov: this.camera.fov }),
+      cameraPose: () => ({ pos: this.camera.position.toArray(), fov: this.camera.fov, dir: this.camera.getWorldDirection(new THREE.Vector3()).toArray() }),
+      /** (evidence) a world point's place on screen through the game camera (NDC: in view when |x|,|y| < 1) */
+      projectToScreen: (p: { x: number; y: number; z: number }) => {
+        const v = new THREE.Vector3(p.x, p.y, p.z).project(this.camera);
+        return { x: v.x, y: v.y, z: v.z };
+      },
+      /** (round 6, W-103) the skier on screen, viewport px: helmet top, and the body's x span (head to skis) */
+      skierScreen: () => {
+        if (!this.skier) return null;
+        const px = (v: THREE.Vector3) => ({ x: ((v.x + 1) / 2) * innerWidth, y: ((1 - v.y) / 2) * innerHeight });
+        const head = px(this.skier.getHeadTopWorldPosition(new THREE.Vector3()).project(this.camera));
+        const feet = px(this.skier.root.getWorldPosition(new THREE.Vector3()).project(this.camera));
+        return { headY: head.y, feetY: feet.y, x0: Math.min(head.x, feet.x) - 40, x1: Math.max(head.x, feet.x) + 40 };
+      },
     };
     (window as unknown as { __skifree: typeof api }).__skifree = api;
     (window as unknown as { __THREE: unknown }).__THREE = { Raycaster: THREE.Raycaster };

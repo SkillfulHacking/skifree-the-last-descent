@@ -239,7 +239,6 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     category: 'exploration',
     icon: 'storm',
     biome: BIOME_IDS.whiteout,
-    requires: 'Whiteout Ridge location',
     unlock: (e) => e.type === 'RunFinished' && e.outcome === 'victory' && e.biome === BIOME_IDS.whiteout && (e.difficulty === 'normal' || e.difficulty === 'hard'),
   },
   {

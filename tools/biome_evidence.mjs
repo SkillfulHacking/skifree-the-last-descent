@@ -13,21 +13,16 @@
 // Rendering is software (SwiftShader): a 1920×1080 frame takes 1–4 minutes.
 import { chromium } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { execSync } from 'node:child_process';
+import { servedBuild } from './lib/build_info.mjs';
 
 const [biome = 'fjord', course = 'classic:sprint', outDir = `docs/reviews/biomes/${biome}/round-1`, size = '1920x1080', base = 'http://127.0.0.1:4471', only = 'all'] = process.argv.slice(2);
 const [W, H] = size.split('x').map(Number);
 const [mode, length] = course.split(':');
 const want = (k) => only === 'all' || only.split(',').includes(k);
 mkdirSync(outDir, { recursive: true });
-const sha = (() => {
-  try {
-    return execSync('git rev-parse --short HEAD').toString().trim() + (execSync('git status --porcelain --untracked-files=no').toString().trim() ? '+dirty' : '');
-  } catch {
-    return 'unknown';
-  }
-})();
-const manifest = { biome, course, viewport: size, sha, date: new Date().toISOString(), shots: [], errors: [] };
+const build = await servedBuild(base);
+const sha = build.sha;
+const manifest = { biome, course, viewport: size, sha, build, date: new Date().toISOString(), shots: [], errors: [] };
 const t0 = Date.now();
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(0)}s]`, ...a);
 
@@ -294,9 +289,10 @@ if (want('cave') || want('cinematic') || want('pursuit')) {
       await settle(1500);
       await shot('08d_yeti_cinematic_roar', 'Cave cinematic, t≈11.65 s (Fjord: the roar blows spray and sea smoke out of the mouth; the lintel icicles drop and shatter)');
     }
-    await framesUntil(biome === "fjord" ? `(s) => s.cinematicTime >= 15.0` : `(s) => s.cinematicTime >= 14.6`, 400);
+    // (W-076: the Yeti on the ledge 14.2–14.7 s, then the swing round to the run; the leap is the chase's first second)
+    await framesUntil(`(s) => s.cinematicTime >= 14.45`, 400);
     await settle(1500);
-    await shot('08b_yeti_cinematic', biome === 'fjord' ? 'Cave cinematic, t≈15.0 s (Fjord: the leap from the ledge, down onto the skier)' : 'Cave cinematic, t≈14.6 s');
+    await shot('08b_yeti_cinematic', 'Cave cinematic, t≈14.45 s: over the shoulder, the Yeti on the ledge, gathering for the leap');
   }
   // 9) pursuit with the rear view
   if (want('pursuit')) {

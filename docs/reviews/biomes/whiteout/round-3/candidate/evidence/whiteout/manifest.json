@@ -1,0 +1,822 @@
+{
+  "biome": "whiteout",
+  "seed": "WO-R1",
+  "length": "sprint",
+  "viewport": "1366x768",
+  "sha": "8bc6fbf",
+  "renderer": "SwiftShader (software)",
+  "date": "2026-11-23T02:44:49.994Z",
+  "shots": [
+    {
+      "name": "01_clear_window",
+      "note": "Third-person, clear window (start): broken cloud deck, cloud shadows on the snow, the ridge in sun",
+      "camera": {
+        "pos": [
+          0.7029109553857863,
+          -88.73059769917501,
+          418.5517967781594
+        ],
+        "fov": 67.86949779969312,
+        "dir": [
+          0.033509334076841535,
+          -0.2788067515583211,
+          0.9597624288412334
+        ]
+      },
+      "phase": "chase",
+      "z": 425.2436632058578,
+      "time": 9.499999999999915,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 12.500000000000085,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "02_wall_far",
+      "note": "Third-person, 24 s before a front: the storm wall on the windward horizon",
+      "camera": {
+        "pos": [
+          27.470009262593845,
+          -168.49162221130337,
+          614.684714233318
+        ],
+        "fov": 66.44432833860195,
+        "dir": [
+          0.12379159905123717,
+          -0.3479413557055874,
+          0.9293075126103822
+        ]
+      },
+      "phase": "chase",
+      "z": 621.0925076124802,
+      "time": -0.5000000000000053,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 22,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "03_wall_near",
+      "note": "9 s before the front: the wall crossing the ridges, the deck thickening and lowering, spindrift rising",
+      "camera": {
+        "pos": [
+          35.128108398876556,
+          -197.4106615211505,
+          677.7854332565286
+        ],
+        "fov": 67.78277638077317,
+        "dir": [
+          0.11372568821902433,
+          -0.3075556578063393,
+          0.9447094713140223
+        ]
+      },
+      "phase": "chase",
+      "z": 684.4288894154779,
+      "time": 14.499999999999915,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 7.500000000000085,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "04_build",
+      "note": "Building (5 s in): the wall over the course, wind and blowing snow up, light flattening",
+      "camera": {
+        "pos": [
+          42.18028163718968,
+          -223.01722511838847,
+          737.8540470496841
+        ],
+        "fov": 66.93850433671183,
+        "dir": [
+          0.043797047552992546,
+          -0.25252200694255056,
+          0.9665994282200603
+        ]
+      },
+      "phase": "chase",
+      "z": 744.4683815289727,
+      "time": 28.499999999999915,
+      "front": {
+        "s": 0.8113854595335963,
+        "dir": 1,
+        "phase": "build",
+        "left": 2.5000000000000853,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "05_storm",
+      "note": "Storm (14 s in): visibility ~80 m, driving snow streaks, trail-marker lamps and rim wands the way through",
+      "camera": {
+        "pos": [
+          45.85335273059982,
+          -254.226787056931,
+          817.9366551449153
+        ],
+        "fov": 67.00969010696062,
+        "dir": [
+          -0.06239679460800861,
+          -0.28362574481545816,
+          0.9569028565640938
+        ]
+      },
+      "phase": "chase",
+      "z": 824.5518858260895,
+      "time": 46.499999999999915,
+      "front": {
+        "s": 0.8177933192313022,
+        "dir": 1,
+        "phase": "storm",
+        "left": 32.077723168768074,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "06_easing",
+      "note": "Easing (5 s in): the trailing edge tearing open",
+      "camera": {
+        "pos": [
+          40.644688348729034,
+          -284.08444210320516,
+          898.5003725930719
+        ],
+        "fov": 67.05582386101166,
+        "dir": [
+          -0.05292715246498708,
+          -0.23988341433271124,
+          0.9693578617105392
+        ]
+      },
+      "phase": "chase",
+      "z": 905.1308315950105,
+      "time": 85.2500000000012,
+      "front": {
+        "s": 0.0734906661822956,
+        "dir": 1,
+        "phase": "ease",
+        "left": 1.327723168766795,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "07_clearing",
+      "note": "Clearing (~2 s after the storm): sun back through the gaps, cloud shadows breaking up over the ridge",
+      "camera": {
+        "pos": [
+          37.00941551502063,
+          -298.0225806533809,
+          938.138567073863
+        ],
+        "fov": 67.21889908859194,
+        "dir": [
+          -0.06471449662664083,
+          -0.24881066641369465,
+          0.9663877514771873
+        ]
+      },
+      "phase": "chase",
+      "z": 944.7703689898734,
+      "time": 94.2500000000012,
+      "front": {
+        "s": 0,
+        "dir": -1,
+        "phase": "clear",
+        "left": 31.34218455571562,
+        "k": 1
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "08_cornice_edge",
+      "note": "The corniced rim (drop side), from just off the edge: the lip curling over the flank, rim wands set back from it",
+      "camera": {
+        "pos": [
+          45.846314896805595,
+          -507.2397613956115,
+          1605
+        ],
+        "fov": 58,
+        "dir": [
+          -0.15495153585274438,
+          -0.28900773203465774,
+          0.9447034203182814
+        ]
+      },
+      "phase": "chase",
+      "z": 1654.4863588964115,
+      "time": 7.500000000000075,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 14.499999999999925,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "09_valley_view",
+      "note": "Over the edge: the flank falling ~500 m into the valley, far ranges across it",
+      "camera": {
+        "pos": [
+          51.065083064768146,
+          -538.745971901429,
+          1710
+        ],
+        "fov": 60,
+        "dir": [
+          0.8422819049191155,
+          -0.40225570795464494,
+          0.35881964559334484
+        ]
+      },
+      "phase": "chase",
+      "z": 1654.4863588964115,
+      "time": 7.500000000000075,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 14.499999999999925,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "10_crest",
+      "note": "Across the piste to the crest side: the rocky crest and its tors, sky behind it",
+      "camera": {
+        "pos": [
+          -37.319675775715666,
+          -559.4201848809647,
+          1740
+        ],
+        "fov": 58,
+        "dir": [
+          -0.8917133796029119,
+          0.369593278276692,
+          0.2612432913776757
+        ]
+      },
+      "phase": "chase",
+      "z": 1654.4863588964115,
+      "time": 7.500000000000075,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 14.499999999999925,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "11_ridge_overview",
+      "note": "The ridge from above the piste: the course along the top, the drop on one side, the crest on the other",
+      "camera": {
+        "pos": [
+          -27.205754358616623,
+          -443.42686562887377,
+          1490
+        ],
+        "fov": 62,
+        "dir": [
+          -0.07377037924117262,
+          -0.41491308664455784,
+          0.9068655146589815
+        ]
+      },
+      "phase": "chase",
+      "z": 1654.4863588964115,
+      "time": 7.500000000000075,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 14.499999999999925,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "12_cave_mouth",
+      "note": "Cave encounter 3 s: the rimed mouth, snow curtain off the brow",
+      "camera": {
+        "pos": [
+          -18.12248538635115,
+          -28.773771708537286,
+          268.1424252240579
+        ],
+        "fov": 40,
+        "dir": [
+          -0.9095096532571898,
+          0.21375555628056336,
+          -0.35651192517386193
+        ]
+      },
+      "phase": "caveCinematic",
+      "z": 282.5,
+      "time": 0,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 22,
+        "k": 0
+      },
+      "cinematicTime": 3.0333333333333323
+    },
+    {
+      "name": "13_cave_emerge",
+      "note": "Emergence (8.6 s): the squall rolling in, spindrift across the mouth",
+      "camera": {
+        "pos": [
+          -31.890611636256935,
+          -30.728348242014494,
+          263.1434380505174
+        ],
+        "fov": 50,
+        "dir": [
+          -0.9325684904783783,
+          0.04552653743323788,
+          -0.3581107998318665
+        ]
+      },
+      "phase": "caveCinematic",
+      "z": 282.5,
+      "time": 0,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 22,
+        "k": 0
+      },
+      "cinematicTime": 8.633333333333313
+    },
+    {
+      "name": "14_cave_roar",
+      "note": "The roar (11.3 s): snow blasted off the brow",
+      "camera": {
+        "pos": [
+          -33.39632751439999,
+          -31.55921649216789,
+          263.16729547025403
+        ],
+        "fov": 45.67295470254055,
+        "dir": [
+          -0.9045945149517769,
+          0.27003668778747303,
+          -0.3298317006716156
+        ]
+      },
+      "phase": "caveCinematic",
+      "z": 282.5,
+      "time": 0,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 22,
+        "k": 0
+      },
+      "cinematicTime": 11.333333333333304
+    },
+    {
+      "name": "15_cave_leap",
+      "note": "The leap (15.2 s)",
+      "camera": {
+        "pos": [
+          1.0109936903333905,
+          -41.8935303821275,
+          280.13267184106513
+        ],
+        "fov": 51.32696777144161,
+        "dir": [
+          -0.9220536522555596,
+          -0.009094474810899138,
+          0.3869552337029407
+        ]
+      },
+      "phase": "caveCinematic",
+      "z": 282.5,
+      "time": 0,
+      "front": {
+        "s": 0,
+        "dir": 1,
+        "phase": "clear",
+        "left": 22,
+        "k": 0
+      },
+      "cinematicTime": 15.23333333333329
+    },
+    {
+      "name": "16_storm_chase",
+      "note": "Chase in a storm (third-person): the Yeti 18–34 m behind, rear view, distance bar, captions",
+      "camera": {
+        "pos": [
+          48.31273161784215,
+          -268.92464018946373,
+          852.8062621693375
+        ],
+        "fov": 67.75363143134614,
+        "dir": [
+          -0.32121948297302194,
+          -0.29169841786743256,
+          0.9009606410782778
+        ]
+      },
+      "phase": "chase",
+      "z": 859.1393043990458,
+      "time": 71.00000000000426,
+      "front": {
+        "s": 0.8272568501216079,
+        "dir": 1,
+        "phase": "storm",
+        "left": 7.577723168763725,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "17_yeti_silhouette",
+      "note": "Looking back from the skier in the storm: the Yeti silhouette in the snow",
+      "camera": {
+        "pos": [
+          47.298706405265634,
+          -271.2739833967322,
+          856.1393043990458
+        ],
+        "fov": 50,
+        "dir": [
+          -0.04689965124239823,
+          0.38430002342517644,
+          -0.9220162225843699
+        ]
+      },
+      "phase": "chase",
+      "z": 859.1393043990458,
+      "time": 71.00000000000426,
+      "front": {
+        "s": 0.8272568501216079,
+        "dir": 1,
+        "phase": "storm",
+        "left": 7.577723168763725,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "18_hard_snowball_fog",
+      "note": "Hard, in a storm: a snowball's landing ring drawn over the fog (marker up)",
+      "camera": {
+        "pos": [
+          -4.606347387559949,
+          -65.5722034343931,
+          347.64584175062123
+        ],
+        "fov": 71.19805078156826,
+        "dir": [
+          0.09736472601491412,
+          -0.2688311147619673,
+          0.9582535895387394
+        ]
+      },
+      "phase": "chase",
+      "z": 354.5099541926742,
+      "time": 146.94999999999618,
+      "front": {
+        "s": 0.8398310796293115,
+        "dir": -1,
+        "phase": "storm",
+        "left": 42.80447261054451,
+        "k": 1
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "19_station_approach",
+      "note": "Approaching the rescue station through the storm (gameplay camera)",
+      "camera": {
+        "pos": [
+          0.7916757096657884,
+          -892.601303861285,
+          2873.66283009607
+        ],
+        "fov": 67.14507426490317,
+        "dir": [
+          -0.03403394107635745,
+          -0.20606731683726193,
+          0.9779457816189518
+        ]
+      },
+      "phase": "chase",
+      "z": 2880.333843010173,
+      "time": 45.96666666666616,
+      "front": {
+        "s": 0.818787041570989,
+        "dir": 1,
+        "phase": "storm",
+        "left": 32.61105650210183,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "20_v_arrive",
+      "note": "Victory 1.8 s (beat 1, into the light): behind the skier toward the hut through the storm; letterbox on",
+      "camera": {
+        "pos": [
+          -3.3292042963848414,
+          -917.1732426201611,
+          3008.560432797371
+        ],
+        "fov": 47.82373295338896,
+        "dir": [
+          -0.3255752081712556,
+          -0.014053968865208656,
+          0.9454116932762042
+        ]
+      },
+      "phase": "victory",
+      "z": 3016.4952473994776,
+      "time": 55.26666666666563,
+      "front": {
+        "s": 0.8859770350368195,
+        "dir": 1,
+        "phase": "storm",
+        "left": 23.31105650210236,
+        "k": 0
+      },
+      "cinematicTime": 1.8000000000000023
+    },
+    {
+      "name": "21_v_welcome",
+      "note": "Victory 5.2 s (beat 2, welcome): in front of the porch looking at the door as it opens, skier arriving",
+      "camera": {
+        "pos": [
+          -5.839219986612652,
+          -916.737184291182,
+          3022.5422698577195
+        ],
+        "fov": 47.56560149016205,
+        "dir": [
+          -0.5383908005356074,
+          -0.12411568831636094,
+          0.833505034065412
+        ]
+      },
+      "phase": "victory",
+      "z": 3022.429584427263,
+      "time": 58.69999999999877,
+      "front": {
+        "s": 0.7906551469354214,
+        "dir": 1,
+        "phase": "storm",
+        "left": 19.877723168769222,
+        "k": 0
+      },
+      "cinematicTime": 5.2333333333333245
+    },
+    {
+      "name": "22_v_lantern",
+      "note": "Victory 8.2 s (beat 3, the lantern raised in the doorway: halo + light)",
+      "camera": {
+        "pos": [
+          -4.878125352600657,
+          -918.2157148814312,
+          3019.8429018383663
+        ],
+        "fov": 37.50462962962967,
+        "dir": [
+          -0.6495375199238548,
+          0.12633227284891074,
+          0.7497607398683904
+        ]
+      },
+      "phase": "victory",
+      "z": 3022.4510913148733,
+      "time": 61.699999999998596,
+      "front": {
+        "s": 0.8402366778842622,
+        "dir": 1,
+        "phase": "storm",
+        "left": 16.877723168769393,
+        "k": 0
+      },
+      "cinematicTime": 8.233333333333315
+    },
+    {
+      "name": "23_v_yeti_white",
+      "note": "Victory 10.2 s (beat 4): past the skier and lantern, the Yeti coming in from the white",
+      "camera": {
+        "pos": [
+          -8.415558698641586,
+          -917.5649072226798,
+          3023.4536296269234
+        ],
+        "fov": 30.81260850694459,
+        "dir": [
+          0.019124199841881205,
+          0.11878585072787692,
+          -0.9927357083570946
+        ]
+      },
+      "phase": "victory",
+      "z": 3022.4647402380024,
+      "time": 63.69999999999848,
+      "front": {
+        "s": 0.8874184684062864,
+        "dir": 1,
+        "phase": "storm",
+        "left": 14.877723168769506,
+        "k": 0
+      },
+      "cinematicTime": 10.233333333333308
+    },
+    {
+      "name": "24_v_yeti_flinch",
+      "note": "Victory 11.9 s (beat 5): close on the Yeti in the searchlight beam, flinching",
+      "camera": {
+        "pos": [
+          -10.181790800252038,
+          -914.8161669037197,
+          3005.339358039964
+        ],
+        "fov": 34.82371584146739,
+        "dir": [
+          0.047112913339391146,
+          0.09022853479715444,
+          -0.9948061041755994
+        ]
+      },
+      "phase": "victory",
+      "z": 3022.5162032428257,
+      "time": 65.39999999999958,
+      "front": {
+        "s": 0.9313213510533386,
+        "dir": 1,
+        "phase": "storm",
+        "left": 13.17772316876841,
+        "k": 0
+      },
+      "cinematicTime": 11.933333333333302
+    },
+    {
+      "name": "24b_v_yeti_leaves",
+      "note": "Victory 13.4 s (beat 5 end): turning back into the storm",
+      "camera": {
+        "pos": [
+          -10.171799941517415,
+          -914.9049014178734,
+          3004.5070787148275
+        ],
+        "fov": 32.04720241406634,
+        "dir": [
+          0.06502594647004861,
+          0.11769173015676003,
+          -0.9909189083564723
+        ]
+      },
+      "phase": "victory",
+      "z": 3022.5957828522924,
+      "time": 66.90000000000077,
+      "front": {
+        "s": 0.9388515268868042,
+        "dir": 1,
+        "phase": "storm",
+        "left": 11.677723168767216,
+        "k": 0
+      },
+      "cinematicTime": 13.433333333333296
+    },
+    {
+      "name": "25_v_break",
+      "note": "Victory 16.0 s (beat 6): the storm breaking, the camera rising off the station",
+      "camera": {
+        "pos": [
+          -33.93360415138819,
+          -910.4154051064311,
+          3041.7361479953042
+        ],
+        "fov": 51.92001896296291,
+        "dir": [
+          0.5451809097876097,
+          -0.060429755472098716,
+          -0.8361375606063494
+        ]
+      },
+      "phase": "victory",
+      "z": 3022.7352780145757,
+      "time": 69.50000000000284,
+      "front": {
+        "s": 0.8651220772158659,
+        "dir": 1,
+        "phase": "storm",
+        "left": 9.077723168765147,
+        "k": 0
+      },
+      "cinematicTime": 16.03333333333329
+    },
+    {
+      "name": "26_v_reveal",
+      "note": "Victory 20.5 s (beat 7): settled reveal — station, ridge behind, title",
+      "camera": {
+        "pos": [
+          -55.334460335643165,
+          -903.5519174835781,
+          3068.669114584333
+        ],
+        "fov": 53.697044264906644,
+        "dir": [
+          0.5054382809376226,
+          -0.05192414560895679,
+          -0.8612990347525072
+        ]
+      },
+      "phase": "victory",
+      "z": 3022.9670871341054,
+      "time": 73.96666666667306,
+      "front": {
+        "s": 0.831818208612663,
+        "dir": 1,
+        "phase": "storm",
+        "left": 4.611056502094925,
+        "k": 0
+      },
+      "cinematicTime": 20.500000000000178
+    }
+  ],
+  "errors": [],
+  "courseId": "SEED-3403625622-SPR@WHITE",
+  "runs": [
+    {
+      "difficulty": "normal",
+      "requestedSeed": "WO-R1",
+      "courseId": "SEED-3403625622-SPR@WHITE",
+      "builtWorldId": "SEED-3403625622-SPR@WHITE",
+      "seed": 3403625622,
+      "verified": true
+    },
+    {
+      "difficulty": "normal",
+      "requestedSeed": "WO-R1",
+      "courseId": "SEED-3403625622-SPR@WHITE",
+      "builtWorldId": "SEED-3403625622-SPR@WHITE",
+      "seed": 3403625622,
+      "verified": true
+    },
+    {
+      "difficulty": "hard",
+      "requestedSeed": "WO-R1",
+      "courseId": "SEED-3403625622-SPR-H@WHITE",
+      "builtWorldId": "SEED-3403625622-SPR-H@WHITE",
+      "seed": 3403625622,
+      "verified": true
+    },
+    {
+      "difficulty": "normal",
+      "requestedSeed": "WO-R1",
+      "courseId": "SEED-3403625622-SPR@WHITE",
+      "builtWorldId": "SEED-3403625622-SPR@WHITE",
+      "seed": 3403625622,
+      "verified": true
+    }
+  ],
+  "course": {
+    "L": 3000,
+    "cave": {
+      "index": 0,
+      "caveZ": 260,
+      "triggerZ": 282,
+      "foreshadowZ": 180,
+      "anchor": {
+        "z": 260,
+        "centerX": 6.185433809964871,
+        "side": -1,
+        "d": 46
+      },
+      "chaseEndZ": 3000,
+      "checkpointZ": null,
+      "speedMul": 1
+    },
+    "rimSide": 1
+  }
+}

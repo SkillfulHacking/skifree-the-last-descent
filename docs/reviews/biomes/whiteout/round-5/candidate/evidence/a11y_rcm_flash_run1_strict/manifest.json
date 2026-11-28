@@ -1,0 +1,196 @@
+{
+  "biome": "whiteout",
+  "seed": "WO-R1",
+  "length": "sprint",
+  "viewport": "1366x768",
+  "sha": "bbbef83",
+  "settingsOverride": {
+    "reduceCameraMotion": true,
+    "reduceFlashes": true
+  },
+  "renderer": "SwiftShader (software)",
+  "date": "2026-11-27T00:30:55.105Z",
+  "shots": [
+    {
+      "name": "19_station_approach",
+      "note": "Approaching the rescue station through the storm (gameplay camera)",
+      "expect": {},
+      "checks": {},
+      "failed": [],
+      "course": "SEED-3403625622-SPR@WHITE",
+      "yeti": {
+        "distance": 2608.5,
+        "phase": "chase",
+        "drawn": true,
+        "inMainView": false,
+        "heightPx": 0,
+        "fromCamera": 2601.1
+      },
+      "skier": {
+        "inMainView": true
+      },
+      "letterboxPx": 0,
+      "camera": {
+        "pos": [
+          0.7898398360259985,
+          -892.6276346572536,
+          2873.767228244125
+        ],
+        "fov": 64,
+        "dir": [
+          -0.03341340773574467,
+          -0.20536055600618144,
+          0.9781158347661676
+        ]
+      },
+      "phase": "chase",
+      "z": 2880.475496154131,
+      "time": 45.86666666666616,
+      "front": {
+        "s": 0.8192641191224931,
+        "dir": 1,
+        "phase": "storm",
+        "left": 32.711056502101826,
+        "k": 0
+      },
+      "cinematicTime": -1
+    },
+    {
+      "name": "20_v_arrive",
+      "note": "Victory 1.8 s (beat 1, into the light): behind the skier toward the hut through the storm; letterbox on",
+      "expect": {
+        "skier": "main",
+        "letterbox": true
+      },
+      "checks": {
+        "skier": true,
+        "letterbox": true
+      },
+      "failed": [],
+      "course": "SEED-3403625622-SPR@WHITE",
+      "yeti": {
+        "phase": "stopped",
+        "drawn": false,
+        "inMainView": false,
+        "heightPx": 0,
+        "fromCamera": 24.1
+      },
+      "skier": {
+        "inMainView": true
+      },
+      "letterboxPx": 84,
+      "camera": {
+        "pos": [
+          -3.7288327123524834,
+          -917.2430165535238,
+          3009.9469841085133
+        ],
+        "fov": 46,
+        "dir": [
+          -0.32853568300022334,
+          -0.007740286923188899,
+          0.9444598418958445
+        ]
+      },
+      "phase": "victory",
+      "z": 3016.747758392972,
+      "time": 54.933333333332314,
+      "front": {
+        "s": 0.8957056911100841,
+        "dir": 1,
+        "phase": "storm",
+        "left": 23.644389835435675,
+        "k": 0
+      },
+      "cinematicTime": 1.8000000000000023
+    },
+    {
+      "name": "21_v_welcome",
+      "note": "Victory 5.2 s (beat 2, welcome): in front of the porch looking at the door as it opens, skier arriving",
+      "expect": {
+        "skier": "main"
+      },
+      "checks": {
+        "skier": false
+      },
+      "failed": [
+        "skier"
+      ],
+      "course": "SEED-3403625622-SPR@WHITE",
+      "yeti": {
+        "phase": "stopped",
+        "drawn": false,
+        "inMainView": false,
+        "heightPx": 0,
+        "fromCamera": 37.1
+      },
+      "skier": {
+        "inMainView": false
+      },
+      "letterboxPx": 84,
+      "camera": {
+        "pos": [
+          -6.1562430739134095,
+          -916.8154643656901,
+          3022.8729849720467
+        ],
+        "fov": 46,
+        "dir": [
+          -0.5280353369055707,
+          -0.11979699629569046,
+          0.8407302555859106
+        ]
+      },
+      "phase": "victory",
+      "z": 3022.39455237375,
+      "time": 58.36666666666545,
+      "front": {
+        "s": 0.796680771211718,
+        "dir": 1,
+        "phase": "storm",
+        "left": 20.211056502102537,
+        "k": 0
+      },
+      "cinematicTime": 5.2333333333333245
+    }
+  ],
+  "errors": [],
+  "courseId": "SEED-3403625622-SPR@WHITE",
+  "runs": [
+    {
+      "difficulty": "normal",
+      "requestedSeed": "WO-R1",
+      "courseId": "SEED-3403625622-SPR@WHITE",
+      "builtWorldId": "SEED-3403625622-SPR@WHITE",
+      "seed": 3403625622,
+      "verified": true
+    },
+    {
+      "difficulty": "normal",
+      "requestedSeed": "WO-R1",
+      "courseId": "SEED-3403625622-SPR@WHITE",
+      "builtWorldId": "SEED-3403625622-SPR@WHITE",
+      "seed": 3403625622,
+      "verified": true
+    }
+  ],
+  "course": {
+    "L": 3000,
+    "cave": {
+      "index": 0,
+      "caveZ": 260,
+      "triggerZ": 282,
+      "foreshadowZ": 180,
+      "anchor": {
+        "z": 260,
+        "centerX": 6.185433809964871,
+        "side": -1,
+        "d": 46
+      },
+      "chaseEndZ": 3000,
+      "checkpointZ": null,
+      "speedMul": 1
+    },
+    "rimSide": 1
+  }
+}

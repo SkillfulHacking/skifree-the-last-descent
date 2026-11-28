@@ -90,6 +90,9 @@ kbd {
 .letterbox.on { height: 11vh; }
 .hud-tl { position: absolute; left: 32px; top: 26px; text-shadow: 0 2px 12px rgba(0,0,0,0.45); }
 .hud-score { font: 900 30px/1 var(--display); letter-spacing: 0.02em; }
+.hud-weather { position: absolute; left: 32px; top: 104px; padding: 5px 12px; border-radius: 999px; background: rgba(12,18,28,0.62); color: #e8f0ff; font: 800 14px/1.2 var(--display, sans-serif); letter-spacing: 0.1em; text-shadow: none; }
+.hud-weather.warn { background: rgba(140,82,0,0.94); color: #fff; } /* (W-074) 6.3:1 for white text; was 3.8:1 */
+.hud-weather.storm { background: rgba(28,44,70,0.85); color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.5); }
 .hud-mult { margin-top: 4px; font-weight: 800; font-size: 15px; color: var(--ice); letter-spacing: 0.08em; }
 .hud-mult.hot { color: var(--accent); }
 .hud-tr { position: absolute; right: 32px; top: 26px; text-align: right; text-shadow: 0 2px 12px rgba(0,0,0,0.45); }
@@ -161,10 +164,22 @@ kbd {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 .rear-view { position: fixed; border: 2px solid rgba(255,255,255,0.7); border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(0,0,0,0.3); pointer-events: none; opacity: 0; transition: opacity 0.3s; }
+.rear-view.snap { transition: none; }
 .rear-view::after { content: 'BEHIND YOU'; position: absolute; left: 8px; top: 4px; font: 800 10px var(--font); letter-spacing: 0.25em; color: #ffd0d0; text-shadow: 0 1px 4px #000; }
-.hud-caption { position: absolute; left: 50%; bottom: calc(11vh + 64px); transform: translateX(-50%); padding: 6px 14px; border-radius: 8px; background: rgba(0,0,0,0.55); font-size: 15px; letter-spacing: 0.04em; opacity: 0; transition: opacity 0.25s !important; white-space: nowrap; }
+.hud-caption { position: absolute; left: 50%; bottom: calc(11vh + 64px); transform: translateX(-50%); padding: 6px 14px; border-radius: 8px; background: rgba(0,0,0,0.62); font-size: 15px; line-height: 1.35; letter-spacing: 0.04em; opacity: 0; transition: opacity 0.25s !important;
+  /* (W-047) wraps: never wider than the screen at any UI scale */
+  white-space: normal; width: max-content; max-width: min(86vw, 760px); box-sizing: border-box; text-align: center; overflow-wrap: anywhere; }
+.hud-caption .cap-line { display: none; }
+.hud-caption .cap-line.on { display: block; }
+.hud-caption .cap-hard.on + .cap-soft.on { margin-top: 3px; padding-top: 3px; border-top: 1px solid rgba(255,255,255,0.18); }
 .hud-caption.on { opacity: 1; }
-.hud-center.run { top: 36%; font-size: clamp(44px, 7vw, 96px) !important; }
+/* (round 4, W-085 / review C R3-C4) RUN. sits below the rear-view inset at every UI scale: the inset's bottom is
+   78px·scale + min(420px·scale, 30vw) / 2.4 (App.prepareRearView); round 3 overlapped it by 12–18 px at UI 1.5 */
+/* (W-085, round 5 E4-1) RUN. sits just below the rear-view inset. The HUD is inside .ui's zoom, which already
+   multiplies px and vw by --ui-scale, while the inset outside it is scaled once: so the inset's own size
+   (78px + min(175px, 12.5vw) scaled, then +10px) is written here in the zoom's units — px unscaled, and the
+   screen-sized terms divided by the scale */
+.hud-center.run { top: max(36%, calc(78px + min(175px, 12.5vw / var(--ui-scale, 1)) + 10px / var(--ui-scale, 1))); font-size: clamp(44px, 7vw, 96px) !important; }
 
 /* ---------- main menu (pass 2): hero title outside the panel; fits without scrolling ---------- */
 .menu-root.main { flex-direction: column; align-items: flex-start; justify-content: center; gap: 0;
@@ -221,6 +236,7 @@ kbd {
 .hud-mult { text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }
 .hud-yeti-label { font-size: 14px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85), 0 2px 12px rgba(0, 0, 0, 0.6); }
 .hud-yeti.near .hud-yeti-label { color: #ffc4c4; }
+.hud-yeti.closing .hud-yeti-label { color: #ffd38a; }
 .hud-skip { font-size: 14px; color: rgba(236, 244, 255, 0.9); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8); }
 .rear-view::after { font-size: 12px; }
 .menu-row .label small { font-size: 12px; }
@@ -232,3 +248,6 @@ kbd {
 .hud-mult.hot { color: #ffd28a; }
 /* a one-time control hint in the caption line: wraps instead of running off narrow screens */
 .hud-caption.hint { white-space: normal; max-width: min(78vw, 640px); text-align: center; }
+
+/* round 6: the consented playtest log is visibly on (docs/playtest/WHITEOUT_PLAYTEST.md) */
+.playtest-tag { position: fixed; left: 8px; bottom: 6px; z-index: 50; pointer-events: none; font: 600 11px/1.2 system-ui, sans-serif; letter-spacing: 0.04em; color: #fff; background: rgba(160, 30, 30, 0.75); padding: 3px 7px; border-radius: 4px; }

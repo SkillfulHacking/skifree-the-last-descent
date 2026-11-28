@@ -11,7 +11,7 @@
 import { smoothstep } from '../../core/rng';
 import type { SurfaceType } from '../../core/types';
 import type { Mountain } from '../course';
-import type { EnvQuery, EnvSample, PhysicsEnvironment } from '../../physics/environment';
+import { HEADWIND_STANCE, SLIP_EDGE, type EnvQuery, type EnvSample, type PhysicsEnvironment } from '../../physics/environment';
 import { capabilitiesOf, type BiomeCapabilities, type GameDifficulty } from './index';
 import { combineSurface, resetSurface, type SurfaceQuery, type SurfaceWeights } from './surface';
 import { makeWeatherSample, type WeatherSample } from './weather';
@@ -52,6 +52,14 @@ export const RIM_GUARD = { reach: 16, updraft: 30, over: 1.5, drop: 10, back: 6 
  * on the piste like the out-of-bounds rule, with its own cue. The cornice snow does not resist
  * heading inland, so this is a backstop (an idle or floundering skier), not the way out.
  */
+/**
+ * The ridge rim (Whiteout): updraft (m/s², toward the ridge) within `reach` m of the rim for an
+ * airborne skier; over by more than `over` m (grounded, or `drop` m below the rim in the air) → put
+ * back on the piste `back` m uphill. The first metres past the rim are the cornice's gentle roll-over,
+ * so a skier who slides onto it sees the edge before the guard acts.
+ */
+export const RIDGE_GUARD = { reach: 14, updraft: 12, over: 8, drop: 8, back: 6 } as const;
+
 export const CORNICE_STALL = { zone: 18, speed: 1, time: 3 } as const;
 
 /** how far ahead (m) a periodic hazard's telegraph/active transitions are reported */
@@ -103,8 +111,16 @@ export class BiomeEnvironment implements PhysicsEnvironment {
 
   /** × hazard effect strength for the game difficulty (HazardSetup.intensity) */
   readonly intensity: number;
+  /** (Round 5, W-094) the weather building down the mountain on this difficulty (HazardSetup.builds) */
+  private readonly build: { from: number; to: number; amount: number } | null;
+  /** the hazard intensity at a point of the course (the difficulty's, × the build-up by then) */
+  intensityAt(z: number): number {
+    return this.build ? this.intensity * (1 + this.build.amount * smoothstep(this.build.from, this.build.to, z)) : this.intensity;
+  }
   /** the weather's mean wind speed over a run (m/s), the reference for the headwind's gust factor */
   private readonly meanWind: number;
+  /** the wind exposure (0..1) at the last sampled point (1 when the model has none) */
+  lastExposure = 1;
   /** this course's headwind drag coefficient (0 = none; WeatherCoupling.headwind) */
   readonly headwind: number;
 
@@ -116,6 +132,8 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     this.caps = capabilitiesOf(mountain.biome);
     const long = !Number.isFinite(mountain.finishZ) || mountain.finishZ >= 20000;
     this.intensity = (this.caps.hazards.intensity?.[opts.difficulty ?? 'normal'] ?? 1) * (long ? (this.caps.hazards.longCourse ?? 1) : 1);
+    const b = this.caps.hazards.builds;
+    this.build = b && b.amount[opts.difficulty ?? 'normal'] ? { from: b.from, to: b.to, amount: b.amount[opts.difficulty ?? 'normal']! } : null;
     this.kinds = this.caps.hazards.kinds.map(getHazardKind);
     this.hazards = new HazardField(mountain, seed, this.kinds, this.caps.hazards.density);
     const cpl = this.caps.weather.coupling;
@@ -220,9 +238,20 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       gust = w.gust;
       // the breeze's strength relative to its mean (gusts above 1, lulls below)
       gustK = this.meanWind > 0 ? Math.hypot(wx, wz) / this.meanWind : 1;
+      // sheltered ground (trees, gullies) takes less of the wind (WeatherModel.exposure; default 1)
+      const ex = caps.weather.exposure ? caps.weather.exposure(this.mountain, q.x, q.z, q.t, this.seed) : 1;
+      this.lastExposure = ex;
+      wx *= ex;
+      wz *= ex;
+      gust *= ex;
+      gustK *= ex;
     }
-    // the breeze costs a grounded, upright skier speed whatever their heading (extra drag × its strength)
-    if (this.headwind && q.grounded && !q.crashed) S.dragAdd += this.headwind * gustK;
+    // the breeze costs a grounded skier speed whatever their heading (extra drag × its strength); like the
+    // skier's own air drag it bites less on the tuck's smaller frontal area (W-080: HEADWIND_STANCE)
+    if (this.headwind && q.grounded && !q.crashed) S.dragAdd += this.headwind * gustK * (1 - (1 - HEADWIND_STANCE.tuck) * (q.tuck ?? 0));
+    // the weather's own wind at the skier (before any hazard's), for the ground crosswind slip
+    const wwx = wx;
+    const wwz = wz;
     // 3) hazards
     let px = 0;
     let pz = 0;
@@ -237,6 +266,21 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     }
     out.airAccelX = q.grounded ? 0 : cpl.airborne * wx + push;
     out.airAccelZ = q.grounded ? 0 : cpl.airborne * wz;
+    // the crosswind on open, wind-scoured snow (W-014): exposure is already folded into wx/wz
+    const gs = cpl.groundSlip ?? 0;
+    if (gs > 0 && q.grounded && !q.crashed) {
+      const k = gs * (2 - S.grip);
+      const sx = Math.max(-2.2, Math.min(2.2, k * wwx));
+      px += sx;
+      pz += Math.max(-1, Math.min(1, 0.3 * k * wwz));
+      // (steeply with exposure: the fully open crest lines pay; part-sheltered ground hardly)
+      // (scaled like the hazards by the game difficulty's environment intensity)
+      // (W-035: the speed it costs follows how much of the slip takes hold — SkierPhysics.SLIP_EDGE —
+      // so a skier who rises onto their edges in an exposed crosswind pays less than one still tucked;
+      // normalised so a full tuck pays what it always did)
+      const take = (1 + SLIP_EDGE.tuck * (q.tuck ?? 1)) / (1 + SLIP_EDGE.tuck);
+      if (cpl.skidDrag) S.dragAdd += cpl.skidDrag * Math.abs(sx) * smoothstep(0.86, 1, this.lastExposure) * this.intensityAt(q.z) * take;
+    }
     out.groundSlipX = q.grounded && !q.crashed ? px : 0;
     out.groundSlipZ = q.grounded && !q.crashed ? pz : 0;
     out.balance = q.grounded ? cpl.balance * gust : 0;
@@ -265,6 +309,19 @@ export class BiomeEnvironment implements PhysicsEnvironment {
         }
       } else this.stall = 0;
     } else this.stall = 0;
+    // 5) a ridge's corniced rim (Whiteout, terrain.ridge): the wind lifting up the flank eases an
+    //    airborne skier back over the ridge; a skier who goes over the rim anyway (grounded past it,
+    //    or airborne and well below it) is put back on the piste, crashed, with a cue — the flank is a
+    //    long fall into the valley, not a route
+    const rb = this.mountain.beyondRidgeRim(q.x, q.z);
+    if (!Number.isNaN(rb) && !q.crashed && !out.relocate) {
+      if (!q.grounded && rb > -RIDGE_GUARD.reach) out.airAccelX -= this.mountain.biome.terrain.ridge!.dropSide * RIDGE_GUARD.updraft * smoothstep(-RIDGE_GUARD.reach, 0, rb);
+      const rimY = this.mountain.heightAt(this.mountain.ridgeRimX(q.z), q.z);
+      if (rb > RIDGE_GUARD.over && (q.grounded || q.y < rimY - RIDGE_GUARD.drop)) {
+        const z = q.z - RIDGE_GUARD.back;
+        out.relocate = { x: this.mountain.routeX(z), z, reason: 'over the cornice' };
+      }
+    }
   }
 
   /** wind x/z (m/s, airborne coupling), grounded side-slip x/z (m/s) and airborne push x (m/s²) from hazards this step */
@@ -280,7 +337,10 @@ export class BiomeEnvironment implements PhysicsEnvironment {
     // physics-critical band must exist even if the caller did not stream (simulations)
     this.hazards.ensure(q.z - 1, q.z + 1);
     const near = this.hazards.near(q.x, q.z + HAZARD_ALERT_RANGE * 0.5, HAZARD_ALERT_RANGE * 0.5 + HAZARD_PASS_RANGE, this.near);
-    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensity, tuck: q.tuck };
+    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: q.speed, grounded: q.grounded, heightAbove: 0, t: q.t, intensity: this.intensityAt(q.z), seed: this.seed, tuck: q.tuck, clearance: 0 };
+    // (airborne: the height over the ground right beneath the skier, measured once per step, only when needed)
+    let clearance = Number.NaN;
+    const clearanceNow = () => (q.grounded ? 0 : Number.isNaN(clearance) ? (clearance = Math.max(0, q.y - this.mountain.heightAt(q.x, q.z))) : clearance);
     for (const h of near) {
       let tr = this.tracks.get(h.id);
       const k = tr?.k ?? getHazardKind(h.kind);
@@ -302,6 +362,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
         contact.dist = dist;
         contact.inside = dist < h.r;
         contact.heightAbove = q.grounded ? 0 : Math.max(0, q.y - h.y);
+        contact.clearance = clearanceNow();
         const e = k.effect(h, ph, contact);
         if (e) applyContinuous(e, out, hw);
         continue;
@@ -311,11 +372,15 @@ export class BiomeEnvironment implements PhysicsEnvironment {
         this.tracks.set(h.id, tr);
       }
       // telegraph / active transitions ahead of the skier
-      if (k.timing.kind === 'periodic' && tr.phase !== ph.phase && h.z > q.z - h.r && h.z - q.z < HAZARD_ALERT_RANGE) {
+      // (round 3, R2 B N1) the phase is only recorded once the hazard is within alert range: a cell
+      // tracked further out (the near window reaches r + reach + 175 m) whose telegraph began there is
+      // reported as it comes into range, not consumed silently
+      const inAlert = h.z > q.z - h.r && h.z - q.z < HAZARD_ALERT_RANGE;
+      if (k.timing.kind === 'periodic' && tr.phase !== ph.phase && inAlert) {
         if (ph.phase === 'telegraph') this.emit({ type: 'hazard-telegraph', hazard: h, kind: k.id, cue: k.audio?.telegraph ?? null, t: q.t });
         else if (ph.phase === 'active') this.emit({ type: 'hazard-active', hazard: h, kind: k.id, cue: k.audio?.active ?? null, t: q.t });
       }
-      tr.phase = ph.phase;
+      if (inAlert || k.timing.kind !== 'periodic') tr.phase = ph.phase;
       tr.closest = Math.min(tr.closest, dist - h.r);
       const inside = dist < h.r;
       if (inside !== tr.inside) {
@@ -334,6 +399,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
       contact.dist = dist;
       contact.inside = inside;
       contact.heightAbove = q.grounded ? 0 : Math.max(0, q.y - h.y);
+      contact.clearance = clearanceNow();
       const e = k.effect(h, ph, contact);
       if (!e) continue;
       applyContinuous(e, out, hw);
@@ -365,7 +431,7 @@ export class BiomeEnvironment implements PhysicsEnvironment {
   hazardVisibility(x: number, z: number, t: number): number {
     if (this.hazards.empty) return 1;
     let v = 1;
-    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: 0, grounded: true, heightAbove: 0, t, intensity: this.intensity };
+    const contact: HazardContact = { dx: 0, dz: 0, dist: 0, inside: false, speed: 0, grounded: true, heightAbove: 0, t, intensity: this.intensityAt(z), seed: this.seed };
     for (const h of this.hazards.near(x, z, 60, [])) {
       const k = getHazardKind(h.kind);
       contact.dx = x - h.x;

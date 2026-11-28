@@ -39,11 +39,13 @@ const ROWS: Array<[number, number]> = [
   [1.0, 620],
 ];
 
-function ridgeHeight(a: number, L: Layer): number {
+function ridgeHeight(a: number, L: Layer, soft = 0): number {
   // sample noise on a circle (seamless around 360°)
   const cx = Math.cos(a) * L.freq;
   const cz = Math.sin(a) * L.freq;
-  const r = ridged(cx + 11, cz + 7, L.seed, 5); // 0..~1, sharp crests
+  let r = ridged(cx + 11, cz + 7, L.seed, soft > 0 ? 3 : 5); // 0..~1, sharp crests
+  // (W-004) rounded crests: compress the peaks into shoulders
+  if (soft > 0 && r > 0.45) r = 0.45 + (r - 0.45) * (1 - 0.55 * soft);
   const broad = 0.5 + 0.5 * gnoise(cx * 0.35 + 3, cz * 0.35 - 5, L.seed + 1);
   const t = Math.min(1, Math.max(0, 0.15 + 0.75 * r * (0.55 + 0.6 * broad)));
   return L.h0 + (L.h1 - L.h0) * t;
@@ -69,7 +71,7 @@ function FAR_CLAMP(look: BiomeRangesLook): string {
   return look.openSector ? '\n  gl_Position.z = min(gl_Position.z, gl_Position.w * 0.99999);' : '';
 }
 
-function ringGeometry(L: Layer, open?: BiomeRangesLook['openSector'], rot = 0): THREE.BufferGeometry {
+function ringGeometry(L: Layer, open?: BiomeRangesLook['openSector'], rot = 0, soft = 0): THREE.BufferGeometry {
   const rng = new Rng(L.seed * 977);
   const nR = ROWS.length;
   const pos = new Float32Array((SEG + 1) * nR * 3);
@@ -78,7 +80,7 @@ function ringGeometry(L: Layer, open?: BiomeRangesLook['openSector'], rot = 0): 
   for (let i = 0; i <= SEG; i++) jit.push(i === SEG ? jit[0]! : rng.range(-0.25, 0.25));
   for (let i = 0; i <= SEG; i++) {
     const a = ((i + jit[i]! * 0.5) / SEG) * Math.PI * 2;
-    let h = ridgeHeight(a, L);
+    let h = ridgeHeight(a, L, soft);
     if (open) {
       // the mesh is rotated by `rot` about Y: local angle a points at world angle a − rot
       const m = 1 - smoothstep(open.halfWidth * 0.55, open.halfWidth, angDist(a - rot, open.center));
@@ -271,7 +273,7 @@ export class DistantRanges {
   constructor(sunDir: THREE.Vector3, sunColor: THREE.Color, skyColor: THREE.Color, look: BiomeRangesLook = getBiome().ranges) {
     this.group.name = 'DistantRanges';
     for (const L of LAYERS) {
-      const g = look.openSector ? ringGeometry(L, look.openSector, L.seed * 0.71) : ringGeometry(L);
+      const g = look.openSector ? ringGeometry(L, look.openSector, L.seed * 0.71, look.soft ?? 0) : ringGeometry(L, undefined, 0, look.soft ?? 0);
       const m = ridgeMaterial(L, sunDir, sunColor, skyColor, look);
       const mesh = new THREE.Mesh(g, m);
       mesh.frustumCulled = false;

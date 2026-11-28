@@ -1,0 +1,60 @@
+SHA 7b25f2bbf21441a4cc5669d0b56d568ccffa98d8
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 1 test using 1 worker
+
+[1/1] tests/e2e/scenic.spec.ts:61:1 › Scenic Route: choose Fjord Coast, ski to a viewpoint, unlock, toast, Achievements, survives a reload (no ?debug)
+tests/e2e/scenic.spec.ts:61:1 › Scenic Route: choose Fjord Coast, ski to a viewpoint, unlock, toast, Achievements, survives a reload (no ?debug)
+[scenic 0] t=1.0 5 km/h, 3.0 km to go, unlocked=false
+
+[scenic 0] t=2.0 10 km/h, 3.0 km to go, unlocked=false
+
+[scenic 0] t=3.0 13 km/h, 3.0 km to go, unlocked=false
+
+[scenic 0] t=4.0 16 km/h, 3.0 km to go, unlocked=false
+
+[scenic 0] t=5.0 18 km/h, 3.0 km to go, unlocked=false
+
+[scenic 0] t=6.0 19 km/h, 3.0 km to go, unlocked=false
+
+[scenic 0] t=7.0 24 km/h, 3.0 km to go, unlocked=false
+
+[scenic 0] t=8.0 27 km/h, 3.0 km to go, unlocked=false
+
+[scenic 0] t=9.0 30 km/h, 3.0 km to go, unlocked=false
+
+[scenic 0] t=10.0 30 km/h, 3.0 km to go, unlocked=false
+
+[scenic 0] t=11.0 30 km/h, 2.9 km to go, unlocked=false
+
+[scenic 0] t=12.0 30 km/h, 2.9 km to go, unlocked=false
+
+[scenic 0] t=13.0 30 km/h, 2.9 km to go, unlocked=false
+
+[scenic 0] t=14.0 31 km/h, 2.9 km to go, unlocked=false
+
+[scenic 0] t=15.0 33 km/h, 2.9 km to go, unlocked=false
+
+[scenic 0] t=16.0 37 km/h, 2.9 km to go, unlocked=false
+
+[scenic 0] t=17.0 39 km/h, 2.9 km to go, unlocked=false
+
+[scenic 0] t=18.0 40 km/h, 2.9 km to go, unlocked=false
+
+[scenic 0] t=19.0 37 km/h, 2.9 km to go, unlocked=false
+
+[scenic 0] t=20.0 35 km/h, 2.9 km to go, unlocked=false
+
+[scenic 0] t=21.0 29 km/h, 2.9 km to go, unlocked=false
+
+[scenic 0] t=22.0 20 km/h, 2.8 km to go, unlocked=true
+
+{"toasts":["Scenic Route"],"tricks":["VIEWPOINT DISCOVERED+500"],"caps":["[a distant growl echoes across the mountain][a squall gusts across the jump ahead]","[a distant growl echoes across the mountain]Moving slowly? Hold R to push with your poles.","[a distant growl echoes across the mountain][gulls cry over open water — a viewpoint]"]}
+
+  Slow test file: tests/e2e/scenic.spec.ts (1.3h)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  1 passed (1.3h)
+exit 0

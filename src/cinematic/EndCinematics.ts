@@ -16,6 +16,7 @@ export class DefeatCinematic {
   private side = new THREE.Vector3();
 
   constructor(private st: Stage) {
+    this.tl.calm = () => st.settings.reduceCameraMotion;
     const yp = st.yetiAI.pos.clone();
     this.yetiPos.copy(yp);
     const h = st.yetiAI.heading;
@@ -93,12 +94,14 @@ export class VictoryCinematic implements VictoryDirector {
   onResults: (() => void) | null = null;
   /** 0..1 how much the game should auto-steer the skier to the stop point */
   autopilot = 1;
+  stopOnMark = false;
   cheer = 0;
   welcome = 0;
   readonly stopPoint = new THREE.Vector3();
   private script: VictoryScript;
 
   constructor(st: Stage) {
+    this.tl.calm = () => st.settings.reduceCameraMotion;
     const finish = st.world.finish!;
     finish.getStopPoint(this.stopPoint);
     this.script = st.world.finishDef.victory(st, finish, this);

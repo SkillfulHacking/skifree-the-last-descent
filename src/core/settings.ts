@@ -2,7 +2,7 @@
 import type { QualityPreset } from './types';
 import { DEFAULT_BINDINGS, type Action } from '../input/Input';
 import type { CourseMode, Difficulty, LengthMode } from '../game/CourseConfig';
-import { DEFAULT_BIOME, hasBiome, type BiomeId } from '../world/biome';
+import { DEFAULT_BIOME, hasBiome, listBiomes, type BiomeId } from '../world/biome';
 
 export interface Settings {
   quality: QualityPreset;
@@ -12,6 +12,10 @@ export interface Settings {
   sfxVolume: number;
   cameraShake: number; // 0..1
   reduceFlashes: boolean;
+  /** (round 4, W-088) controller vibration (rumble) on impacts and the Yeti's landing */
+  vibration: boolean;
+  /** thinner snow, lighter storm fog, less blowing motion (presentation only: W-049) */
+  reduceWeather: boolean;
   reduceCameraMotion: boolean;
   invertCameraY: boolean;
   invertCameraX: boolean;
@@ -60,6 +64,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sfxVolume: 0.9,
   cameraShake: 1,
   reduceFlashes: false,
+  vibration: true,
+  reduceWeather: false,
   reduceCameraMotion: false,
   invertCameraY: false,
   invertCameraX: false,
@@ -86,9 +92,22 @@ export const DEFAULT_RECORDS: Records = { bestTime: null, bestScore: 0, bestDist
 
 /** Local records, kept separately for every course id (mode + seed/date + length). */
 export interface RecordBook {
-  /** progress flag shared by all courses */
+  /**
+   * The pre-round-4 progress flag shared by every location (production builds still read it). Kept as
+   * "a cave cinematic has been watched somewhere"; the game itself now reads `seenCave`.
+   */
   seenCaveCinematic: boolean;
+  /**
+   * (Round 4, owner's decision B) the cave cinematic watched to its end, per location (biome id). A
+   * first viewing in a location cannot be skipped; seeing one location's never marks another's.
+   */
+  seenCave: Partial<Record<BiomeId, true>>;
   courses: Record<string, Records>;
+  /**
+   * What the stored book held that this build does not know (fields from other builds), written back
+   * unchanged with the book: top level and per course. Never shown to the game.
+   */
+  unknown?: { top: Record<string, unknown>; courses: Record<string, Record<string, unknown>> };
 }
 
 const KEY_S = 'skifree-tld.settings.v1';
@@ -137,6 +156,8 @@ export function sanitize(s: Settings): Settings {
   s.deadzone = num(s.deadzone, d.deadzone, 0.02, 0.4);
   s.uiScale = num(s.uiScale, d.uiScale, 0.85, 1.5);
   s.reduceFlashes = bool(s.reduceFlashes, d.reduceFlashes);
+  s.vibration = bool(s.vibration, d.vibration);
+  s.reduceWeather = bool(s.reduceWeather, d.reduceWeather);
   s.reduceCameraMotion = bool(s.reduceCameraMotion, d.reduceCameraMotion);
   s.invertCameraX = bool(s.invertCameraX, d.invertCameraX);
   s.invertCameraY = bool(s.invertCameraY, d.invertCameraY);
@@ -189,30 +210,92 @@ export function saveRecords(r: Records, kv: KV | null = storage()) {
   }
 }
 
+/** The location of a course id (courseId: an `@CODE` suffix; none = Alpine). */
+export function courseBiome(id: string, codes: Readonly<Record<string, BiomeId>>): BiomeId | null {
+  const at = id.lastIndexOf('@');
+  if (at < 0) return DEFAULT_BIOME;
+  return codes[id.slice(at + 1)] ?? null;
+}
+
+const RECORD_FIELDS = new Set<string>(Object.keys(DEFAULT_RECORDS));
+const BOOK_FIELDS = new Set(['seenCaveCinematic', 'seenCave', 'courses']);
+
+/**
+ * (Round 4, decision B) The per-location history for a book stored before it existed (no `seenCave`):
+ *  - the old flag meant "a cave cinematic was watched to its end somewhere";
+ *  - reliable evidence of where: runs on that location's courses. With runs on Alpine (or no runs at
+ *    all — the flag then came from Alpine, the first location every player gets) Alpine is marked;
+ *  - with no Alpine runs but Fjord runs, it can only have been Fjord's: Fjord is marked;
+ *  - Whiteout is never inferred from the old flag (owner's decision B): its storm-cave version is new.
+ * Idempotent: a book that has `seenCave` is never migrated again.
+ */
+export function migrateCaveHistory(legacySeen: boolean, courses: Record<string, Records>, codes: Readonly<Record<string, BiomeId>>): Partial<Record<BiomeId, true>> {
+  const out: Partial<Record<BiomeId, true>> = {};
+  if (!legacySeen) return out;
+  const runs: Partial<Record<string, number>> = {};
+  for (const [id, r] of Object.entries(courses)) {
+    const b = courseBiome(id, codes);
+    if (b) runs[b] = (runs[b] ?? 0) + r.runs;
+  }
+  const any = Object.values(runs).some((n) => (n ?? 0) > 0);
+  if ((runs[DEFAULT_BIOME] ?? 0) > 0 || !any) out[DEFAULT_BIOME] = true;
+  else if ((runs['fjord'] ?? 0) > 0) out['fjord' as BiomeId] = true;
+  return out;
+}
+
+/** Biome codes (the `@CODE` of course ids) → ids, from the registry (the locations registered at load) */
+function biomeCodes(): Record<string, BiomeId> {
+  return Object.fromEntries(listBiomes().map((b) => [b.code, b.id]));
+}
+
 /**
  * Load the per-course record book. Records from before courses existed (v1: one global set,
- * all earned on the original 3 km course) are migrated to CLASSIC-SPR.
+ * all earned on the original 3 km course) are migrated to CLASSIC-SPR. Fields this build does not
+ * know are kept and written back unchanged (round 4).
  */
 export function loadRecordBook(kv: KV | null = storage()): RecordBook {
-  const book: RecordBook = { seenCaveCinematic: false, courses: {} };
+  const book: RecordBook = { seenCaveCinematic: false, seenCave: {}, courses: {}, unknown: { top: {}, courses: {} } };
   try {
     const raw = kv?.getItem(KEY_RB);
     if (raw) {
-      const p = JSON.parse(raw) as Partial<RecordBook>;
+      const p = JSON.parse(raw) as Partial<RecordBook> & Record<string, unknown>;
+      if (!p || typeof p !== 'object') return book;
       book.seenCaveCinematic = p.seenCaveCinematic === true;
-      if (p.courses && typeof p.courses === 'object') for (const [k, v] of Object.entries(p.courses)) if (v && typeof v === 'object') book.courses[k] = cleanRecords(v);
+      if (p.courses && typeof p.courses === 'object')
+        for (const [k, v] of Object.entries(p.courses)) {
+          if (!v || typeof v !== 'object') continue;
+          book.courses[k] = cleanRecords(v);
+          const extra = Object.fromEntries(Object.entries(v as unknown as Record<string, unknown>).filter(([f]) => !RECORD_FIELDS.has(f)));
+          if (Object.keys(extra).length) book.unknown!.courses[k] = extra;
+        }
+      for (const [f, v] of Object.entries(p)) if (!BOOK_FIELDS.has(f)) book.unknown!.top[f] = v;
+      if (p.seenCave && typeof p.seenCave === 'object') {
+        for (const [b, v] of Object.entries(p.seenCave)) if (v === true) book.seenCave[b as BiomeId] = true;
+      } else book.seenCave = migrateCaveHistory(book.seenCaveCinematic, book.courses, biomeCodes());
       return book;
     }
     const old = kv?.getItem(KEY_R);
     if (old) {
       const r = { ...DEFAULT_RECORDS, ...(JSON.parse(old) as Partial<Records>) };
-      book.seenCaveCinematic = r.seenCaveCinematic;
+      book.seenCaveCinematic = r.seenCaveCinematic === true;
       if (r.runs > 0) book.courses['CLASSIC-SPR'] = cleanRecords(r);
+      book.seenCave = migrateCaveHistory(book.seenCaveCinematic, book.courses, biomeCodes());
     }
   } catch {
     /* corrupt: start fresh */
   }
   return book;
+}
+
+/** Has the cave cinematic been watched to its end in this location? */
+export function caveSeen(b: RecordBook, biome: BiomeId): boolean {
+  return b.seenCave[biome] === true;
+}
+
+/** Mark a location's cave cinematic watched (its first complete viewing). */
+export function markCaveSeen(b: RecordBook, biome: BiomeId): void {
+  b.seenCave[biome] = true;
+  b.seenCaveCinematic = true;
 }
 
 /** Repair a stored record set: every field gets the right type and a sane range (B9). */
@@ -231,7 +314,11 @@ export function cleanRecords(v: Partial<Records>): Records {
 
 export function saveRecordBook(b: RecordBook, kv: KV | null = storage()) {
   try {
-    kv?.setItem(KEY_RB, JSON.stringify(b));
+    // what this build knows, over what it does not (kept as it was stored)
+    const u = b.unknown ?? { top: {}, courses: {} };
+    const courses: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(b.courses)) courses[k] = { ...(u.courses[k] ?? {}), ...v };
+    kv?.setItem(KEY_RB, JSON.stringify({ ...u.top, seenCaveCinematic: b.seenCaveCinematic, seenCave: b.seenCave, courses }));
   } catch {
     /* ignore */
   }

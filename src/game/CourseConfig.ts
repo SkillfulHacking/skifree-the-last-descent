@@ -16,6 +16,7 @@
  */
 import { Mountain, SEED_DEFAULT } from '../world/course';
 import { DEFAULT_BIOME, biomeByCode, getBiome, hasBiome, listBiomes, type BiomeId } from '../world/biome';
+import { capabilitiesOf } from '../world/capabilities';
 
 export type CourseMode = 'classic' | 'daily' | 'custom';
 export type LengthMode = 'sprint' | 'standard' | 'endurance' | 'expedition' | 'endless';
@@ -26,6 +27,14 @@ export const DIFFICULTY: Record<Difficulty, { yetiSpeed: number; label: string; 
   normal: { yetiSpeed: 1, label: 'Normal', code: '' },
   hard: { yetiSpeed: 1.07, label: 'Hard', code: 'H' },
 };
+
+/**
+ * The Yeti's pace multiplier for a difficulty at a location: the difficulty's pace × the location's
+ * difficulty-specific pace (BiomeTerrain.difficultyPace, Round 5 W-094). Fixed for the whole run.
+ */
+export function yetiSpeedFor(d: Difficulty, biome: BiomeId | undefined): number {
+  return DIFFICULTY[d].yetiSpeed * (getBiome(biome ?? DEFAULT_BIOME).terrain.difficultyPace?.[d] ?? 1);
+}
 
 export const LENGTH_MODES: readonly LengthMode[] = ['sprint', 'standard', 'endurance', 'expedition', 'endless'];
 
@@ -231,9 +240,9 @@ export function courseSpec(c: CourseConfig, upToZ = 60000) {
     config: c,
     profile: P.kind,
     finishZ: Number.isFinite(m.finishZ) ? m.finishZ : null,
-    difficulty: { name: c.difficulty, yetiSpeed: DIFFICULTY[c.difficulty].yetiSpeed },
+    difficulty: { name: c.difficulty, yetiSpeed: +yetiSpeedFor(c.difficulty, c.biome).toFixed(3) },
     segments: segs.filter((s) => s.z0 < end).map((s) => ({ type: s.type, z0: Math.round(s.z0), z1: Number.isFinite(s.z1) ? Math.round(s.z1) : null })),
-    encounters: P.encounters(-Infinity, end).map((e) => ({ index: e.index, caveZ: e.caveZ, side: e.anchor.side, chaseEndZ: e.chaseEndZ, refugeZ: e.checkpointZ, yetiSpeed: +(e.speedMul * DIFFICULTY[c.difficulty].yetiSpeed).toFixed(3) })),
+    encounters: P.encounters(-Infinity, end).map((e) => ({ index: e.index, caveZ: e.caveZ, side: e.anchor.side, chaseEndZ: e.chaseEndZ, refugeZ: e.checkpointZ, yetiSpeed: +(e.speedMul * yetiSpeedFor(c.difficulty, c.biome)).toFixed(3) })),
     refuges: P.checkpoints(-Infinity, end),
     alternateLines: P.altRoutes(-Infinity, end).map((a) => ({ type: a.type, z0: Math.round(a.z0), z1: Math.round(a.z1) })),
     route,
@@ -268,4 +277,28 @@ export function buildMountain(c: CourseConfig): Mountain {
   const biome = getBiome(c.biome);
   if (usesClassicLayout(c)) return Mountain.classic(worldSeed(c), biome);
   return Mountain.generated(worldSeed(c), LENGTH_INFO[c.length].metres, biome);
+}
+
+/**
+ * (Round 6, owner ruling 1) What a difficulty actually changes on a location, worded for the menu, from
+ * the live configuration — so the label never claims a difference the game does not make:
+ *  - the Yeti's pace against Normal's on that location (only named when it differs by 3 % or more);
+ *  - the location's hazards (strength against Normal, and a build-up over long courses);
+ *  - Hard's snowballs.
+ */
+export function difficultySummary(d: Difficulty, biome: BiomeId): string {
+  if (d === 'normal') return 'The standard pursuit and weather for this mountain';
+  const parts: string[] = [];
+  const caps = capabilitiesOf(getBiome(biome)) as { hazards?: { intensity?: Partial<Record<Difficulty, number>>; builds?: { amount: Partial<Record<Difficulty, number>> } } };
+  const hz = caps.hazards;
+  const hi = hz?.intensity?.[d];
+  const hn = hz?.intensity?.normal;
+  if (hi !== undefined && hn !== undefined && hn > 0 && Math.abs(hi / hn - 1) >= 0.05) parts.push(hi > hn ? `${Math.round((hi / hn - 1) * 100)}% stronger hazards` : `${Math.round((1 - hi / hn) * 100)}% gentler hazards`);
+  if (hz?.builds?.amount[d]) parts.push('storms build over long courses');
+  if (d === 'hard') parts.push('the Yeti throws snowballs');
+  const pace = yetiSpeedFor(d, biome) / yetiSpeedFor('normal', biome);
+  if (Math.abs(pace - 1) >= 0.03) parts.push(pace > 1 ? `a ${Math.round((pace - 1) * 100)}% faster Yeti` : `a ${Math.round((1 - pace) * 100)}% slower Yeti`);
+  else parts.push('the Yeti at about Normal pace');
+  const s = parts.join(' · ');
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }

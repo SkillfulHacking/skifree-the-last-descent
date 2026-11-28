@@ -22,6 +22,8 @@ export interface WalkStep {
   slipX: number;
   airX: number;
   drag: number;
+  /** (round 4) the weather's headwind share of `drag` (drag − the same step with the headwind off) */
+  headwind: number;
   friction: number;
   knock: boolean;
 }
@@ -96,6 +98,8 @@ export function walk(seed: string, gate: boolean, grounded: boolean, tuck: numbe
   const G = h.params.gate;
   const x = G ? G.x - 0.8 * G.r : h.x;
   const env = new BiomeEnvironment(m, ws, { difficulty: 'normal' });
+  const still = new BiomeEnvironment(m, ws, { difficulty: 'normal', headwind: false });
+  const outStill = makeEnvSample();
   const events: WalkEvent[] = [];
   let zNow = 0;
   env.listen((e: EnvironmentEvent) => {
@@ -125,6 +129,7 @@ export function walk(seed: string, gate: boolean, grounded: boolean, tuck: numbe
     q.t = t;
     q.tuck = tuck;
     env.sample(q, out);
+    still.sample(q, outStill);
     const d = Math.hypot(x - h.x, z - h.z);
     steps.push({
       z: Math.round(z * 100) / 100,
@@ -132,6 +137,7 @@ export function walk(seed: string, gate: boolean, grounded: boolean, tuck: numbe
       slipX: out.groundSlipX,
       airX: out.airAccelX,
       drag: out.surface.dragAdd,
+      headwind: out.surface.dragAdd - outStill.surface.dragAdd,
       friction: out.surface.friction,
       knock: !!out.knock,
     });

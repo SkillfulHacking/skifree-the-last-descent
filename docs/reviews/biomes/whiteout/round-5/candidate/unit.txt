@@ -1,0 +1,15 @@
+SHA 729e22655eb3f26eb1c52e81a0e8b4534c758023 (unit suite run on this tree before the commit; see git log)
+
+ RUN  v5.1.0 /home/claude/sf-wo
+
+
+cornice roots: gather 34.8 ms (rays 12.25 ms) vs Raycaster 205.1 ms, 1107 triangles kept
+
+ Test Files  67 passed (67)
+      Tests  542 passed (542)
+   Start at  05:49:49
+   Duration  715.11s (tests 98%, import 2%)
+
+    Isolate  67 workers spawned · ~196ms startup each (spawn + environment, per file)
+             at least ~12.95s faster with isolate: false — reuses workers across files instead of one per file
+

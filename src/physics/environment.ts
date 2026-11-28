@@ -20,6 +20,16 @@
 import type { SurfaceType } from '../core/types';
 import { IDENTITY_SURFACE, type SurfaceModifiers } from '../world/capabilities/surface';
 
+/** How a grounded side-slip (EnvSample.groundSlip*) takes hold, by what the skier is doing (SkierPhysics). */
+export const SLIP_EDGE = { base: 1, tuck: 0.6, brake: 0.45, drift: 0.6 } as const;
+/**
+ * (round 4, W-080) How much of the weather's headwind drag a fully tucked skier takes, relative to an
+ * upright one: the ratio of the two air-drag coefficients (TUNING.dragTuck / TUNING.dragUpright — the
+ * tuck's smaller frontal area; checked by a unit test). Round 3 charged the upright figure whatever the
+ * stance, a flat tax a perfect run could not reduce. (An object so measurement runs can compare tuck = 1.)
+ */
+export const HEADWIND_STANCE = { tuck: 0.004 / 0.0085 };
+
 export interface EnvQuery {
   x: number;
   y: number;

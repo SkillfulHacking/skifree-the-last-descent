@@ -11,8 +11,13 @@
 // those render calls are timed separately and reported as software-renderer numbers only.
 import { chromium } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
+import { servedBuild } from './lib/build_info.mjs';
+// (round 4, W-084) the build and the settings a result belongs to are part of the result
+const QUALITY = process.env.Q ?? 'high';
 
 const [base = 'http://127.0.0.1:4471', biome = 'fjord', out = `/tmp/prod_frames_${biome}.json`, kmArg = '12', reArg = '240'] = process.argv.slice(2);
+const build = await servedBuild(base);
+const sha = build.sha;
 const KM = Number(kmArg);
 const RENDER_EVERY = Number(reArg);
 const b = await chromium.launch({ executablePath: process.env.PW_CHROME ?? '/usr/bin/google-chrome', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--js-flags=--expose-gc'] });
@@ -20,12 +25,12 @@ const p = await b.newPage({ viewport: { width: 640, height: 360 } });
 const errors = [];
 p.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
 p.on('console', (m) => m.type() === 'error' && errors.push(m.text().slice(0, 300)));
-await p.addInitScript((biome) => {
+await p.addInitScript((a) => {
   if (!sessionStorage.getItem('pf')) {
     sessionStorage.setItem('pf', '1');
-    localStorage.setItem('skifree-tld.settings.v1', JSON.stringify({ quality: 'high', biome, course: 'classic', courseLength: 'endless', difficulty: 'relaxed', showTutorial: false }));
+    localStorage.setItem('skifree-tld.settings.v1', JSON.stringify({ quality: a.q, biome: a.biome, course: 'classic', courseLength: 'endless', difficulty: 'relaxed', showTutorial: false }));
   }
-}, biome);
+}, { biome, q: QUALITY });
 await p.goto(base + '/?debug');
 await p.waitForFunction(() => window.__ready === true, null, { timeout: 900_000, polling: 1000 });
 await p.evaluate(() => window.__skifree.startRun(true));
@@ -42,7 +47,41 @@ const res = await p.evaluate(
     let lastZ = 0;
     let i = 0;
     const z = () => s.state().session.z ?? 0;
+    // (round 5, W-096) per km: heap (after a GC where exposed), shader programs, geometries and textures
+    // (Endless memory: does anything grow without bound?), and the frame's draw calls and triangles
+    const perKm = [];
+    let nextKm = 0;
+    const sample = () => {
+      s.gc?.();
+      const pf = s.perf();
+      perKm.push({ km: +(z() / 1000).toFixed(1), heapMB: s.heap?.() ? +(s.heap() / 1048576).toFixed(1) : null, programs: pf.programs, geometries: pf.geometries, textures: pf.textures, calls: pf.calls, triangles: pf.triangles });
+    };
+    const programs0 = s.perf().programs;
+    // (round 6, W-105 / review D5-2: the net count hid programs released and re-linked) every program that
+    // links after the run began, by id (gross), its name, and whether one with the same cache key had
+    // linked before (a re-link)
+    const seenIds = new Set();
+    const seenKeys = new Set();
+    for (const p of s.renderer.info.programs ?? []) {
+      seenIds.add(p.id);
+      seenKeys.add(p.cacheKey);
+    }
+    const links = [];
+    const watchPrograms = () => {
+      for (const p of s.renderer.info.programs ?? []) {
+        if (seenIds.has(p.id)) continue;
+        seenIds.add(p.id);
+        links.push({ km: +(z() / 1000).toFixed(2), name: p.name || String(p.cacheKey).slice(0, 48).replace(/\s+/g, ' '), relink: seenKeys.has(p.cacheKey) });
+        seenKeys.add(p.cacheKey);
+      }
+    };
     while (true) {
+      if (z() >= nextKm * 1000) {
+        await new Promise((r) => requestAnimationFrame(() => r()));
+        sample();
+        watchPrograms();
+        nextKm++;
+      }
       const st = s.state().session;
       if (st.phase === 'caveCinematic') s.skipCave();
       if (st.outcome && st.outcome !== 'none') {
@@ -62,10 +101,13 @@ const res = await p.evaluate(
         const r0 = performance.now();
         await new Promise((r) => requestAnimationFrame(() => r()));
         render.push(performance.now() - r0);
+        watchPrograms();
       }
       if (i > KM * 1000 * 6) break; // safety: < ~10 m/s average
     }
-    return { step, render, restarts, z: lastZ, heapMB: s.heap?.() ? s.heap() / 1048576 : null, perf: s.perf() };
+    sample();
+    watchPrograms();
+    return { step, render, restarts, z: lastZ, heapMB: s.heap?.() ? s.heap() / 1048576 : null, perf: s.perf(), perKm, programs0, links };
   },
   [KM, RENDER_EVERY],
 );
@@ -86,9 +128,21 @@ const summary = {
   softwareRenderMs: { n: res.render.length, median: res.render.length ? +res.render.sort((a, c) => a - c)[Math.floor(res.render.length / 2)].toFixed(0) : null },
   heapMB: res.heapMB && +res.heapMB.toFixed(1),
   renderer: res.perf,
+  // shader programs linked after the run began (compiles during play; the warm-up happens before)
+  programsCompiledInPlay: res.perf.programs - res.programs0,
+  // (round 6) gross: every link after the run began (named), and how many re-linked a program seen before
+  programLinksInPlay: res.links.length,
+  programRelinks: res.links.filter((l) => l.relink).length,
+  programLinks: res.links,
+  caveSliceMaxMs: res.perf.caveSliceMaxMs,
+  caveSlice: res.perf.caveSlice,
+  maxCalls: Math.max(...res.perKm.map((k) => k.calls)),
+  maxTriangles: Math.max(...res.perKm.map((k) => k.triangles)),
+  perKm: res.perKm,
   errors,
   seconds: Math.round((Date.now() - t0) / 1000),
 };
-writeFileSync(out, JSON.stringify({ summary, step: res.step.map((x) => +x.toFixed(2)) }));
+const course = await p.evaluate(() => window.__skifree.state().course?.id ?? null).catch(() => null);
+writeFileSync(out, JSON.stringify({ sha, build, quality: QUALITY, biome, course, summary, step: res.step.map((x) => +x.toFixed(2)) }));
 console.log(JSON.stringify(summary));
 await b.close();

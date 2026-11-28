@@ -1,0 +1,15 @@
+[201s] course verified SEED-3403625622-SPR@WHITE normal
+[210s] course {"L":3000,"cave":{"index":0,"caveZ":260,"triggerZ":282,"foreshadowZ":180,"anchor":{"z":260,"centerX":6.185433809964871,"side":-1,"d":46},"chaseEndZ":3000,"checkpointZ":null,"speedMul":1},"rimSide":1}
+[259s] course verified SEED-3403625622-SPR@WHITE normal
+[435s] shot 19_station_approach storm s=0.82 
+[444s] finish true
+[592s] shot 20_v_arrive storm s=0.90 
+[741s] shot 21_v_welcome storm s=0.80 FAILED skier
+[900s] shot 22_v_lantern storm s=0.83 
+[1088s] shot 23_v_yeti_white storm s=0.88 
+[1330s] shot 24_v_yeti_light storm s=0.92 
+[1627s] shot 24c_v_yeti_recoil storm s=0.94 
+[1898s] shot 24b_v_yeti_leaves storm s=0.94 
+[2022s] shot 25_v_break storm s=0.87 
+[2139s] shot 26_v_reveal storm s=0.82 
+[2139s] done; page errors: 0

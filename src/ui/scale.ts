@@ -8,3 +8,14 @@
 export function autoUiScale(w: number, h: number): number {
   return Math.min(1.6, Math.max(1, Math.min(w / 1920, h / 1080)));
 }
+
+/**
+ * The chase's rear-view inset in CSS px (App lays it out; Hud.fitRun keeps RUN. below it). `ui` is the
+ * effective UI scale (the player's size × autoUiScale). (Round 6, W-103: fitRun read the inset from the
+ * DOM, where on the hand-off's first frame it still had its previous, pre-chase box.)
+ */
+export function rearInsetRect(W: number, ui: number): { x: number; top: number; w: number; h: number } {
+  const w = Math.round(Math.min(420 * ui, W * 0.3));
+  const h = Math.round(w / 2.4);
+  return { x: Math.round((W - w) / 2), top: Math.round(78 * ui), w, h };
+}

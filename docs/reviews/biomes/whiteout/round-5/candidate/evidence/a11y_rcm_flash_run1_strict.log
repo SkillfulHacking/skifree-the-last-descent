@@ -1,0 +1,16 @@
+[205s] course verified SEED-3403625622-SPR@WHITE normal
+[215s] course {"L":3000,"cave":{"index":0,"caveZ":260,"triggerZ":282,"foreshadowZ":180,"anchor":{"z":260,"centerX":6.185433809964871,"side":-1,"d":46},"chaseEndZ":3000,"checkpointZ":null,"speedMul":1},"rimSide":1}
+[266s] course verified SEED-3403625622-SPR@WHITE normal
+[450s] shot 19_station_approach storm s=0.82 
+[460s] finish true
+[610s] shot 20_v_arrive storm s=0.90 
+[766s] shot 21_v_welcome storm s=0.80 FAILED skier
+file:///home/claude/sf-wo/tools/whiteout_evidence.mjs:113
+  if (failed.length && !LENIENT) throw new Error(`${name}: the frame does not show ${failed.join(', ')} (${note})`);
+                                       ^
+
+Error: 21_v_welcome: the frame does not show skier (Victory 5.2 s (beat 2, welcome): in front of the porch looking at the door as it opens, skier arriving)
+    at shot (file:///home/claude/sf-wo/tools/whiteout_evidence.mjs:113:40)
+    at async file:///home/claude/sf-wo/tools/whiteout_evidence.mjs:373:5
+
+Node.js v22.23.4

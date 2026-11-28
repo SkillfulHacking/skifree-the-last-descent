@@ -263,26 +263,8 @@ export function seaCaveCinematic(ctx: CaveCinematicContext): CaveCinematicExtras
   }
   // 11.0 s: the roar, opened wider for the plume and the falling icicles
   tl.shot({ start: 11.0, end: 12.3, from: () => pose(at(...CAVE_CAMS.roar0), M.clone().add(new THREE.Vector3(0, 3.6, 0)).addScaledVector(O, 1.2), 56), to: () => pose(at(...CAVE_CAMS.roar1), M.clone().add(new THREE.Vector3(0, 3.8, 0)).addScaledVector(O, 1.2), 52) });
-  // 14.6 s: the leap, from the ledge behind him, down onto the skier (and the sea beyond)
-  const P = st.phys.s.pos.clone();
-  // (mouth facing inland: the dressing's sea-framing station, out on the slope looking back up at him)
-  const ledgeCam = !mouthToSea && sea?.leap ? sea.leap.cam.clone() : cave.ledge.clone().addScaledVector(O, -2.6).addScaledVector(T, 1.4).add(new THREE.Vector3(0, 2.7, 0));
-  const leapYaw = !mouthToSea && sea?.leap ? sea.leap.yaw : 0;
-  const leapPitch = !mouthToSea && sea?.leap ? sea.leap.pitch : 0;
-  const leapFov = !mouthToSea && sea?.leap ? sea.leap.fov : 56;
-  // (from the sea-framing station out on the slope the camera faces the cave: it holds the Yeti
-  // leaping toward it — the skier is behind the lens — instead of a point between the two)
-  const leapK = !mouthToSea && sea?.leap ? 0 : 0.42;
-  const leapLook = () => framedLook(ledgeCam, yetiAt().add(new THREE.Vector3(0, 1.6, 0)).lerp(P.clone().add(new THREE.Vector3(0, 1.0, 0)), leapK), leapYaw, leapPitch);
-  tl.shot({ start: 14.6, end: 16.95, from: () => pose(ledgeCam, leapLook(), leapFov), to: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), leapFov + 4) });
-  const followPos = new THREE.Vector3();
-  const followLook = new THREE.Vector3();
-  const followPose = () => {
-    const s = st.phys.s;
-    st.follow.idealPose({ pos: s.pos, vel: s.vel, heading: s.heading, grounded: s.grounded, crashed: false, speed: s.speed }, followPos, followLook);
-    return pose(followPos, followLook, 64);
-  };
-  tl.shot({ start: 16.95, end: 18.0, from: () => pose(ledgeCam.clone().add(new THREE.Vector3(0, 0.4, 0)).addScaledVector(O, 1.2), leapLook(), 60), via: () => pose(P.clone().add(new THREE.Vector3(0, 3.2, -5)), P.clone().add(new THREE.Vector3(0, 1.2, 4)), 58), to: followPose, easing: ease.inOutCubic });
+  // (round 3: the cinematic ends at the leap beat, 14.6 s — caveHandoff.ts; the leap is the chase's
+  // first second, so the leap shots that followed it here are gone)
 
   tl.at(2.5, () => {
     st.audio.playCue('gull', M.clone().add(new THREE.Vector3(0, 8, 0)));

@@ -147,7 +147,7 @@ interface WeatherModel {
   out for tests that measure another mechanic alone. Keep wind skill-based: gusts telegraphed by particles and audio,
   bounded, never strong enough to throw the skier off a kicker line unannounced.
 - **Must**: be a pure function of `(x, z, t, seed)` and pass `validateWeather` (finite, visibility
-  in (0, 12], snowfall in [0, 4], wind ≤ 40 m/s, coupling in range). Fjord-style light crosswinds
+  in (0, 24], snowfall in [0, 4], wind ≤ 40 m/s, coupling in range). Fjord-style light crosswinds
   and Whiteout fronts and fog banks are one call to `parametricWeather({...})`.
 - Alpine: `ALPINE_WEATHER`. windX = 1 (the flake drift the renderer always used), visibility 1,
   snowfall 1, coupling 0.

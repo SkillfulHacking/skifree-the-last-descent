@@ -3,7 +3,6 @@
  * Mirrors the rules in GameSession without any rendering. Works for any course: classic,
  * generated finite lengths, and Endless (bounded by `maxZ`).
  */
-import * as THREE from 'three';
 import { Mountain, SEED_DEFAULT, type Encounter } from '../world/course';
 import { ObstacleField, generateObstacles } from '../physics/obstacles';
 import { PHYS_DT, SkierPhysics, type SkierInput, type SkierState } from '../physics/SkierPhysics';
@@ -11,6 +10,7 @@ import { BiomeEnvironment } from '../world/capabilities/environment';
 import { YetiAI } from '../yeti/YetiAI';
 import { yetiSpawnAfterCinematic } from '../yeti/spawn';
 import { SnowballBarrage, SNOWBALL, clampToPiste, type SnowballEvent } from '../yeti/Snowballs';
+import { startCanonicalChase, type CaveSpawn } from '../cinematic/caveHandoff';
 
 export interface SimResult {
   outcome: 'victory' | 'caught' | 'timeout' | 'distance';
@@ -67,6 +67,8 @@ export interface SimOptions {
    * with `start` true): the encounter, the time into the chase, the skier and the Yeti
    */
   trace?: (e: Encounter, ct: number, s: SkierState, yeti: YetiAI, start: boolean) => void;
+  /** start each chase (default: the canonical hand-off, caveHandoff.ts) — measurement of other hand-offs */
+  handoff?: (yeti: YetiAI, spawn: CaveSpawn, e: Encounter) => void;
 }
 
 export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierState, t: number) => SkierInput, opts: SimOptions = {}): SimResult {
@@ -115,6 +117,9 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
   };
   while (t < maxTime) {
     const s = phys.s;
+    // (W-089) hazards stream ahead as in the game (World.stream → environment.stream: z − 80 … z + 400),
+    // so a weather-reading driver and the alert logic see what a player would
+    env?.stream(s.pos.z);
     if (opts.streaming) {
       f.ensure(s.pos.z - 300, s.pos.z + 700);
       f.release(s.pos.z - 400, s.pos.z + 800);
@@ -122,8 +127,10 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
       peakBands = Math.max(peakBands, f.bandCount);
     }
     const inp = driver(s, t);
-    if (balls && opts.dodge && !s.crashed) {
+    if (balls && opts.dodge && !s.crashed && s.grounded) {
       // read the marks: if the current line runs through a landing zone, steer out of it
+      // (round 4: only on the snow — round 3's dodge also yanked the skis round in the air, and the
+      // landing that followed was sideways: the expert's Alpine Classic Hard Standard crash at 215.6 s)
       for (const b of balls.balls) {
         if (b.landed) continue;
         // the whole danger window (the end of the fall + the splash), not just the impact instant
@@ -164,8 +171,8 @@ export function simulateCourse(m: Mountain, f: ObstacleField, driver: (s: SkierS
         // cinematic happens here (simulation frozen) — then the yeti leaps out of the cave
         const sp = yetiSpawnAfterCinematic(m, e.anchor);
         yeti.speedMul = Math.min(1.33, e.speedMul * (opts.yetiSpeed ?? 1));
-        yeti.place(sp.pos.x, sp.pos.z, sp.heading, sp.pos.y - m.heightAt(sp.pos.x, sp.pos.z));
-        yeti.startChase(new THREE.Vector3(sp.leap.x, sp.leap.y, sp.leap.z));
+        if (opts.handoff) opts.handoff(yeti, sp, e);
+        else startCanonicalChase(yeti, sp, (x, z) => m.heightAt(x, z));
         balls?.reset();
         chaseStart = t;
         if (firstChase < 0) firstChase = t;

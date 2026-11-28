@@ -4,6 +4,7 @@
  * gamepad, settings persist across reloads.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { shotPath } from './shots';
 
 type MW = {
   __ready?: boolean;
@@ -83,7 +84,7 @@ for (const [w, h] of [
       expect(l, `${mode} @ ${w}x${h}`).toMatchObject({ panelScroll: 0, overflowX: 0, overflowY: 0, titleClipped: false, rowsOutside: 0 });
     }
     // software rendering of a 2560x1440 frame can take minutes on a loaded CI box (the layout checks above are what matter)
-    await page.screenshot({ path: `docs/reviews/pass2/menu/e2e_menu_${w}x${h}.png`, timeout: 600_000 });
+    await page.screenshot({ path: shotPath(`docs/reviews/pass2/menu/e2e_menu_${w}x${h}.png`), timeout: 600_000 });
   });
 }
 
@@ -225,6 +226,6 @@ test('the Location row (Alpine, Fjord Coast) shows name, rating and description 
       return n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).fontSize);
     });
     expect(noteEm).toBeLessThan(1.8); // one line of text
-    await page.screenshot({ path: `docs/reviews/biomes/fjord/round-1/e2e_menu_location_${w}x${h}.png`, timeout: 600_000 }); // software rendering is slow at 2560x1440
+    await page.screenshot({ path: shotPath(`docs/reviews/biomes/fjord/round-1/e2e_menu_location_${w}x${h}.png`), timeout: 600_000 }); // software rendering is slow at 2560x1440
   }
 });

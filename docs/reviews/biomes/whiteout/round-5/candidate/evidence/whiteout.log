@@ -1,0 +1,45 @@
+[235s] course verified SEED-3403625622-SPR@WHITE normal
+[235s] course {"L":3000,"cave":{"index":0,"caveZ":260,"triggerZ":282,"foreshadowZ":180,"anchor":{"z":260,"centerX":6.185433809964871,"side":-1,"d":46},"chaseEndZ":3000,"checkpointZ":null,"speedMul":1},"rimSide":1}
+[682s] shot 01_clear_window clear s=0.00 
+[1051s] shot 02_wall_far clear s=0.00 
+[1429s] shot 03_wall_near clear s=0.00 
+[1819s] shot 04_build build s=0.81 
+[2207s] shot 05_storm storm s=0.82 
+[2568s] shot 06_easing ease s=0.07 
+[2812s] shot 07_clearing clear s=0.00 
+[3110s] shot 08_cornice_edge clear s=0.00 
+[3238s] shot 09_valley_view clear s=0.00 
+[3362s] shot 10_crest clear s=0.00 
+[3573s] shot 11_ridge_overview clear s=0.00 
+[3600s] rim {"z":1380,"d":54.79364705379366}
+[3873s] shot 27_play_rim_clear clear s=0.00 
+[4157s] shot 28_play_rim_storm storm s=0.84 
+[4170s] row {"z":1201.4536421000957,"gap":11.2120708115858,"line":-3.8440111865761715}
+[4501s] shot 29_play_drift_row_storm storm s=0.86 
+[4564s] course verified SEED-3403625622-SPR@WHITE normal
+[4600s] cinematic true
+[4829s] shot 12_cave_mouth clear s=0.00 
+[5073s] shot 13_cave_emerge clear s=0.00 
+[5381s] shot 14_cave_roar clear s=0.00 
+[5581s] shot 15_cave_setup clear s=0.00 
+[5757s] shot 15b_cave_turn clear s=0.00 
+[5843s] gap true
+[6059s] shot 16_storm_chase storm s=0.90 
+[6329s] shot 17_yeti_silhouette storm s=0.90 
+[6459s] course verified SEED-3403625622-SPR-H@WHITE hard
+[6493s] throw true
+[6707s] shot 18_hard_snowball_fog storm s=0.84 
+[6836s] course verified SEED-3403625622-SPR@WHITE normal
+[7007s] shot 19_station_approach storm s=0.82 
+[7017s] finish true
+[7161s] shot 20_v_arrive storm s=0.90 
+[7306s] shot 21_v_welcome storm s=0.80 FAILED skier
+file:///home/claude/sf-wo/tools/whiteout_evidence.mjs:113
+  if (failed.length && !LENIENT) throw new Error(`${name}: the frame does not show ${failed.join(', ')} (${note})`);
+                                       ^
+
+Error: 21_v_welcome: the frame does not show skier (Victory 5.2 s (beat 2, welcome): in front of the porch looking at the door as it opens, skier arriving)
+    at shot (file:///home/claude/sf-wo/tools/whiteout_evidence.mjs:113:40)
+    at async file:///home/claude/sf-wo/tools/whiteout_evidence.mjs:373:5
+
+Node.js v22.23.4

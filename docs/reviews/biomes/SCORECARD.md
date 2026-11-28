@@ -216,3 +216,47 @@ inside budget); all tests pass (311/311 unit; 19/19 browser); critic Overall 8; 
 
 ## Whiteout Ridge, Frozen Frontier, Volcanic Expanse
 Not started.
+
+## Whiteout Ridge (3/5)
+
+### Round 1 — build `3f7bc45` (src = `0f04659`) — **FAIL** (all six reviewers)
+
+| Category | A | B | C | D | E | F | Gate |
+|---|---|---|---|---|---|---|---|
+| Visual art direction | **5** | 7 (lc) | 6 (lc) | 7 (lc) | 7 (lc) | 6 (lc) | ✗ |
+| Environmental uniqueness | **6** | 7 (lc) | 7 (lc) | 8 (lc) | 8 (lc) | 5 (lc) | ✗ |
+| Skiing and hazard mechanics | 6 (lc) | **5** | 6 (lc) | 7 (lc) | 6 (lc) | 5 (lc) | ✗ |
+| Difficulty and fairness | 6 (lc) | **4** | 6 (lc) | 7 (lc) | 5 (lc) | 5 (lc) | ✗ |
+| Cinematics | 5 (lc) | 7 (lc) | **5** | 7 (lc) | 7 (lc) | 6 (lc) | ✗ |
+| Performance and stability | 7 (lc) | 7 (lc) | 6 (lc) | **6** | 5 (lc) | 5 (lc) | ✗ |
+| Accessibility and controls | 7 (lc) | 6 (lc) | 6 (lc) | 7 (lc) | **6** | 6 (lc) | ✗ |
+| Overall player experience | 6 (lc) | 6 (lc) | 6 (lc) | 7 (lc) | 6 (lc) | **5** | ✗ |
+
+Reports: `whiteout/round-1/REVIEW_{A_art,B_physics,C_cinematic,D_tech,E_qa,F_critic}.md`; consolidated defects in `whiteout/round-1/CONSOLIDATED.md`. No Critical findings.
+
+Major themes:
+- The storm doesn't read as a whiteout (fog ceiling, light, particles).
+- Weather decisions aren't rewarded, and hopping over drifts beats every intended choice.
+- Normal is a steep step and Hard's weather is weaker than Normal's.
+- The victory lacks letterbox, music and title, and its light beats don't read.
+- The wind-drift plume loop costs about 4.8 ms per frame.
+- Storm warnings get dropped, captions are too fast, and storm audio is flat.
+- The cave is Alpine's, re-tinted.
+- Achievements still say "coming soon".
+- The storm-chase evidence was captured mid-blend.
+
+### Round 2 — build `b70a793` — **FAIL** (all six reviewers)
+
+| Category | A | B | C | D | E | F | Gate |
+|---|---|---|---|---|---|---|---|
+| Visual art direction | **6** | 7 (lc) | 6.5 (lc) | 7 (lc) | 7 (lc) | 6 (lc) | ✗ |
+| Environmental uniqueness | **6** | 7 (lc) | 7.5 (lc) | 8 (lc) | 8 (lc) | 6 (lc) | ✗ |
+| Skiing and hazard mechanics | 6 (lc) | **7** | 6 (lc) | 7 (lc) | 7 (lc) | 6 (lc) | ✗ |
+| Difficulty and fairness | 6 (lc) | **6** | 6 (lc) | 7 (lc) | 6 (lc) | 4 (lc) | ✗ |
+| Cinematics | 6 (lc) | 7 (lc) | **6.5** | 7 (lc) | 7 (lc) | 6 (lc) | ✗ |
+| Performance and stability | 7 (lc) | 7 (lc) | 6 (lc) | **7** | 7 (lc) | 7 (lc) | ✗ |
+| Accessibility and controls | 7 (lc) | 6 (lc) | 6 (lc) | 7 (lc) | **7** | 7 (lc) | ✗ |
+| Overall player experience | 6 (lc) | 7 (lc) | 6.5 (lc) | 7 (lc) | 7 (lc) | **5** | ✗ |
+
+Reports: `whiteout/round-2/REVIEW_*.md`; consolidated in `whiteout/round-2/CONSOLIDATED.md` (W-056…W-075). One Critical: the default course (Classic Sprint, Normal) could not be won by any policy (W-056).
+

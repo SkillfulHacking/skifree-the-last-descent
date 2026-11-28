@@ -74,6 +74,11 @@ export interface BiomeAtmosphere {
   linear: number;
   /** 1 / haze scale height (m) */
   falloff: number;
+  /**
+   * Optional accessibility ceiling on the FogExp2 density the weather may reach (Whiteout: the
+   * fog never closes in below ~80 m, so obstacles stay readable at speed). Absent = no ceiling.
+   */
+  maxFogDensity?: number;
 }
 
 export interface BiomeWeather {
@@ -99,6 +104,20 @@ export interface BiomeTerrainLook {
   shadeTint: RGB;
   /** multiplier on indirect (sky) light on snow */
   skylightTint: RGB;
+  /**
+   * Optional (Whiteout, W-065): ground far below the eye and far away is darkened toward `tint` by up
+   * to `amount` (from `below[0]`→`below[1]` m below the camera, `dist[0]`→`dist[1]` m away): the valley
+   * under a ridge reads as depth, not as a snow bank beside the piste. Absent = none (bit-identical).
+   */
+  valleyShade?: { tint: RGB; amount: number; below: [number, number]; dist: [number, number] };
+  /**
+   * Optional (Whiteout, Round 5 W-065): the wind-scoured flank. Ground that is both steep (`slope`
+   * 1 − n.y from [0] to [1]) and well below the eye (`below` m) is bare, dark rock streaked down the
+   * fall line with snow (`streak` share): the drop beyond a ridge's rim reads as a dark cliff band
+   * falling away, where the geometry really falls. Presentation only. Absent = none.
+   */
+  /** (W-065/W-100) dark scoured rock on steep ground `past` m beyond the ridge rim, drop side only */
+  scouredFlank?: { rock: RGB; slope: [number, number]; past: [number, number]; streak: number };
 }
 
 /** Distant skyline palette (look/ranges.ts). */
@@ -119,6 +138,12 @@ export interface BiomeRangesLook {
    * clear coastal air, islands and the far shore stay readable).
    */
   horizonHaze?: number;
+  /**
+   * Optional (Whiteout, W-004): 0..1 rounds the far ridges' crests (fewer noise octaves, compressed
+   * peaks) — the 5-octave ridged crest aliases into a regular sawtooth on the 480-segment rings.
+   * Absent = the original skyline (bit-identical).
+   */
+  soft?: number;
 }
 
 /** One conifer species (shape + needle colour). See props.ts pineGeometry. */
@@ -166,6 +191,12 @@ export interface BiomeRocks {
   tintDark: RGB;
   /** snow cap colour */
   snow: RGB;
+  /**
+   * Scanned CC0 boulders (art/scanModels ids) for the near-LOD obstacle rocks: when set, the
+   * procedural near rocks are replaced by these once they load (the collision is unchanged —
+   * the scans are normalised to the same unit footprint). Unset: the procedural rocks.
+   */
+  scan?: readonly ('namaqualand_boulder_02' | 'namaqualand_boulder_06' | 'boulder_01')[];
 }
 
 /** Obstacle mix: multipliers on the base placement probabilities (1 = original). */
@@ -173,6 +204,13 @@ export interface BiomeObstacles {
   rocks: number;
   logs: number;
   stumps: number;
+  /**
+   * (W-078 / Review B3-2) each placement cell draws from its own random stream, so a change to the
+   * terrain or the hazards in one place never re-rolls obstacles elsewhere (the shared per-band stream
+   * let off-piste terrain re-roll on-piste obstacles). Off for locations already released: switching
+   * would re-roll their Classic layouts.
+   */
+  cellStream?: boolean;
 }
 
 /**
@@ -193,12 +231,71 @@ export interface BiomeTerrain {
   altTypes?: readonly SegmentType[];
   /** floor (degrees) on regular segments' slope; omit for none (see profile.ts ProfileKnobs) */
   minSlope?: number;
+  /** (W-077) the location's fixed Yeti pace on every encounter; omit for 1 (see profile.ts ProfileKnobs) */
+  encounterPace?: number;
+  /**
+   * (Round 5, W-094) the location's Yeti pace on one difficulty only, × the difficulty's own pace
+   * (DIFFICULTY.yetiSpeed); omit for 1. Lets a location's Hard be tuned without touching its Normal or
+   * Relaxed — never a response to how the player is skiing.
+   */
+  difficultyPace?: Partial<Record<'relaxed' | 'normal' | 'hard', number>>;
+  /**
+   * (Round 6, owner ruling 2, terrain-paced pursuit) a competent skier's measured speed (m/s) by grade on
+   * this location: base + slope × grade° (balance/r6/data/speed_slope.json). The Yeti's pace follows it.
+   */
+  pursuitLine?: { base: number; slope: number };
   /** ridgeline spines with gap jumps; omit for none (see profile.ts ProfileKnobs) */
   spine?: { types: readonly SegmentType[]; bow: number; side: 1 | -1; gap: boolean };
   /** run-in slope at the start gate (degrees, default 6) */
   startSlope?: number;
   /** side of the piste the Yeti caves are cut into (default +1; a coast: −1, the sea side) */
   caveSide?: 1 | -1;
+  /**
+   * Optional (Pass 5, Whiteout): the ground falls away on one side of the piste instead of rising
+   * into a valley wall — the course runs along a ridge's shoulder with open air on that side. The
+   * drop is `depth` m reached over `width` m from the piste edge (keep it skiable: ≤ ~16°). The
+   * cave side must be the other side. Absent = a valley on both sides (bit-identical).
+   */
+  shoulderDrop?: { side: 1 | -1; depth: number; width: number };
+  /**
+   * Optional (Whiteout full production): the course runs along the top of a broad ridge. On
+   * `dropSide` the bank rolls over a corniced rim `rim` m beyond the piste edge (rising `lip` m) and
+   * the flank falls `depth` m over `flank` m into a valley (steepest ≈ 1.5·depth/flank at mid-flank,
+   * rock ribs and couloirs); on the other side a broken rocky crest rises `crest` m (varying along the
+   * course) `crestE` m out and falls `backDrop` m behind it, so there is sky on both sides. Supersedes
+   * `shoulderDrop`; absent = no ridge (bit-identical). Off-piste only: the rim guard
+   * (capabilities/environment.ts) returns a skier who goes over the rim.
+   */
+  /**
+   * Optional (Whiteout, W-005): 0..1 domain-warps the wind drifts and breaks them into patches
+   * (sastrugi fields), instead of one regular anisotropic noise (which reads as diagonal stripes).
+   * Absent = the original drifts (bit-identical).
+   */
+  driftWarp?: number;
+  ridge?: {
+    dropSide: 1 | -1;
+    rim: number;
+    lip: number;
+    depth: number;
+    flank: number;
+    crest: number;
+    crestE: number;
+    backDrop: number;
+    /**
+     * Optional (round 3, W-065): past the piste edge on the drop side the valley cross-section stops
+     * rising (it holds its value at the edge) and the bank rolls down `rollDown` m to the rim instead of
+     * rising over a lip — so the rim sits below the gameplay camera's eye, not 5–8 m above it. The
+     * piste itself (and the racing line on it) is untouched. Absent = the original bank (bit-identical).
+     */
+    rollDown?: number;
+    /**
+     * Optional (round 4, W-065 / W-093): the far ranges beyond the drop are this share of rangeHeight
+     * (default 1): below 1 they sit below the skier's eye, so the drop side is a deep, hazy distance —
+     * peaks rising out of the valley's cloud sea, seen from above — instead of a white wall at eye height
+     * that read as a plateau. Art only: kilometres past the rim, nothing reaches it.
+     */
+    farRanges?: number;
+  };
   /** valley wall height (m) */
   wallHeight: number;
   /** ridged/fbm relief on the valley walls (m) */
@@ -322,7 +419,13 @@ export const ALPINE: Biome = {
   rocks: { base: [0.27, 0.26, 0.25], tintCool: [0.95, 0.97, 1.02], tintWarm: [1.18, 1.06, 0.92], tintDark: [0.62, 0.62, 0.66], snow: [0.88, 0.9, 0.94] },
   obstacles: { rocks: 1, logs: 1, stumps: 1 },
   // profile.ts GeneratedProfile (scales) + course.ts Mountain.heightAt (amplitudes)
-  terrain: { slopeScale: 1, widthScale: 1, swingScale: 1, wallHeight: 330, wallRelief: 64, rangeHeight: 900, undulation: 7, detail: 1.4, moguls: 0.42, drifts: 0.9, driftsPowder: 0.6, rollers: 0.6 },
+  // (round 3, W-077) a fixed Yeti pace for Alpine's encounters: on its steep runs a competent skier
+  // outran the shipped pace and a crash or a sloppy run cost nothing (balance/w077/README.md)
+  // (round 4, W-079) 1.05, not 1.10: the same graded Normal pressure on a crash (Standard crash 2/7, min 11 m)
+  // without making Hard disproportionately punishing (1.10: Sprint, every crash a capture; Hard clean
+  // skilled caught 4/7) — balance/w080/README.md
+  // (Round 5, W-094) Alpine's Hard: ×1.09 on Hard only (owner's ranges; Normal and Relaxed unchanged)
+  terrain: { encounterPace: 1.05, difficultyPace: { hard: 1.135 }, pursuitLine: { base: 10.3, slope: 0.657 }, slopeScale: 1, widthScale: 1, swingScale: 1, wallHeight: 330, wallRelief: 64, rangeHeight: 900, undulation: 7, detail: 1.4, moguls: 0.42, drifts: 0.9, driftsPowder: 0.6, rollers: 0.6 },
   audio: { ambience: 'wind', windGain: 1, windPitch: 1 },
 };
 

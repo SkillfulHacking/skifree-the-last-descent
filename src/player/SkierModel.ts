@@ -248,6 +248,11 @@ export class SkierModel {
     this.mats.flutter.uFlutter.value = 0.0045 * clamp(pose.speed / 28, 0, 1) * (1 - st.crashW * 0.8) + 0.0012 * st.wobble;
   }
 
+  /** Writes the world-space position of the top of the helmet (round 6, W-103: HUD layout). */
+  getHeadTopWorldPosition(out: THREE.Vector3): THREE.Vector3 {
+    return this.bones[BONE.head]!.localToWorld(out.set(0, 0.16, 0));
+  }
+
   /** Writes the world-space position of the given hand (fist centre). */
   getHandWorldPosition(side: 'left' | 'right', target: THREE.Vector3): THREE.Vector3 {
     const b = this.bones[side === 'left' ? BONE.handL : BONE.handR];
@@ -270,6 +275,14 @@ export class SkierModel {
 
   setVisible(v: boolean): void {
     this.root.visible = v;
+  }
+
+  /**
+   * (Round 5, review C4-5) a hand that holds something else (the finish trophy, the rescue lantern)
+   * lets its pole go: 0 = left, 1 = right.
+   */
+  setPoleVisible(i: 0 | 1, v: boolean): void {
+    this.poles[i].visible = v;
   }
 
   /** Cosmetics: recolour the jacket (purely visual). */

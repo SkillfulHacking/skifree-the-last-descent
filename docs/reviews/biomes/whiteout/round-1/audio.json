@@ -1,0 +1,1218 @@
+{
+ "summary": {
+  "courseId": "SEED-3403625622-SPR@WHITE",
+  "seed": "WO-R1",
+  "errors": [],
+  "ctxState": "running",
+  "maxPeak": 0.4646835923194885,
+  "anyNaN": false,
+  "rmsClear": 0.08945176073072766,
+  "rmsStorm": 0.10141594526966427,
+  "peakClear": 0.4154731333255768,
+  "peakStorm": 0.4646835923194885,
+  "tStorm": 37,
+  "sourcesStarted": 705
+ },
+ "rows": [
+  {
+   "ctx": "running",
+   "rms": 0.07596685638945767,
+   "peak": 0.26004499197006226,
+   "nan": false,
+   "starts": 91,
+   "phase": "chase",
+   "t": 8.099999999999994,
+   "z": 287.61429185328404,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08985626549805507,
+   "peak": 0.4112085700035095,
+   "nan": false,
+   "starts": 91,
+   "phase": "chase",
+   "t": 8.199999999999989,
+   "z": 289.1487755160612,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09659343217136508,
+   "peak": 0.30150169134140015,
+   "nan": false,
+   "starts": 103,
+   "phase": "chase",
+   "t": 8.299999999999983,
+   "z": 290.68691512230026,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.07900717886776336,
+   "peak": 0.24403037130832672,
+   "nan": false,
+   "starts": 123,
+   "phase": "chase",
+   "t": 8.399999999999977,
+   "z": 292.2331850896707,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08665802006965255,
+   "peak": 0.28133782744407654,
+   "nan": false,
+   "starts": 126,
+   "phase": "chase",
+   "t": 8.499999999999972,
+   "z": 293.792132605794,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08444605569168802,
+   "peak": 0.2738349735736847,
+   "nan": false,
+   "starts": 145,
+   "phase": "chase",
+   "t": 8.599999999999966,
+   "z": 295.3655930381109,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.0865399061960823,
+   "peak": 0.31375977396965027,
+   "nan": false,
+   "starts": 145,
+   "phase": "chase",
+   "t": 8.69999999999996,
+   "z": 296.9520955878431,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09749903789660302,
+   "peak": 0.3414157032966614,
+   "nan": false,
+   "starts": 159,
+   "phase": "chase",
+   "t": 8.799999999999955,
+   "z": 298.5481667336938,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08750663259957714,
+   "peak": 0.3008154630661011,
+   "nan": false,
+   "starts": 159,
+   "phase": "chase",
+   "t": 8.899999999999949,
+   "z": 300.1506040109014,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08524630822901921,
+   "peak": 0.25480422377586365,
+   "nan": false,
+   "starts": 177,
+   "phase": "chase",
+   "t": 8.999999999999943,
+   "z": 301.75244936896974,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09464476400037676,
+   "peak": 0.37555980682373047,
+   "nan": false,
+   "starts": 177,
+   "phase": "chase",
+   "t": 9.099999999999937,
+   "z": 303.35020527091217,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08738927670368218,
+   "peak": 0.2645631432533264,
+   "nan": false,
+   "starts": 198,
+   "phase": "chase",
+   "t": 9.199999999999932,
+   "z": 304.94904796094124,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.07815639311626991,
+   "peak": 0.2911759912967682,
+   "nan": false,
+   "starts": 198,
+   "phase": "chase",
+   "t": 9.299999999999926,
+   "z": 306.5597560619236,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.0903127664077466,
+   "peak": 0.297135591506958,
+   "nan": false,
+   "starts": 209,
+   "phase": "chase",
+   "t": 9.39999999999992,
+   "z": 308.1937040882796,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08436057627480943,
+   "peak": 0.24760836362838745,
+   "nan": false,
+   "starts": 224,
+   "phase": "chase",
+   "t": 9.499999999999915,
+   "z": 309.8565999619434,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.07994441893231022,
+   "peak": 0.24115006625652313,
+   "nan": false,
+   "starts": 224,
+   "phase": "chase",
+   "t": 9.599999999999909,
+   "z": 311.5433178535985,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.07979965822927376,
+   "peak": 0.2596409022808075,
+   "nan": false,
+   "starts": 227,
+   "phase": "chase",
+   "t": 9.699999999999903,
+   "z": 313.25183982101726,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08510471480780003,
+   "peak": 0.31852099299430847,
+   "nan": false,
+   "starts": 227,
+   "phase": "chase",
+   "t": 9.799999999999898,
+   "z": 314.9811945734978,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08638686603080749,
+   "peak": 0.3070090711116791,
+   "nan": false,
+   "starts": 239,
+   "phase": "chase",
+   "t": 9.899999999999892,
+   "z": 316.72578767470856,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.07710015166880385,
+   "peak": 0.2663538455963135,
+   "nan": false,
+   "starts": 242,
+   "phase": "chase",
+   "t": 9.999999999999886,
+   "z": 318.4809605229015,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08547878524093637,
+   "peak": 0.2825778126716614,
+   "nan": false,
+   "starts": 257,
+   "phase": "chase",
+   "t": 10.09999999999988,
+   "z": 320.2446049738013,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.07767158465041803,
+   "peak": 0.3118497133255005,
+   "nan": false,
+   "starts": 259,
+   "phase": "chase",
+   "t": 10.199999999999875,
+   "z": 322.0187670985468,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.07703912856691277,
+   "peak": 0.25557681918144226,
+   "nan": false,
+   "starts": 262,
+   "phase": "chase",
+   "t": 10.29999999999987,
+   "z": 323.8037612980686,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08150942174159058,
+   "peak": 0.27719253301620483,
+   "nan": false,
+   "starts": 265,
+   "phase": "chase",
+   "t": 10.399999999999864,
+   "z": 325.598336370205,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09096821789624358,
+   "peak": 0.32492727041244507,
+   "nan": false,
+   "starts": 278,
+   "phase": "chase",
+   "t": 10.499999999999858,
+   "z": 327.41027455419044,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08328882572865898,
+   "peak": 0.2512648105621338,
+   "nan": false,
+   "starts": 278,
+   "phase": "chase",
+   "t": 10.599999999999852,
+   "z": 329.2464060899625,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08782476477222616,
+   "peak": 0.30669063329696655,
+   "nan": false,
+   "starts": 289,
+   "phase": "chase",
+   "t": 10.699999999999847,
+   "z": 331.1044963642472,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09786331935525654,
+   "peak": 0.3409368395805359,
+   "nan": false,
+   "starts": 289,
+   "phase": "chase",
+   "t": 10.79999999999984,
+   "z": 332.97444620887035,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08167010017139938,
+   "peak": 0.28231316804885864,
+   "nan": false,
+   "starts": 306,
+   "phase": "chase",
+   "t": 10.899999999999835,
+   "z": 334.84826094016273,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09963575934163225,
+   "peak": 0.34055811166763306,
+   "nan": false,
+   "starts": 306,
+   "phase": "chase",
+   "t": 10.99999999999983,
+   "z": 336.72699730316816,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09279042659528759,
+   "peak": 0.28360116481781006,
+   "nan": false,
+   "starts": 319,
+   "phase": "chase",
+   "t": 11.099999999999824,
+   "z": 338.6089231203052,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08710989528454775,
+   "peak": 0.30716097354888916,
+   "nan": false,
+   "starts": 319,
+   "phase": "chase",
+   "t": 11.199999999999818,
+   "z": 340.49318643213576,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09973143608030999,
+   "peak": 0.3211429715156555,
+   "nan": false,
+   "starts": 324,
+   "phase": "chase",
+   "t": 11.299999999999812,
+   "z": 342.38530827752214,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10363768536325943,
+   "peak": 0.3404444456100464,
+   "nan": false,
+   "starts": 329,
+   "phase": "chase",
+   "t": 11.399999999999807,
+   "z": 344.2947297758789,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10186844481950155,
+   "peak": 0.30055588483810425,
+   "nan": false,
+   "starts": 340,
+   "phase": "chase",
+   "t": 11.499999999999801,
+   "z": 346.2222197885046,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09398674178445816,
+   "peak": 0.3385469913482666,
+   "nan": false,
+   "starts": 343,
+   "phase": "chase",
+   "t": 11.599999999999795,
+   "z": 348.15153278408525,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.11386019453809823,
+   "peak": 0.4070549011230469,
+   "nan": false,
+   "starts": 345,
+   "phase": "chase",
+   "t": 11.69999999999979,
+   "z": 350.08574904136924,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10440258259663755,
+   "peak": 0.31132543087005615,
+   "nan": false,
+   "starts": 356,
+   "phase": "chase",
+   "t": 11.799999999999784,
+   "z": 352.0442817582244,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09546756995141417,
+   "peak": 0.30774110555648804,
+   "nan": false,
+   "starts": 361,
+   "phase": "chase",
+   "t": 11.899999999999778,
+   "z": 354.04052989036904,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10974626496917338,
+   "peak": 0.4154731333255768,
+   "nan": false,
+   "starts": 372,
+   "phase": "chase",
+   "t": 11.999999999999773,
+   "z": 356.0717855429244,
+   "front": {
+    "phase": "clear",
+    "s": 0
+   },
+   "segment": "clear"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10513183801030689,
+   "peak": 0.3435906171798706,
+   "nan": false,
+   "starts": 388,
+   "phase": "chase",
+   "t": 37.099999999999994,
+   "z": 360.17713188560214,
+   "front": {
+    "phase": "storm",
+    "s": 0.88727205663393
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09830029125091598,
+   "peak": 0.36311572790145874,
+   "nan": false,
+   "starts": 405,
+   "phase": "chase",
+   "t": 37.19999999999999,
+   "z": 362.2269843139642,
+   "front": {
+    "phase": "storm",
+    "s": 0.8866334898716197
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09068577620319805,
+   "peak": 0.28744643926620483,
+   "nan": false,
+   "starts": 407,
+   "phase": "chase",
+   "t": 37.29999999999998,
+   "z": 364.28421547677135,
+   "front": {
+    "phase": "storm",
+    "s": 0.8858975582248922
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10209497951012372,
+   "peak": 0.39274513721466064,
+   "nan": false,
+   "starts": 421,
+   "phase": "chase",
+   "t": 37.39999999999998,
+   "z": 366.3590201142443,
+   "front": {
+    "phase": "storm",
+    "s": 0.8850667806864558
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10528674980883701,
+   "peak": 0.3704974055290222,
+   "nan": false,
+   "starts": 423,
+   "phase": "chase",
+   "t": 37.49999999999997,
+   "z": 368.4490074262457,
+   "front": {
+    "phase": "storm",
+    "s": 0.8841441998144929
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10752717262710661,
+   "peak": 0.3482735753059387,
+   "nan": false,
+   "starts": 428,
+   "phase": "chase",
+   "t": 37.599999999999966,
+   "z": 370.5489886267107,
+   "front": {
+    "phase": "storm",
+    "s": 0.8831333625791581
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08899567834899545,
+   "peak": 0.2952567934989929,
+   "nan": false,
+   "starts": 431,
+   "phase": "chase",
+   "t": 37.69999999999996,
+   "z": 372.6547743872638,
+   "front": {
+    "phase": "storm",
+    "s": 0.882038299754598
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09907921192735605,
+   "peak": 0.3424968719482422,
+   "nan": false,
+   "starts": 445,
+   "phase": "chase",
+   "t": 37.799999999999955,
+   "z": 374.7502866430308,
+   "front": {
+    "phase": "storm",
+    "s": 0.8808635038564955
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.0848080629607805,
+   "peak": 0.3087119460105896,
+   "nan": false,
+   "starts": 447,
+   "phase": "chase",
+   "t": 37.89999999999995,
+   "z": 376.8318992196768,
+   "front": {
+    "phase": "storm",
+    "s": 0.8796139056251372
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09274509763618022,
+   "peak": 0.3856714367866516,
+   "nan": false,
+   "starts": 463,
+   "phase": "chase",
+   "t": 37.99999999999994,
+   "z": 378.91151686495294,
+   "front": {
+    "phase": "storm",
+    "s": 0.8782948490540045
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.0936651134316087,
+   "peak": 0.36253881454467773,
+   "nan": false,
+   "starts": 468,
+   "phase": "chase",
+   "t": 38.09999999999994,
+   "z": 380.9927020271879,
+   "front": {
+    "phase": "storm",
+    "s": 0.8769120649638881
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10946531357104196,
+   "peak": 0.41479945182800293,
+   "nan": false,
+   "starts": 482,
+   "phase": "chase",
+   "t": 38.19999999999993,
+   "z": 383.06860930789236,
+   "front": {
+    "phase": "storm",
+    "s": 0.8754716431225265
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10693702188753415,
+   "peak": 0.39514926075935364,
+   "nan": false,
+   "starts": 487,
+   "phase": "chase",
+   "t": 38.299999999999926,
+   "z": 385.1524170201641,
+   "front": {
+    "phase": "storm",
+    "s": 0.8739800029097673
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10850656548413351,
+   "peak": 0.41783949732780457,
+   "nan": false,
+   "starts": 489,
+   "phase": "chase",
+   "t": 38.39999999999992,
+   "z": 387.2530686985083,
+   "front": {
+    "phase": "storm",
+    "s": 0.872443862528253
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09630770897045197,
+   "peak": 0.38434818387031555,
+   "nan": false,
+   "starts": 504,
+   "phase": "chase",
+   "t": 38.499999999999915,
+   "z": 389.36196279443664,
+   "front": {
+    "phase": "storm",
+    "s": 0.8708702067596298
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10616535267209234,
+   "peak": 0.357918918132782,
+   "nan": false,
+   "starts": 506,
+   "phase": "chase",
+   "t": 38.59999999999991,
+   "z": 391.46373894521827,
+   "front": {
+    "phase": "storm",
+    "s": 0.8692662532662796
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.08940918282186912,
+   "peak": 0.31863465905189514,
+   "nan": false,
+   "starts": 520,
+   "phase": "chase",
+   "t": 38.6999999999999,
+   "z": 393.5620097718048,
+   "front": {
+    "phase": "storm",
+    "s": 0.8676394174385761
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09862069355007906,
+   "peak": 0.3095952272415161,
+   "nan": false,
+   "starts": 522,
+   "phase": "chase",
+   "t": 38.7999999999999,
+   "z": 395.6577484270416,
+   "front": {
+    "phase": "storm",
+    "s": 0.8659972757876652
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.11551713242634348,
+   "peak": 0.38698962330818176,
+   "nan": false,
+   "starts": 536,
+   "phase": "chase",
+   "t": 38.89999999999989,
+   "z": 397.7396094973412,
+   "front": {
+    "phase": "storm",
+    "s": 0.8643475278837667
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09182430481274177,
+   "peak": 0.2763599753379822,
+   "nan": false,
+   "starts": 541,
+   "phase": "chase",
+   "t": 38.999999999999886,
+   "z": 399.80588987189196,
+   "front": {
+    "phase": "storm",
+    "s": 0.862697956840002
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09776254676862749,
+   "peak": 0.35415518283843994,
+   "nan": false,
+   "starts": 552,
+   "phase": "chase",
+   "t": 39.09999999999988,
+   "z": 401.8682605418064,
+   "front": {
+    "phase": "storm",
+    "s": 0.8610563883417438
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10987948149282281,
+   "peak": 0.40690720081329346,
+   "nan": false,
+   "starts": 566,
+   "phase": "chase",
+   "t": 39.199999999999875,
+   "z": 403.92892683164155,
+   "front": {
+    "phase": "storm",
+    "s": 0.8594306482214903
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09759966263312839,
+   "peak": 0.3034292459487915,
+   "nan": false,
+   "starts": 571,
+   "phase": "chase",
+   "t": 39.29999999999987,
+   "z": 405.9798151963104,
+   "front": {
+    "phase": "storm",
+    "s": 0.857828518579262
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10782904597765143,
+   "peak": 0.3758312165737152,
+   "nan": false,
+   "starts": 573,
+   "phase": "chase",
+   "t": 39.399999999999864,
+   "z": 408.03142347877844,
+   "front": {
+    "phase": "storm",
+    "s": 0.856257692448523
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10686039822423746,
+   "peak": 0.3913130760192871,
+   "nan": false,
+   "starts": 581,
+   "phase": "chase",
+   "t": 39.49999999999986,
+   "z": 410.09191759883146,
+   "front": {
+    "phase": "storm",
+    "s": 0.8547257270076253
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10341979477103812,
+   "peak": 0.35130998492240906,
+   "nan": false,
+   "starts": 581,
+   "phase": "chase",
+   "t": 39.59999999999985,
+   "z": 412.1536801957776,
+   "front": {
+    "phase": "storm",
+    "s": 0.8532399953367767
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10891652119617365,
+   "peak": 0.3441486656665802,
+   "nan": false,
+   "starts": 586,
+   "phase": "chase",
+   "t": 39.69999999999985,
+   "z": 414.2067709734951,
+   "front": {
+    "phase": "storm",
+    "s": 0.8518076367205326
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09674643454942282,
+   "peak": 0.3205776810646057,
+   "nan": false,
+   "starts": 588,
+   "phase": "chase",
+   "t": 39.79999999999984,
+   "z": 416.2634765182158,
+   "front": {
+    "phase": "storm",
+    "s": 0.8504355054958108
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10120714431344534,
+   "peak": 0.3403567671775818,
+   "nan": false,
+   "starts": 602,
+   "phase": "chase",
+   "t": 39.899999999999835,
+   "z": 418.32577618338905,
+   "front": {
+    "phase": "storm",
+    "s": 0.8491301184454304
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10526663169701307,
+   "peak": 0.33101361989974976,
+   "nan": false,
+   "starts": 619,
+   "phase": "chase",
+   "t": 39.99999999999983,
+   "z": 420.3830844168206,
+   "front": {
+    "phase": "storm",
+    "s": 0.847897600737174
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09394622301672342,
+   "peak": 0.33860406279563904,
+   "nan": false,
+   "starts": 621,
+   "phase": "chase",
+   "t": 40.099999999999824,
+   "z": 422.4375865224904,
+   "front": {
+    "phase": "storm",
+    "s": 0.8467436304083734
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10241354289107617,
+   "peak": 0.35381224751472473,
+   "nan": false,
+   "starts": 635,
+   "phase": "chase",
+   "t": 40.19999999999982,
+   "z": 424.5070558587404,
+   "front": {
+    "phase": "storm",
+    "s": 0.8456733813960191
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10186349060843523,
+   "peak": 0.3323202133178711,
+   "nan": false,
+   "starts": 637,
+   "phase": "chase",
+   "t": 40.29999999999981,
+   "z": 426.60350543209717,
+   "front": {
+    "phase": "storm",
+    "s": 0.8446914651123929
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09670687326800088,
+   "peak": 0.29432371258735657,
+   "nan": false,
+   "starts": 651,
+   "phase": "chase",
+   "t": 40.39999999999981,
+   "z": 428.72979827385416,
+   "front": {
+    "phase": "storm",
+    "s": 0.8438018705662246
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.1079303136764396,
+   "peak": 0.4058379530906677,
+   "nan": false,
+   "starts": 670,
+   "phase": "chase",
+   "t": 40.4999999999998,
+   "z": 430.88052020920384,
+   "front": {
+    "phase": "storm",
+    "s": 0.8430079030293722
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.1108367697737019,
+   "peak": 0.35381823778152466,
+   "nan": false,
+   "starts": 672,
+   "phase": "chase",
+   "t": 40.599999999999795,
+   "z": 433.0371606524743,
+   "front": {
+    "phase": "storm",
+    "s": 0.842312121249025
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.11230122468039906,
+   "peak": 0.4646835923194885,
+   "nan": false,
+   "starts": 686,
+   "phase": "chase",
+   "t": 40.69999999999979,
+   "z": 435.1865075824949,
+   "front": {
+    "phase": "storm",
+    "s": 0.841716273205431
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09930230817255496,
+   "peak": 0.3455384075641632,
+   "nan": false,
+   "starts": 688,
+   "phase": "chase",
+   "t": 40.799999999999784,
+   "z": 437.33151341534517,
+   "front": {
+    "phase": "storm",
+    "s": 0.8412212304151474
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.10512723721944042,
+   "peak": 0.3358296751976013,
+   "nan": false,
+   "starts": 702,
+   "phase": "chase",
+   "t": 40.89999999999978,
+   "z": 439.49341769778266,
+   "front": {
+    "phase": "storm",
+    "s": 0.8408269207798155
+   },
+   "segment": "storm"
+  },
+  {
+   "ctx": "running",
+   "rms": 0.09964891794454213,
+   "peak": 0.3777450919151306,
+   "nan": false,
+   "starts": 705,
+   "phase": "chase",
+   "t": 40.99999999999977,
+   "z": 441.6831197130935,
+   "front": {
+    "phase": "storm",
+    "s": 0.8405322599804572
+   },
+   "segment": "storm"
+  }
+ ]
+}

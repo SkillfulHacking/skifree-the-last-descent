@@ -3,6 +3,7 @@
  * fast-forward, autopilot) — never exposed in the normal UI.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { shotPath } from './shots';
 
 type State = {
   mode: string;
@@ -20,6 +21,8 @@ declare global {
       teleport(z: number, speed?: number): void;
       advance(sec: number): void;
       frames(n: number, dt?: number): void;
+      framesLive(n: number, dt?: number): void;
+      hold(v: boolean): void;
       autopilot(style: string | null): void;
       placeYeti(gap: number): void;
       pressMenu(label: string): boolean;
@@ -64,7 +67,7 @@ test('main menu loads with a rendered 3D background and no fatal errors', async 
   const perf = await page.evaluate(() => window.__skifree.perf());
   expect(perf.calls).toBeGreaterThan(20); // the scene really draws
   expect(perf.triangles).toBeGreaterThan(50_000);
-  await page.screenshot({ path: 'docs/screenshots/e2e_menu.png' });
+  await page.screenshot({ path: shotPath('docs/screenshots/e2e_menu.png') });
   expect(errors).toEqual([]);
 });
 
@@ -76,10 +79,17 @@ test('full loop: start → learn → cave cinematic → chase → caught → ret
   await page.waitForFunction(() => window.__skifree.state().mode === 'playing');
   let s = await st(page);
   expect(s.session?.phase).toBe('intro');
-  // skip the intro with a key
+  // skip the intro with a key. (Round 4, W-090: the press is read through the real input pipeline on
+  // frames stepped here — round 3 relied on the live loop running a frame between the press and the
+  // neutral debug frames, and failed once under CPU load)
   await page.evaluate(() => window.__skifree.frames(3));
-  await page.keyboard.press('Space');
-  await page.evaluate(() => window.__skifree.frames(3));
+  await page.evaluate(() => window.__skifree.hold(true));
+  // (round 4: Space is the pop key, read as held — press() releases it before the stepped frames run;
+  // a player's tap lasts several frames, so hold it down across them)
+  await page.keyboard.down('Space');
+  await page.evaluate(() => window.__skifree.framesLive(3));
+  await page.keyboard.up('Space');
+  await page.evaluate(() => window.__skifree.hold(false));
   s = await st(page);
   expect(s.session?.intro).toBe(false);
   expect(s.session?.phase).toBe('learn');
@@ -94,7 +104,7 @@ test('full loop: start → learn → cave cinematic → chase → caught → ret
   // first playthrough: the tutorial is on (unset means the default, on)
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('skifree-tld.settings.v1') ?? '{}').showTutorial)).not.toBe(false);
   expect(await page.locator('.hud-prompt.on').isVisible()).toBe(true);
-  await page.screenshot({ path: 'docs/screenshots/e2e_tutorial.png' });
+  await page.screenshot({ path: shotPath('docs/screenshots/e2e_tutorial.png') });
 
   // ski down to the cave with the autopilot (fast-forwarded, deterministic)
   await page.evaluate(() => window.__skifree.autopilot('skilled'));
@@ -107,7 +117,7 @@ test('full loop: start → learn → cave cinematic → chase → caught → ret
   s = await st(page);
   expect(s.session?.phase).toBe('caveCinematic');
   expect(s.session!.z).toBeCloseTo(zFrozen, 3);
-  await page.screenshot({ path: 'docs/screenshots/e2e_cave_cinematic.png' });
+  await page.screenshot({ path: shotPath('docs/screenshots/e2e_cave_cinematic.png') });
   // first viewing cannot be skipped: Esc pauses instead, and the cinematic resumes afterwards
   await page.keyboard.press('Escape');
   await page.evaluate(() => window.__skifree.frames(2));
@@ -123,7 +133,7 @@ test('full loop: start → learn → cave cinematic → chase → caught → ret
   expect(s.session?.yetiPhase).toBe('chase');
   expect(s.records.seenCaveCinematic).toBe(true);
   await page.evaluate(() => window.__skifree.frames(20));
-  await page.screenshot({ path: 'docs/screenshots/e2e_chase.png' });
+  await page.screenshot({ path: shotPath('docs/screenshots/e2e_chase.png') });
   expect(await page.locator('.hud-yeti').isVisible()).toBe(true);
 
   // lose: put the yeti right behind and stop skiing
@@ -136,7 +146,7 @@ test('full loop: start → learn → cave cinematic → chase → caught → ret
   expect(s.session?.phase).toBe('caught');
   expect(s.session?.outcome).toBe('caught');
   await page.evaluate(() => window.__skifree.frames(60));
-  await page.screenshot({ path: 'docs/screenshots/e2e_defeat.png' });
+  await page.screenshot({ path: shotPath('docs/screenshots/e2e_defeat.png') });
   await page.evaluate(() => window.__skifree.frames(160));
   await page.waitForFunction(() => window.__skifree.state().menu === 'results');
   await expect(page.locator('.menu-title')).toHaveText('THE YETI WAS HUNGRY');
@@ -168,13 +178,13 @@ test('full loop: start → learn → cave cinematic → chase → caught → ret
   expect(s.session?.outcome).toBe('victory');
   expect(s.session?.phase).toBe('victory');
   await page.evaluate(() => window.__skifree.frames(90));
-  await page.screenshot({ path: 'docs/screenshots/e2e_victory_stop.png' });
+  await page.screenshot({ path: shotPath('docs/screenshots/e2e_victory_stop.png') });
   await page.evaluate(() => window.__skifree.frames(180));
-  await page.screenshot({ path: 'docs/screenshots/e2e_victory_trophy.png' });
+  await page.screenshot({ path: shotPath('docs/screenshots/e2e_victory_trophy.png') });
   await page.evaluate(() => window.__skifree.frames(250));
   await page.waitForFunction(() => window.__skifree.state().menu === 'results');
   await expect(page.locator('.menu-title')).toHaveText('YOU SURVIVED THE MOUNTAIN');
-  await page.screenshot({ path: 'docs/screenshots/e2e_results_win.png' });
+  await page.screenshot({ path: shotPath('docs/screenshots/e2e_results_win.png') });
   s = await st(page);
   expect(s.records.wins).toBe(1);
   expect(s.records.runs).toBe(2);

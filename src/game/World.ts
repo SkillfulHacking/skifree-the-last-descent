@@ -17,6 +17,7 @@
  * focus), so GPU float32 maths always works with small numbers — no jitter 50 km down the hill.
  */
 import type { ExtraCollider } from '../physics/SkierPhysics';
+import { weatherFx, WEATHER_FX_FOG_KEEP } from '../world/look/weatherFx';
 import * as THREE from 'three';
 import type { QualityPreset } from '../core/types';
 import type { Encounter, Mountain } from '../world/course';
@@ -97,6 +98,10 @@ export class World {
   /** render-space origin (see header) */
   readonly origin = new THREE.Vector3();
   private caves = new Map<number, CaveSlot>();
+  /** the dressings of the caves currently built (a location's cinematic hook can talk to its own) */
+  *caveDressings() {
+    for (const s of this.caves.values()) if (s.dressing) yield s.dressing;
+  }
   /** caves being built in time slices (one step per frame) */
   private caveJobs = new Map<number, { enc: Encounter; job: Generator<void, Cave, void> }>();
   /** location dressings being built in time slices after their cave (round 3, D2) */
@@ -139,9 +144,9 @@ export class World {
       const t = this.finish.trophy;
       this.trophyHome = { parent: t.parent, pos: t.position.clone(), quat: t.quaternion.clone(), scale: t.scale.clone() };
     } else this.finish = null;
-    this.hazardViews = new HazardLayer(this.environment, { mountain: this.mountain, quality, biome: this.biome });
+    this.hazardViews = new HazardLayer(this.environment, { mountain: this.mountain, quality, biome: this.biome, terrainMaterial: this.terrain.material });
     this.scene.add(this.hazardViews.group);
-    this.scenery = this.presentation.scenery?.build({ mountain: this.mountain, quality, biome: this.biome, terrain: this.terrain.uniforms, sunDir: this.env.sunDir }) ?? null;
+    this.scenery = this.presentation.scenery?.build({ mountain: this.mountain, quality, biome: this.biome, terrain: this.terrain.uniforms, sunDir: this.env.sunDir, terrainMaterial: this.terrain.material }) ?? null;
     if (this.scenery) this.scene.add(this.scenery.group);
     this.start = new StartArea(this.mountain, quality);
     this.scene.add(this.start.group);
@@ -158,6 +163,9 @@ export class World {
     onProgress(0.02, 'Shaping the mountain');
     await tick();
     const w = new World(renderer, quality, course);
+    // scanned meshes stream in after construction (they replace placeholders when ready)
+    void w.vegetation.loadScans();
+    void w.scenery?.loadAssets?.();
     onProgress(0.08, 'Growing the forest');
     await tick();
     const x0 = w.mountain.routeX(0);
@@ -236,6 +244,22 @@ export class World {
     });
   }
 
+  /**
+   * (Round 5, W-096 / review D4-4) the longest single slice of cave building (dressing or cave) seen in
+   * play, ms of main thread: what one frame of streaming a cave costs at worst. Read by perf captures.
+   */
+  caveSliceMaxMs = 0;
+  /** the same, per kind */
+  readonly caveSliceMax = { dressing: 0, cave: 0 };
+  private timeSlice<T>(kind: 'dressing' | 'cave', f: () => T): T {
+    const t0 = performance.now();
+    const r = f();
+    const ms = performance.now() - t0;
+    if (ms > this.caveSliceMax[kind]) this.caveSliceMax[kind] = ms;
+    if (ms > this.caveSliceMaxMs) this.caveSliceMaxMs = ms;
+    return r;
+  }
+
   /** Advance pending cave builds by one slice (called every frame): dressings first, then caves. */
   private stepCaves() {
     for (const i of this.dressJobs.keys()) {
@@ -243,7 +267,7 @@ export class World {
       return; // one slice per frame
     }
     for (const [i, j] of this.caveJobs) {
-      const r = j.job.next();
+      const r = this.timeSlice('cave', () => j.job.next());
       if (r.done) {
         this.caveJobs.delete(i);
         this.installCave(j.enc, r.value);
@@ -293,7 +317,7 @@ export class World {
   private stepDressing(i: number, all: boolean) {
     const job = this.dressJobs.get(i);
     if (!job) return;
-    let r = job.next();
+    let r = all ? job.next() : this.timeSlice('dressing', () => job.next());
     while (all && !r.done) r = job.next();
     if (!r.done) return;
     this.dressJobs.delete(i);
@@ -412,7 +436,31 @@ export class World {
     return this.finish;
   }
 
+  /**
+   * A finish cinematic's own weather (Whiteout: the storm clears over the rescue station), in place
+   * of the weather model's while set. Cleared with the trophy at the next run.
+   */
+  weatherOverride: { visibility: number; snowfall: number; storm: number; windX: number } | null = null;
+  /**
+   * Hand a cinematic's weather back to the model gradually: `releaseWeather(s)` clears the override
+   * and blends from its last values to the live weather over `s` seconds (presentation only; the
+   * physics weather is never overridden).
+   */
+  releaseWeather(seconds: number) {
+    const wo = this.weatherOverride;
+    this.weatherOverride = null;
+    if (!wo || seconds <= 0) return;
+    this.weatherFade = { from: { ...wo }, left: seconds, dur: seconds };
+  }
+  private weatherFade: { from: { visibility: number; snowfall: number; storm: number; windX: number }; left: number; dur: number } | null = null;
+  /** (debug/evidence) end a weather hand-back now, so a capture after a clock jump shows the live weather */
+  finishWeatherBlend() {
+    this.weatherFade = null;
+  }
+
   resetTrophy() {
+    this.weatherOverride = null;
+    this.weatherFade = null;
     if (!this.finish || !this.trophyHome) return;
     const t = this.finish.trophy;
     const h = this.trophyHome;
@@ -447,6 +495,8 @@ export class World {
     this.vegetation.group.traverse((o) => (o.visible = true));
     // one view of every hazard kind (disposed again on the next update)
     this.hazardViews.warmup();
+    // the location's weather layers that are hidden in fair weather (W-086)
+    this.scenery?.warmup?.();
   }
 
   /** frames each streaming consumer has waited with work pending (starvation guard) */
@@ -552,10 +602,37 @@ export class World {
     // weather on the physics clock (Alpine: constant; fog, flakes exactly as before)
     const env = this.environment;
     env.weatherAt(focus.x, focus.z, env.clock, this.weather);
-    this.env.applyWeather(this.weather.visibility * env.hazardVisibility(focus.x, focus.z, env.clock), this.weather.snowfall);
+    const wo = this.weatherOverride;
+    const blending = !wo && !!this.weatherFade;
+    if (wo) {
+      this.weather.visibility = wo.visibility;
+      this.weather.snowfall = wo.snowfall;
+      this.weather.storm = wo.storm;
+      this.weather.windX = wo.windX;
+      this.weatherFade = null;
+    } else if (this.weatherFade) {
+      const F = this.weatherFade;
+      F.left -= dt;
+      const k = Math.max(0, F.left / F.dur);
+      const e = k * k * (3 - 2 * k);
+      const w = this.weather;
+      w.visibility += (F.from.visibility - w.visibility) * e;
+      w.snowfall += (F.from.snowfall - w.snowfall) * e;
+      w.storm = (w.storm ?? 0) + (F.from.storm - (w.storm ?? 0)) * e;
+      w.windX += (F.from.windX - w.windX) * e;
+      if (F.left <= 0) this.weatherFade = null;
+    }
+    let vis = this.weather.visibility * (wo ? 1 : env.hazardVisibility(focus.x, focus.z, env.clock));
+    let snowfall = this.weather.snowfall;
+    if (weatherFx.scale < 1) {
+      // Reduce Weather Effects: only the storm's excess over clear air is thinned (presentation)
+      vis = vis > 1 ? 1 + (vis - 1) * WEATHER_FX_FOG_KEEP : vis;
+      snowfall *= 0.3 + 0.7 * weatherFx.scale;
+    }
+    this.env.applyWeather(vis, snowfall, this.weather.storm ?? 0);
     this.env.update(dt, focus, camPos, time, this.weather.windX);
     this.hazardViews.update(dt, focus.z);
-    this.scenery?.update(dt, time, { focus, camPos, origin: this.origin });
+    this.scenery?.update(dt, time, { focus, camPos, origin: this.origin, storm: this.weather.storm ?? 0, clock: env.clock, weatherSeed: env.seed, windX: this.weather.windX, windZ: this.weather.windZ, override: !!wo, blend: blending });
     for (const s of this.caves.values()) s.dressing?.update?.(dt, time);
     this.particles.update(dt);
   }

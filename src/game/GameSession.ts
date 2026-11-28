@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import type { Encounter, Sighting } from '../world/course';
-import { DIFFICULTY } from './CourseConfig';
+import { yetiSpeedFor } from './CourseConfig';
 import { capabilitiesOf } from '../world/capabilities';
 
 /** style points for discovering a scenic viewpoint (they sit outside the chases: exploring is free) */
@@ -19,9 +19,12 @@ import { RunState } from './RunState';
 import { FollowCamera } from '../camera/FollowCamera';
 import { CaveCinematic } from '../cinematic/CaveCinematic';
 import { DefeatCinematic, VictoryCinematic } from '../cinematic/EndCinematics';
-import { Timeline, ease, pose } from '../cinematic/Timeline';
+import { Timeline, ease, pose, type CamPose } from '../cinematic/Timeline';
+import { ChasePresence, type PresenceCue } from '../yeti/presence';
 import { autopilotInput, type AutopilotStyle } from '../debug/autopilot';
 import { clamp, damp, smoothstep, wrapAngle } from '../core/rng';
+import { victorySteer } from './victorySteer';
+import { blizzardPushDir } from '../world/biomes/whiteout/hazards';
 import type { SkierPose, YetiAnimState, YetiMode, AudioFrameState } from '../core/types';
 import type { World } from './World';
 import type { SkierModel } from '../player/SkierModel';
@@ -63,6 +66,9 @@ export interface SessionHooks {
   onResults(stats: RunStats, won: boolean): void;
   onPauseRequest(): void;
 }
+
+/** (round 4, W-085) seconds after control returns before a storm front's pill and caption show */
+export const FRONT_QUIET = 3;
 
 export class GameSession implements Stage {
   readonly phys: SkierPhysics;
@@ -120,6 +126,7 @@ export class GameSession implements Stage {
   // --- gameplay events (achievements / statistics; see events.ts) ---------------------------
   /** Gameplay event bus of this run. Subscribe before the first frame (RunStarted is emitted on the first simulated step). */
   readonly events: EventBus;
+  private readonly tmpHead = new THREE.Vector3();
   private telemetry: RunTelemetry;
   private runStartedSent = false;
   private runFinishedSent = false;
@@ -190,6 +197,24 @@ export class GameSession implements Stage {
     this.follow.addTrauma(amount * this.settings.cameraShake);
   }
 
+  gameplayPose(): CamPose {
+    // exactly the pose finishCave's snap gives the first controllable frame (W-076, decision 1)
+    const c = this.camera;
+    const pos = c.position.clone();
+    const quat = c.quaternion.clone();
+    const fov = c.fov;
+    const held = this.follow.lookBack;
+    this.follow.lookBack = 0;
+    this.follow.snap(this.followTarget());
+    this.follow.lookBack = held;
+    const out: CamPose = { pos: c.position.clone(), look: this.follow.lookTarget.clone(), fov: c.fov };
+    c.position.copy(pos);
+    c.quaternion.copy(quat);
+    c.fov = fov;
+    c.updateProjectionMatrix();
+    return out;
+  }
+
   setYetiMode(m: YetiMode) {
     if (this.yetiAnim.mode !== m) {
       this.yetiAnim.mode = m;
@@ -230,7 +255,11 @@ export class GameSession implements Stage {
     const fp = new THREE.Vector3();
     const fl = new THREE.Vector3();
     this.follow.idealPose(this.followTarget(), fp, fl);
-    tl.shot({ start: 0, end: 4.2, from: () => pose(P.clone().add(new THREE.Vector3(18, 9, 22)), P.clone().add(new THREE.Vector3(0, 1.2, 0)), 46), via: () => pose(P.clone().add(new THREE.Vector3(10, 4, -8)), P.clone().add(new THREE.Vector3(0, 1.4, 4)), 52), to: () => pose(fp, fl, 64), easing: ease.inOutCubic });
+    tl.shot({ start: 0, end: 4.2, from: () => pose(P.clone().add(new THREE.Vector3(18, 9, 22)), P.clone().add(new THREE.Vector3(0, 1.2, 0)), 46), via: () => pose(P.clone().add(new THREE.Vector3(10, 4, -8)), P.clone().add(new THREE.Vector3(0, 1.4, 4)), 52), to: () => pose(fp, fl, 64), easing: ease.inOutCubic, when: () => !this.settings.reduceCameraMotion });
+    // (round 4, W-088 / review E F3) Reduce Camera Motion: no crane — the establishing view held, then one
+    // cut to the gameplay camera (read as it plays, like the cave's turn)
+    tl.shot({ start: 0, end: 2.6, from: () => pose(P.clone().add(new THREE.Vector3(18, 9, 22)), P.clone().add(new THREE.Vector3(0, 1.2, 0)), 46), to: () => pose(P.clone().add(new THREE.Vector3(18, 9, 22)), P.clone().add(new THREE.Vector3(0, 1.2, 0)), 46), when: () => this.settings.reduceCameraMotion });
+    tl.shot({ start: 2.6, end: 4.2, from: () => pose(fp, fl, 64), to: () => pose(fp, fl, 64), when: () => this.settings.reduceCameraMotion });
     const goal = this.endless ? 'Survive as far as you can. Bank your run at the refuges.' : `Reach the ${this.world.finishDef.goal ?? 'resort'}, ${(this.world.mountain.finishZ / 1000).toFixed(0)} km down the mountain.`;
     tl.at(0.2, () => this.hud.title('THE LAST DESCENT', goal, 'intro notice', 3.4));
     tl.at(4.2, () => {});
@@ -282,6 +311,8 @@ export class GameSession implements Stage {
         this.applyCineShake(dt);
       }
       if (this.cave.tl.done) {
+        // (W-076, owner's decision 1) watched or skipped, control returns on the follow camera's
+        // forward view: the cinematic's last beat swings round to exactly that pose (CaveCinematic)
         this.finishCave();
         // the cinematic already moved the Yeti this frame: start simulating next frame (C13)
         this.handoffFrame = true;
@@ -337,6 +368,8 @@ export class GameSession implements Stage {
       this.follow.avoid = this.run.phase === 'chase' && this.yeti.root.visible ? this.yeti.root.position : null;
       this.follow.update(dt, this.followTarget(true));
     }
+    if (this.sinceLanding >= 0) this.sinceLanding += dt;
+    this.updatePresence(dt);
     this.updateTutorial(dt);
     this.updateHud(dt);
     this.updateAudio(dt);
@@ -344,9 +377,42 @@ export class GameSession implements Stage {
 
   recordsSeenCave = false;
   private handoffFrame = false;
+  /** the chase began with the Yeti's leap from the cave and he has not landed yet */
+  private leapPending = false;
+  private yetiLanded() {
+    this.leapPending = false;
+    this.sinceLanding = 0;
+    const p = this.yetiAI.pos;
+    this.shake(0.5);
+    this.audio.playYetiFootstep(p, 1);
+    // (W-076 review F, F3) the landing is felt wherever he lands: a close, unattenuated impact layer,
+    // the pad's rumble and a caption (the shake alone is gone with Reduce Camera Motion)
+    this.audio.playImpact('rock-light', 1);
+    this.rumble?.(0.8, 0.5, 260);
+    this.hud.caption('[a heavy landing behind you]', 1.6);
+    this.world.particles.emit({ x: p.x, y: p.y + 0.2, z: p.z, vx: 0, vy: 2, vz: 0, spread: 2.5, size: 0.7, life: 1.4, count: 60, gravity: 0.5, drag: 1.6, grow: 1.4, alpha: 0.85 });
+  }
+  private showRunTitle() {
+    this.hud.title('RUN.', '', 'run', 1.6);
+    this.audio.playRunPrompt();
+  }
+
+  /** seconds since the Yeti's landing in this chase (−1 while he is still in the air / no chase) */
+  private sinceLanding = -1;
+  /** 0..1: how tight the rear-view inset frames the leap and the landing (W-076 review F, F2) */
+  rearViewZoom(): number {
+    if (this.run.phase !== 'chase') return 0;
+    if (this.leapPending) return 1;
+    if (this.sinceLanding < 0) return 0;
+    // (W-088) Reduce Camera Motion: the inset cuts back to its usual framing instead of easing
+    if (this.settings.reduceCameraMotion) return this.sinceLanding < 1.4 ? 1 : 0;
+    return 1 - smoothstep(1.0, 1.8, this.sinceLanding);
+  }
 
   /** Rear-view framing (skier in the foreground, the yeti behind), or null when not needed. */
   rearView(out: { pos: THREE.Vector3; look: THREE.Vector3 }): number {
+    // (W-076, decision 1) the main camera faces the run from the first controllable frame: the inset
+    // shows the leap and the landing behind the skier
     if (this.run.phase !== 'chase' || !this.yeti.root.visible) return 0;
     const d = this.yetiAI.distance;
     if (d > 110) return 0;
@@ -356,8 +422,12 @@ export class GameSession implements Stage {
     const fz = Math.cos(yaw);
     const p = this.renderPos;
     // just ahead and off to the side of the skier, framed on the beast (the skier is a small
-    // foreground silhouette at the frame edge)
-    out.pos.set(p.x + fx * 1.5 + fz * 2.4, p.y + 1.5, p.z + fz * 1.5 - fx * 2.4);
+    // foreground silhouette at the frame edge). (Round 4, W-082) through the leap and the landing the
+    // camera drops lower and further out to the side: the arc is seen across, against the sky, not end-on
+    // against the pale rock and snow it rose from (round 3: a 8–12 px smudge after the cave mouth)
+    const z = this.rearViewZoom();
+    const side = 2.4 + 4.2 * z;
+    out.pos.set(p.x + fx * 1.5 + fz * side, p.y + 1.5 - 0.8 * z, p.z + fz * 1.5 - fx * side);
     const y = this.yeti.root.position;
     out.look.set(y.x, y.y + 1.6, y.z);
     return smoothstep(110, 90, d);
@@ -414,6 +484,17 @@ export class GameSession implements Stage {
     }
     this.telemetry.step(s, PHYS_DT);
     this.checkLookouts();
+    // (round 6, W-102 / review B5-1: the Hard storm build-up had no cue) where the weather starts to build
+    // down the mountain, and again where it is at its strongest, the player is told
+    {
+      const env = this.world.environment;
+      const k = env.intensity > 0 ? env.intensityAt(s.pos.z) / env.intensity - 1 : 0;
+      const step = k >= 0.45 ? 2 : k >= 0.05 ? 1 : 0;
+      if (step > this.buildCaptioned && this.run.controllable) {
+        this.buildCaptioned = step;
+        this.envCaption(step === 1 ? '[the storms grow stronger from here down the mountain]' : '[the storms are at their fiercest now]', 3.5, `build${step}`, CAPTION_PRIORITY.warning);
+      }
+    }
     if (this.pendingSurfCaption && s.time > 4 && this.run.controllable) {
       this.pendingSurfCaption = false;
       this.envCaption('[surf booms against the cliffs far below]', 3, 'surf', CAPTION_PRIORITY.ambient);
@@ -442,6 +523,7 @@ export class GameSession implements Stage {
     if (this.run.phase === 'chase') {
       const target = { pos: s.pos, vel: s.vel, airborne: !s.grounded, down: s.crashed || s.recoverTime > 0 };
       this.yetiAI.update(PHYS_DT, target);
+      if (this.leapPending && !this.yetiAI.airborne) this.yetiLanded();
       this.stepSnowballs();
       if (this.yetiAI.phase === 'chase' && !this.yetiAI.airborne) this.chaseMinGap = Math.min(this.chaseMinGap, this.yetiAI.distance);
       if (this.yetiAI.canCatch(target) && this.run.catchPlayer()) this.beginDefeat();
@@ -536,27 +618,13 @@ export class GameSession implements Stage {
     this.prevHeading = s.heading;
     const v = this.victory;
     if (!v) return;
-    // auto-steer to the stop point; drift-brake into a hockey stop near it
-    const sp = v.stopPoint;
-    const d = Math.hypot(sp.x - s.pos.x, sp.z - s.pos.z);
-    const want = Math.atan2(sp.x - s.pos.x, Math.max(2, sp.z - s.pos.z));
-    const err = wrapAngle(want - s.heading);
-    const stopping = d < 22 || s.pos.z > sp.z - 4;
-    // hockey stop: swing the skis ~90° across the direction of travel once, then hold the edge
-    const travel = s.speed > 1 ? Math.atan2(s.vel.x, s.vel.z) : s.heading;
-    const across = Math.abs(wrapAngle(s.heading - travel));
-    if (stopping && !this.hockey) {
-      this.hockey = true;
+    // auto-steer to the stop point; drift-brake into a hockey stop near it (victorySteer.ts)
+    const st = { hockey: this.hockey };
+    const { input: inp, hockeyStarted } = victorySteer(s, v.stopPoint, st, { onMark: v.stopOnMark, driftMin: DRIFT_MIN_SPEED });
+    this.hockey = st.hockey;
+    if (hockeyStarted) {
       this.world.particles.emit({ x: s.pos.x, y: s.pos.y + 0.1, z: s.pos.z, vx: s.vel.x * 0.4, vy: 1.6, vz: s.vel.z * 0.4, spread: 2.2, size: 0.45, life: 1.3, count: 70, gravity: 0.5, drag: 1.8, grow: 1.4, alpha: 0.85 });
     }
-    const inp: SkierInput = {
-      steer: stopping ? (across < 1.45 && s.speed > 2 ? 1 : 0) : clamp(-err * 2.5, -1, 1),
-      tuck: 0,
-      brake: stopping ? 1 : smoothstep(60, 20, d) * 0.6,
-      drift: stopping && s.speed > DRIFT_MIN_SPEED,
-      pop: false,
-      recover: true,
-    };
     this.phys.step(inp, PHYS_DT);
     for (const e of this.phys.drainEvents()) this.onEvent(e);
     if (s.speed < 0.5) s.vel.multiplyScalar(0.9);
@@ -577,7 +645,11 @@ export class GameSession implements Stage {
       case 'land': {
         this.audio.playLanding(e.impact, e.hard);
         const n = Math.round(10 + e.impact * 50);
-        fx.emit({ x: s.pos.x, y: s.pos.y + 0.05, z: s.pos.z, vx: s.vel.x * 0.3, vy: 1.5 + e.impact * 2, vz: s.vel.z * 0.3, spread: 1.5 + e.impact * 2, size: 0.4 + e.impact * 0.4, life: 1.1, count: n, gravity: 0.5, drag: 2, grow: 1.4, alpha: 0.8 });
+        // (round 4, W-065 review A) a small landing's snow stays low round the skis: round 3 threw every
+        // landing's burst ~2 m up, between the follow camera and the skier, and a hop over a roller hid
+        // him in a white cloud for a second (every Whiteout rim capture); a hard landing still erupts
+        const k = Math.min(1, e.impact);
+        fx.emit({ x: s.pos.x, y: s.pos.y + 0.05, z: s.pos.z, vx: s.vel.x * 0.3, vy: 0.5 + k * 1.6, vz: s.vel.z * 0.3, spread: 1.2 + k * 2.3, size: 0.3 + k * 0.4, life: 0.7 + k * 0.4, count: n, gravity: 0.6, drag: 2.4, grow: 1.0 + k * 0.4, alpha: 0.4 + k * 0.3 });
         if (e.hard) {
           this.shake(0.45);
           this.audio.playExertion('grunt');
@@ -718,12 +790,14 @@ export class GameSession implements Stage {
   // --- phases ---------------------------------------------------------------------
   private beginCave() {
     this.hud.setPrompt(null);
+    // (W-076 review C, C4) a camera nudge before the trigger does not outlive the cinematic
+    this.follow.resetOrbit();
     const e = this.run.encounter!;
     this.world.focusEncounter = e;
     this.world.caveFor(e);
     // documented ceiling: never more than +33 % over the classic Yeti, whatever the escalation
     // and difficulty (B13); a skilled skier must always be able to escape
-    this.yetiAI.speedMul = Math.min(1.33, e.speedMul * DIFFICULTY[this.world.course.difficulty].yetiSpeed);
+    this.yetiAI.speedMul = Math.min(1.33, e.speedMul * yetiSpeedFor(this.world.course.difficulty, this.world.course.biome));
     this.cave = new CaveCinematic(this);
     this.cave.onRunPrompt = () => {};
     this.input.steer = 0;
@@ -731,6 +805,8 @@ export class GameSession implements Stage {
 
   private finishCave() {
     if (!this.cave) return;
+    // (W-076 review B, B1) control returns facing the run, whatever was held as the cave triggered
+    this.follow.lookBack = 0;
     this.cave.finish();
     this.cave = null;
     this.run.endCaveCinematic();
@@ -738,10 +814,16 @@ export class GameSession implements Stage {
     this.recordsSeenCave = true;
     this.onCaveSeen?.();
     this.chaseMinGap = Infinity;
+    this.sinceControl = 0;
+    this.presence = new ChasePresence(this.world.seed + (this.run.encounter?.index ?? 0));
     if (this.run.encounter) this.events.emit({ type: 'YetiEncountered', encounter: this.run.encounter.index, difficulty: this.world.course.difficulty });
     this.hud.setSkipHint(null);
-    this.hud.title('RUN.', '', 'run', 1.6);
-    this.audio.playRunPrompt();
+    // (W-076, decision 1) the danger is announced at once — RUN. on the first controllable frame —
+    // and the leap is the chase's first beat: his landing (yetiLanded) hits with a thud and a shake
+    this.showRunTitle();
+    this.sinceLanding = -1;
+    this.leapPending = this.yetiAI.airborne;
+    if (!this.leapPending) this.yetiLanded();
     this.audio.setMusicMode('chase');
     this.follow.snap(this.followTarget());
     this.yeti.setVisible(true);
@@ -811,6 +893,25 @@ export class GameSession implements Stage {
           const text = P.gate ? '[a squall builds off the sea — take the lee of the rocks, or the notch in the lull]' : (P.slip ?? 0) > 0 ? '[a squall builds off the sea — it will push you left]' : '[a squall gusts across the jump ahead]';
           this.envCaption(text, 2.4, `squall:${e.hazard.id}`, CAPTION_PRIORITY.warning);
         }
+        // every blizzard cell gets its warning once: when it builds ahead, or — a cell already blowing
+        // when it comes into range — when it is first seen (W-046: round 1 left those uncaptioned)
+        if ((e.type === 'hazard-telegraph' || e.type === 'hazard-active') && e.kind === 'blizzard' && !this.blizzardWarned.has(e.hazard.id)) {
+          // (round 3, R2 E N1) the push named is the one the cell will give (it follows the front in a
+          // storm, as the HUD arrow and the wind do); the cell counts as warned only once its caption is
+          // on screen or waiting, and it may wait as long as the cell takes to arrive (~8 s), not 3.5 s
+          const dir = blizzardPushDir(e.hazard as never, e.t, this.world.environment.seed);
+          const what = e.type === 'hazard-telegraph' ? 'a blizzard builds ahead' : 'a blizzard is blowing across the piste ahead';
+          if (this.envCaption(`[${what} — stand up out of the tuck; it pushes you ${dir > 0 ? 'left' : 'right'}]`, 2.8, `blizzard:${e.hazard.id}`, CAPTION_PRIORITY.warning, 8)) {
+            this.blizzardWarned.add(e.hazard.id);
+            if (this.blizzardWarned.size > 64) this.blizzardWarned.delete(this.blizzardWarned.values().next().value!);
+          }
+        }
+        if (e.type === 'hazard-hit' && e.kind === 'blizzard') this.envCaption('[a gust catches you in the tuck — you stagger]', 2, 'blizzard-hit', CAPTION_PRIORITY.report);
+        // (round 3, R2 B N4) a jump that came down in the snow: say why the skier staggered
+        if (e.type === 'hazard-hit' && e.kind === 'wind-drift') this.envCaption('[the jump falls short — your skis catch the drift]', 2, 'drift-clip', CAPTION_PRIORITY.report);
+      } else if (e.type === 'hazard-enter' && e.kind === 'wind-drift') {
+        this.audio.playCue('drift-plough', null);
+        this.envCaption('[skis plough into a deep drift]', 1.4, 'drift', CAPTION_PRIORITY.report);
       } else if (e.type === 'hazard-enter' && e.kind === 'scoured-rock') {
         this.audio.playCue('rock-scrape', null);
         this.envCaption('[skis scrape over bare rock]', 1.6, 'rock', CAPTION_PRIORITY.report);
@@ -821,17 +922,26 @@ export class GameSession implements Stage {
   }
 
   private pendingSurfCaption = false;
+  /** blizzard cells already warned about this run (one warning per cell) */
+  private blizzardWarned = new Set<number>();
   /** last time each kind of location caption was shown (separate throttles: round 2, E3) */
   private envCaptionAt = new Map<string, number>();
+  /** (round 6) the storm build-up's captions already given this run: 0 none, 1 building, 2 strongest */
+  private buildCaptioned = 0;
   /**
    * Caption a location sound (squall, rock, surf, viewpoint). Never replaces a Yeti caption; a
    * warning that asks for a decision (a squall ahead) replaces a report (rock under the skis) that is
    * still on screen; each kind at most once every 3 s, so one kind never mutes another.
    */
-  private envCaption(text: string, seconds: number, kind: string, priority: number = CAPTION_PRIORITY.report) {
+  private envCaption(text: string, seconds: number, kind: string, priority: number = CAPTION_PRIORITY.report, ttl = 4): boolean {
     const t = this.phys.s.time;
-    if (t - (this.envCaptionAt.get(kind) ?? -Infinity) < 3) return;
-    if (this.hud.caption(text, seconds, { soft: true, priority })) this.envCaptionAt.set(kind, t);
+    if (t - (this.envCaptionAt.get(kind) ?? -Infinity) < 3) return false;
+    // warnings wait for the caption line (Hud queue) for up to `ttl` s; reports are dropped if busy
+    if (this.hud.caption(text, seconds, { soft: true, priority, queue: priority >= CAPTION_PRIORITY.warning, ttl })) {
+      this.envCaptionAt.set(kind, t);
+      return true;
+    }
+    return false;
   }
 
   /** Optional viewpoints on a coast's rim: reaching one reports ScenicLocationDiscovered once per run. */
@@ -986,6 +1096,7 @@ export class GameSession implements Stage {
       this.yetiAnim.turn = this.yetiAI.turn;
       if (this.run.phase === 'chase') this.setYetiMode(this.yetiAI.mode);
     }
+    this.updateYetiStormLook();
     this.yetiAnim.modeTime += dt;
     if (this.yetiAnim.throwT !== undefined) {
       this.yetiAnim.throwT += dt;
@@ -1010,7 +1121,9 @@ export class GameSession implements Stage {
       this.lastRight.copy(r);
       if (s.grounded && s.speed > 2) {
         const intensity = clamp(s.edgeLoad * 0.8 + s.brake * 0.8 + s.driftAmount + (s.surface === 'powder' ? 0.5 : 0), 0, 2) * clamp(s.speed / 20, 0.2, 1.4);
-        this.sprayAcc += dt * (8 + intensity * 70);
+        // (round 4, W-065 review A: a dense white puff hid the skier in every Whiteout rim capture) the
+        // spray thins out at full edge load instead of piling into one glowing cloud round the skier
+        this.sprayAcc += dt * (8 + Math.min(intensity, 1.2) * 45);
         while (this.sprayAcc > 1) {
           this.sprayAcc -= 1;
           const src = Math.random() < 0.5 ? l : r;
@@ -1030,7 +1143,7 @@ export class GameSession implements Stage {
             gravity: 0.65,
             drag: 2.2,
             grow: 1.6,
-            alpha: 0.55 + 0.3 * Math.min(1, intensity),
+            alpha: 0.45 + 0.25 * Math.min(1, intensity),
           });
         }
       }
@@ -1123,12 +1236,111 @@ export class GameSession implements Stage {
     }
   }
 
+  private lastFront: { k: string; phase: string } = { k: '', phase: 'clear' };
+
+  /**
+   * (W-009) A white Yeti in a white storm. Not a colour that changes as he closes in (the slice's
+   * distance darkening read as a fake): the storm's flat, dim light takes the pelt down with everything
+   * else — the same at 10 m as at 60 m, changing only as slowly as the weather — and his eyes burn
+   * through the snow as they do in the cave, the pair of points that finds him first.
+   *
+   * It applies while he is out in the weather on the course (the chase, and the catch). Once the run
+   * moves on to anything else it is put back exactly once (Gitar, PR #9 r4581960912: it used to carry
+   * into the rescue victory — the searchlight beat, the clearing — because the victory takes manual
+   * control of the Yeti and nothing reset it). The cave cinematic owns the Yeti's look in its phase and
+   * restores it itself.
+   */
+  private yetiStormLook = false;
+  private updateYetiStormLook() {
+    const ph = this.run.phase;
+    if ((ph === 'chase' || ph === 'caught') && this.run.yetiReleased) {
+      const storm = this.world.weather.storm ?? 0;
+      this.yeti.setShade(1 - 0.36 * storm);
+      // (W-088) dimmer with Reduce flashes & pulsing (as in the cave cinematic)
+      this.yeti.setEyeGlow((this.settings.reduceFlashes ? 0.55 : 0.75) * smoothstep(0.25, 0.7, storm));
+      this.yetiStormLook = true;
+    } else if (this.yetiStormLook && ph !== 'caveCinematic') {
+      this.yeti.setShade(1);
+      this.yeti.setEyeGlow(0);
+      this.yetiStormLook = false;
+    }
+  }
+  /** the storm-front forecast on the HUD and in the captions (locations whose weather has fronts) */
+  private updateWeatherHud() {
+    const env = this.world.environment;
+    const wm = capabilitiesOf(this.world.biome).weather;
+    const f = wm.front?.(env.clock, env.seed) ?? null;
+    if (!f || !this.run.simulating) {
+      this.hud.setWeather(null);
+      return;
+    }
+    // (round 4, W-085 / review C R3-C3, F5) the first seconds of control belong to RUN., the leap and the
+    // inset: the front's pill and caption wait FRONT_QUIET s (alerts only — the weather itself runs on)
+    if (this.run.phase === 'chase' && this.sinceControl < FRONT_QUIET) {
+      this.hud.setWeather(null);
+      return;
+    }
+    // +X (dir +1) is the skier's left when facing downhill: the arrow points the way the wind pushes
+    const arrow = f.dir > 0 ? '←' : '→';
+    const side = f.dir > 0 ? 'left' : 'right';
+    if (f.phase === 'build') this.hud.setWeather(`STORM IN ${Math.max(1, Math.ceil(f.left))} s  ${arrow}`, 'warn');
+    else if (f.phase === 'storm') this.hud.setWeather(`STORM  ${arrow}`, 'storm');
+    else if (f.phase === 'ease') this.hud.setWeather('CLEARING', 'calm');
+    else this.hud.setWeather(null);
+    if (f.phase !== this.lastFront.phase) {
+      // (a front that built while the alerts waited is announced when they resume)
+      if (f.phase === 'build' || (f.phase === 'storm' && this.lastFront.phase !== 'build')) {
+        // (W-048) heard from upwind: the front rolls in from the side it will blow from
+        const sp = this.phys.s.pos;
+        this.audio.playCue('blizzard-build', new THREE.Vector3(sp.x - f.dir * 60, sp.y + 8, sp.z + 20));
+        // (W-047: short enough to read at 15 characters a second while the front builds.) Round 3 (R2
+        // F N2, W-055): the caption no longer sends the player to the lee shoulder — measured, it is not
+        // a net win (it crosses the drift rows) — but to the marked drift gaps, the move that is
+        // (balance/round2: +12/−0 on held-out Normal Sprint seeds)
+        this.envCaption(`[a storm front rolls in — the wind pushes you ${side}; ski the flagged gaps in the drifts]`, 3.2, 'front', CAPTION_PRIORITY.warning, 6);
+      } else if (f.phase === 'ease') {
+        // (round 3, R2 A N8) the front's warning is taken back as it eases
+        this.hud.withdrawCaption((t) => t.startsWith('[a storm front rolls in'));
+        this.envCaptionAt.delete('front');
+        this.envCaption('[the storm eases — the view opens up]', 2.2, 'front', CAPTION_PRIORITY.report);
+      }
+      this.lastFront.phase = f.phase;
+    }
+  }
+
+  /** seconds since control returned at the last cave hand-off (W-085: the front's alerts wait) */
+  private sinceControl = Infinity;
+  /** the Yeti's presence cues (presentation only: yeti/presence.ts) */
+  private presence = new ChasePresence(1);
+  private presenceCue: PresenceCue = { call: false, closing: false };
+  private updatePresence(dt: number) {
+    if (this.run.phase !== 'chase' || this.leapPending) {
+      this.presenceCue = { call: false, closing: false };
+      return;
+    }
+    this.presenceCue = this.presence.update(dt, this.yetiAI.distance);
+    if (this.presenceCue.call) {
+      this.audio.playYetiGrowl(this.yeti.root.position, true);
+      // (W-076 review B, B3) never over another caption (Hard's snowball instruction shares the line)
+      if (!this.hud.captionText) this.hud.caption('[a roar, far behind you]', 2);
+    }
+  }
+
   private updateHud(dt: number) {
+    // (W-088) the settings are read live: a change in the pause menu applies at once
+    this.follow.reduceMotion = this.settings.reduceCameraMotion;
+    if (this.run.phase === 'chase') this.sinceControl += dt;
+    this.updateWeatherHud();
     const s = this.phys.s;
     const m = this.world.mountain;
     const L = m.finishZ;
     const enc = this.run.encounter;
     const nextRefuge = this.endless ? (enc?.checkpointZ ?? null) : null;
+    // (round 6, W-103) RUN. between the rear-view inset and the skier's helmet, wherever the camera puts him
+    if (this.run.phase === 'chase' && this.sinceControl < 2) {
+      const h = this.skier.getHeadTopWorldPosition(this.tmpHead).project(this.camera);
+      this.hud.fitRun(((1 - h.y) / 2) * innerHeight);
+    }
     this.hud.update(dt, {
       speedKmh: s.speed * 3.6,
       distanceToFinish: L - s.pos.z,
@@ -1138,6 +1350,7 @@ export class GameSession implements Stage {
       score: this.liveScore(),
       multiplier: this.multiplier,
       yetiDistance: this.run.phase === 'chase' ? this.yetiAI.distance : null,
+      yetiClosing: this.run.phase === 'chase' && this.presenceCue.closing,
       chase: this.run.phase === 'chase',
       crashed: s.crashed,
       canRecover: s.crashTime > 1,
@@ -1168,8 +1381,32 @@ export class GameSession implements Stage {
       crowdLevel: this.world.resort ? smoothstep(this.world.mountain.finishZ - 400, this.world.mountain.finishZ, s.pos.z) : 0,
       eerie: this.run.phase === 'caveCinematic' ? 1 : this.eerie,
       coast: this.coastLevel(),
+      weather: this.weatherAudio(),
     };
     this.audio.update(dt, st);
+  }
+
+  /**
+   * The storm for the wind bed (W-048): the front's strength, the shelter where the skier is, and
+   * where the wind comes from relative to the camera (it blows toward +X when dir = +1).
+   */
+  private weatherAudio(): AudioFrameState['weather'] {
+    const env = this.world.environment;
+    const f = capabilitiesOf(this.world.biome).weather.front?.(env.clock, env.seed) ?? null;
+    if (!f) return undefined;
+    const fwd = this.camera.getWorldDirection(this.vFwd);
+    // the listener's right (Web Audio pan +1) is forward × up = (−fwd.z, 0, fwd.x); the wind comes
+    // from −dir·X
+    const rx = -fwd.z;
+    const rz = fwd.x;
+    const len = Math.hypot(rx, rz) || 1;
+    const pan = (-f.dir * rx) / len;
+    void rz;
+    // (round 3, R2 C N-6) a victory that stages its own weather (Whiteout: the storm holds, then
+    // breaks) is heard as staged: the wind drops with the break, not with the live front
+    const wo = this.victory ? this.world.weatherOverride : null;
+    const storm = wo ? wo.storm : this.run.simulating || this.victory ? f.s : 0;
+    return { storm, exposure: env.lastExposure ?? 1, pan };
   }
 
   /** 0..1 closeness to the sea for the surf/gull beds (coastal locations) */
@@ -1187,6 +1424,12 @@ export class GameSession implements Stage {
   }
 
   // --- debug / test harness (not exposed in UI) -----------------------------------
+  /** (evidence captures) jump the run's physics clock — the weather timeline follows it (Whiteout fronts) */
+  debugSetTime(t: number) {
+    this.debugUsed = true;
+    this.phys.s.time = t;
+  }
+
   debugTeleport(z: number, speed = 18, atX?: number, heading?: number) {
     this.debugUsed = true;
     const m = this.world.mountain;
@@ -1255,7 +1498,13 @@ export class GameSession implements Stage {
   debugFrames(n: number, dt = 1 / 30) {
     this.debugUsed = true;
     const neutral = { steer: 0, tuck: 0, brake: 0, drift: false, pop: false, recoverPressed: false, recoverHeld: false, lookBack: false, pausePressed: false, skipPressed: false, camX: 0, camY: 0, ...this.debugHeld };
-    for (let i = 0; i < n; i++) this.frame(dt, neutral, 'keyboard');
+    for (let i = 0; i < n; i++) {
+      this.frame(dt, neutral, 'keyboard');
+      // (round 3, R2 C N-3/N-5) the finish animates as in play (App's loop updates it there): the
+      // captures stepped the session alone, so the station's door, lantern and searchlight never moved
+      const r = this.world.resort;
+      if (r && Math.abs(this.camera.position.z - r.finishZ) < 900) r.update(dt, this.time, this.resortState);
+    }
   }
 
   debugState() {
@@ -1265,7 +1514,13 @@ export class GameSession implements Stage {
       outcome: this.run.outcome,
       z: s.pos.z,
       x: s.pos.x,
+      y: s.pos.y,
+      time: s.time,
       speed: s.speed,
+      /** (evidence) a Hard snowball in flight, i.e. its landing ring is up */
+      snowballMarker: (this.snowballs?.balls.length ?? 0) > 0,
+      yetiLook: this.yeti.look,
+      yetiVisible: this.yeti.root.visible,
       grounded: s.grounded,
       crashed: s.crashed,
       heading: s.heading,
@@ -1273,6 +1528,15 @@ export class GameSession implements Stage {
       yetiPhase: this.yetiAI.phase,
       yetiMode: this.yetiAnim.mode,
       yetiPos: [this.yetiAI.pos.x, this.yetiAI.pos.y, this.yetiAI.pos.z],
+      /** the Yeti model's root (in a cinematic the script moves the model, not the AI) */
+      yetiRoot: this.yeti.root.position.toArray(),
+      /** (round 3) the chase hand-off state: velocity (x, vy, z), speed, airborne, start delay, heading */
+      yetiVel: [this.yetiAI.vel.x, this.yetiAI.vy, this.yetiAI.vel.z],
+      yetiSpeed: this.yetiAI.speed,
+      yetiAirborne: this.yetiAI.airborne,
+      yetiDelay: this.yetiAI.delay,
+      yetiHeading: this.yetiAI.heading,
+      vel: [s.vel.x, s.vel.y, s.vel.z],
       yetiThrowT: this.yetiAnim.throwT ?? null,
       chaseTime: this.run.chaseTime,
       cinematicTime: this.cave?.tl.time ?? this.victory?.tl.time ?? this.defeat?.tl.time ?? -1,
@@ -1301,6 +1565,10 @@ export class GameSession implements Stage {
     this.snowView = null;
     for (const t of this.timers) clearTimeout(t);
     this.world.env.setAmbientScale(1);
+    this.world.env.setSunScale(1);
+    // (round 6, review D5-4) the victory searchlight beat darkens the storm: a skip and a quick Retry
+    // must not carry the gloom into the next run on the same world
+    this.world.env.setGloom(0);
     this.timers = [];
     this.yeti.onFootstep = null;
     // an abandoned run (restart / exit) still reports its last partial pizza chunk and open drift

@@ -1,0 +1,26 @@
+SHA 056a9302842e716305e54a1284f1f17de3fe1440
+[WebServer] (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+[WebServer]   - `__dirname` (vite.config.ts:7:23). Use `import.meta.dirname` instead
+[WebServer] Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+
+Running 1 test using 1 worker
+
+[1/1] tests/e2e/scenic.spec.ts:61:1 › Scenic Route: choose Fjord Coast, ski to a viewpoint, unlock, toast, Achievements, survives a reload (no ?debug)
+  1) tests/e2e/scenic.spec.ts:61:1 › Scenic Route: choose Fjord Coast, ski to a viewpoint, unlock, toast, Achievements, survives a reload (no ?debug) 
+
+    Error: clock.pauseAt: Error: Cannot fast-forward to the past
+        at ClockController._innerFastForwardTo (<anonymous>:207:13)
+        at ClockController.pauseAt (<anonymous>:133:16)
+        at async <anonymous>:381:23
+        at ClockController._innerFastForwardTo (<anonymous>:207:13)
+        at ClockController.pauseAt (<anonymous>:133:16)
+        at async <anonymous>:381:23
+        at /home/claude/sf-wo/tests/e2e/scenic.spec.ts:111:24
+
+    Error Context: test-results/scenic-Scenic-Route-choose-77887-survives-a-reload-no-debug-/error-context.md
+
+
+  1 failed
+    tests/e2e/scenic.spec.ts:61:1 › Scenic Route: choose Fjord Coast, ski to a viewpoint, unlock, toast, Achievements, survives a reload (no ?debug) 
+exit 1

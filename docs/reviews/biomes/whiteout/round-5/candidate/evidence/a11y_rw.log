@@ -1,0 +1,10 @@
+[200s] course verified SEED-3403625622-SPR@WHITE normal
+[209s] course {"L":3000,"cave":{"index":0,"caveZ":260,"triggerZ":282,"foreshadowZ":180,"anchor":{"z":260,"centerX":6.185433809964871,"side":-1,"d":46},"chaseEndZ":3000,"checkpointZ":null,"speedMul":1},"rimSide":1}
+[462s] shot 01_clear_window clear s=0.00 
+[680s] shot 02_wall_far clear s=0.00 
+[883s] shot 03_wall_near clear s=0.00 
+[1084s] shot 04_build build s=0.81 
+[1299s] shot 05_storm storm s=0.82 
+[1534s] shot 06_easing ease s=0.07 
+[1765s] shot 07_clearing clear s=0.00 
+[1765s] done; page errors: 0

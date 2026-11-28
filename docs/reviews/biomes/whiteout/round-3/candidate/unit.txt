@@ -1,0 +1,13 @@
+unit tests on 46ed200
+
+ RUN  v5.1.0 /home/claude/sf-wo
+
+
+cornice roots: gather 18.6 ms (rays 10.37 ms) vs Raycaster 108.1 ms, 1107 triangles kept
+
+ Test Files  51 passed (51)
+      Tests  489 passed (489)
+   Start at  15:16:26
+   Duration  481.24s (tests 98%, import 2%)
+
+exit 0

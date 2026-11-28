@@ -115,8 +115,13 @@ export const FJORD_SURFACE: SurfaceModel = {
  * (headwind drag × gusts), so the coast is consistently the slower, harder mountain than sheltered
  * Alpine (F-039). Relaxed has no headwind: an upright skier must still outrun its Yeti.
  */
-/** Fjord's grounded headwind drag (WeatherCoupling.headwind) */
-export const FJORD_HEADWIND = 0.0007;
+/**
+ * Fjord's grounded headwind drag (WeatherCoupling.headwind), for an upright skier. (W-080, round 4) The
+ * headwind now bites a tucked skier by the tuck's own drag ratio (HEADWIND_STANCE: ~47 %), so 0.0010
+ * (round 3: 0.0007 whatever the stance) keeps the coast the slower mountain (F-039) while a tucked
+ * expert can win Fjord Hard (balance/w080/README.md).
+ */
+export const FJORD_HEADWIND = 0.001;
 
 export const FJORD_WEATHER = parametricWeather({
   id: 'fjord',
@@ -184,6 +189,12 @@ export function makeFjordBiome(): Biome {
     rocks: { base: [0.19, 0.198, 0.21], tintCool: [0.9, 0.97, 1.06], tintWarm: [1.1, 1.02, 0.92], tintDark: [0.5, 0.52, 0.58], snow: [0.88, 0.91, 0.965] },
     obstacles: { rocks: 1.7, logs: 0.25, stumps: 0.35 },
     terrain: {
+      // (W-077) Alpine's fixed Yeti pace is Alpine's own (deriveBiome would inherit it): unchanged here
+      encounterPace: 1,
+      // (Round 5) likewise Alpine's Hard-only pace: Fjord's Hard is already inside the owner's ranges
+      difficultyPace: { hard: 1.02 },
+      // (round 6) a competent skier's measured speed by grade here (balance/r6/data/speed_slope.json)
+      pursuitLine: { base: 7.6, slope: 0.749 },
       // round 3 (B N1, F2): the round-2 terrain (minSlope 14, highspeed-heavy, swing 0.8) made the
       // Fjord the faster mountain on unseen seeds. The terrain alone now skis like Alpine's for a
       // skilled skier (measured route gradient on 8 unseen seeds: Sprint 14.8° / Standard 15.8° /

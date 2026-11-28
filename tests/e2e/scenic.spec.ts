@@ -17,11 +17,12 @@
  */
 import { test, expect, type Page } from '@playwright/test';
 import { focusRow, press } from './keyboard-menu';
+import { shotPath } from './shots';
 
 const KEY_S = 'skifree-tld.settings.v1';
 const KEY_P = 'skifree-tld.progress';
 const KEY_R = 'skifree-tld.records.v2';
-const OUT = 'docs/reviews/biomes/fjord/round-4/scenic-journey';
+const OUT = shotPath('docs/reviews/biomes/fjord/round-4/scenic-journey');
 const T0 = Date.parse('2026-11-08T17:30:00Z');
 
 /** a returning Alpine player: Location is still Alpine, so the menu choice below is real */
@@ -107,7 +108,16 @@ test('Scenic Route: choose Fjord Coast, ski to a viewpoint, unlock, toast, Achie
       await press(page, 'Enter');
       await page.waitForSelector('.hud:not(.hidden)', { timeout: 600_000 });
       // from here the page clock is driven by the test
-      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 3000)); // a little ahead: SwiftShader frames are slow
+      // a little ahead: SwiftShader frames are slow. (round 4: under load the page clock passed the target
+      // before pauseAt ran — "Cannot fast-forward to the past"; take a fresh target and try again)
+      for (let tries = 0; ; tries++) {
+        try {
+          await page.clock.pauseAt(await page.evaluate((ms) => Date.now() + ms, 3000 + tries * 5000));
+          break;
+        } catch (e) {
+          if (tries >= 3 || !/past/.test(String(e))) throw e;
+        }
+      }
     } else {
       // pause → Restart (same course)
       await page.keyboard.press('Escape');

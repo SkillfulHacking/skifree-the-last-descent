@@ -69,6 +69,7 @@ export type YetiMode =
   | 'eat' // comedic: lifts held object to mouth, gulps, pats belly
   | 'disgust' // stops, recoils, shakes head
   | 'gag' // comedic: hunches, left hand to the throat, retches with the jaw wide, shudders
+  | 'recoil' // blinded by a light: jerks back, a forearm thrown up across the eyes, head turned away, a step back
   | 'turnAway'; // turns around and walks off
 
 export interface YetiAnimState {
@@ -111,6 +112,13 @@ export interface AudioFrameState {
   crowdLevel: number;
   /** 0..1 closeness to the sea (coastal locations: surf/gull beds); absent/0 inland */
   coast?: number;
+  /**
+   * The storm at the skier (W-048): `storm` 0..1 (the front's strength: rises through the build,
+   * falls through the clearing), `exposure` 0..1 (shelter — trees, gullies, the lee shoulder —
+   * takes the wind down), `pan` −1..1 where the wind comes from (+ = the listener's right).
+   * Absent where it never storms.
+   */
+  weather?: { storm: number; exposure: number; pan: number };
   /** 0..1 how deep the player is inside the "eerie" zone before the cave (ducks wind/music). */
   eerie: number;
 }

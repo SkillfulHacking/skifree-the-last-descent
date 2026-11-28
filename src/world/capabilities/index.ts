@@ -38,6 +38,13 @@ export interface HazardSetup {
    * over a long run, so a location can ease it there to keep its place on the difficulty ladder.
    */
   readonly longCourse?: number;
+  /**
+   * (Round 5, W-094) the weather builds down the mountain on one difficulty: × (1 + amount) on the
+   * hazard intensity, ramped in from `from` to `to` m of course. A long descent then costs more than a
+   * short one (the expert's lead otherwise settles early and the rest of a long run adds little risk);
+   * a course shorter than `from` is untouched. Fixed by position, never by how the player is doing.
+   */
+  readonly builds?: { readonly from: number; readonly to: number; readonly amount: Readonly<Partial<Record<GameDifficulty, number>>> };
 }
 
 /** The player's game difficulty setting (mirrors game/CourseConfig Difficulty; world code may not import game). */

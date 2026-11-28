@@ -9,6 +9,7 @@ import { VoiceLimiter, clamp, musicDuck } from './logic';
 import { MusicEngine, defeatSting, scheduleFanfare } from './music';
 import * as sfx from './sfx';
 import { coastCue } from './coastal';
+import { isStormCue, stormCue } from './storm';
 
 export interface AudioVolumes {
   master: number;
@@ -141,7 +142,7 @@ export class AudioCore {
   }
   /** location cue by id (hazard telegraph/active/hit cues, viewpoints; see coastal.ts) */
   playCue(id: string, pos: Vec3Like | null): void {
-    this.go(`cue:${id}`, 1.2, () => coastCue(this.dst, this.t, id, pos));
+    this.go(`cue:${id}`, isStormCue(id) ? 3 : 1.2, () => (isStormCue(id) ? stormCue(this.dst, this.t, id, pos) : coastCue(this.dst, this.t, id, pos)));
   }
   playBranchSnap(pos: Vec3Like | null): void {
     this.go('branch', 0.65, () => sfx.branchSnap(this.dst, this.t, pos));

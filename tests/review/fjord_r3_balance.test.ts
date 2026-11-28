@@ -12,6 +12,7 @@ import { simulateCourse } from '../../src/game/simulate';
 import { autopilotInput, type AutopilotStyle } from '../../src/debug/autopilot';
 import { BiomeEnvironment } from '../../src/world/capabilities/environment';
 import { readerDriver } from '../sim/readerDriver';
+import { outPath } from '../sim/outPath';
 
 type Driver = 'reader' | AutopilotStyle;
 
@@ -42,7 +43,7 @@ const list = (k: string, d: string) => (penv[k] ?? d).split(',').map((s) => s.tr
 
 it('fjord round-3 balance', async () => {
   const fs = (await import(/* @vite-ignore */ 'node:fs' as string)) as { appendFileSync(p: string, d: string): void; existsSync(p: string): boolean; readFileSync(p: string, e: string): string };
-  const out = penv.OUT ?? '/tmp/fjord_r3_balance.jsonl';
+  const out = await outPath(penv.OUT, '.measure/fjord_r3_balance.jsonl');
   const key = (r: { biome: string; len: string; seed: string; diff: string; driver: string; env: boolean }) => [r.biome, r.len, r.seed, r.diff, r.driver, r.env].join('|');
   const have = new Set<string>();
   if (fs.existsSync(out)) for (const l of fs.readFileSync(out, 'utf8').split('\n')) if (l.trim()) have.add(key(JSON.parse(l)));

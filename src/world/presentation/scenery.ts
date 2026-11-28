@@ -24,6 +24,8 @@ export interface SceneryContext {
   terrain: TerrainUniforms;
   /** direction towards the sun (world space, normalised) */
   sunDir: THREE.Vector3;
+  /** the terrain's snow material, for authored snow forms that must read as the same snow */
+  terrainMaterial?: THREE.Material;
 }
 
 export interface SceneryFrame {
@@ -32,6 +34,21 @@ export interface SceneryFrame {
   camPos: THREE.Vector3;
   /** render-space origin (World.origin) */
   origin: THREE.Vector3;
+  /** the weather's storm intensity at the focus right now (0..1; 0 where it never storms) */
+  storm?: number;
+  /** the weather's physics clock (s) and seed: the same timeline the skier's weather follows */
+  clock?: number;
+  weatherSeed?: number;
+  /** wind at the focus (m/s) */
+  windX?: number;
+  windZ?: number;
+  /** true while a finish cinematic overrides the weather (World.weatherOverride) */
+  override?: boolean;
+  /**
+   * true while a cinematic's weather is being handed back to the model (World.releaseWeather): `storm`
+   * is the blended value the fog and snow use, so the sky follows it too (W-043)
+   */
+  blend?: boolean;
 }
 
 export interface SceneryView {
@@ -47,9 +64,17 @@ export interface SceneryView {
   readonly pending?: number;
   /** finish every queued build now (loading, teleports) */
   flush?(): void;
+  /** start loading optional assets (scanned meshes); World.create calls it once after construction */
+  loadAssets?(): Promise<void>;
   update(dt: number, time: number, f: SceneryFrame): void;
   /** optional main-menu camera (the location's establishing view around the start); null = default */
   menuCamera?(time: number, out: { pos: THREE.Vector3; look: THREE.Vector3; fov: number }): boolean;
+  /**
+   * (round 4, W-086 / review D3-3) make every layer that can show during a run visible for the load-time
+   * shader warm-up (renderer.compile skips hidden objects: the storm dome, wall, cloud sea and blowing
+   * snow compiled mid-run at their first sight); the next update restores them
+   */
+  warmup?(): void;
   /** live object/instance counts (streaming tests, debug) */
   stats?(): Record<string, number>;
   dispose(): void;

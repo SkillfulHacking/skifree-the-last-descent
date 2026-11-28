@@ -1,0 +1,10 @@
+e2e progression on 46ed200 (dist built from 46ed200)
+
+Running 2 tests using 1 worker
+
+[1/2] tests/e2e/progression.spec.ts:88:1 › Achievements + Locker: layout, keyboard/mouse/gamepad, v1 save migration, equip persists and recolours the skier
+[2/2] tests/e2e/progression.spec.ts:174:1 › an automated ?debug run reports unlocks but never persists them
+  Slow test file: tests/e2e/progression.spec.ts (12.6m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  2 passed (12.6m)
+exit 0

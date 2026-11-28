@@ -39,6 +39,24 @@ export const LANE_HALF = 6;
 /** coastal locations: extra clearance (m) between a rock's edge and the obstacle-free lane */
 const EDGE_CLEAR = 1.0;
 export const BAND = 256;
+
+/** a rectangle (centre, half-extents) the obstacle field keeps free of rock and trees */
+export interface ClearZone {
+  x: number;
+  z: number;
+  hx: number;
+  hz: number;
+}
+/**
+ * The location's hazards that ask the skier to ski somewhere off the racing line (a drift row's gap)
+ * keep that ground clear (HazardKind.clearZones). Installed by the hazard field module
+ * (world/hazards/field.ts) so this module stays free of the hazard layer; pure in (m, seed, z0, z1).
+ */
+type ClearingsFn = (m: Mountain, seed: number, z0: number, z1: number) => readonly ClearZone[];
+let clearings: ClearingsFn | null = null;
+export function setObstacleClearings(fn: ClearingsFn | null): void {
+  clearings = fn;
+}
 const CELL = 6.5;
 const X_MIN = -560;
 const X_MAX = 560;
@@ -245,7 +263,8 @@ export function* generateBandSteps(m: Mountain, seed: number, band: number): Gen
   const kLogs = B.obstacles.logs;
   const kStumps = B.obstacles.stumps;
   const speciesW = B.trees.speciesWeights;
-  const rng = new Rng((seed ^ 0x0b57ac1e ^ Math.imul(band + 7919, 0x85ebca6b)) >>> 0);
+  let rng = new Rng((seed ^ 0x0b57ac1e ^ Math.imul(band + 7919, 0x85ebca6b)) >>> 0);
+  const cellStream = B.obstacles.cellStream === true;
   const list: Obstacle[] = [];
   const zA = band * BAND;
   const zB = zA + BAND;
@@ -255,9 +274,22 @@ export function* generateBandSteps(m: Mountain, seed: number, band: number): Gen
   const cps = P.checkpoints(zA - 200, zB + 200);
   const kickers = P.kickersNear(zA - 40, zB + 40, []);
   const caves = P.encounters(zA - 60, zB + 60).map((e) => ({ x: e.anchor.centerX + e.anchor.side * e.anchor.d, z: e.anchor.z, side: e.anchor.side, d: e.anchor.d }));
+  // (W-076, review C C11) the sight line of the chase's opening: from the skier's first ~45 m after a
+  // cave's trigger back to where the Yeti lands (yeti/spawn.ts) stays clear of trees — a tree there
+  // hid his whole leap and landing from the look-back camera
+  const leapViews = P.encounters(zA - 120, zB + 120).map((e) => {
+    const lz = e.anchor.z + 14;
+    const L = { x: m.centerX(lz) + 18 * e.anchor.side, z: lz };
+    const a = { x: m.routeX(e.triggerZ), z: e.triggerZ };
+    const b = { x: m.routeX(e.triggerZ + 45), z: e.triggerZ + 45 };
+    return [L, a, b] as const;
+  });
+  const inLeapView = (x: number, z: number) => leapViews.some((t) => inTriangle(x, z, t, 4));
   const hasAlt = P.altRoutes(zA - 10, zB + 10).length > 0;
   const coast = m.coast;
   const lookouts = coast ? coast.lookouts(zA - 70, zB + 70) : [];
+  const zones = clearings ? clearings(m, seed, zA - 60, zB + 60) : [];
+  const inZone = (x: number, z: number) => zones.some((c) => Math.abs(x - c.x) < c.hx && Math.abs(z - c.z) < c.hz);
   const nearKicker = (x: number, z: number) => kickers.some((k) => z > k.z - k.run - 18 && z < k.z + 26 && Math.abs(x - (m.centerX(k.z) + k.d)) < k.width * 0.5 + 6);
   let local = 0;
   const add = (o: Omit<Obstacle, 'id' | 'collidable' | 'y'>) => {
@@ -270,6 +302,7 @@ export function* generateBandSteps(m: Mountain, seed: number, band: number): Gen
     if (gz > Math.max(zA, -260)) yield;
     // per-row seed so a band's layout does not depend on generation order
     for (let gx = X_MIN; gx < X_MAX; gx += CELL) {
+      if (cellStream) rng = new Rng((seed ^ 0x3c6ef372 ^ Math.imul(Math.round(gx) + 104729, 0x85ebca6b) ^ Math.imul(Math.round(gz) + 7919, 0xc2b2ae35)) >>> 0);
       const x = gx + rng.range(0.1, 0.9) * CELL;
       const z = gz + rng.range(0.1, 0.9) * CELL;
       const roll = rng.float();
@@ -287,7 +320,9 @@ export function* generateBandSteps(m: Mountain, seed: number, band: number): Gen
       if (cps.some((c) => Math.abs(z - c) < 120 && ad < 110)) continue; // Endless checkpoint lodges
       if (z < 40 && z > -60 && ad < 40) continue; // start platform
       if (caves.some((c) => Math.hypot(x - c.x, z - c.z) < 26)) continue; // cave mouth
+      if (inLeapView(x, z)) continue; // the leap's sight line
       if (nearKicker(x, z)) continue;
+      if (inZone(x, z)) continue; // a hazard's clear line (a drift row's gap)
       if (caves.some((c) => d * c.side > c.d - 16 && Math.abs(z - c.z) < 40)) continue; // keep cave clearing open
       // coast: nothing on the cornice, the cliff or in the water; viewpoints stay clear
       if (coast && (coast.beyondRim(x, z) > -5 || lookouts.some((l) => Math.hypot(x - l.x, z - l.z) < 13))) continue;
@@ -394,4 +429,21 @@ export function laneClearance(field: ObstacleField, z0: number, z1: number): num
     best = Math.min(best, dist);
   }
   return clamp(best, -1e9, 1e9);
+}
+
+/** (x, z) inside the triangle t, or within `pad` m of one of its edges */
+function inTriangle(x: number, z: number, t: readonly [{ x: number; z: number }, { x: number; z: number }, { x: number; z: number }], pad: number): boolean {
+  const [a, b, c] = t;
+  const cross = (p: { x: number; z: number }, q: { x: number; z: number }) => (q.x - p.x) * (z - p.z) - (q.z - p.z) * (x - p.x);
+  const d1 = cross(a, b);
+  const d2 = cross(b, c);
+  const d3 = cross(c, a);
+  if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) return true;
+  const seg = (p: { x: number; z: number }, q: { x: number; z: number }) => {
+    const dx = q.x - p.x;
+    const dz = q.z - p.z;
+    const u = Math.max(0, Math.min(1, ((x - p.x) * dx + (z - p.z) * dz) / (dx * dx + dz * dz || 1)));
+    return Math.hypot(p.x + dx * u - x, p.z + dz * u - z);
+  };
+  return seg(a, b) < pad || seg(b, c) < pad || seg(c, a) < pad;
 }

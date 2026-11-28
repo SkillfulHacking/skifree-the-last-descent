@@ -23,6 +23,11 @@ import { autopilotInput } from '../../src/debug/autopilot';
 import { makeEnvQuery, makeEnvSample } from '../../src/physics/environment';
 import { findGust, peakTime, walk, WALKS, WALK_SEED, type Walk } from './hazardWalk';
 import MAIN from './fixtures/hazard_walk_main.json';
+import { FJORD_HEADWIND } from '../../src/world/biomes/fjord/biome';
+import { HEADWIND_STANCE } from '../../src/physics/environment';
+
+/** production main's Fjord headwind (whatever the stance) when the fixture was recorded */
+const MAIN_HEADWIND = 0.0007;
 
 type MainWalk = { hazard: Walk['hazard']; steps: number[][]; events: Walk['events'] };
 const main = (MAIN as unknown as { walks: Record<string, MainWalk> }).walks;
@@ -54,7 +59,12 @@ describe('Hazard physics continuity (Gitar r4581847939)', () => {
         expect(s.z, at).toBeCloseTo(z!, 9);
         expect(s.slipX, at).toBe(slipX);
         expect(s.airX, at).toBe(airX);
-        expect(s.drag, at).toBe(drag);
+        // (W-080, round 4) the weather's headwind changed on purpose (it now follows the stance, and
+        // Fjord's breeze is FJORD_HEADWIND): main's drag, with main's headwind share (0.0007 × gust,
+        // whatever the stance) replaced by this build's, must match to rounding — the hazards' own
+        // drag is untouched
+        const gust = s.headwind / (FJORD_HEADWIND * (1 - (1 - HEADWIND_STANCE.tuck) * w.tuck));
+        expect(s.drag - s.headwind, at).toBeCloseTo(drag! - MAIN_HEADWIND * gust, 12);
         expect(s.friction, at).toBe(friction);
       });
     }
